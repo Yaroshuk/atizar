@@ -29,7 +29,23 @@ export async function* mapClaudeStream(
     } catch {
       continue
     }
-    const obj = parsed as { type?: string; event?: Record<string, unknown> }
+    const obj = parsed as {
+      type?: string
+      event?: Record<string, unknown>
+      is_error?: boolean
+      result?: string
+    }
+    // A run-level failure (e.g. auth: "Not logged in · Please run /login") arrives
+    // as a `result` line, not a stream_event — surface it as readable text and stop.
+    if (obj.type === 'result' && obj.is_error) {
+      yield {
+        type: EventType.TEXT_MESSAGE_CHUNK,
+        role: 'assistant',
+        messageId: crypto.randomUUID(),
+        delta: `Provider error: ${obj.result ?? 'run failed'}`,
+      } as BaseEvent
+      return
+    }
     if (obj.type !== 'stream_event' || !obj.event) continue
     const ev = obj.event as {
       type?: string

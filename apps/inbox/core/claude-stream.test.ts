@@ -62,6 +62,19 @@ describe('mapClaudeStream', () => {
     expect(out[0]).toMatchObject({ delta: 'ok' })
   })
 
+  it('surfaces a run-level result error (e.g. auth failure) as a text chunk and stops', async () => {
+    const out = await collect(
+      [
+        JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login' }),
+        textDelta('THIS MUST NOT APPEAR'),
+      ],
+      ['confirmSend'],
+    )
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant' })
+    expect(out[0].delta).toMatch(/Not logged in/)
+  })
+
   it('emits args from content_block_start.input when no input_json_delta arrives', async () => {
     const start = JSON.stringify({
       type: 'stream_event',
