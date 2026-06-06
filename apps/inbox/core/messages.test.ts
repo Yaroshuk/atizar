@@ -3,6 +3,7 @@ import {
   isAssistant,
   isToolMessage,
   toolCallsOf,
+  hasPendingApproval,
   type Message,
 } from "./messages.js";
 
@@ -20,6 +21,38 @@ function assistantText(content: string): Message {
 function toolResult(toolCallId: string): Message {
   return { role: "tool", id: "t1", content: "ok", toolCallId };
 }
+
+describe("hasPendingApproval", () => {
+  const APPROVALS = ["confirmSend"];
+
+  it("false when there are no tool calls", () => {
+    expect(hasPendingApproval([assistantText("hi")], APPROVALS)).toBe(false);
+  });
+
+  it("true when an approval tool call has no matching tool result", () => {
+    const msgs = [assistantWithToolCall("confirmSend", "x1")];
+    expect(hasPendingApproval(msgs, APPROVALS)).toBe(true);
+  });
+
+  it("false when the approval tool call has been answered", () => {
+    const msgs = [assistantWithToolCall("confirmSend", "x1"), toolResult("x1")];
+    expect(hasPendingApproval(msgs, APPROVALS)).toBe(false);
+  });
+
+  it("ignores non-approval tool calls", () => {
+    const msgs = [assistantWithToolCall("renderLead", "x1")];
+    expect(hasPendingApproval(msgs, APPROVALS)).toBe(false);
+  });
+
+  it("true when one of several approvals is unanswered", () => {
+    const msgs = [
+      assistantWithToolCall("confirmSend", "x1"),
+      toolResult("x1"),
+      assistantWithToolCall("confirmDelete", "x2"),
+    ];
+    expect(hasPendingApproval(msgs, ["confirmSend", "confirmDelete"])).toBe(true);
+  });
+});
 
 describe("guards", () => {
   it("isAssistant narrows assistant messages", () => {

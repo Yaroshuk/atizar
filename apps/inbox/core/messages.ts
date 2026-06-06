@@ -18,3 +18,30 @@ export function isToolMessage(m: Message): m is ToolMessage {
 export function toolCallsOf(m: Message): ToolCall[] {
   return isAssistant(m) && Array.isArray(m.toolCalls) ? m.toolCalls : [];
 }
+
+// Render-independent detection of a pending human-in-the-loop approval: an
+// approval tool call exists whose toolCallId has no matching role:"tool" result.
+// Approval names are passed in (from `def.approvals`), never hardcoded.
+export function hasPendingApproval(
+  messages: readonly Message[],
+  approvalNames: readonly string[],
+): boolean {
+  const answered = new Set<string>();
+  for (const m of messages) {
+    if (isToolMessage(m) && typeof m.toolCallId === "string") {
+      answered.add(m.toolCallId);
+    }
+  }
+  for (const m of messages) {
+    for (const tc of toolCallsOf(m)) {
+      if (
+        approvalNames.includes(tc.function.name) &&
+        typeof tc.id === "string" &&
+        !answered.has(tc.id)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
