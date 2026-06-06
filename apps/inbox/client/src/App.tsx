@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   CopilotKit,
   useAgent,
@@ -6,11 +7,19 @@ import {
   useRenderToolCall,
 } from "@copilotkit/react-core/v2";
 import { useInboxActions } from "./actions";
+import { AgentCard } from "./components/AgentCard";
+import { AgentModal } from "./components/AgentModal";
+import { useAgentStatus } from "./useAgentStatus";
 
 function Spike() {
-  // Register the generative-UI renderers (renderLead -> LeadCard, etc.).
-  // Must run inside <CopilotKit>.
-  useInboxActions();
+  // Modal open state + the human-in-the-loop "awaiting approval" signal.
+  const [open, setOpen] = useState(false);
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
+
+  // Register the generative-UI renderers (renderLead -> LeadCard, etc.) and
+  // surface the confirmSend executing-state so the card can show
+  // "Жду подтверждения". Must run inside <CopilotKit>.
+  useInboxActions({ onApprovalPending: setAwaitingApproval });
 
   // The CopilotKitCore singleton. Runs MUST be driven through
   // `copilotkit.runAgent({ agent })` — NOT the bare `agent.runAgent()`.
@@ -38,47 +47,33 @@ function Spike() {
   });
 
   // useRenderToolCall() returns a function that renders a single AG-UI tool call
-  // using the renderers registered via useRenderTool() (see actions.tsx).
+  // using the renderers registered via useRenderTool() (see actions.tsx). The
+  // mapping over `agent.messages[].toolCalls[]` (pairing each with its matching
+  // `role:"tool"` message by toolCallId) now lives in <AgentModal>; the live
+  // `respond` for the ApprovalDialog comes from the executing-tool-call state,
+  // not from `toolMessage`, so it keeps working inside the modal.
   const renderToolCall = useRenderToolCall();
 
-  // Map over assistant messages and render any tool calls they carry. The mock
-  // agent's first turn emits a text message, then a `renderLead` tool call, then
-  // a `confirmSend` tool call — so this surface shows the LeadCard on START.
-  //
-  // For each tool call we also look up the matching `role:"tool"` message (by
-  // `toolCallId`) and pass it as `toolMessage`. This matters for the
-  // human-in-the-loop `confirmSend` call: while the run is paused awaiting the
-  // human, the framework marks the tool call "executing" (via
-  // `executingToolCallIds`) so `useRenderToolCall` renders it with a live
-  // `respond` callback. Once the human approves, a tool message exists and the
-  // same render surfaces it as "complete". `useHumanInTheLoop` only exposes
-  // `respond` in the executing state, so this executing-tool-call path — not a
-  // raw render — is what makes the dialog button able to resume the agent.
-  const toolMessageByCallId = new Map<string, any>();
-  for (const msg of agent.messages as any[]) {
-    if (msg.role === "tool" && msg.toolCallId) {
-      toolMessageByCallId.set(msg.toolCallId, msg);
-    }
-  }
-
-  const toolCallEls = agent.messages.flatMap((msg: any) =>
-    msg.role === "assistant" && Array.isArray(msg.toolCalls)
-      ? msg.toolCalls.map((toolCall: any) => (
-          <div key={toolCall.id}>
-            {renderToolCall({
-              toolCall,
-              toolMessage: toolMessageByCallId.get(toolCall.id),
-            })}
-          </div>
-        ))
-      : [],
-  );
+  // Status comes from the agent's real run lifecycle (onRunStartedEvent ->
+  // running, onRunFinalized -> done, onRunFailed -> error) with the confirmSend
+  // executing-state overriding to "awaiting_approval".
+  const status = useAgentStatus(agent, awaitingApproval);
 
   return (
-    <div>
-      <button onClick={() => void copilotkit.runAgent({ agent })}>START</button>
-      <div>{toolCallEls}</div>
-      <pre>{JSON.stringify(agent.messages, null, 2)}</pre>
+    <div style={{ padding: 24 }}>
+      <AgentCard
+        name="EMAIL AGENT"
+        status={status}
+        onStart={() => void copilotkit.runAgent({ agent })}
+        onOpen={() => setOpen(true)}
+      />
+      {open && (
+        <AgentModal
+          agent={agent}
+          renderToolCall={renderToolCall}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </div>
   );
 }
