@@ -70,26 +70,28 @@ binary uses the Claude Code subscription login). Files (`apps/inbox`):
 - `core/claude-cli-provider.ts` — `Provider` factory with an **injected** `spawn`
   (keeps `core/` Node-free). Turn 1 = canned-lead prompt → stream → stop at `confirmSend`,
   kill. Resume (approval resolved) = **stateless re-prime** (fresh run, "human approved").
-- `server/claude-spawn.ts` — the real Node spawn (`claude --bare -p … --mcp-config …
+- `server/claude-spawn.ts` — the real Node spawn (`claude -p … --mcp-config …
   --output-format stream-json`), 120s timeout, spawn-error/timeout surfaced as a result
   line, temp config dir cleaned up, `ANTHROPIC_API_KEY` deleted (force subscription auth).
+  **Do NOT pass `--bare`** — it skips keychain reads, so the subscription OAuth token
+  (stored in the macOS keychain) isn't found → every run returns "Not logged in".
 - `mcp/inbox-tools.mjs` — stdio MCP server exposing `renderLead`/`confirmSend` so the
   model can call them (handlers are trivial acks; the UI is driven by emitted AG-UI events).
 - `server/providers.ts` — runtime registry (`mock` + `claude-cli`), **server-side** (the
   registry moved out of `core/inbox.agent.ts` because the real provider needs Node and
   `core/` is imported by the client). `inboxAgent.provider` is now `'claude-cli'`.
 
-**Verification:** 41 unit tests pass; lint+tsc clean. The full real pipeline (client →
-server → provider → real `claude` subprocess → stream parse → AG-UI event → client render)
-is browser-verified. The happy path (real lead + approval) is **pending an interactive
-`claude login`** — this environment's headless `claude` returns "Not logged in", which the
-provider surfaces cleanly as an error chunk (verified). Spec/plan:
-`docs/superpowers/specs/2026-06-06-first-real-provider-design.md` +
+**Verification:** 41 unit tests pass; lint+tsc clean. **The full real-model happy path is
+browser-verified end-to-end**: START → real `claude` reads the canned lead → drafts a
+contextual reply → calls `renderLead` (→ LeadCard) + `confirmSend` (→ ApprovalDialog) →
+pause (Awaiting approval) → approve → resume → real "Done — your reply … has been sent."
+Spec/plan: `docs/superpowers/specs/2026-06-06-first-real-provider-design.md` +
 `docs/superpowers/plans/2026-06-06-first-real-provider.md`.
 
-**Verify-when-authed (from code review):** confirm the happy-path stream shape (text +
-`renderLead` + `confirmSend` deltas) and that `deny`/`--disallowed-tools` actually block
-the built-in tools.
+**Known cosmetic artifact:** in this env the model reaches the MCP tools via a built-in
+`ToolSearch` step, which renders as a stray "ToolSearch Running" chip in the thread. It's
+benign (tool discovery) — do NOT disallow `ToolSearch`, that's how the model finds
+`renderLead`/`confirmSend` here. Tightening the available-tool set is a minor follow-up.
 
 ## Next after that
 
