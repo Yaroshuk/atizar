@@ -72,7 +72,12 @@ export const InboxView = () => {
         onOpen={() => setOpen(true)}
       />
       {open && (
-        <AgentModal agent={agent} renderToolCall={renderToolCall} onClose={() => setOpen(false)} />
+        <AgentModal
+          agent={agent}
+          renderToolCall={renderToolCall}
+          loading={status === 'running'}
+          onClose={() => setOpen(false)}
+        />
       )}
     </div>
   )

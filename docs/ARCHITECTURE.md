@@ -104,25 +104,32 @@ defineAgent({
   nothing consumes it until the form/DB land. `type` ∈ string | text | secret | number |
   boolean | enum; `secret` sourced from env by name. Rejoins the contract with the form/DB.
 
-## 5. Provider registry ✅ (interface + registry + one fake provider built)
+## 5. Provider registry ✅ (interface + registry + mock + `claude-cli` built)
 
 Models are not hardcoded in the agent. A separate registry defines providers; agents
 reference one by name. Built in `apps/inbox/core/providers.ts` (the `Provider` interface +
-`defineProviders` with name-based `resolve`) and `apps/inbox/core/mock-provider.ts` (the one
-fake provider). The eventual shape:
+`defineProviders` with name-based `resolve`), `core/mock-provider.ts` (fake), and the real
+`claude-cli` provider. The registry now lives **server-side** (`server/providers.ts`):
 
 ```ts
 defineProviders({
-  "mock":       { /* fake: yields the scripted AG-UI event stream (built) */ },
-  "claude-cli": { type: "cli", command: "claude" },      // 💤 runs Claude Code via CLI
-  "claude-api": { type: "api", sdk: "anthropic", model: "claude-opus-4-8", apiKey: env("...") }, // 💤
+  mock:         createMockInboxProvider(...),          // ✅ scripted AG-UI stream
+  'claude-cli': createClaudeCliProvider({ spawn, ... }), // ✅ real `claude` subprocess
+  // 'claude-api': anthropic SDK …                      // 💤 deferred (needs API key)
 })
 ```
 
+`claude-cli` (✅, branch `feat/claude-cli-provider`): spawns the real `claude` binary
+(`-p --output-format stream-json`, tools via a stdio MCP server), maps the NDJSON stream to
+AG-UI events (`core/claude-stream.ts`), and pauses HITL by **detecting the `confirmSend`
+tool call and killing the process**; resume is a stateless re-prime. The registry moved to
+`server/` because the real provider needs Node and `core/` is client-imported; `spawn` is
+injected so `core/claude-cli-provider.ts` stays Node-free.
+
 The `Provider` interface is `run(input: RunAgentInput) → AsyncIterable<BaseEvent>`. CLI vs API
-are different execution models that will be normalized behind it; the runtime is swappable
-behind the registry. For now there is exactly one fake provider (real model 💤 deferred).
-**Open question for next session:** which provider to wire for real first (CLI vs API).
+are different execution models normalized behind it; the runtime is swappable behind the
+registry. **Decided:** wire `claude-cli` first (no API key; subscription login). `claude-api`
+and a real agentic loop (Mastra) remain 💤.
 
 ## 6. Generative UI & the consumer UX 🎯 (slice is a first cut ✅)
 

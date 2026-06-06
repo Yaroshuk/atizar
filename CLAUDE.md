@@ -58,16 +58,55 @@ Done; modal thread = assistant text + LeadCard + ApprovalDialog; approve → res
 - Core layer: `docs/superpowers/specs/2026-06-06-core-layer-design.md`
   + `docs/superpowers/plans/2026-06-06-core-layer.md`
 
-## Next Phase — first real provider (NOT STARTED)
+## First real provider — `claude-cli` (BUILT on branch `feat/claude-cli-provider`)
 
-The core proved the contract on a fake provider. Next: wire ONE real provider behind
-the `Provider` interface (`core/providers.ts`). **Open question to decide first:**
-`claude-cli` vs `claude-api`. Then a real agentic loop (Mastra) and one real integration
-(Gmail/MCP). Go through brainstorm → spec → plan → execution as before.
+The first real provider is built: it runs the **real `claude` CLI as a subprocess**
+behind the `Provider` seam (we chose `claude-cli` over `claude-api` — no API key; the
+binary uses the Claude Code subscription login). Files (`apps/inbox`):
+- `core/claude-stream.ts` — pure NDJSON→AG-UI parser (isomorphic). Handles BOTH
+  streamed `stream_event` deltas and complete top-level `assistant` messages (deduped),
+  strips the `mcp__inbox__` tool prefix, surfaces `result` errors as text, and STOPS
+  after the approval tool call (HITL pause). Skips `<synthetic>` message text.
+- `core/claude-cli-provider.ts` — `Provider` factory with an **injected** `spawn`
+  (keeps `core/` Node-free). Turn 1 = canned-lead prompt → stream → stop at `confirmSend`,
+  kill. Resume (approval resolved) = **stateless re-prime** (fresh run, "human approved").
+- `server/claude-spawn.ts` — the real Node spawn (`claude -p … --mcp-config …
+  --output-format stream-json`), 120s timeout, spawn-error/timeout surfaced as a result
+  line, temp config dir cleaned up, `ANTHROPIC_API_KEY` deleted (force subscription auth).
+  **Do NOT pass `--bare`** — it skips keychain reads, so the subscription OAuth token
+  (stored in the macOS keychain) isn't found → every run returns "Not logged in".
+- `mcp/inbox-tools.mjs` — stdio MCP server exposing `renderLead`/`confirmSend` so the
+  model can call them (handlers are trivial acks; the UI is driven by emitted AG-UI events).
+- `server/providers.ts` — runtime registry (`mock` + `claude-cli`), **server-side** (the
+  registry moved out of `core/inbox.agent.ts` because the real provider needs Node and
+  `core/` is imported by the client). `inboxAgent.provider` is now `'claude-cli'`.
 
-**Still deferred (don't pull in yet):** `defineAgent.fields` (+ auto-form), DB + config
-file/DB layering (base⊕overrides), auth/RBAC/audit, the `@platform/*` package split,
-mode-2 visual/chat editor.
+**Verification:** 41 unit tests pass; lint+tsc clean. **The full real-model happy path is
+browser-verified end-to-end**: START → real `claude` reads the canned lead → drafts a
+contextual reply → calls `renderLead` (→ LeadCard) + `confirmSend` (→ ApprovalDialog) →
+pause (Awaiting approval) → approve → resume → real "Done — your reply … has been sent."
+Spec/plan: `docs/superpowers/specs/2026-06-06-first-real-provider-design.md` +
+`docs/superpowers/plans/2026-06-06-first-real-provider.md`.
+
+**Loader:** while a run is active (`status === 'running'`) the card swaps its status dot
+for a spinner and the modal shows a trailing "Working…" — real runs take seconds.
+
+**TODO — later, play with prompts/restrictions (not blocking):**
+- The model reaches the MCP tools via a built-in `ToolSearch` step. We already filter
+  non-contract tool calls out of the thread (`surfaceTools` in `claude-stream.ts`), so the
+  "ToolSearch Running" chip no longer shows — but the model still *uses* ToolSearch and
+  sometimes narrates it. Do NOT hard-disallow `ToolSearch` (that's how it finds the tools
+  here); instead tighten the available-tool set / permission config so it goes straight to
+  the tools.
+- The model still narrates a bit ("I'll load the inbox tool schemas, then surface the lead")
+  despite the anti-narration line in `firstPrompt`. Tune the prompt (or strip pre-tool
+  chatter client-side) so the consumer thread stays clean.
+
+## Next after that
+
+Real agentic loop (Mastra) → one real integration (Gmail/MCP). **Still deferred:**
+`defineAgent.fields` (+ auto-form), DB + config file/DB layering (base⊕overrides),
+auth/RBAC/audit, the `@platform/*` package split, mode-2 visual/chat editor.
 
 **Read before starting:** this file (Decisions + the CopilotKit v2 API notes below),
 `.claude/skills/rules/copilotkit-v2.md`, `docs/ARCHITECTURE.md`, and `apps/inbox/core/`.
@@ -85,6 +124,7 @@ mode-2 visual/chat editor.
 - Slice verified by manual click-through; TDD + review loop starts with the reusable core layer (next phase).
 - Config split (later): structure in files, manager-editable text fields in DB; secrets in env only.
 - Models accessed via a separate provider registry (CLI / API); agents reference a provider by name.
+- First real provider = **`claude-cli`** (subprocess), not `claude-api` (no API key; binary uses the Claude Code subscription). HITL = **detect the `confirmSend` tool call in the stream-json and kill the process** (we do NOT hold the CLI open awaiting a human — that would fight CopilotKit's client-held two-request pause). Resume = **stateless re-prime** (fresh run, "human approved"), no server-side session. The runtime **registry lives in `server/`** (not `core/`) because the real provider needs Node and `core/` is imported by the client; the injected `spawn` keeps `core/claude-cli-provider.ts` Node-free. Custom tools (`renderLead`/`confirmSend`) are exposed to the CLI via a **stdio MCP server** (`mcp/inbox-tools.mjs`); tool names arrive prefixed `mcp__inbox__…` and are stripped to the bare names the client registered.
 - Core layer lives in `apps/inbox/core/` (shared by client+server, no React/runtime imports). NOT a package yet — `@platform/*` split deferred until the contract settles and a 2nd consumer exists.
 - Message layer reuses `@ag-ui` types IN FULL (import `Message`/`ToolCall` from `@ag-ui/client`; derive per-role types via `Extract<Message,{role}>` — `@ag-ui/client` doesn't export `AssistantMessage`/`ToolMessage` by name). We add behavior (pure functions), not a parallel domain model. Approval tool names are a PARAMETER (from `def.approvals`), never hardcoded.
 - `defineAgent.renders` is keyed BY TOOL NAME (`{ renderLead: "LeadCard", confirmSend: "ApprovalDialog" }`), refining the doc's abstract `key→component`; it drives client registration directly. Values are component *names*; the client `renderRegistry` maps name→React component (keeps `core/` React-free).
