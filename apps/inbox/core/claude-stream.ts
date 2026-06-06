@@ -76,7 +76,7 @@ export async function* mapClaudeStream(
       event?: Record<string, unknown>
       is_error?: boolean
       result?: string
-      message?: { content?: Array<Record<string, unknown>> }
+      message?: { model?: string; content?: Array<Record<string, unknown>> }
     }
 
     // A run-level failure (e.g. auth: "Not logged in · Please run /login") arrives
@@ -86,11 +86,15 @@ export async function* mapClaudeStream(
       return
     }
 
-    // Complete top-level assistant message (covers synthetic/non-streamed turns).
+    // Complete top-level assistant message (covers non-streamed turns). Skip TEXT
+    // from `<synthetic>` messages — those are system-injected notices (e.g. the
+    // "Not logged in" auth message), already surfaced via the result-error path;
+    // don't echo them as assistant chat text. Real model turns are emitted normally.
     if (obj.type === 'assistant' && obj.message?.content) {
+      const synthetic = obj.message.model === '<synthetic>'
       for (const block of obj.message.content) {
         const b = block as { type?: string; text?: string; id?: string; name?: string; input?: unknown }
-        if (b.type === 'text' && b.text && !streamedText) {
+        if (b.type === 'text' && b.text && !streamedText && !synthetic) {
           yield textChunk(b.text)
         }
         if (b.type === 'tool_use' && b.id && !emittedToolIds.has(b.id)) {

@@ -80,6 +80,15 @@ describe('mapClaudeStream', () => {
     expect(out[3]).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_lead' })
   })
 
+  it('skips TEXT from a <synthetic> assistant message (system notice), still surfaced via result-error', async () => {
+    const synthetic = JSON.stringify({
+      type: 'assistant',
+      message: { model: '<synthetic>', content: [{ type: 'text', text: 'Not logged in · Please run /login' }] },
+    })
+    const out = await collect([synthetic], ['confirmSend'])
+    expect(out).toHaveLength(0)
+  })
+
   it('stops at an approval tool_use in a complete top-level assistant message', async () => {
     const out = await collect(
       [assistantMsg([{ type: 'tool_use', id: 'tc_ok', name: 'mcp__inbox__confirmSend', input: { leadId: 42 } }]), textDelta('NOPE')],
