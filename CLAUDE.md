@@ -14,11 +14,20 @@ isn't persisted is one that will repeat.
 - These rules grow **organically** — add a rule the moment a real pattern
   appears in the code, not before.
 
+## Skills / Rules
+
+Hard-won API gotchas are distilled into rule files for quick recall:
+- `.claude/skills/rules/copilotkit-v2.md` — CopilotKit v2 + AG-UI must-not-rediscover rules
+
 ## Current State
 
-First milestone: vertical slice on mocks — one agent card, START runs a
-mock agent through the real CopilotKit + AG-UI loop (text → lead card →
-approval → resume). See:
+**COMPLETE — browser-verified.** The vertical slice end-to-end loop works:
+a closed AgentCard shows live status (idle "Готов" → "Работает…" →
+"Жду подтверждения" → "Готово"). Clicking the card opens AgentModal with
+the full conversation thread (assistant text + LeadCard + ApprovalDialog).
+START runs the mock agent via CopilotKit v2 + AG-UI: streams text →
+renders a LeadCard → pauses at a human-in-the-loop ApprovalDialog →
+on approve, resumes and emits "Готово, ответ отправлен." See:
 - Spec: `docs/superpowers/specs/2026-06-06-inbox-vertical-slice-design.md`
 - Plan: `docs/superpowers/plans/2026-06-06-inbox-vertical-slice.md`
 
@@ -36,66 +45,110 @@ approval → resume). See:
 - Config split (later): structure in files, manager-editable text fields in DB; secrets in env only.
 - Models accessed via a separate provider registry (CLI / API); agents reference a provider by name.
 
-### CopilotKit v2 API — CONFIRMED against installed packages (Task 1 spike)
+### CopilotKit v2 API — CONFIRMED against installed packages
 
 Installed versions (note: package version is 1.59.5, but a real `/v2` subpath ships inside it):
 - `@copilotkit/runtime` 1.59.5
 - `@copilotkit/react-core` 1.59.5
 - `@ag-ui/client` 0.0.55 (re-exports `@ag-ui/core`)
 
+**v2 subpath imports are required:** server imports come from `@copilotkit/runtime/v2`;
+client hooks come from `@copilotkit/react-core/v2` (NOT the package root).
+
 Server (import from `@copilotkit/runtime/v2`):
 - `new CopilotRuntime({ agents: { default: agent }, runner: new InMemoryAgentRunner() })` — `runner` is optional.
 - `new BuiltInAgent({ type: "custom", factory })` — custom factory yields raw AG-UI `BaseEvent`s.
   Factory signature: `(ctx: { input: RunAgentInput; abortController; abortSignal }) => AsyncIterable<BaseEvent>`.
-  (The `({ input })` destructure works but isn't required for the spike.)
-- `createCopilotEndpoint({ runtime, basePath, mode })` returns a **Hono app** (HonoBase) whose ONLY route is
-  `ALL ${basePath}/*` (`new Hono().basePath(basePath).all("*", c => handler(c.req.raw))`). Mount it with
-  `app.route("/", copilot)`. That wildcard DOES match the bare `/api/copilotkit` (verified) — all real routing
-  happens INSIDE `handler` (`createCopilotRuntimeHandler`), keyed off `mode`. `createCopilotEndpoint` is a
+- `createCopilotEndpoint({ runtime, basePath, mode })` returns a Hono app whose ONLY route is
+  `ALL ${basePath}/*`. Mount it with `app.route("/", copilot)`. `createCopilotEndpoint` is a
   deprecated alias of `createCopilotHonoHandler`. Dedicated subpath also exists: `@copilotkit/runtime/v2/hono`.
-- **`mode` MUST match the client transport — this is the connection-handshake gotcha:**
-  - `mode: "multi-route"` (the library default) exposes REST paths: `GET ${basePath}/info`,
-    `POST ${basePath}/agent/:id/run`, etc. There is **no route at the bare `${basePath}`** → bare POST = 404.
+- **`mode` MUST match the client transport:**
+  - `mode: "multi-route"` (library default) exposes REST paths (`GET ${basePath}/info`, etc.). There is **no route
+    at the bare `${basePath}`** → bare POST = 404.
   - `mode: "single-route"` exposes ONE endpoint: `POST ${basePath}` dispatched by a JSON envelope
-    `{ method, params?, body? }` (e.g. `{ "method": "info" }`).
-  - The v2 React client (`@copilotkit/react-core/v2`) defaults to the **single-endpoint transport**
-    (`CopilotKitProvider` sets `useSingleEndpoint ?? true`; `@copilotkit/core` maps that to `transport: "single"`).
-    Its handshake is `POST <runtimeUrl>` with body `{ "method": "info" }` (NOT `GET <runtimeUrl>/info`). So the
-    server must be created with **`mode: "single-route"`**, else that bare POST 404s and the client logs
-    `Runtime info request failed with status 404`.
-  - **Decision: server uses `mode: "single-route"`** with `basePath: "/api/copilotkit"`; client keeps
-    `runtimeUrl="/api/copilotkit"` (no client change needed). Verified headlessly:
-    `curl -X POST :4000/api/copilotkit -d '{"method":"info"}'` → 200, and `{"method":"agent/run",...}` → 200 stream.
-- AG-UI events from `@ag-ui/client`: `EventType.TEXT_MESSAGE_CHUNK` with fields `{ type, role, messageId, delta }`
-  (all optional in schema). `BaseEvent` type imported from the same package.
+    `{ method, params?, body? }`.
+  - The v2 React client defaults to single-endpoint transport (`useSingleEndpoint ?? true`), handshake is
+    `POST <runtimeUrl>` with body `{ "method": "info" }`. **Server MUST use `mode: "single-route"`**, else
+    the bare POST 404s with `Runtime info request failed with status 404`.
+  - **Decision: server uses `mode: "single-route"`** with `basePath: "/api/copilotkit"`.
+    Verified: `curl -X POST :4000/api/copilotkit -d '{"method":"info"}'` → 200.
+- AG-UI events from `@ag-ui/client`: `EventType.TEXT_MESSAGE_CHUNK` with fields `{ type, role, messageId, delta }`.
 
-Client (import from `@copilotkit/react-core/v2` — the v2 hooks are NOT on the package root):
-- `<CopilotKit runtimeUrl="/api/copilotkit">` provider (component; `CopilotKitProvider` is the underlying FC).
+Client (import from `@copilotkit/react-core/v2`):
+- `<CopilotKit runtimeUrl="/api/copilotkit">` provider.
 - `useAgent({ agentId: "default", updates: [UseAgentUpdate.OnMessagesChanged] })` returns **`{ agent }`**
-  (an AG-UI `AbstractAgent`) — NOT `{ messages, runAgent }`.
-  - Run with `agent.runAgent()`. Read messages via `agent.messages`.
-  - Pass `updates: [UseAgentUpdate.OnMessagesChanged]` so React re-renders as the stream mutates `agent.messages`.
+  (an AG-UI `AbstractAgent`). Read messages via `agent.messages`; subscribe to lifecycle events via
+  `agent.subscribe({ onRunStartedEvent, onRunFinalized, onRunFailed, onMessagesChanged })`.
+- **CRITICAL — runs MUST go through `copilotkit.runAgent({ agent })`** (from `const { copilotkit } = useCopilotKit()`).
+  **Do NOT call bare `agent.runAgent()`.**
+  - `agent.runAgent()` (the AG-UI `AbstractAgent` method) only streams one turn and accumulates messages.
+    It does NOT run CopilotKit's frontend-tool pipeline. The human-in-the-loop resume lives in
+    `CopilotKitCore.runAgent` → `processAgentResult`: that is what invokes the `useHumanInTheLoop` tool
+    handler (resolving the `respond` Promise), splices the resulting `role:"tool"` message into
+    `agent.messages`, and — because `followUp` defaults on — fires the follow-up `runAgent({ agent })`.
+    That follow-up re-runs the SAME agent, so `prepareRunAgentInput` reads the now-populated
+    `agent.messages` (history + the confirmSend tool call + the tool result), and the resume POST carries
+    the full conversation instead of `[]`.
+  - Calling bare `agent.runAgent()` bypasses all of that. The resume run would send `messages: []` and the
+    agent would re-emit turn 1 instead of resuming. **Verified: `App.tsx` uses `copilotkit.runAgent({ agent })`.**
 - `*.css` side-effect imports need an ambient `declare module "*.css"` (TS 6.0 strictness) — see
   `client/src/vite-env.d.ts`.
 
-Generative UI — mapping agent-emitted tool calls → React components (Task 3, CONFIRMED):
-- The v2 mechanism is **`useRenderTool`** (NOT `useCopilotAction`, which is the v1 API and absent from
-  `@copilotkit/react-core/v2`). Import from `@copilotkit/react-core/v2`. Other v2 candidates inspected:
-  `useFrontendTool` (client-executed tools w/ a handler), `useHumanInTheLoop` (render + `respond()` resume —
-  this is what Task 4 will use for `confirmSend`), `useDefaultRenderTool` (wildcard fallback), `useRenderToolCall`.
-- Signature: `useRenderTool({ name, parameters, render }, deps)` where `parameters` is a **Standard Schema**
-  (Zod 4 is installed and used). `render` receives `{ name, toolCallId, parameters, status, result }` with
-  `status` in `"inProgress" | "executing" | "complete"` — `parameters` is `Partial<T>` while `inProgress`,
-  full `T` once `executing`/`complete`. Register inside a component nested under `<CopilotKit>`.
-  Registrations live in `client/src/actions.tsx`, exported as `useInboxActions()`.
-- **Rendering surface:** registering a renderer is not enough to paint it — something must invoke it.
-  `useRenderToolCall()` returns a fn `({ toolCall, toolMessage? }) => ReactElement | null` that renders a single
-  AG-UI tool call using the registered renderers. `App.tsx` maps over `agent.messages`, and for each assistant
-  message's `toolCalls[]` (`{ id, function: { name, arguments } }`, type `ToolCall` from `@ag-ui/client`) calls
-  `renderToolCall({ toolCall })`. (Alternative surface: CopilotKit's `<CopilotChat>`/`CopilotChatView` auto-apply
-  these, but the spike uses the headless `useAgent` + manual render path, no chat UI.)
-- Task 3 wiring: `renderLead` → `<LeadCard lead={parameters} />` (fully working); `confirmSend` → `<ApprovalDialog>`
-  STUB (returns null; Task 4 swaps to `useHumanInTheLoop` with `respond()`).
+### Generative UI
+
+v2 mechanism: **`useRenderTool`** and **`useHumanInTheLoop`** (NOT `useCopilotAction`, which is v1/absent from
+`@copilotkit/react-core/v2`). Import from `@copilotkit/react-core/v2`. Register inside a component nested
+under `<CopilotKit>`. Registrations live in `client/src/actions.tsx`, exported as `useInboxActions()`.
+
+Tool registrations (both REAL and working):
+- **`renderLead`** — `useRenderTool({ name, parameters, render })`: pure generative UI, maps to `<LeadCard />`.
+  `render` receives `{ name, toolCallId, parameters, status, result }`. `parameters` is `Partial<T>` while
+  `inProgress`, full `T` once `executing`/`complete`. Note: historical tool calls surfaced via
+  `useRenderToolCall({ toolCall })` (no `toolMessage`) are reported as `status: "inProgress"` even though
+  arguments are fully streamed — gate on field presence, not status.
+- **`confirmSend`** — `useHumanInTheLoop({ name, parameters, render })` (REAL, not a stub):
+  the hook registers a frontend tool whose handler returns a Promise that stays pending until the user acts.
+  `render` receives `{ args, status, respond }` where `respond` is only present while `status === "executing"`.
+  `render` returns `<ApprovalDialog ... onApprove={() => respond("approved")} />`. Calling `respond("approved")`
+  resolves the Promise, the framework records a `role:"tool"` message with the matching `toolCallId`, and
+  (followUp default) re-runs the agent — this is the resume turn the server detects in `approvalResolved`.
+
+**Rendering surface:** `useRenderToolCall()` returns `({ toolCall, toolMessage? }) => ReactElement | null`.
+`App.tsx` maps over `agent.messages`; `<AgentModal>` pairs each assistant `toolCalls[]` entry with its
+matching `role:"tool"` message by `toolCallId` and calls `renderToolCall({ toolCall, toolMessage? })`.
+
+### Human-in-the-Loop + Resume
+
+The HITL flow (verified end-to-end):
+1. Server emits `confirmSend` tool call events. Client-side `useHumanInTheLoop` intercepts it, returns an
+   `<ApprovalDialog>` with `respond` live.
+2. User clicks approve → `respond("approved")`. `CopilotKitCore` splices a `role:"tool"` message into
+   `agent.messages` with the matching `toolCallId`, then fires a follow-up `copilotkit.runAgent({ agent })`.
+3. Server's `approvalResolved(input)` detects the resumed turn: it collects all assistant `confirmSend`
+   `toolCallId`s, then checks whether any `role:"tool"` message's `toolCallId` matches.
+   **AG-UI's `ToolMessageSchema` STRIPS `name`/`toolName`** from tool result messages — name-matching cannot
+   work; correlation MUST be by `toolCallId`.
+4. Server emits "Готово, ответ отправлен." and the run finalizes.
+
+### Status Derivation
+
+`useAgentStatus(agent)` in `client/src/useAgentStatus.ts`:
+- **Lifecycle** (`running`/`done`/`error`) comes from `agent.subscribe({ onRunStartedEvent, onRunFinalized, onRunFailed })`.
+- **`awaiting_approval`** is derived from MESSAGE STATE via pure `hasPendingApproval(messages)`:
+  a `confirmSend` tool call exists in messages with no matching `role:"tool"` result.
+- This is **render-independent**: the closed AgentCard shows "Жду подтверждения" even when the modal (and
+  `<ApprovalDialog>`) are not mounted.
+- `awaiting_approval` **takes priority over `done`**: `onRunFinalized` fires at the end of turn 1, at the
+  exact moment the agent pauses for the human. Without the message-state override, lifecycle would read "done"
+  while still awaiting approval. Only a terminal `error` wins over `awaiting_approval`.
+- **Do NOT derive `awaiting_approval` from a tool's render/executing callback** — that only fires when the
+  modal is open (a bug we already hit and fixed).
+
+### Known Issues (Benign)
+
+- `GET /api/copilotkit/threads?agentId=default` → **405 in single-route mode** is BY DESIGN. Single-route
+  serves only the POST envelope endpoint; `/threads` is a multi-route / Intelligence feature. The client
+  tolerates it gracefully. Not a bug.
 
 Toolchain note: Vite 8 uses rolldown; npm did not auto-install the platform binding, so
 `@rolldown/binding-darwin-arm64` is pinned as an explicit devDependency (macOS arm64 only — revisit for CI/other OS).
@@ -107,3 +160,4 @@ Run from `apps/inbox/`:
 - `npm run dev:server` / `npm run dev:client` — run each half separately.
 - `npm run build` — vite production build.
 - `npm run typecheck` — `tsc --noEmit`.
+- `npm test` — run vitest (unit tests).
