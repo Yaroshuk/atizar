@@ -11,24 +11,39 @@ operational index; that file is the big picture.
 
 ## ⏭️ Handoff — start here (next session)
 
-**Done & merged to `master`:** the first real provider, **`claude-cli`** (runs the real
-`claude` CLI as a subprocess). Full HITL happy path browser-verified: START → real model
-reads the canned lead → drafts a reply → `renderLead` + `confirmSend` → pause → approve →
-resume → real "done". A loading spinner shows while running. See **"First real provider"**
-section below for files + design, and `docs/superpowers/specs|plans/2026-06-06-first-real-provider*`.
+**Done on branch `feat/gmail-draft-integration` (NOT yet merged):** the first real
+integration — a **Gmail draft agent**. START → real `claude` reads your **latest real
+Gmail email** (`get_latest_email`) → renders it (`renderLead` → LeadCard) → drafts a
+contextual reply → asks approval (`saveDraft` → ApprovalDialog, button "Save draft") →
+pause → approve → resume → **creates a real Gmail draft in the thread** (`create_draft`,
+**never sends**) → Done. **Browser-verified end-to-end on real Gmail** (account
+`sjuser95@gmail.com`). See "Gmail draft integration" section below + `docs/superpowers/
+specs|plans/2026-06-06-gmail-draft-integration*`.
+
+**On `master`:** the `claude-cli` provider with the canned-lead happy path (prior phase).
 
 **Pick next (suggested order):**
-1. *Quick polish (see the TODO block in the provider section):* steer the model away from
-   the built-in `ToolSearch` via tool-restriction config, and tune `firstPrompt` so it stops
-   narrating ("I'll load the inbox tool schemas…"). Keeps the consumer thread clean.
-2. *Then the roadmap:* real agentic loop (**Mastra**) → one real integration (**Gmail/MCP**)
-   — this is where the canned lead becomes a real inbox. Brainstorm → spec → plan → TDD.
+1. **Merge `feat/gmail-draft-integration`** (review the branch first).
+2. *Polish:* the model still narrates ToolSearch ("I'll load the tool schemas…") in the
+   consumer thread — steer it via tool-restriction config / prompt or strip pre-tool
+   chatter client-side. Cosmetic. (Also: tighten the Gmail scope from `gmail.modify` to
+   `readonly`+`compose`; clean stale `confirmSend` mentions in client comments +
+   `core/claude-stream.test.ts`/`messages.test.ts` fixtures — name-agnostic, harmless.)
+3. *Roadmap:* multi-provider / API-key path (**Mastra** or `claude-api`) so the same agent
+   runs on models beyond the subscription CLI. Deferred while the CLI subscription suffices.
 
-**Don't-rediscover gotchas:** never pass `--bare` to `claude` (it skips keychain reads →
-"Not logged in"); auth is the **subscription** via macOS keychain, no API key; `core/` must
-stay **Node-free** (the real provider's `spawn` is injected, lives in `server/`); the HITL
-contract is **client-held, two requests** (don't change the client/transport — the provider
-conforms to it). Run from `apps/inbox/`: `npm run dev`, `npm test`, `npm run lint`.
+**Don't-rediscover gotchas:**
+- **Gmail MCP:** the *official* Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
+  Developer Preview** — it 403s (`caller does not have permission`) for personal `@gmail.com`
+  even with everything configured. The proven community pkg `@gongrzhe/server-gmail-autoauth-mcp`
+  is **archived** AND **blocked by the Claude Code safety classifier** (untrusted external code).
+  → We use **our own thin stdio Gmail MCP** (`mcp/gmail-tools.mjs`) on the standard Gmail API.
+- **OAuth setup is reused, not re-done:** client + token live at `~/.gmail-mcp/gcp-oauth.keys.json`
+  + `credentials.json` (scope `gmail.modify`); the keys/secret are also in gitignored `.env.local`.
+- never pass `--bare` to `claude` (skips keychain → "Not logged in"); auth is the **subscription**
+  via macOS keychain, no API key; `core/` stays **Node-free** (Node lives in `server/` + `mcp/`);
+  HITL is **client-held, two requests** (don't change client/transport — the provider conforms).
+- Run from `apps/inbox/`: `npm run dev`, `npm test`, `npm run lint`.
 
 ## Agent-First Project — Continuous Learning
 
@@ -123,9 +138,33 @@ for a spinner and the modal shows a trailing "Working…" — real runs take sec
   despite the anti-narration line in `firstPrompt`. Tune the prompt (or strip pre-tool
   chatter client-side) so the consumer thread stays clean.
 
+## Gmail draft integration — BUILT (branch `feat/gmail-draft-integration`)
+
+The first real integration. The inbox agent reads your **latest real Gmail email** and,
+on one human click, saves a **draft reply** in Gmail (variant B — never sends; the human
+sends from Gmail). Browser-verified end-to-end on a real account. Files (`apps/inbox`):
+- `mcp/gmail-format.mjs` — **pure** helpers (unit-tested): `parseLatestMessage` (Gmail full
+  message → `{threadId, from, subject, body}`, base64url decode + text/plain walk) and
+  `buildReplyRaw` (RFC822 reply MIME, `Re:`-no-double-prefix, base64url).
+- `mcp/gmail-tools.mjs` — our **own thin stdio Gmail MCP** on the standard `googleapis`
+  Gmail API. Tools: `get_latest_email` (no args) + `create_draft {threadId, body}`
+  (derives To/Subject from the thread, **draft-only, no send**). Lazy auth so a missing/bad
+  creds file surfaces as a tool error, not a server crash. Reads OAuth from `~/.gmail-mcp/`.
+- `server/claude-spawn.ts` — `--mcp-config` now lists **both** `inbox` + `gmail` stdio
+  servers; allow-list adds `mcp__gmail__get_latest_email` / `mcp__gmail__create_draft`.
+- Tool contract renamed `confirmSend` → `saveDraft`; `renderLead` carries `{from, subject,
+  summary}`, `saveDraft` carries `{threadId, body}`. Provider prompts call `get_latest_email`
+  / `create_draft`. HITL (detect-and-kill + stateless re-prime) unchanged — the resume run
+  reads `{threadId, body}` from the thread's `saveDraft` call (`lastApprovalArgs`).
+
+Why our own MCP (not the official Google one or a community pkg): see the **gotchas** in the
+Handoff above (official = Workspace-preview-gated; GongRzhe = archived + classifier-blocked).
+Spec/plan: `docs/superpowers/specs/2026-06-06-gmail-draft-integration-design.md` (+ plan).
+
 ## Next after that
 
-Real agentic loop (Mastra) → one real integration (Gmail/MCP). **Still deferred:**
+Multi-provider / API-key path (**Mastra** or `claude-api`) — run the same agent on models
+beyond the subscription CLI, behind the existing `Provider` seam. **Still deferred:**
 `defineAgent.fields` (+ auto-form), DB + config file/DB layering (base⊕overrides),
 auth/RBAC/audit, the `@platform/*` package split, mode-2 visual/chat editor.
 
