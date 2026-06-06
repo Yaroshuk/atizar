@@ -21,10 +21,13 @@ import {
 type AgentModalProps = {
   agent: { messages: Message[] }
   renderToolCall: (args: { toolCall: ToolCall; toolMessage?: ToolMessage }) => ReactNode
+  // True while the agent run is active — shows a trailing "Working…" loader. A real
+  // model run takes seconds, so the thread can sit empty for a while after START.
+  loading: boolean
   onClose: () => void
 }
 
-export const AgentModal = ({ agent, renderToolCall, onClose }: AgentModalProps) => {
+export const AgentModal = ({ agent, renderToolCall, loading, onClose }: AgentModalProps) => {
   // Index tool result messages by toolCallId so each assistant tool call can be
   // paired with its matching `role:"tool"` result (used to surface a completed
   // confirmSend as done).
@@ -102,6 +105,12 @@ export const AgentModal = ({ agent, renderToolCall, onClose }: AgentModalProps) 
           </button>
         </div>
         <div>{thread}</div>
+        {loading && (
+          <div className="inbox-working">
+            <span className="spinner" />
+            Working…
+          </div>
+        )}
       </div>
     </div>
   )

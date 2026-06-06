@@ -52,14 +52,18 @@ export const AgentCard = ({ name, status, onStart, onOpen }: AgentCardProps) => 
             color: '#666',
           }}
         >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 8,
-              background: DOT[status],
-            }}
-          />
+          {status === 'running' ? (
+            <span className="spinner" />
+          ) : (
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 8,
+                background: DOT[status],
+              }}
+            />
+          )}
           {LABEL[status]}
         </span>
       </div>
