@@ -78,6 +78,25 @@ Client (import from `@copilotkit/react-core/v2` — the v2 hooks are NOT on the 
 - `*.css` side-effect imports need an ambient `declare module "*.css"` (TS 6.0 strictness) — see
   `client/src/vite-env.d.ts`.
 
+Generative UI — mapping agent-emitted tool calls → React components (Task 3, CONFIRMED):
+- The v2 mechanism is **`useRenderTool`** (NOT `useCopilotAction`, which is the v1 API and absent from
+  `@copilotkit/react-core/v2`). Import from `@copilotkit/react-core/v2`. Other v2 candidates inspected:
+  `useFrontendTool` (client-executed tools w/ a handler), `useHumanInTheLoop` (render + `respond()` resume —
+  this is what Task 4 will use for `confirmSend`), `useDefaultRenderTool` (wildcard fallback), `useRenderToolCall`.
+- Signature: `useRenderTool({ name, parameters, render }, deps)` where `parameters` is a **Standard Schema**
+  (Zod 4 is installed and used). `render` receives `{ name, toolCallId, parameters, status, result }` with
+  `status` in `"inProgress" | "executing" | "complete"` — `parameters` is `Partial<T>` while `inProgress`,
+  full `T` once `executing`/`complete`. Register inside a component nested under `<CopilotKit>`.
+  Registrations live in `client/src/actions.tsx`, exported as `useInboxActions()`.
+- **Rendering surface:** registering a renderer is not enough to paint it — something must invoke it.
+  `useRenderToolCall()` returns a fn `({ toolCall, toolMessage? }) => ReactElement | null` that renders a single
+  AG-UI tool call using the registered renderers. `App.tsx` maps over `agent.messages`, and for each assistant
+  message's `toolCalls[]` (`{ id, function: { name, arguments } }`, type `ToolCall` from `@ag-ui/client`) calls
+  `renderToolCall({ toolCall })`. (Alternative surface: CopilotKit's `<CopilotChat>`/`CopilotChatView` auto-apply
+  these, but the spike uses the headless `useAgent` + manual render path, no chat UI.)
+- Task 3 wiring: `renderLead` → `<LeadCard lead={parameters} />` (fully working); `confirmSend` → `<ApprovalDialog>`
+  STUB (returns null; Task 4 swaps to `useHumanInTheLoop` with `respond()`).
+
 Toolchain note: Vite 8 uses rolldown; npm did not auto-install the platform binding, so
 `@rolldown/binding-darwin-arm64` is pinned as an explicit devDependency (macOS arm64 only — revisit for CI/other OS).
 
