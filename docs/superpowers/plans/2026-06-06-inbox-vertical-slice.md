@@ -219,7 +219,7 @@ export const mockAgent = new BuiltInAgent({
       type: EventType.TEXT_MESSAGE_CHUNK,
       role: "assistant",
       messageId,
-      delta: "Проверяю входящие…",
+      delta: "Checking inbox…",
     } as BaseEvent;
   },
 });
@@ -306,7 +306,7 @@ createRoot(document.getElementById("root")!).render(
 Run: `npm run dev`
 Open: `http://localhost:5173`
 Click START.
-Expected: the streamed assistant message "Проверяю входящие…" appears in the `<pre>` dump. This confirms client → Hono → runtime → mock agent → stream → client works.
+Expected: the streamed assistant message "Checking inbox…" appears in the `<pre>` dump. This confirms client → Hono → runtime → mock agent → stream → client works.
 If it does not: fix import paths / endpoint mounting / hook names before proceeding. Do NOT continue until one message streams end-to-end.
 
 - [ ] **Step 13: Commit**
@@ -331,7 +331,7 @@ The agent must be **stateful on input**: human-in-the-loop resumes as a new turn
 import { EventType, type BaseEvent } from "@ag-ui/client";
 import { BuiltInAgent } from "@copilotkit/runtime/v2";
 
-const LEAD = { id: 42, from: "ivan@acme.ru", subject: "Заказ 10 шт", intent: "order" };
+const LEAD = { id: 42, from: "ivan@acme.ru", subject: "Order: 10 units", intent: "order" };
 
 // Did a previous turn already resolve the confirmSend approval?
 function approvalResolved(input: any): boolean {
@@ -356,18 +356,18 @@ export const mockAgent = new BuiltInAgent({
     if (approvalResolved(input)) {
       yield {
         type: EventType.TEXT_MESSAGE_CHUNK, role: "assistant",
-        messageId: crypto.randomUUID(), delta: "Готово, ответ отправлен.",
+        messageId: crypto.randomUUID(), delta: "Done — reply sent.",
       } as BaseEvent;
       return;
     }
 
     yield {
       type: EventType.TEXT_MESSAGE_CHUNK, role: "assistant",
-      messageId: crypto.randomUUID(), delta: "Проверяю входящие… нашёл заявку.",
+      messageId: crypto.randomUUID(), delta: "Checking inbox… found a lead.",
     } as BaseEvent;
 
     yield* toolCall("renderLead", LEAD);
-    yield* toolCall("confirmSend", { leadId: LEAD.id, message: "Отправить ответ на заявку?" });
+    yield* toolCall("confirmSend", { leadId: LEAD.id, message: "Send a reply to this lead?" });
   },
 });
 ```
@@ -440,7 +440,7 @@ Update `App.tsx` `Spike` to call `useInboxActions()` before returning. Confirm t
 - [ ] **Step 4: Verify lead renders**
 
 Run: `npm run dev`, click START.
-Expected: the `LeadCard` with "Заказ 10 шт", "ivan@acme.ru", "order" renders in the chat output (instead of/in addition to the raw tool-call dump).
+Expected: the `LeadCard` with "Order: 10 units", "ivan@acme.ru", "order" renders in the chat output (instead of/in addition to the raw tool-call dump).
 
 - [ ] **Step 5: Commit**
 
@@ -466,7 +466,7 @@ export function ApprovalDialog({ data, onApprove }: { data: ApprovalData; onAppr
     <div style={{ border: "1px solid #f0c000", borderRadius: 10, padding: 12, background: "#fffbe6", margin: "8px 0" }}>
       <div style={{ marginBottom: 8 }}>{data.message}</div>
       <button onClick={onApprove} style={{ background: "#0a7", color: "#fff", border: 0, borderRadius: 6, padding: "6px 14px" }}>
-        Отправить
+        Send
       </button>
     </div>
   );
@@ -477,10 +477,10 @@ export function ApprovalDialog({ data, onApprove }: { data: ApprovalData; onAppr
 
 Run: `npm run dev`, click START.
 Expected sequence in the browser:
-1. text "Проверяю входящие… нашёл заявку."
+1. text "Checking inbox… found a lead."
 2. `LeadCard` renders.
-3. `ApprovalDialog` renders with "Отправить ответ на заявку?" and a button.
-4. Click "Отправить" → the run resumes → final text "Готово, ответ отправлен." appears.
+3. `ApprovalDialog` renders with "Send a reply to this lead?" and a button.
+4. Click "Send" → the run resumes → final text "Done — reply sent." appears.
 
 If the resume turn does not fire (agent doesn't continue after `respond`): confirm how the approval result is fed back. The mock agent expects the resolved tool result to appear in `input.messages` on the next turn (see Task 2 `approvalResolved`). Adjust the detection to match the actual message shape CopilotKit sends back, and record it in `CLAUDE.md`.
 
@@ -552,8 +552,8 @@ export function useInboxActions(onAwaitApproval: (waiting: boolean) => void) {
 type Status = "idle" | "running" | "awaiting_approval" | "done" | "error";
 
 const LABEL: Record<Status, string> = {
-  idle: "Готов", running: "Работает…", awaiting_approval: "Жду подтверждения",
-  done: "Готово", error: "Ошибка",
+  idle: "Idle", running: "Working…", awaiting_approval: "Awaiting approval",
+  done: "Done", error: "Error",
 };
 const DOT: Record<Status, string> = {
   idle: "#bbb", running: "#0a7", awaiting_approval: "#f0c000", done: "#0a7", error: "#e33",
@@ -646,11 +646,11 @@ export default function App() {
 
 Run: `npm run dev`, open `http://localhost:5173`.
 Expected:
-1. Card "EMAIL AGENT", status dot grey "Готов".
-2. Click START → status "Работает…".
+1. Card "EMAIL AGENT", status dot grey "Idle".
+2. Click START → status "Working…".
 3. Open the card → modal shows streamed text + LeadCard.
-4. Approval appears → card status "Жду подтверждения" (yellow).
-5. Click "Отправить" → final text "Готово" → status "Готово".
+4. Approval appears → card status "Awaiting approval" (yellow).
+5. Click "Send" → final text "Done" → status "Done".
 
 - [ ] **Step 7: Commit**
 

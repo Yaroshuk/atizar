@@ -90,7 +90,7 @@ export function AgentModal({
           <strong>EMAIL AGENT</strong>
           <button
             onClick={onClose}
-            aria-label="Закрыть"
+            aria-label="Close"
             style={{
               border: 0,
               background: "transparent",

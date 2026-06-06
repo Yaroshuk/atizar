@@ -65,7 +65,7 @@ export function useInboxActions() {
   // `args` is typed by the schema; `respond` is only present while the tool
   // call is `executing` (i.e. the run has paused waiting for the human). We
   // render the dialog with the streamed args and, when `respond` is available,
-  // wire the "Отправить" button to `respond("approved")` to resume the agent.
+  // wire the "Send" button to `respond("approved")` to resume the agent.
   // After the human approves the tool call becomes `complete` (a tool message
   // exists) and `respond` is undefined — we keep showing the dialog text but
   // the button is inert.

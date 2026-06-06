@@ -14,6 +14,11 @@ isn't persisted is one that will repeat.
 - These rules grow **organically** — add a rule the moment a real pattern
   appears in the code, not before.
 
+## Conventions
+
+All project content — docs, code, comments, identifiers, and user-facing/demo
+strings — is written in English, regardless of the language used in chat.
+
 ## Skills / Rules
 
 Hard-won API gotchas are distilled into rule files for quick recall:
@@ -22,12 +27,12 @@ Hard-won API gotchas are distilled into rule files for quick recall:
 ## Current State
 
 **COMPLETE — browser-verified.** The vertical slice end-to-end loop works:
-a closed AgentCard shows live status (idle "Готов" → "Работает…" →
-"Жду подтверждения" → "Готово"). Clicking the card opens AgentModal with
+a closed AgentCard shows live status (idle "Idle" → "Working…" →
+"Awaiting approval" → "Done"). Clicking the card opens AgentModal with
 the full conversation thread (assistant text + LeadCard + ApprovalDialog).
 START runs the mock agent via CopilotKit v2 + AG-UI: streams text →
 renders a LeadCard → pauses at a human-in-the-loop ApprovalDialog →
-on approve, resumes and emits "Готово, ответ отправлен." See:
+on approve, resumes and emits "Done — reply sent." See:
 - Spec: `docs/superpowers/specs/2026-06-06-inbox-vertical-slice-design.md`
 - Plan: `docs/superpowers/plans/2026-06-06-inbox-vertical-slice.md`
 
@@ -128,7 +133,7 @@ The HITL flow (verified end-to-end):
    `toolCallId`s, then checks whether any `role:"tool"` message's `toolCallId` matches.
    **AG-UI's `ToolMessageSchema` STRIPS `name`/`toolName`** from tool result messages — name-matching cannot
    work; correlation MUST be by `toolCallId`.
-4. Server emits "Готово, ответ отправлен." and the run finalizes.
+4. Server emits "Done — reply sent." and the run finalizes.
 
 ### Status Derivation
 
@@ -136,7 +141,7 @@ The HITL flow (verified end-to-end):
 - **Lifecycle** (`running`/`done`/`error`) comes from `agent.subscribe({ onRunStartedEvent, onRunFinalized, onRunFailed })`.
 - **`awaiting_approval`** is derived from MESSAGE STATE via pure `hasPendingApproval(messages)`:
   a `confirmSend` tool call exists in messages with no matching `role:"tool"` result.
-- This is **render-independent**: the closed AgentCard shows "Жду подтверждения" even when the modal (and
+- This is **render-independent**: the closed AgentCard shows "Awaiting approval" even when the modal (and
   `<ApprovalDialog>`) are not mounted.
 - `awaiting_approval` **takes priority over `done`**: `onRunFinalized` fires at the end of turn 1, at the
   exact moment the agent pauses for the human. Without the message-state override, lifecycle would read "done"

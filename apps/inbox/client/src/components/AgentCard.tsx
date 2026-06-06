@@ -6,11 +6,11 @@ export type Status =
   | "error";
 
 const LABEL: Record<Status, string> = {
-  idle: "Готов",
-  running: "Работает…",
-  awaiting_approval: "Жду подтверждения",
-  done: "Готово",
-  error: "Ошибка",
+  idle: "Idle",
+  running: "Working…",
+  awaiting_approval: "Awaiting approval",
+  done: "Done",
+  error: "Error",
 };
 const DOT: Record<Status, string> = {
   idle: "#bbb",

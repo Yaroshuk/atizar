@@ -20,7 +20,7 @@ export type AgentMessage = {
 // is paused awaiting the human. Because this is computed purely from message
 // state, it is true whether or not the ApprovalDialog (or the modal) is
 // mounted. That is the whole point: the CLOSED card must show
-// "Жду подтверждения" without the user opening the modal.
+// "Awaiting approval" without the user opening the modal.
 export function hasPendingApproval(messages: readonly AgentMessage[]): boolean {
   // Ids of confirmSend tool calls the human has already answered.
   const answeredCallIds = new Set<string>();

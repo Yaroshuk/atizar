@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { hasPendingApproval, type AgentMessage } from "./useAgentStatus";
 
 // `hasPendingApproval` is the render-INDEPENDENT predicate that decides whether
-// the AgentCard should show "Жду подтверждения" (awaiting_approval). It reads
+// the AgentCard should show "Awaiting approval" (awaiting_approval). It reads
 // `agent.messages` directly — the same shape the agent accumulates and the mock
 // streams in (tool name at `toolCalls[].function.name`, id at `toolCalls[].id`;
 // tool results as `{ role:"tool", toolCallId }`).
@@ -35,7 +35,7 @@ const toolResult = (toolCallId: string): AgentMessage => ({
 describe("hasPendingApproval", () => {
   it("is TRUE when a confirmSend tool call has no matching tool message (run paused for human)", () => {
     const messages: AgentMessage[] = [
-      assistantText("Проверяю входящие… нашёл заявку."),
+      assistantText("Checking inbox… found a lead."),
       renderLeadCall("tc_lead"),
       confirmSendCall("tc_confirm"),
     ];
@@ -44,18 +44,18 @@ describe("hasPendingApproval", () => {
 
   it("is FALSE when the confirmSend tool call has a matching role:'tool' message (human approved)", () => {
     const messages: AgentMessage[] = [
-      assistantText("Проверяю входящие… нашёл заявку."),
+      assistantText("Checking inbox… found a lead."),
       renderLeadCall("tc_lead"),
       confirmSendCall("tc_confirm"),
       toolResult("tc_confirm"),
-      assistantText("Готово, ответ отправлен."),
+      assistantText("Done — reply sent."),
     ];
     expect(hasPendingApproval(messages)).toBe(false);
   });
 
   it("is FALSE when there is only a renderLead tool call (no confirmSend at all)", () => {
     const messages: AgentMessage[] = [
-      assistantText("Проверяю входящие… нашёл заявку."),
+      assistantText("Checking inbox… found a lead."),
       renderLeadCall("tc_lead"),
     ];
     expect(hasPendingApproval(messages)).toBe(false);

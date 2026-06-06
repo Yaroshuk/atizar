@@ -1,7 +1,7 @@
 import { EventType, type BaseEvent } from "@ag-ui/client";
 import { BuiltInAgent } from "@copilotkit/runtime/v2";
 
-const LEAD = { id: 42, from: "ivan@acme.ru", subject: "Заказ 10 шт", intent: "order" };
+const LEAD = { id: 42, from: "ivan@acme.ru", subject: "Order: 10 units", intent: "order" };
 
 // Did a previous turn already resolve the confirmSend approval?
 //
@@ -65,7 +65,7 @@ export const mockAgent = new BuiltInAgent({
         type: EventType.TEXT_MESSAGE_CHUNK,
         role: "assistant",
         messageId: crypto.randomUUID(),
-        delta: "Готово, ответ отправлен.",
+        delta: "Done — reply sent.",
       } as BaseEvent;
       return;
     }
@@ -74,10 +74,10 @@ export const mockAgent = new BuiltInAgent({
       type: EventType.TEXT_MESSAGE_CHUNK,
       role: "assistant",
       messageId: crypto.randomUUID(),
-      delta: "Проверяю входящие… нашёл заявку.",
+      delta: "Checking inbox… found a lead.",
     } as BaseEvent;
 
     yield* toolCall("renderLead", LEAD);
-    yield* toolCall("confirmSend", { leadId: LEAD.id, message: "Отправить ответ на заявку?" });
+    yield* toolCall("confirmSend", { leadId: LEAD.id, message: "Send a reply to this lead?" });
   },
 });

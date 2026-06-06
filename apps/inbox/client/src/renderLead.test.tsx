@@ -10,7 +10,7 @@ import { useInboxActions } from "./actions";
 const messages = [
   {
     role: "assistant",
-    content: "Проверяю входящие… нашёл заявку.",
+    content: "Checking inbox… found a lead.",
   },
   {
     role: "assistant",
@@ -23,7 +23,7 @@ const messages = [
           arguments: JSON.stringify({
             id: 42,
             from: "ivan@acme.ru",
-            subject: "Заказ 10 шт",
+            subject: "Order: 10 units",
             intent: "order",
           }),
         },
@@ -56,7 +56,7 @@ describe("renderLead generative-UI mapping", () => {
     );
 
     // The LeadCard must visibly paint: subject, the envelope + sender, and intent.
-    expect(screen.getByText("Заказ 10 шт")).toBeInTheDocument();
+    expect(screen.getByText("Order: 10 units")).toBeInTheDocument();
     expect(screen.getByText(/ivan@acme\.ru/)).toBeInTheDocument();
     expect(screen.getByText(/✉️/)).toBeInTheDocument();
     expect(screen.getByText("order")).toBeInTheDocument();

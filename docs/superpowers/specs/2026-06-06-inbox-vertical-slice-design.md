@@ -1,118 +1,119 @@
-# Дизайн: вертикальный срез «Inbox» на моках
+# Design: "Inbox" vertical slice on mocks
 
-- **Дата:** 2026-06-06
-- **Статус:** на ревью
-- **Автор:** Sergey + Claude
+- **Date:** 2026-06-06
+- **Status:** in review
+- **Author:** Sergey + Claude
 
-## 1. Контекст и цель
+## 1. Context and goal
 
-Гринфилд-проект: опенсорс-фреймворк для AI-инженеров, которые ставят агентные
-автоматизации клиентам (разделение «режим разработчика» / «режим консьюмера»).
-Заточка по умолчанию — обработка входящих потоков: письмо/заявка → квалификация
-→ подтверждение человеком → действие.
+Greenfield project: an open-source framework for AI engineers who ship agentic
+automations to clients (a split between "developer mode" and "consumer mode").
+The default focus is processing inbound flows: email/lead → qualify → human
+approval → action.
 
-Это **первый рабочий артефакт** — вертикальный срез сверху вниз на фейковых данных.
-Цель: за один-два дня получить **живой кликабельный дашборд** и доказать, что
-самый рискованный кусок стека (CopilotKit + AG-UI: стриминг, generative UI,
-человек-в-контуре) работает end-to-end.
+This is the **first working artifact** — a top-to-bottom vertical slice on fake
+data. The goal: in one or two days, get a **live, clickable dashboard** and prove
+that the riskiest part of the stack (CopilotKit + AG-UI: streaming, generative
+UI, human-in-the-loop) works end-to-end.
 
-Подход выбран сознательно — **«максимально приближённо к реальному» (подход Б)**:
-вся проводка настоящая (CopilotKit, AG-UI, Hono, Copilot Runtime), фейковый только
-сам агент (заскриптованная лента событий, без настоящей модели).
+The approach is chosen deliberately — **"as close to real as possible" (approach
+B)**: all the wiring is real (CopilotKit, AG-UI, Hono, Copilot Runtime); only the
+agent itself is fake (a scripted event stream, no real model).
 
 ## 2. Scope
 
-### В срезе (делаем)
+### In the slice (we build)
 
-- Один экран — рабочий стол с одной карточкой агента «EMAIL AGENT».
-- Закрытая карточка: имя, кнопка START, визуальный индикатор статуса.
-- Открытая карточка (модалка): лента-чат с результатами работы агента.
-- Фейковый агент, который по START стримит заскриптованную ленту событий.
-- Generative UI: агент рисует карточку лида (`LeadCard`).
-- Человек-в-контуре: пауза на подтверждение (`ApprovalDialog`), кнопка возобновляет.
-- Настоящие CopilotKit + AG-UI + Hono + Copilot Runtime.
+- One screen — a desktop with a single agent card, "EMAIL AGENT".
+- Closed card: name, START button, visual status indicator.
+- Open card (modal): a chat thread with the agent's work.
+- A fake agent that, on START, streams a scripted event sequence.
+- Generative UI: the agent renders a lead card (`LeadCard`).
+- Human-in-the-loop: a pause for approval (`ApprovalDialog`); a button resumes it.
+- Real CopilotKit + AG-UI + Hono + Copilot Runtime.
 
-### НЕ в срезе (откладываем)
+### Out of the slice (deferred)
 
-- Mastra / реальный агентный цикл / настоящая модель.
-- Реальные интеграции (Gmail и т.п.), MCP.
-- База данных, хранение настроек, разделение файл/DB.
-- Авторизация, роли, RBAC, audit-log.
-- Разбивка на пакеты `@platform/*` (вынесем позже, когда петля заработает).
-- Реестр провайдеров, контракт `defineAgent`, визуальный редактор, режим 2/3
-  в полном виде, автогенерация форм из Zod.
+- Mastra / a real agentic loop / a real model.
+- Real integrations (Gmail, etc.), MCP.
+- A database, settings storage, the file/DB split.
+- Authentication, roles, RBAC, audit log.
+- A `@platform/*` package split (extracted later, once the loop works).
+- A provider registry, the `defineAgent` contract, a visual editor, mode 2/3 in
+  full, auto-generating forms from Zod.
 
-## 3. Стек среза
+## 3. Slice stack
 
-| Слой | Инструмент | Роль |
+| Layer | Tool | Role |
 |---|---|---|
-| Интерфейс | React + Vite | рисует карточку, ленту, кнопки; быстрый dev/hot-reload |
-| Язык | TypeScript | типобезопасность |
-| Сервер | Hono | тонкий BFF; монтирует Copilot Runtime |
-| UI-агенты | `@copilotkit/react-core`, `@copilotkit/react-ui` | стриминг, generative UI, human-in-the-loop |
-| Рантайм | `@copilotkit/runtime` (v2) | серверный слой CopilotKit |
-| События | `@ag-ui/client` | типы событий AG-UI для фейкового агента |
-| Стили | Tailwind CSS | аккуратный вид без возни |
+| Interface | React + Vite | renders the card, thread, buttons; fast dev/hot-reload |
+| Language | TypeScript | type safety |
+| Server | Hono | thin BFF; mounts the Copilot Runtime |
+| Agent UI | `@copilotkit/react-core`, `@copilotkit/react-ui` | streaming, generative UI, human-in-the-loop |
+| Runtime | `@copilotkit/runtime` (v2) | CopilotKit's server layer |
+| Events | `@ag-ui/client` | AG-UI event types for the fake agent |
+| Styles | Tailwind CSS | a tidy look without the fuss |
 
-Hono выбран осознанно: построен на Web-стандартах (fetch), поэтому
-`createCopilotEndpoint` (fetch-обработчик) монтируется в него без адаптеров.
-Сервер взаимозаменяем за тонким слоем — при желании заменяется на Express/Fastify
-без переделки остального.
+Hono is chosen on purpose: it is built on Web standards (fetch), so
+`createCopilotEndpoint` (a fetch handler) mounts into it without adapters. The
+server is interchangeable behind a thin layer — it can be swapped for
+Express/Fastify without reworking the rest.
 
-## 4. Структура файлов
+## 4. File structure
 
-Одно приложение, без разбивки на пакеты. Клиент и сервер запускаются вместе.
+A single application, with no package split. Client and server run together.
 
 ```
 apps/inbox/
-├── package.json                    # скрипт dev запускает клиент + сервер
-├── client/                         # интерфейс (Vite + React)
+├── package.json                    # the dev script runs client + server
+├── client/                         # interface (Vite + React)
 │   └── src/
-│       ├── main.tsx                # точка входа
-│       ├── App.tsx                 # <CopilotKit> провайдер + рабочий стол
+│       ├── main.tsx                # entry point
+│       ├── App.tsx                 # <CopilotKit> provider + desktop
 │       ├── actions.ts              # useCopilotAction: renderLead, confirmSend
 │       └── components/
-│           ├── AgentCard.tsx       # ЗАКРЫТАЯ карточка: имя, START, индикатор статуса
-│           ├── AgentModal.tsx      # ОТКРЫТАЯ карточка: лента-чат
-│           ├── LeadCard.tsx        # карточка лида (рисуется агентом через render)
-│           └── ApprovalDialog.tsx  # окно подтверждения (renderAndWaitForResponse)
-└── server/                         # тонкий сервер (Hono)
-    ├── index.ts                    # Hono + CopilotRuntime, эндпоинт /api/copilotkit
-    └── mock-agent.ts               # BuiltInAgent type:"custom", заскриптованная лента
+│           ├── AgentCard.tsx       # CLOSED card: name, START, status indicator
+│           ├── AgentModal.tsx      # OPEN card: chat thread
+│           ├── LeadCard.tsx        # lead card (rendered by the agent via render)
+│           └── ApprovalDialog.tsx  # approval dialog (renderAndWaitForResponse)
+└── server/                         # thin server (Hono)
+    ├── index.ts                    # Hono + CopilotRuntime, /api/copilotkit endpoint
+    └── mock-agent.ts               # BuiltInAgent type:"custom", scripted event stream
 ```
 
-## 5. Поток сигнала (петля)
+## 5. Signal flow (the loop)
 
 ```
-менеджер жмёт START на AgentCard
-  → клиент инициирует прогон агента на сервере (/api/copilotkit)
-  → mock-agent (async generator) шлёт события AG-UI по порядку:
-       1. TEXT_MESSAGE_CHUNK "Проверяю входящие…"   → лента; статус = "работает"
-       2. TOOL_CALL (renderLead) {данные лида}        → CopilotKit рисует <LeadCard>
-       3. TOOL_CALL (confirmSend) {…}                 → пауза, рисует <ApprovalDialog>,
-                                                         статус = "жду подтверждения"
-  → менеджер жмёт "Отправить" → respond() → агент продолжает
-       4. TEXT_MESSAGE_CHUNK "Готово, ответ отправлен" → статус = "готово"
+manager clicks START on the AgentCard
+  → client kicks off the agent run on the server (/api/copilotkit)
+  → mock-agent (async generator) emits AG-UI events in order:
+       1. TEXT_MESSAGE_CHUNK "Checking inbox…"        → thread; status = "working"
+       2. TOOL_CALL (renderLead) {lead data}           → CopilotKit renders <LeadCard>
+       3. TOOL_CALL (confirmSend) {…}                  → pause, renders <ApprovalDialog>,
+                                                          status = "awaiting approval"
+  → manager clicks "Send" → respond() → the agent continues
+       4. TEXT_MESSAGE_CHUNK "Done — reply sent"       → status = "done"
 ```
 
-«Один run, два вида»: закрытая карточка и открытая модалка — два отображения одного
-прогона. Статус-индикатор выводится из состояния прогона CopilotKit
-(idle / работает / жду подтверждения / готово), лента целиком видна в модалке.
+"One run, two views": the closed card and the open modal are two renderings of a
+single run. The status indicator is derived from CopilotKit's run state
+(idle / working / awaiting approval / done); the full thread is visible in the
+modal.
 
-## 6. Модель статуса карточки
+## 6. Card status model
 
-Закрытая карточка показывает один из статусов, выведенный из жизненного цикла прогона:
+The closed card shows one of these statuses, derived from the run lifecycle:
 
-- `idle` — ничего не происходит (до START);
-- `running` — идёт работа (после START, во время стрима, лоадер);
-- `awaiting_approval` — отрисован `ApprovalDialog`, ждём нажатия;
-- `done` — прогон завершён;
-- `error` — ошибка (минимально, для полноты).
+- `idle` — nothing happening (before START);
+- `running` — work in progress (after START, during the stream; a loader);
+- `awaiting_approval` — the `ApprovalDialog` is rendered, waiting for a click;
+- `done` — the run is finished;
+- `error` — an error (minimal, for completeness).
 
-## 7. Фейковый агент (ключевая механика подхода Б)
+## 7. The fake agent (the key mechanic of approach B)
 
-Серверный кастомный агент CopilotKit — async generator, который yield-ит события
-AG-UI без участия модели. Опорная форма (по доке CopilotKit v2):
+A CopilotKit server-side custom agent — an async generator that yields AG-UI
+events without a model. The reference shape (per the CopilotKit v2 docs):
 
 ```ts
 import { EventType, type BaseEvent } from "@ag-ui/client";
@@ -124,10 +125,10 @@ import {
 const agent = new BuiltInAgent({
   type: "custom",
   factory: async function* ({ input, abortSignal }) {
-    // 1) текст
-    // 2) TOOL_CALL_START/ARGS/END → renderLead {данные лида}
-    // 3) TOOL_CALL_START/ARGS/END → confirmSend {текст подтверждения}
-    // 4) текст "готово" (после возобновления)
+    // 1) text
+    // 2) TOOL_CALL_START/ARGS/END → renderLead {lead data}
+    // 3) TOOL_CALL_START/ARGS/END → confirmSend {approval text}
+    // 4) "done" text (after resume)
   },
 });
 
@@ -137,22 +138,23 @@ const runtime = new CopilotRuntime({
 });
 
 const endpoint = createCopilotEndpoint({ runtime, basePath: "/api/copilotkit" });
-// endpoint (fetch-обработчик) монтируется в Hono
+// endpoint (a fetch handler) is mounted into Hono
 ```
 
-Имена tool-call (`renderLead`, `confirmSend`) совпадают с именами действий
-`useCopilotAction` на клиенте — так агент «вызывает» нужный компонент.
+The tool-call names (`renderLead`, `confirmSend`) match the names of the
+`useCopilotAction` actions on the client — that is how the agent "invokes" the
+right component.
 
-## 8. Generative UI и человек-в-контуре (клиент)
+## 8. Generative UI and human-in-the-loop (client)
 
 ```ts
-// renderLead → рисует карточку лида (generative UI)
+// renderLead → renders the lead card (generative UI)
 useCopilotAction({
   name: "renderLead",
   render: ({ args }) => <LeadCard lead={args} />,
 });
 
-// confirmSend → пауза, ждём ответа менеджера (human-in-the-loop)
+// confirmSend → pause, wait for the manager's answer (human-in-the-loop)
 useCopilotAction({
   name: "confirmSend",
   renderAndWaitForResponse: ({ args, respond }) => (
@@ -161,29 +163,30 @@ useCopilotAction({
 });
 ```
 
-Захардкоженный лид (пример данных), который шлёт агент:
+The hardcoded lead (sample data) the agent sends:
 
 ```json
-{ "id": 42, "from": "ivan@acme.ru", "subject": "Заказ 10 шт", "intent": "order" }
+{ "id": 42, "from": "ivan@acme.ru", "subject": "Order: 10 units", "intent": "order" }
 ```
 
-## 9. Критерий готовности (проверка)
+## 9. Definition of done (acceptance)
 
-Успех = руками прокликать всю петлю:
+Success = clicking through the whole loop by hand:
 
-1. Открыл дашборд → видна карточка «EMAIL AGENT», статус `idle`.
-2. Нажал START → статус `running`, в ленте появился текст «Проверяю входящие…».
-3. Появилась карточка лида (`LeadCard`) с данными.
-4. Появилось окно подтверждения (`ApprovalDialog`), статус `awaiting_approval`.
-5. Нажал «Отправить» → агент дописал «Готово», статус `done`.
+1. Opened the dashboard → the "EMAIL AGENT" card is visible, status `idle`.
+2. Clicked START → status `running`, the text "Checking inbox…" appears in the thread.
+3. The lead card (`LeadCard`) appears with its data.
+4. The approval dialog (`ApprovalDialog`) appears, status `awaiting_approval`.
+5. Clicked "Send" → the agent appends "Done", status `done`.
 
-Автотесты для этого черновика не пишем. Компоненты держим чистыми и без лишних
-зависимостей, чтобы их было легко покрыть тестами на следующих шагах.
+We do not write automated tests for this draft. We keep the components clean and
+free of unnecessary dependencies so they are easy to cover with tests in the next
+steps.
 
-## 10. Открытые вопросы / на потом
+## 10. Open questions / for later
 
-- Точная форма монтирования `createCopilotEndpoint` в Hono — уточняется на этапе кода.
-- Как именно вывести статус карточки из состояния прогона CopilotKit (какие хуки) —
-  уточняется на этапе кода.
-- Версии пакетов CopilotKit/AG-UI фиксируются при установке.
-- git-репозиторий ещё не инициализирован; коммит спецификации — по решению пользователя.
+- The exact way to mount `createCopilotEndpoint` into Hono — to be confirmed at the code stage.
+- Exactly how to derive the card status from CopilotKit's run state (which hooks) —
+  to be confirmed at the code stage.
+- The CopilotKit/AG-UI package versions are pinned at install time.
+- The git repository is not yet initialized; committing the spec is the user's decision.
