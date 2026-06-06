@@ -38,5 +38,3 @@ describe("guards", () => {
     expect(toolCallsOf(toolResult("tc1"))).toEqual([]);
   });
 });
-
-export { assistantWithToolCall, assistantText, toolResult };
