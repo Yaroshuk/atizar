@@ -36,6 +36,36 @@ on approve, resumes and emits "Done — reply sent." See:
 - Spec: `docs/superpowers/specs/2026-06-06-inbox-vertical-slice-design.md`
 - Plan: `docs/superpowers/plans/2026-06-06-inbox-vertical-slice.md`
 
+## Next Phase — extract the reusable core (NOT STARTED)
+
+The slice proved the loop. Next: extract the framework's reusable core from it.
+**Start a fresh session** and brainstorm this (do NOT just start coding — go
+through brainstorming → spec → plan → execution like last time).
+
+**What to build (the core layer):**
+- `defineAgent` contract — the agent description object we designed in chat:
+  `id`, `name`, `provider`, `instructions`, `fields` (each `{ type, label, editableBy, default }`;
+  `type` ∈ string/text/secret/number/boolean/enum; `secret` sourced from env by name),
+  `tools`, `approvals`, `renders` (key → component). The form/UI, the file-vs-DB
+  storage split, and who-sees-what all derive from this object.
+- Provider registry — providers defined once (`claude-cli` | `claude-api` | `openai`…),
+  agents reference one by name; runtime is swappable behind the registry.
+- Message/registry layer — the shared piece the slice review flagged as the
+  extraction target: the toolCallId↔toolMessage correlation is currently duplicated
+  in `server/mock-agent.ts`, `client/src/useAgentStatus.ts`, and `components/AgentModal.tsx`;
+  client message/tool-call shapes are typed `any`. Unify into one typed layer.
+
+**Why now:** these are the first reusable, logic-heavy pieces — worth the full
+**TDD + structured code-review loop** (per the timing we agreed: the slice was
+proven by click-through; rigor starts here).
+
+**Still deferred (don't pull in yet):** Mastra/real model, real integrations (Gmail/MCP),
+DB + config layering (base⊕overrides), auth/RBAC/audit, the `@platform/*` package split,
+mode-2 visual/chat editor.
+
+**Read before starting:** this file (Decisions + the CopilotKit v2 API notes below),
+`.claude/skills/rules/copilotkit-v2.md`, and the slice code under `apps/inbox/`.
+
 ## Stack
 
 - Client: Vite + React + TypeScript
