@@ -10,6 +10,7 @@ import { useInboxActions } from "./actions";
 import { AgentCard } from "./components/AgentCard";
 import { AgentModal } from "./components/AgentModal";
 import { useAgentStatus } from "./useAgentStatus";
+import { inboxAgent } from "../../core/inbox.agent";
 
 function Spike() {
   // Modal open state.
@@ -59,12 +60,12 @@ function Spike() {
   // running, onRunFinalized -> done, onRunFailed -> error) with a pending
   // confirmSend tool call (derived from agent.messages) overriding to
   // "awaiting_approval" — render-independent, so the CLOSED card shows it.
-  const status = useAgentStatus(agent);
+  const status = useAgentStatus(agent, inboxAgent.approvals);
 
   return (
     <div>
       <AgentCard
-        name="EMAIL AGENT"
+        name={inboxAgent.name}
         status={status}
         onStart={() => void copilotkit.runAgent({ agent })}
         onOpen={() => setOpen(true)}

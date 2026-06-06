@@ -31,45 +31,41 @@ Hard-won API gotchas are distilled into rule files for quick recall:
 
 ## Current State
 
-**COMPLETE — browser-verified.** The vertical slice end-to-end loop works:
-a closed AgentCard shows live status (idle "Idle" → "Working…" →
-"Awaiting approval" → "Done"). Clicking the card opens AgentModal with
-the full conversation thread (assistant text + LeadCard + ApprovalDialog).
-START runs the mock agent via CopilotKit v2 + AG-UI: streams text →
-renders a LeadCard → pauses at a human-in-the-loop ApprovalDialog →
-on approve, resumes and emits "Done — reply sent." See:
-- Spec: `docs/superpowers/specs/2026-06-06-inbox-vertical-slice-design.md`
-- Plan: `docs/superpowers/plans/2026-06-06-inbox-vertical-slice.md`
+**COMPLETE — browser-verified.** The vertical slice loop works AND the reusable
+core layer is extracted under `apps/inbox/core/`:
+- `core/messages.ts` — typed message layer over `@ag-ui` (`hasPendingApproval`,
+  `approvalResolved`, `pairToolResults`, guards). Replaces the `toolCallId↔toolMessage`
+  logic that was duplicated in 3 files; no more `any`.
+- `core/providers.ts` + `core/mock-provider.ts` — `Provider` interface
+  (`run(input) → AsyncIterable<BaseEvent>`) + `defineProviders` registry + one fake
+  provider that emits the scripted inbox stream.
+- `core/defineAgent.ts` + `core/inbox.agent.ts` — the Zod-validated agent passport +
+  the concrete inbox instance (`inboxAgent`, `providerRegistry`).
+- Threaded through both sides: server (`server/build-agent.ts`) builds the
+  `BuiltInAgent` from the passport + registry; client (`client/src/renderRegistry.tsx`,
+  `actions.tsx`, `useAgentStatus.ts`, `AgentModal.tsx`, `App.tsx`) reads the passport.
+  The hardcoded `"confirmSend"`/`"renderLead"`/`"LeadCard"` strings are gone.
 
-## Next Phase — extract the reusable core (NOT STARTED)
+Behavior is identical to the slice (closed card Idle → Working → Awaiting approval →
+Done; modal thread = assistant text + LeadCard + ApprovalDialog; approve → resume →
+"Done — reply sent."). 28 unit tests pass; browser click-through re-verified. See:
+- Slice: `docs/superpowers/specs/2026-06-06-inbox-vertical-slice-design.md` (+ plan)
+- Core layer: `docs/superpowers/specs/2026-06-06-core-layer-design.md`
+  + `docs/superpowers/plans/2026-06-06-core-layer.md`
 
-The slice proved the loop. Next: extract the framework's reusable core from it.
-**Start a fresh session** and brainstorm this (do NOT just start coding — go
-through brainstorming → spec → plan → execution like last time).
+## Next Phase — first real provider (NOT STARTED)
 
-**What to build (the core layer):**
-- `defineAgent` contract — the agent description object we designed in chat:
-  `id`, `name`, `provider`, `instructions`, `fields` (each `{ type, label, editableBy, default }`;
-  `type` ∈ string/text/secret/number/boolean/enum; `secret` sourced from env by name),
-  `tools`, `approvals`, `renders` (key → component). The form/UI, the file-vs-DB
-  storage split, and who-sees-what all derive from this object.
-- Provider registry — providers defined once (`claude-cli` | `claude-api` | `openai`…),
-  agents reference one by name; runtime is swappable behind the registry.
-- Message/registry layer — the shared piece the slice review flagged as the
-  extraction target: the toolCallId↔toolMessage correlation is currently duplicated
-  in `server/mock-agent.ts`, `client/src/useAgentStatus.ts`, and `components/AgentModal.tsx`;
-  client message/tool-call shapes are typed `any`. Unify into one typed layer.
+The core proved the contract on a fake provider. Next: wire ONE real provider behind
+the `Provider` interface (`core/providers.ts`). **Open question to decide first:**
+`claude-cli` vs `claude-api`. Then a real agentic loop (Mastra) and one real integration
+(Gmail/MCP). Go through brainstorm → spec → plan → execution as before.
 
-**Why now:** these are the first reusable, logic-heavy pieces — worth the full
-**TDD + structured code-review loop** (per the timing we agreed: the slice was
-proven by click-through; rigor starts here).
-
-**Still deferred (don't pull in yet):** Mastra/real model, real integrations (Gmail/MCP),
-DB + config layering (base⊕overrides), auth/RBAC/audit, the `@platform/*` package split,
+**Still deferred (don't pull in yet):** `defineAgent.fields` (+ auto-form), DB + config
+file/DB layering (base⊕overrides), auth/RBAC/audit, the `@platform/*` package split,
 mode-2 visual/chat editor.
 
 **Read before starting:** this file (Decisions + the CopilotKit v2 API notes below),
-`.claude/skills/rules/copilotkit-v2.md`, and the slice code under `apps/inbox/`.
+`.claude/skills/rules/copilotkit-v2.md`, `docs/ARCHITECTURE.md`, and `apps/inbox/core/`.
 
 ## Stack
 
@@ -84,6 +80,12 @@ mode-2 visual/chat editor.
 - Slice verified by manual click-through; TDD + review loop starts with the reusable core layer (next phase).
 - Config split (later): structure in files, manager-editable text fields in DB; secrets in env only.
 - Models accessed via a separate provider registry (CLI / API); agents reference a provider by name.
+- Core layer lives in `apps/inbox/core/` (shared by client+server, no React/runtime imports). NOT a package yet — `@platform/*` split deferred until the contract settles and a 2nd consumer exists.
+- Message layer reuses `@ag-ui` types IN FULL (import `Message`/`ToolCall` from `@ag-ui/client`; derive per-role types via `Extract<Message,{role}>` — `@ag-ui/client` doesn't export `AssistantMessage`/`ToolMessage` by name). We add behavior (pure functions), not a parallel domain model. Approval tool names are a PARAMETER (from `def.approvals`), never hardcoded.
+- `defineAgent.renders` is keyed BY TOOL NAME (`{ renderLead: "LeadCard", confirmSend: "ApprovalDialog" }`), refining the doc's abstract `key→component`; it drives client registration directly. Values are component *names*; the client `renderRegistry` maps name→React component (keeps `core/` React-free).
+- `defineAgent` validates STRUCTURE only (`approvals ⊆ tools`, `renders` keys ⊆ `tools`). Provider-existence is enforced by `registry.resolve(def.provider)` at wiring time, not in the passport.
+- `defineAgent(def)` param is typed as `AgentDefinition` (the output type), not `unknown` — deliberate: the only caller is a hand-authored literal that benefits from compile-time field checks, and `parse()` still runs the cross-field rules. Switch to `unknown` (+ `.strict()`) when config is loaded from file/DB (deferred).
+- `zod` is now an explicit dependency of `apps/inbox` (was transitive); `core/defineAgent.ts` uses it directly. zod v3 API.
 
 ### CopilotKit v2 API — CONFIRMED against installed packages
 

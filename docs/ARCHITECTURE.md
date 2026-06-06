@@ -76,48 +76,53 @@ config source adapter:
 ⊕ overrides (DbAdapter, visual, client). Keep overrides limited to leaf text fields so the
 merge stays trivial. **Deferred** — it's a solution to a problem we don't have until mode 2 exists.
 
-## 4. The `defineAgent` contract 🎯 (next-phase core)
+## 4. The `defineAgent` contract ✅ (core built; `fields` deferred)
 
-A single object describes an agent; the form/UI, storage split, pauses, and rendering all
-*derive* from it:
+A single object describes an agent; the UI, pauses, and rendering all *derive* from it.
+Built in `apps/inbox/core/defineAgent.ts` (Zod-validated) + the concrete instance in
+`apps/inbox/core/inbox.agent.ts`:
 
 ```ts
 defineAgent({
-  id, name, description,
-  provider: "claude-api",            // ref into the provider registry (§5)
-  instructions,                       // base prompt
-  fields: {                           // configurable fields → auto-form + storage split
-    replyPrompt: { type: "text",   label, editableBy: "manager",   default },
-    senderEmail: { type: "string", label, editableBy: "developer" },
-    apiKey:      { type: "secret", label, env: "GMAIL_API_KEY" },   // env-sourced
-  },
-  tools: ["gmailSearch", "gmailSend"],
-  approvals: ["gmailSend"],           // actions that pause for human-in-the-loop
-  renders: { lead: "LeadCard", approval: "ApprovalDialog" }, // key → component
+  id, name,
+  provider: "mock",                  // ref into the provider registry (§5)
+  instructions,                       // base prompt (declared; not yet consumed — mock provider scripts its own output)
+  tools: ["renderLead", "confirmSend"],
+  approvals: ["confirmSend"],         // actions that pause for human-in-the-loop
+  renders: { renderLead: "LeadCard", confirmSend: "ApprovalDialog" }, // tool name → component name
 })
 ```
 
-- field `type` ∈ string | text | secret | number | boolean | enum.
-- Form is generated from `fields` (auto-form from Zod) once there are many fields;
-  hand-built is fine while few. Form filters by `currentUser.role` (admin sees more).
-- `secret` is sourced from env by name (form shows the var name, never the value).
+- `renders` is keyed **by tool name** (refinement of the original `key → component` idea):
+  keying by tool name lets it drive client tool registration directly. The values are
+  component *names*; a client-side registry (`renderRegistry.tsx`) maps names → React
+  components, keeping the shared passport free of React imports.
+- `defineAgent` validates STRUCTURE only — `approvals ⊆ tools`, `renders` keys ⊆ `tools`.
+  The "provider exists" check is enforced at wiring time by `registry.resolve(def.provider)`,
+  not in the passport (a passport doesn't know the registry).
+- 💤 `fields` (configurable fields + `editableBy` + auto-form + storage split) — **deferred**:
+  nothing consumes it until the form/DB land. `type` ∈ string | text | secret | number |
+  boolean | enum; `secret` sourced from env by name. Rejoins the contract with the form/DB.
 
-## 5. Provider registry 🎯
+## 5. Provider registry ✅ (interface + registry + one fake provider built)
 
 Models are not hardcoded in the agent. A separate registry defines providers; agents
-reference one by name:
+reference one by name. Built in `apps/inbox/core/providers.ts` (the `Provider` interface +
+`defineProviders` with name-based `resolve`) and `apps/inbox/core/mock-provider.ts` (the one
+fake provider). The eventual shape:
 
 ```ts
 defineProviders({
-  "claude-cli": { type: "cli", command: "claude" },      // runs Claude Code via CLI
-  "claude-api": { type: "api", sdk: "anthropic", model: "claude-opus-4-8", apiKey: env("...") },
-  "openai":     { type: "api", sdk: "openai",    model: "gpt-4",            apiKey: env("...") },
+  "mock":       { /* fake: yields the scripted AG-UI event stream (built) */ },
+  "claude-cli": { type: "cli", command: "claude" },      // 💤 runs Claude Code via CLI
+  "claude-api": { type: "api", sdk: "anthropic", model: "claude-opus-4-8", apiKey: env("...") }, // 💤
 })
 ```
 
-CLI vs API are different execution models, normalized behind one provider interface
-(`run(messages, tools) → stream`). The runtime is swappable behind the registry.
-**Open question for next session:** which provider to wire for real first.
+The `Provider` interface is `run(input: RunAgentInput) → AsyncIterable<BaseEvent>`. CLI vs API
+are different execution models that will be normalized behind it; the runtime is swappable
+behind the registry. For now there is exactly one fake provider (real model 💤 deferred).
+**Open question for next session:** which provider to wire for real first (CLI vs API).
 
 ## 6. Generative UI & the consumer UX 🎯 (slice is a first cut ✅)
 
@@ -168,9 +173,10 @@ trust/self-host/audit, last-mile UX, client relationships & context.
 ## 9. Roadmap
 
 - ✅ **Vertical slice on mocks** — done, browser-verified, merged. (`apps/inbox/`)
-- 🎯 **Next: extract the reusable core** — `defineAgent` contract, provider registry,
-  unified message/registry layer (dedupe the toolCallId logic, replace `any` types). Full
-  TDD + review loop starts here. See `CLAUDE.md` → "Next Phase".
+- ✅ **Reusable core extracted** — `apps/inbox/core/`: typed message layer (deduped the
+  toolCallId↔toolMessage logic, replaced `any`), `Provider` interface + registry + one fake
+  provider, and the `defineAgent` contract — all threaded through server & client (TDD +
+  two-stage review; browser-verified). `fields` and the `@platform/*` package split stay 💤.
 - 💤 **Then, roughly in order:** real agent (Mastra) → one real integration (Gmail MCP) →
   auth/RBAC/audit → DB + config file/DB split → deploy (Docker, self-host) → (much later)
   mode-2 visual/chat editor, base⊕overrides, `@platform/*` package split.
@@ -184,8 +190,9 @@ execution only). Edit code locally → `git push` → CI/CD deploys to client se
 
 ## 11. How this maps to what exists today
 
-Only `apps/inbox/` is built: a single app (no package split yet), Hono + CopilotKit v2
-runtime, a **mock** custom agent (no real model), the consumer card→modal→approval loop
-on real CopilotKit + AG-UI. Everything in §3–§5, §7, §10 and most of §6/§8 is design intent
-to be built incrementally — starting with the core layer (§9). See the slice spec/plan in
-`docs/superpowers/`.
+Built: `apps/inbox/` — a single app (no package split yet), Hono + CopilotKit v2 runtime,
+the consumer card→modal→approval loop on real CopilotKit + AG-UI, and now the reusable
+**core layer** in `apps/inbox/core/` (message layer, provider registry + one fake provider,
+`defineAgent` — §4/§5 BUILT). The agent still runs on a **mock** provider (no real model).
+`fields`, config file/DB split (§3), skills storage (§7), §10, and parts of §6/§8 remain
+design intent to be built incrementally. See the spec/plan in `docs/superpowers/`.
