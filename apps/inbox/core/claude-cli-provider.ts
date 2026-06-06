@@ -1,10 +1,7 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import type { Provider } from './providers.js'
-import { approvalResolved, type Message } from './messages.js'
+import { approvalResolved, lastApprovalArgs, type Message } from './messages.js'
 import { mapClaudeStream } from './claude-stream.js'
-
-// The canned lead — placeholder for real Gmail data (next phase).
-const LEAD = { id: 42, from: 'ivan@acme.ru', subject: 'Order: 10 units', intent: 'order' }
 
 // Spawns a `claude` run for a prompt and exposes stdout as NDJSON lines + kill().
 // Injectable so the Node implementation stays server-side and tests use a fake.
@@ -17,22 +14,27 @@ function firstPrompt(instructions: string): string {
   return [
     instructions,
     '',
-    `Inbox (one new email): ${JSON.stringify(LEAD)}`,
-    '',
-    'Call renderLead with that email to surface it to the user, then call',
-    'confirmSend with { leadId, message } to ask the human before replying.',
-    'Do not send anything yourself. Do not narrate your tool usage or mention',
-    'tools/schemas — keep any text brief and user-facing.',
+    'Read the single most recent email in the inbox using the Gmail tools',
+    '(search the inbox, then get that thread). Then call renderLead with',
+    '{ from, subject, summary } to surface it, and draft a short reply.',
+    'Then call saveDraft with { threadId, body } — threadId is the Gmail thread',
+    'id of that email, body is your drafted reply — to ask the human before saving.',
+    'Do NOT create the draft yet and do NOT send anything. Do not narrate your',
+    'tool usage or mention tools/schemas — keep any text brief and user-facing.',
   ].join('\n')
 }
 
-function resumePrompt(instructions: string): string {
+function resumePrompt(instructions: string, threadId: string, body: string): string {
   return [
     instructions,
     '',
-    `You surfaced this lead: ${JSON.stringify(LEAD)} and asked the human to`,
-    'confirm sending a reply. The human APPROVED. Reply with one short sentence',
-    'confirming the reply was sent. Do not call any tools.',
+    `The human APPROVED saving this reply. Create it as a Gmail DRAFT now by`,
+    `calling create_draft, replying within thread "${threadId}", with this body:`,
+    '',
+    body,
+    '',
+    'Do not send. After the draft is created, reply with one short sentence',
+    'confirming the draft was saved to Gmail. Do not narrate tool usage.',
   ].join('\n')
 }
 
@@ -60,7 +62,16 @@ export function createClaudeCliProvider(opts: {
       const resuming = approvalResolved(messages, approvalNames)
       let child: { lines: AsyncIterable<string>; kill: () => void } | undefined
       try {
-        child = spawn(resuming ? resumePrompt(instructions) : firstPrompt(instructions))
+        let prompt: string
+        if (resuming) {
+          const args = lastApprovalArgs(messages, approvalNames)
+          const threadId = typeof args?.threadId === 'string' ? args.threadId : ''
+          const body = typeof args?.body === 'string' ? args.body : ''
+          prompt = resumePrompt(instructions, threadId, body)
+        } else {
+          prompt = firstPrompt(instructions)
+        }
+        child = spawn(prompt)
       } catch (err) {
         yield errorChunk(err instanceof Error ? err.message : String(err))
         return
