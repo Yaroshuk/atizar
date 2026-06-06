@@ -67,6 +67,10 @@ export function createClaudeCliProvider(opts: {
           const args = lastApprovalArgs(messages, approvalNames)
           const threadId = typeof args?.threadId === 'string' ? args.threadId : ''
           const body = typeof args?.body === 'string' ? args.body : ''
+          if (!threadId || !body) {
+            yield errorChunk('Resume failed: no saved draft found in the thread')
+            return
+          }
           prompt = resumePrompt(instructions, threadId, body)
         } else {
           prompt = firstPrompt(instructions)

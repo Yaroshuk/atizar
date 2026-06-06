@@ -58,8 +58,8 @@ describe('createClaudeCliProvider', () => {
     const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('Done — reply sent.')] }])
     const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'do it', spawn })
     const messages = [
-      { role: 'assistant', toolCalls: [{ id: 'tc_ok', function: { name: 'saveDraft' } }] },
-      { role: 'tool', toolCallId: 'tc_ok' },
+      { role: 'assistant', toolCalls: [{ id: 'tc_ok', type: 'function', function: { name: 'saveDraft', arguments: '{"threadId":"t_1","body":"Hello"}' } }] },
+      { role: 'tool', toolCallId: 'tc_ok', content: 'approved' },
     ]
     const out = await drain(provider.run(runInput(messages)))
     expect(out).toHaveLength(1)
@@ -94,6 +94,34 @@ describe('createClaudeCliProvider', () => {
     expect(seenPrompt).toContain('t_42')
     expect(seenPrompt).toContain('Hi Ivan')
     expect(seenPrompt).toContain('create_draft')
+  })
+
+  it('resume: surfaces an error when the thread has no usable draft args', async () => {
+    let spawned = false
+    const spawn: ClaudeSpawn = () => {
+      spawned = true
+      async function* lines() { /* no lines */ }
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['renderLead', 'saveDraft'],
+      instructions: 'x',
+      spawn,
+    })
+    // saveDraft call present (so approvalResolved is true) but args lack threadId/body
+    const messages = [
+      {
+        role: 'assistant',
+        id: 'a1',
+        toolCalls: [{ id: 'tc_d', type: 'function', function: { name: 'saveDraft', arguments: '{}' } }],
+      },
+      { role: 'tool', id: 't1', content: 'approved', toolCallId: 'tc_d' },
+    ]
+    const out = await drain(provider.run(runInput(messages)))
+    const errorEvent = out.find((e) => e.type === EventType.TEXT_MESSAGE_CHUNK && e.delta?.includes('Resume failed'))
+    expect(errorEvent).toBeDefined()
+    expect(spawned).toBe(false)
   })
 
   it('emits a readable error chunk when spawn throws', async () => {
