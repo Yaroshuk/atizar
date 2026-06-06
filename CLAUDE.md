@@ -88,10 +88,19 @@ pause (Awaiting approval) → approve → resume → real "Done — your reply �
 Spec/plan: `docs/superpowers/specs/2026-06-06-first-real-provider-design.md` +
 `docs/superpowers/plans/2026-06-06-first-real-provider.md`.
 
-**Known cosmetic artifact:** in this env the model reaches the MCP tools via a built-in
-`ToolSearch` step, which renders as a stray "ToolSearch Running" chip in the thread. It's
-benign (tool discovery) — do NOT disallow `ToolSearch`, that's how the model finds
-`renderLead`/`confirmSend` here. Tightening the available-tool set is a minor follow-up.
+**Loader:** while a run is active (`status === 'running'`) the card swaps its status dot
+for a spinner and the modal shows a trailing "Working…" — real runs take seconds.
+
+**TODO — later, play with prompts/restrictions (not blocking):**
+- The model reaches the MCP tools via a built-in `ToolSearch` step. We already filter
+  non-contract tool calls out of the thread (`surfaceTools` in `claude-stream.ts`), so the
+  "ToolSearch Running" chip no longer shows — but the model still *uses* ToolSearch and
+  sometimes narrates it. Do NOT hard-disallow `ToolSearch` (that's how it finds the tools
+  here); instead tighten the available-tool set / permission config so it goes straight to
+  the tools.
+- The model still narrates a bit ("I'll load the inbox tool schemas, then surface the lead")
+  despite the anti-narration line in `firstPrompt`. Tune the prompt (or strip pre-tool
+  chatter client-side) so the consumer thread stays clean.
 
 ## Next after that
 
