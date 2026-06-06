@@ -46,6 +46,20 @@ export function hasPendingApproval(
   return false;
 }
 
+// Index tool result messages by toolCallId so each assistant tool call can be
+// paired with its matching role:"tool" result (used by the modal thread render).
+export function pairToolResults(
+  messages: readonly Message[],
+): Map<string, ToolMessage> {
+  const byCallId = new Map<string, ToolMessage>();
+  for (const m of messages) {
+    if (isToolMessage(m) && typeof m.toolCallId === "string") {
+      byCallId.set(m.toolCallId, m);
+    }
+  }
+  return byCallId;
+}
+
 // The resume-detection counterpart of hasPendingApproval, viewed from the other
 // end: true when some role:"tool" message answers an approval tool call. Used by
 // the (server-side) provider to decide turn-1 vs resume. Correlates by

@@ -5,6 +5,7 @@ import {
   toolCallsOf,
   hasPendingApproval,
   approvalResolved,
+  pairToolResults,
   type Message,
 } from "./messages.js";
 
@@ -71,6 +72,24 @@ describe("approvalResolved", () => {
   it("false when a tool result answers a non-approval call", () => {
     const msgs = [assistantWithToolCall("renderLead", "x1"), toolResult("x1")];
     expect(approvalResolved(msgs, APPROVALS)).toBe(false);
+  });
+});
+
+describe("pairToolResults", () => {
+  it("indexes tool results by toolCallId", () => {
+    const msgs = [
+      assistantWithToolCall("confirmSend", "x1"),
+      toolResult("x1"),
+    ];
+    const map = pairToolResults(msgs);
+    expect(map.get("x1")?.role).toBe("tool");
+    expect(map.size).toBe(1);
+  });
+
+  it("has no entry for an unanswered tool call", () => {
+    const map = pairToolResults([assistantWithToolCall("confirmSend", "x1")]);
+    expect(map.get("x1")).toBeUndefined();
+    expect(map.size).toBe(0);
   });
 });
 
