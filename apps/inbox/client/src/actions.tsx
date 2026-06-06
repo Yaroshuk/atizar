@@ -7,7 +7,7 @@ import { renderRegistry } from './renderRegistry'
 // `renders` maps tool name → component name; `approvals` decides which tool pauses
 // the run (useHumanInTheLoop) vs. pure render (useRenderTool).
 //
-// The literal tool names below ("renderLead", "confirmSend") and their arg schemas
+// The literal tool names below ("renderLead", "saveDraft") and their arg schemas
 // must match `inboxAgent.tools` — the CopilotKit hooks need a static name + Zod
 // shape, so this is the one place tool identity is restated. The component, though,
 // is resolved via the passport (`renders`) through `renderRegistry`; a missing
@@ -17,40 +17,26 @@ export const useInboxActions = () => {
   useRenderTool(
     {
       name: 'renderLead',
-      parameters: z.object({
-        id: z.number(),
-        from: z.string(),
-        subject: z.string(),
-        intent: z.string(),
-      }),
+      parameters: z.object({ from: z.string(), subject: z.string(), summary: z.string() }),
       render: ({ parameters }) => {
-        const { id, from, subject, intent } = parameters
-        if (
-          id === undefined ||
-          from === undefined ||
-          subject === undefined ||
-          intent === undefined
-        ) {
-          return <></>
-        }
+        const { from, subject, summary } = parameters
+        if (from === undefined || subject === undefined || summary === undefined) return <></>
         const Lead = renderRegistry[inboxAgent.renders.renderLead]
-        return <Lead lead={{ id, from, subject, intent }} />
+        return <Lead lead={{ from, subject, summary }} />
       },
     },
     []
   )
 
-  // confirmSend -> <ApprovalDialog /> (human-in-the-loop pause).
-  useHumanInTheLoop<{ leadId: number; message: string }>(
+  // saveDraft -> <ApprovalDialog /> (human-in-the-loop pause).
+  useHumanInTheLoop<{ threadId: string; body: string }>(
     {
-      name: 'confirmSend',
-      parameters: z.object({ leadId: z.number(), message: z.string() }),
+      name: 'saveDraft',
+      parameters: z.object({ threadId: z.string(), body: z.string() }),
       render: ({ args, status, respond }) => {
-        if (args.leadId === undefined || args.message === undefined) {
-          return <></>
-        }
-        const data = { leadId: args.leadId, message: args.message }
-        const Approval = renderRegistry[inboxAgent.renders.confirmSend]
+        if (args.threadId === undefined || args.body === undefined) return <></>
+        const data = { threadId: args.threadId, body: args.body }
+        const Approval = renderRegistry[inboxAgent.renders.saveDraft]
         return (
           <Approval
             data={data}

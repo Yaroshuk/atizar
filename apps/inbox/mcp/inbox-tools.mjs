@@ -1,7 +1,7 @@
 // stdio MCP server launched by the `claude` CLI (--mcp-config). Exposes the two
 // inbox tools so the model can CALL them. Handlers return trivial acks: the UI is
 // driven by AG-UI events the provider emits from the stream, not by these results.
-// confirmSend is rarely executed — the provider kills the run at the call.
+// saveDraft is rarely executed — the provider kills the run at the call.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -11,17 +11,18 @@ const server = new McpServer({ name: 'inbox', version: '1.0.0' })
 server.registerTool(
   'renderLead',
   {
-    description: 'Surface a lead email as a card in the UI.',
-    inputSchema: { id: z.number(), from: z.string(), subject: z.string(), intent: z.string() },
+    description: 'Surface the incoming email as a card in the UI.',
+    inputSchema: { from: z.string(), subject: z.string(), summary: z.string() },
   },
-  async () => ({ content: [{ type: 'text', text: 'Lead surfaced to the user.' }] }),
+  async () => ({ content: [{ type: 'text', text: 'Email surfaced to the user.' }] }),
 )
 
 server.registerTool(
-  'confirmSend',
+  'saveDraft',
   {
-    description: 'Ask the human to approve sending a reply to the lead.',
-    inputSchema: { leadId: z.number(), message: z.string() },
+    description:
+      'Ask the human to approve saving a draft reply. Args carry the Gmail thread id and the proposed reply body.',
+    inputSchema: { threadId: z.string(), body: z.string() },
   },
   async () => ({ content: [{ type: 'text', text: 'Awaiting human approval.' }] }),
 )
