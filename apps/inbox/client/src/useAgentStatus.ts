@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Status } from "./components/AgentCard";
+import type { Status, Lifecycle } from "./status";
 import { hasPendingApproval, type Message } from "../../core/messages";
 
 // Derives the AgentCard status from the agent's run lifecycle plus message state.
@@ -12,9 +12,7 @@ export function useAgentStatus(
   },
   approvalNames: readonly string[],
 ): Status {
-  const [lifecycle, setLifecycle] = useState<
-    "idle" | "running" | "done" | "error"
-  >("idle");
+  const [lifecycle, setLifecycle] = useState<Lifecycle>("idle");
   const [messages, setMessages] = useState<Message[]>(agent.messages);
 
   useEffect(() => {

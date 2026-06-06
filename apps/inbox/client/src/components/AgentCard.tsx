@@ -1,9 +1,4 @@
-export type Status =
-  | "idle"
-  | "running"
-  | "awaiting_approval"
-  | "done"
-  | "error";
+import type { Status } from "../status";
 
 const LABEL: Record<Status, string> = {
   idle: "Idle",

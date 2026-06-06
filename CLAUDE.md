@@ -86,6 +86,7 @@ mode-2 visual/chat editor.
 - `defineAgent` validates STRUCTURE only (`approvals ⊆ tools`, `renders` keys ⊆ `tools`). Provider-existence is enforced by `registry.resolve(def.provider)` at wiring time, not in the passport.
 - `defineAgent(def)` param is typed as `AgentDefinition` (the output type), not `unknown` — deliberate: the only caller is a hand-authored literal that benefits from compile-time field checks, and `parse()` still runs the cross-field rules. Switch to `unknown` (+ `.strict()`) when config is loaded from file/DB (deferred).
 - `zod` is now an explicit dependency of `apps/inbox` (was transitive); `core/defineAgent.ts` uses it directly. zod v3 API.
+- AgentCard status is a **string literal union, deliberately NOT a TS `enum`** (zero runtime cost, value IS the wire string, `Record<Status,…>` gives exhaustiveness — enum adds a runtime object + `const enum`/bundler footguns). Single source of truth: `client/src/status.ts` — `STATUSES` (`as const` array, also a runtime list) → `Status` (derived union) → `Lifecycle` (`Exclude<Status,"awaiting_approval">`, the run-lifecycle subset). Client-only: server/provider never reference status, so it lives in `client/`, not `core/`.
 
 ### CopilotKit v2 API — CONFIRMED against installed packages
 
