@@ -9,9 +9,26 @@ function stripMcpPrefix(name: string): string {
   return sep === -1 ? name : rest.slice(sep + 2)
 }
 
+function textChunk(text: string): BaseEvent {
+  return {
+    type: EventType.TEXT_MESSAGE_CHUNK,
+    role: 'assistant',
+    messageId: crypto.randomUUID(),
+    delta: text,
+  } as BaseEvent
+}
+
 type ToolBlock = { id: string; name: string; sawArgs: boolean; startInput: unknown }
 
 // Parses the `claude --output-format stream-json` NDJSON stream into AG-UI events.
+//
+// Claude emits a turn in TWO overlapping shapes: incremental `stream_event` lines
+// (content_block_start/delta/stop, with `--include-partial-messages`) AND a final
+// complete top-level `{ type: 'assistant', message }` line. Synthetic/cached turns
+// (and short responses) may arrive ONLY as the complete top-level message with no
+// partial deltas. We handle both and de-duplicate: text is emitted from deltas when
+// streaming, else from the complete message; tool calls are de-duped by id.
+//
 // Stops (returns) right after emitting TOOL_CALL_END for an approval tool — the
 // caller then kills the subprocess (turn-1 HITL pause).
 export async function* mapClaudeStream(
@@ -19,6 +36,31 @@ export async function* mapClaudeStream(
   opts: { approvalNames: readonly string[] },
 ): AsyncGenerator<BaseEvent> {
   const blocks = new Map<number, ToolBlock>()
+  const emittedToolIds = new Set<string>()
+  // Whether text was streamed via deltas since the last message boundary — if so,
+  // skip the complete top-level message's text to avoid double-emitting.
+  let streamedText = false
+
+  // Emits START/ARGS/END for a tool call (used by both the complete-message path
+  // and as a helper). Returns true if it was an approval tool (caller should stop).
+  function* emitToolCall(id: string, rawName: string, argsJson: string | undefined): Generator<BaseEvent> {
+    const name = stripMcpPrefix(rawName)
+    emittedToolIds.add(id)
+    yield {
+      type: EventType.TOOL_CALL_START,
+      toolCallId: id,
+      toolCallName: name,
+      parentMessageId: crypto.randomUUID(),
+    } as BaseEvent
+    if (argsJson) {
+      yield { type: EventType.TOOL_CALL_ARGS, toolCallId: id, delta: argsJson } as BaseEvent
+    }
+    yield { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent
+  }
+
+  function isApproval(rawName: string): boolean {
+    return opts.approvalNames.includes(stripMcpPrefix(rawName))
+  }
 
   for await (const line of lines) {
     const trimmed = line.trim()
@@ -34,18 +76,36 @@ export async function* mapClaudeStream(
       event?: Record<string, unknown>
       is_error?: boolean
       result?: string
+      message?: { content?: Array<Record<string, unknown>> }
     }
+
     // A run-level failure (e.g. auth: "Not logged in · Please run /login") arrives
     // as a `result` line, not a stream_event — surface it as readable text and stop.
     if (obj.type === 'result' && obj.is_error) {
-      yield {
-        type: EventType.TEXT_MESSAGE_CHUNK,
-        role: 'assistant',
-        messageId: crypto.randomUUID(),
-        delta: `Provider error: ${obj.result ?? 'run failed'}`,
-      } as BaseEvent
+      yield textChunk(`Provider error: ${obj.result ?? 'run failed'}`)
       return
     }
+
+    // Complete top-level assistant message (covers synthetic/non-streamed turns).
+    if (obj.type === 'assistant' && obj.message?.content) {
+      for (const block of obj.message.content) {
+        const b = block as { type?: string; text?: string; id?: string; name?: string; input?: unknown }
+        if (b.type === 'text' && b.text && !streamedText) {
+          yield textChunk(b.text)
+        }
+        if (b.type === 'tool_use' && b.id && !emittedToolIds.has(b.id)) {
+          const argsJson =
+            b.input && typeof b.input === 'object' && Object.keys(b.input as object).length > 0
+              ? JSON.stringify(b.input)
+              : undefined
+          yield* emitToolCall(b.id, b.name ?? '', argsJson)
+          if (isApproval(b.name ?? '')) return
+        }
+      }
+      streamedText = false
+      continue
+    }
+
     if (obj.type !== 'stream_event' || !obj.event) continue
     const ev = obj.event as {
       type?: string
@@ -55,10 +115,16 @@ export async function* mapClaudeStream(
     }
     const index = typeof ev.index === 'number' ? ev.index : -1
 
+    if (ev.type === 'message_start') {
+      streamedText = false
+      continue
+    }
+
     if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
       const id = ev.content_block.id ?? crypto.randomUUID()
       const name = stripMcpPrefix(ev.content_block.name ?? '')
       blocks.set(index, { id, name, sawArgs: false, startInput: ev.content_block.input })
+      emittedToolIds.add(id)
       yield {
         type: EventType.TOOL_CALL_START,
         toolCallId: id,
@@ -70,12 +136,8 @@ export async function* mapClaudeStream(
 
     if (ev.type === 'content_block_delta') {
       if (ev.delta?.type === 'text_delta' && ev.delta.text) {
-        yield {
-          type: EventType.TEXT_MESSAGE_CHUNK,
-          role: 'assistant',
-          messageId: crypto.randomUUID(),
-          delta: ev.delta.text,
-        } as BaseEvent
+        streamedText = true
+        yield textChunk(ev.delta.text)
         continue
       }
       if (ev.delta?.type === 'input_json_delta' && typeof ev.delta.partial_json === 'string') {

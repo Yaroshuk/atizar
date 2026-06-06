@@ -62,6 +62,53 @@ describe('mapClaudeStream', () => {
     expect(out[0]).toMatchObject({ delta: 'ok' })
   })
 
+  const assistantMsg = (content: unknown[]) => JSON.stringify({ type: 'assistant', message: { content } })
+
+  it('maps a complete top-level assistant message (synthetic/non-streamed turn)', async () => {
+    const out = await collect(
+      [
+        assistantMsg([
+          { type: 'text', text: 'Done — reply sent.' },
+          { type: 'tool_use', id: 'tc_lead', name: 'mcp__inbox__renderLead', input: { id: 42 } },
+        ]),
+      ],
+      ['confirmSend'],
+    )
+    expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK, delta: 'Done — reply sent.' })
+    expect(out[1]).toMatchObject({ type: EventType.TOOL_CALL_START, toolCallId: 'tc_lead', toolCallName: 'renderLead' })
+    expect(out[2]).toMatchObject({ type: EventType.TOOL_CALL_ARGS, toolCallId: 'tc_lead', delta: '{"id":42}' })
+    expect(out[3]).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_lead' })
+  })
+
+  it('stops at an approval tool_use in a complete top-level assistant message', async () => {
+    const out = await collect(
+      [assistantMsg([{ type: 'tool_use', id: 'tc_ok', name: 'mcp__inbox__confirmSend', input: { leadId: 42 } }]), textDelta('NOPE')],
+      ['confirmSend'],
+    )
+    expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
+    expect(out.some((e) => e.delta === 'NOPE')).toBe(false)
+  })
+
+  it('does not double-emit when streamed deltas are followed by the complete message', async () => {
+    const out = await collect(
+      [
+        JSON.stringify({ type: 'stream_event', event: { type: 'message_start' } }),
+        textDelta('hello'),
+        toolStart(0, 'tc_lead', 'mcp__inbox__renderLead'),
+        toolArgs(0, '{"id":42}'),
+        blockStop(0),
+        // The same content arrives again as a complete assistant message:
+        assistantMsg([
+          { type: 'text', text: 'hello' },
+          { type: 'tool_use', id: 'tc_lead', name: 'mcp__inbox__renderLead', input: { id: 42 } },
+        ]),
+      ],
+      ['confirmSend'],
+    )
+    expect(out.filter((e) => e.type === EventType.TEXT_MESSAGE_CHUNK)).toHaveLength(1)
+    expect(out.filter((e) => e.type === EventType.TOOL_CALL_START)).toHaveLength(1)
+  })
+
   it('surfaces a run-level result error (e.g. auth failure) as a text chunk and stops', async () => {
     const out = await collect(
       [
