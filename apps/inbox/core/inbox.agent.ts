@@ -8,7 +8,8 @@ export const inboxAgent = defineAgent({
   id: 'inbox',
   name: 'EMAIL AGENT',
   provider: 'claude-cli',
-  instructions: 'Check the inbox, surface a lead, and ask before replying.',
+  instructions:
+    'Read the latest email in the inbox, draft a reply, and ask the human before saving it as a draft.',
   tools: ['renderLead', 'saveDraft'],
   approvals: ['saveDraft'],
   renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
