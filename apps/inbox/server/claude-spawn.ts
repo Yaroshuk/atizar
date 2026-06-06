@@ -76,7 +76,8 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
   const child = nodeSpawn(
     'claude',
     [
-      '--bare',
+      // NB: do NOT pass --bare — it skips keychain reads, which breaks the
+      // subscription (OAuth-in-keychain) auth and yields "Not logged in".
       '-p',
       prompt,
       '--mcp-config',
