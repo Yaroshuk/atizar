@@ -71,7 +71,7 @@ export function approvalResolved(
   const approvalCallIds = new Set<string>();
   for (const m of messages) {
     for (const tc of toolCallsOf(m)) {
-      if (approvalNames.includes(tc.function.name) && tc.id) {
+      if (approvalNames.includes(tc.function.name) && typeof tc.id === "string") {
         approvalCallIds.add(tc.id);
       }
     }

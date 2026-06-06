@@ -86,7 +86,7 @@ Built in `apps/inbox/core/defineAgent.ts` (Zod-validated) + the concrete instanc
 defineAgent({
   id, name,
   provider: "mock",                  // ref into the provider registry (§5)
-  instructions,                       // base prompt (threaded to the provider)
+  instructions,                       // base prompt (declared; not yet consumed — mock provider scripts its own output)
   tools: ["renderLead", "confirmSend"],
   approvals: ["confirmSend"],         // actions that pause for human-in-the-loop
   renders: { renderLead: "LeadCard", confirmSend: "ApprovalDialog" }, // tool name → component name
