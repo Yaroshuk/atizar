@@ -12,14 +12,15 @@ import { AgentModal } from "./components/AgentModal";
 import { useAgentStatus } from "./useAgentStatus";
 
 function Spike() {
-  // Modal open state + the human-in-the-loop "awaiting approval" signal.
+  // Modal open state.
   const [open, setOpen] = useState(false);
-  const [awaitingApproval, setAwaitingApproval] = useState(false);
 
-  // Register the generative-UI renderers (renderLead -> LeadCard, etc.) and
-  // surface the confirmSend executing-state so the card can show
-  // "Жду подтверждения". Must run inside <CopilotKit>.
-  useInboxActions({ onApprovalPending: setAwaitingApproval });
+  // Register the generative-UI renderers (renderLead -> LeadCard,
+  // confirmSend -> ApprovalDialog). Must run inside <CopilotKit>. The
+  // "awaiting_approval" status is no longer sourced from here — it is derived
+  // from agent.messages in useAgentStatus, so it is reported even when the
+  // ApprovalDialog (and modal) are not mounted.
+  useInboxActions();
 
   // The CopilotKitCore singleton. Runs MUST be driven through
   // `copilotkit.runAgent({ agent })` — NOT the bare `agent.runAgent()`.
@@ -55,9 +56,10 @@ function Spike() {
   const renderToolCall = useRenderToolCall();
 
   // Status comes from the agent's real run lifecycle (onRunStartedEvent ->
-  // running, onRunFinalized -> done, onRunFailed -> error) with the confirmSend
-  // executing-state overriding to "awaiting_approval".
-  const status = useAgentStatus(agent, awaitingApproval);
+  // running, onRunFinalized -> done, onRunFailed -> error) with a pending
+  // confirmSend tool call (derived from agent.messages) overriding to
+  // "awaiting_approval" — render-independent, so the CLOSED card shows it.
+  const status = useAgentStatus(agent);
 
   return (
     <div style={{ padding: 24 }}>

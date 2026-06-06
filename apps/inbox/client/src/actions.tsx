@@ -1,5 +1,4 @@
 import { useHumanInTheLoop, useRenderTool } from "@copilotkit/react-core/v2";
-import { useRef } from "react";
 import { z } from "zod";
 import { LeadCard } from "./components/LeadCard";
 import { ApprovalDialog } from "./components/ApprovalDialog";
@@ -22,23 +21,11 @@ import { ApprovalDialog } from "./components/ApprovalDialog";
 //
 // Call `useInboxActions()` inside a component nested under <CopilotKit>.
 //
-// `onApprovalPending` (optional) is invoked with `true` while the confirmSend
-// human-in-the-loop tool is `executing` (run paused, ApprovalDialog awaiting
-// the user) and `false` once it leaves that state (approved/resolved). This is
-// the cleanest source for the AgentCard's "awaiting_approval" status — it is
-// scoped exactly to the window where `respond` is live.
-export function useInboxActions(opts?: {
-  onApprovalPending?: (pending: boolean) => void;
-}) {
-  const onApprovalPending = opts?.onApprovalPending;
-  // Last pending value reported to the parent, so we only fire on transitions
-  // and defer the call out of render (avoids setState-during-render).
-  const lastPending = useRef<boolean | null>(null);
-  const reportPending = (pending: boolean) => {
-    if (!onApprovalPending || lastPending.current === pending) return;
-    lastPending.current = pending;
-    queueMicrotask(() => onApprovalPending(pending));
-  };
+// Note: the AgentCard's "awaiting_approval" status is NOT sourced from this
+// render callback. It is derived render-independently from `agent.messages`
+// (see `hasPendingApproval` in useAgentStatus.ts), so the CLOSED card surfaces
+// it even when the ApprovalDialog below is never mounted.
+export function useInboxActions() {
   // renderLead -> <LeadCard lead={...} />
   useRenderTool(
     {
@@ -90,9 +77,6 @@ export function useInboxActions(opts?: {
         message: z.string(),
       }),
       render: ({ args, status, respond }) => {
-        // Surface "awaiting_approval" exactly while the run is paused for the
-        // human: the tool call is `executing` and `respond` is live.
-        reportPending(status === "executing" && !!respond);
         if (args.leadId === undefined || args.message === undefined) {
           return <></>;
         }
