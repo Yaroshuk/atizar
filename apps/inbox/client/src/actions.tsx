@@ -28,10 +28,25 @@ export function useInboxActions() {
         subject: z.string(),
         intent: z.string(),
       }),
-      render: ({ status, parameters }) => {
-        // While args are still streaming in, fields may be partial.
-        if (status === "inProgress") return <></>;
-        return <LeadCard lead={parameters} />;
+      render: ({ parameters }) => {
+        // Render whenever the four required fields are present. We do NOT gate
+        // on `status !== "inProgress"`: when surfacing historical tool calls
+        // from `agent.messages` via `useRenderToolCall({ toolCall })` (no
+        // `toolMessage`, id not in `executingToolCallIds`), CopilotKit reports
+        // status `"inProgress"` even though `function.arguments` is fully
+        // streamed in. Gating on that status would blank the card forever.
+        // `parameters` is the partial-JSON-parse of `function.arguments`, so we
+        // guard on the fields actually being present instead.
+        const { id, from, subject, intent } = parameters;
+        if (
+          id === undefined ||
+          from === undefined ||
+          subject === undefined ||
+          intent === undefined
+        ) {
+          return <></>;
+        }
+        return <LeadCard lead={{ id, from, subject, intent }} />;
       },
     },
     [],
@@ -43,8 +58,10 @@ export function useInboxActions() {
     {
       name: "confirmSend",
       parameters: z.object({}).passthrough(),
-      render: ({ status, parameters }) => {
-        if (status === "inProgress") return <></>;
+      render: ({ parameters }) => {
+        // Same rationale as renderLead: historical tool calls surfaced from
+        // `agent.messages` arrive with status "inProgress", so we don't gate on
+        // it. (Task 4 replaces this with a real human-in-the-loop resume.)
         return <ApprovalDialog data={parameters} />;
       },
     },
