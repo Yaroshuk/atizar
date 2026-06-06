@@ -4,6 +4,11 @@ Framework for AI engineers who ship agentic automations to clients:
 code for the engineer, a polished UI for the client. Default focus —
 inbound flows (email/leads → qualify → human approval → action).
 
+📐 **Read `docs/ARCHITECTURE.md` first** — the full vision & architecture
+(three modes, config-as-data, `defineAgent`, providers, generative UI, roadmap),
+with each item marked BUILT / DESIGN INTENT / DEFERRED. This file is the
+operational index; that file is the big picture.
+
 ## Agent-First Project — Continuous Learning
 
 This is an **agent-first project**. Every correction or decision that
