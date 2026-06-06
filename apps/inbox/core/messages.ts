@@ -45,3 +45,27 @@ export function hasPendingApproval(
   }
   return false;
 }
+
+// The resume-detection counterpart of hasPendingApproval, viewed from the other
+// end: true when some role:"tool" message answers an approval tool call. Used by
+// the (server-side) provider to decide turn-1 vs resume. Correlates by
+// toolCallId because AG-UI strips the tool name from tool result messages.
+export function approvalResolved(
+  messages: readonly Message[],
+  approvalNames: readonly string[],
+): boolean {
+  const approvalCallIds = new Set<string>();
+  for (const m of messages) {
+    for (const tc of toolCallsOf(m)) {
+      if (approvalNames.includes(tc.function.name) && tc.id) {
+        approvalCallIds.add(tc.id);
+      }
+    }
+  }
+  return messages.some(
+    (m) =>
+      isToolMessage(m) &&
+      typeof m.toolCallId === "string" &&
+      approvalCallIds.has(m.toolCallId),
+  );
+}

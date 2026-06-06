@@ -4,6 +4,7 @@ import {
   isToolMessage,
   toolCallsOf,
   hasPendingApproval,
+  approvalResolved,
   type Message,
 } from "./messages.js";
 
@@ -51,6 +52,25 @@ describe("hasPendingApproval", () => {
       assistantWithToolCall("confirmDelete", "x2"),
     ];
     expect(hasPendingApproval(msgs, ["confirmSend", "confirmDelete"])).toBe(true);
+  });
+});
+
+describe("approvalResolved", () => {
+  const APPROVALS = ["confirmSend"];
+
+  it("false on turn 1 (approval requested, not answered)", () => {
+    const msgs = [assistantWithToolCall("confirmSend", "x1")];
+    expect(approvalResolved(msgs, APPROVALS)).toBe(false);
+  });
+
+  it("true on resume (a tool result answers the approval call)", () => {
+    const msgs = [assistantWithToolCall("confirmSend", "x1"), toolResult("x1")];
+    expect(approvalResolved(msgs, APPROVALS)).toBe(true);
+  });
+
+  it("false when a tool result answers a non-approval call", () => {
+    const msgs = [assistantWithToolCall("renderLead", "x1"), toolResult("x1")];
+    expect(approvalResolved(msgs, APPROVALS)).toBe(false);
   });
 });
 
