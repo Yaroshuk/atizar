@@ -28,9 +28,16 @@ Conventions: `docs/CONVENTIONS.md` (core/server use `function` declarations; `ty
 
 ---
 
-## Task 0: Recon — pin exact CLI flags + MCP SDK API
+## Task 0: Recon — pin exact CLI flags + MCP SDK API  ✅ DONE
 
-No code change; verify against the installed tools so later tasks use real flags.
+Verified 2026-06-06 against installed tools: `claude` 2.1.167 has all flags
+(`-p`, `--output-format stream-json`, `--mcp-config`, `--strict-mcp-config`,
+`--settings`, `--include-partial-messages`, `--append-system-prompt`, `--bare`,
+`--permission-mode`, `--allowedTools/--disallowedTools`). `@modelcontextprotocol/sdk`
+is **1.29.0**; `McpServer` (from `.../server/mcp.js`) exposes `registerTool` and
+`connect`; `StdioServerTransport` from `.../server/stdio.js`. `ANTHROPIC_API_KEY`
+is unset (subscription auth). The code in Tasks 3–4 matches these. Original recon
+steps kept below for reference.
 
 - [ ] **Step 1: Inspect the CLI flags**
 
@@ -564,10 +571,12 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
   const child = nodeSpawn(
     'claude',
     [
+      '--bare', // skip hooks/LSP/plugins for a clean headless run
       '-p',
       prompt,
       '--mcp-config',
       mcpConfig,
+      '--strict-mcp-config', // ONLY our inbox server, ignore any user MCP config
       '--settings',
       settings,
       '--output-format',
