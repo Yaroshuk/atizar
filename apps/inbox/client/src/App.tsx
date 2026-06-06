@@ -62,7 +62,7 @@ function Spike() {
   const status = useAgentStatus(agent);
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <AgentCard
         name="EMAIL AGENT"
         status={status}
