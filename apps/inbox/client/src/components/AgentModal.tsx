@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
-import { pairToolResults, type Message } from '../../../core/messages'
+import {
+  pairToolResults,
+  type Message,
+  type ToolCall,
+  type ToolMessage,
+} from '../../../core/messages'
 
 // AgentModal renders the conversation thread in an overlay panel.
 //
@@ -19,7 +24,7 @@ export function AgentModal({
   onClose,
 }: {
   agent: { messages: Message[] }
-  renderToolCall: (args: { toolCall: any; toolMessage?: any }) => ReactNode
+  renderToolCall: (args: { toolCall: ToolCall; toolMessage?: ToolMessage }) => ReactNode
   onClose: () => void
 }) {
   // Index tool result messages by toolCallId so each assistant tool call can be
@@ -27,7 +32,7 @@ export function AgentModal({
   // confirmSend as done).
   const toolMessageByCallId = pairToolResults(agent.messages)
 
-  const thread = agent.messages.flatMap((msg: any, i: number) => {
+  const thread = agent.messages.flatMap((msg: Message, i: number) => {
     if (msg.role !== 'assistant') return []
     const nodes: ReactNode[] = []
 

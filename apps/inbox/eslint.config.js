@@ -23,9 +23,18 @@ export default tseslint.config(
     },
   },
   {
+    // Tests use minimal stubs/fixtures cast to domain types — `any` is fine here.
     files: ['**/*.test.*'],
     rules: {
       '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    // Server entry points legitimately log to the console (startup, etc.).
+    files: ['server/**'],
+    rules: {
+      'no-console': 'off',
     },
   },
   prettier,
