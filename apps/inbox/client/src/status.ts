@@ -6,16 +6,10 @@
 //
 // Client-only: the server/provider never references status — it lives here, not
 // in `core/` (which is shared and React/runtime-free).
-export const STATUSES = [
-  "idle",
-  "running",
-  "awaiting_approval",
-  "done",
-  "error",
-] as const;
+export const STATUSES = ['idle', 'running', 'awaiting_approval', 'done', 'error'] as const
 
-export type Status = (typeof STATUSES)[number];
+export type Status = (typeof STATUSES)[number]
 
 // The subset that comes from the agent run lifecycle. `awaiting_approval` is
 // derived from message state (hasPendingApproval), never a lifecycle event.
-export type Lifecycle = Exclude<Status, "awaiting_approval">;
+export type Lifecycle = Exclude<Status, 'awaiting_approval'>

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod'
 
 // One object describes an agent; the server adapter and client glue both derive
 // from it. Pure data — no React, no runtime code. `fields` is intentionally
@@ -19,7 +19,7 @@ export const AgentDefinitionSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `approval "${name}" is not declared in tools`,
-        });
+        })
       }
     }
     for (const key of Object.keys(def.renders)) {
@@ -27,13 +27,13 @@ export const AgentDefinitionSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `render key "${key}" is not declared in tools`,
-        });
+        })
       }
     }
-  });
+  })
 
-export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
+export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>
 
 export function defineAgent(def: AgentDefinition): AgentDefinition {
-  return AgentDefinitionSchema.parse(def);
+  return AgentDefinitionSchema.parse(def)
 }

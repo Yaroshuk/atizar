@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { pairToolResults, type Message } from "../../../core/messages";
+import type { ReactNode } from 'react'
+import { pairToolResults, type Message } from '../../../core/messages'
 
 // AgentModal renders the conversation thread in an overlay panel.
 //
@@ -18,22 +18,22 @@ export function AgentModal({
   renderToolCall,
   onClose,
 }: {
-  agent: { messages: Message[] };
-  renderToolCall: (args: { toolCall: any; toolMessage?: any }) => ReactNode;
-  onClose: () => void;
+  agent: { messages: Message[] }
+  renderToolCall: (args: { toolCall: any; toolMessage?: any }) => ReactNode
+  onClose: () => void
 }) {
   // Index tool result messages by toolCallId so each assistant tool call can be
   // paired with its matching `role:"tool"` result (used to surface a completed
   // confirmSend as done).
-  const toolMessageByCallId = pairToolResults(agent.messages);
+  const toolMessageByCallId = pairToolResults(agent.messages)
 
   const thread = agent.messages.flatMap((msg: any, i: number) => {
-    if (msg.role !== "assistant") return [];
-    const nodes: ReactNode[] = [];
+    if (msg.role !== 'assistant') return []
+    const nodes: ReactNode[] = []
 
     // Assistant text content -> <p>.
-    if (typeof msg.content === "string" && msg.content.length > 0) {
-      nodes.push(<p key={`text-${i}`}>{msg.content}</p>);
+    if (typeof msg.content === 'string' && msg.content.length > 0) {
+      nodes.push(<p key={`text-${i}`}>{msg.content}</p>)
     }
 
     // Assistant tool calls -> generative UI (LeadCard / ApprovalDialog).
@@ -45,53 +45,53 @@ export function AgentModal({
               toolCall,
               toolMessage: toolMessageByCallId.get(toolCall.id),
             })}
-          </div>,
-        );
+          </div>
+        )
       }
     }
 
-    return nodes;
-  });
+    return nodes
+  })
 
   return (
     <div
       onClick={onClose}
       style={{
-        position: "fixed",
+        position: 'fixed',
         inset: 0,
-        background: "rgba(0,0,0,.3)",
-        display: "grid",
-        placeItems: "center",
+        background: 'rgba(0,0,0,.3)',
+        display: 'grid',
+        placeItems: 'center',
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 480,
-          maxHeight: "80vh",
-          overflow: "auto",
-          background: "#fff",
+          maxHeight: '80vh',
+          overflow: 'auto',
+          background: '#fff',
           borderRadius: 12,
           padding: 20,
         }}
       >
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             marginBottom: 12,
           }}
         >
           <strong>EMAIL AGENT</strong>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label='Close'
             style={{
               border: 0,
-              background: "transparent",
+              background: 'transparent',
               fontSize: 20,
-              cursor: "pointer",
+              cursor: 'pointer',
               lineHeight: 1,
             }}
           >
@@ -101,5 +101,5 @@ export function AgentModal({
         <div>{thread}</div>
       </div>
     </div>
-  );
+  )
 }

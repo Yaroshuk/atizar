@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { hasPendingApproval, type Message } from "../../core/messages";
+import { describe, it, expect } from 'vitest'
+import { hasPendingApproval, type Message } from '../../core/messages'
 
 // `hasPendingApproval` is the render-INDEPENDENT predicate that decides whether
 // the AgentCard should show "Awaiting approval" (awaiting_approval). It reads
@@ -17,67 +17,62 @@ import { hasPendingApproval, type Message } from "../../core/messages";
 
 // Helper: cast a minimal stub to Message without satisfying every required field.
 function msg<T extends object>(stub: T): Message {
-  return stub as unknown as Message;
+  return stub as unknown as Message
 }
 
-const assistantText = (content: string): Message =>
-  msg({ role: "assistant", content });
+const assistantText = (content: string): Message => msg({ role: 'assistant', content })
 
 const confirmSendCall = (id: string): Message =>
   msg({
-    role: "assistant",
-    toolCalls: [{ id, function: { name: "confirmSend" } }],
-  });
+    role: 'assistant',
+    toolCalls: [{ id, function: { name: 'confirmSend' } }],
+  })
 
 const renderLeadCall = (id: string): Message =>
   msg({
-    role: "assistant",
-    toolCalls: [{ id, function: { name: "renderLead" } }],
-  });
+    role: 'assistant',
+    toolCalls: [{ id, function: { name: 'renderLead' } }],
+  })
 
-const toolResult = (toolCallId: string): Message =>
-  msg({ role: "tool", toolCallId });
+const toolResult = (toolCallId: string): Message => msg({ role: 'tool', toolCallId })
 
-describe("hasPendingApproval", () => {
-  it("is TRUE when a confirmSend tool call has no matching tool message (run paused for human)", () => {
+describe('hasPendingApproval', () => {
+  it('is TRUE when a confirmSend tool call has no matching tool message (run paused for human)', () => {
     const messages: Message[] = [
-      assistantText("Checking inbox… found a lead."),
-      renderLeadCall("tc_lead"),
-      confirmSendCall("tc_confirm"),
-    ];
-    expect(hasPendingApproval(messages, ["confirmSend"])).toBe(true);
-  });
+      assistantText('Checking inbox… found a lead.'),
+      renderLeadCall('tc_lead'),
+      confirmSendCall('tc_confirm'),
+    ]
+    expect(hasPendingApproval(messages, ['confirmSend'])).toBe(true)
+  })
 
   it("is FALSE when the confirmSend tool call has a matching role:'tool' message (human approved)", () => {
     const messages: Message[] = [
-      assistantText("Checking inbox… found a lead."),
-      renderLeadCall("tc_lead"),
-      confirmSendCall("tc_confirm"),
-      toolResult("tc_confirm"),
-      assistantText("Done — reply sent."),
-    ];
-    expect(hasPendingApproval(messages, ["confirmSend"])).toBe(false);
-  });
+      assistantText('Checking inbox… found a lead.'),
+      renderLeadCall('tc_lead'),
+      confirmSendCall('tc_confirm'),
+      toolResult('tc_confirm'),
+      assistantText('Done — reply sent.'),
+    ]
+    expect(hasPendingApproval(messages, ['confirmSend'])).toBe(false)
+  })
 
-  it("is FALSE when there is only a renderLead tool call (no confirmSend at all)", () => {
+  it('is FALSE when there is only a renderLead tool call (no confirmSend at all)', () => {
     const messages: Message[] = [
-      assistantText("Checking inbox… found a lead."),
-      renderLeadCall("tc_lead"),
-    ];
-    expect(hasPendingApproval(messages, ["confirmSend"])).toBe(false);
-  });
+      assistantText('Checking inbox… found a lead.'),
+      renderLeadCall('tc_lead'),
+    ]
+    expect(hasPendingApproval(messages, ['confirmSend'])).toBe(false)
+  })
 
-  it("is FALSE for an empty message list (idle / before first run)", () => {
-    expect(hasPendingApproval([], ["confirmSend"])).toBe(false);
-  });
+  it('is FALSE for an empty message list (idle / before first run)', () => {
+    expect(hasPendingApproval([], ['confirmSend'])).toBe(false)
+  })
 
   it("matches the approval by toolCallId, not by the tool message's name (AG-UI strips it)", () => {
     // A tool result answering a DIFFERENT call must not count as resolving the
     // pending confirmSend.
-    const messages: Message[] = [
-      confirmSendCall("tc_confirm"),
-      toolResult("tc_other"),
-    ];
-    expect(hasPendingApproval(messages, ["confirmSend"])).toBe(true);
-  });
-});
+    const messages: Message[] = [confirmSendCall('tc_confirm'), toolResult('tc_other')]
+    expect(hasPendingApproval(messages, ['confirmSend'])).toBe(true)
+  })
+})
