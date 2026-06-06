@@ -12,7 +12,7 @@ import { renderRegistry } from './renderRegistry'
 // shape, so this is the one place tool identity is restated. The component, though,
 // is resolved via the passport (`renders`) through `renderRegistry`; a missing
 // registry entry surfaces (renders undefined) rather than silently falling back.
-export function useInboxActions() {
+export const useInboxActions = () => {
   // renderLead -> <LeadCard /> (pure generative UI).
   useRenderTool(
     {

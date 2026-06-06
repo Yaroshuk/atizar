@@ -24,6 +24,11 @@ isn't persisted is one that will repeat.
 All project content — docs, code, comments, identifiers, and user-facing/demo
 strings — is written in English, regardless of the language used in chat.
 
+**Code style → `docs/CONVENTIONS.md`** — the *how we write code* rules Prettier/ESLint
+can't enforce (arrow-const named-export components, `type {Name}Props`, strict
+one-component-per-file, naming, import grouping), distilled from the Magma house
+style and filtered to this stack. Read it before writing client code.
+
 ## Skills / Rules
 
 Hard-won API gotchas are distilled into rule files for quick recall:

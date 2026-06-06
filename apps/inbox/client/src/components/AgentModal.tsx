@@ -18,15 +18,13 @@ import {
 // App.tsx, moved here verbatim so the LeadCard + ApprovalDialog render and the
 // human-in-the-loop approval button keeps its live `respond` callback (sourced
 // from the executing tool-call state, not from `toolMessage`).
-export function AgentModal({
-  agent,
-  renderToolCall,
-  onClose,
-}: {
+type AgentModalProps = {
   agent: { messages: Message[] }
   renderToolCall: (args: { toolCall: ToolCall; toolMessage?: ToolMessage }) => ReactNode
   onClose: () => void
-}) {
+}
+
+export const AgentModal = ({ agent, renderToolCall, onClose }: AgentModalProps) => {
   // Index tool result messages by toolCallId so each assistant tool call can be
   // paired with its matching `role:"tool"` result (used to surface a completed
   // confirmSend as done).

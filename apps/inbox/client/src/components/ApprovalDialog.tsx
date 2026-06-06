@@ -1,6 +1,8 @@
 type ApprovalData = { leadId: number; message: string }
 
-export function ApprovalDialog({ data, onApprove }: { data: ApprovalData; onApprove: () => void }) {
+type ApprovalDialogProps = { data: ApprovalData; onApprove: () => void }
+
+export const ApprovalDialog = ({ data, onApprove }: ApprovalDialogProps) => {
   return (
     <div
       style={{

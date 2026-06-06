@@ -1,6 +1,8 @@
 type Lead = { id: number; from: string; subject: string; intent: string }
 
-export function LeadCard({ lead }: { lead: Lead }) {
+type LeadCardProps = { lead: Lead }
+
+export const LeadCard = ({ lead }: LeadCardProps) => {
   return (
     <div
       style={{

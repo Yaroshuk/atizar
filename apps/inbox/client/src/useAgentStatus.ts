@@ -13,13 +13,13 @@ type AgentSubscriber = {
 // Derives the AgentCard status from the agent's run lifecycle plus message state.
 // `awaiting_approval` (from hasPendingApproval over agent.messages) wins over
 // "done"/"running" but never over a terminal "error" — see CLAUDE.md.
-export function useAgentStatus(
+export const useAgentStatus = (
   agent: {
     messages: Message[]
     subscribe: (s: AgentSubscriber) => { unsubscribe: () => void }
   },
   approvalNames: readonly string[]
-): Status {
+): Status => {
   const [lifecycle, setLifecycle] = useState<Lifecycle>('idle')
   const [messages, setMessages] = useState<Message[]>(agent.messages)
 

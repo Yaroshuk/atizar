@@ -15,17 +15,14 @@ const DOT: Record<Status, string> = {
   error: '#e33',
 }
 
-export function AgentCard({
-  name,
-  status,
-  onStart,
-  onOpen,
-}: {
+type AgentCardProps = {
   name: string
   status: Status
   onStart: () => void
   onOpen: () => void
-}) {
+}
+
+export const AgentCard = ({ name, status, onStart, onOpen }: AgentCardProps) => {
   return (
     <div
       onClick={onOpen}
