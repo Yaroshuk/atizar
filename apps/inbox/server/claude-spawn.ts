@@ -72,7 +72,7 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
       permissions: {
         allow: [
           'mcp__inbox__renderLead',
-          'mcp__inbox__confirmSend',
+          'mcp__inbox__saveDraft',
           'mcp__gmail__get_latest_email',
           'mcp__gmail__create_draft',
         ],
