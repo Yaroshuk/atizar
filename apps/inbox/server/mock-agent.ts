@@ -4,16 +4,40 @@ import { BuiltInAgent } from "@copilotkit/runtime/v2";
 const LEAD = { id: 42, from: "ivan@acme.ru", subject: "Заказ 10 шт", intent: "order" };
 
 // Did a previous turn already resolve the confirmSend approval?
-// NOTE: best-effort heuristic for the resumed-turn message shape; to be
-// verified/tightened in Task 4 (approval wiring). A real AG-UI ToolMessage
-// matches by `toolCallId` (no `name`/`toolName` field), so this also tolerates
-// a custom-shaped resume message carrying the tool name.
+//
+// On resume, `input.messages` (parsed RunAgentInput, @ag-ui/core schemas)
+// contains:
+//   - the prior assistant message with the confirmSend tool call. AG-UI's
+//     AssistantMessageSchema keeps the tool name at `toolCalls[].function.name`
+//     and the id at `toolCalls[].id`.
+//   - a `role:"tool"` message recording the human's answer. AG-UI's
+//     ToolMessageSchema STRIPS `name`/`toolName` — it only carries
+//     `{ id, content, role:"tool", toolCallId }`.
+//
+// So we cannot match on a tool message's name. Instead we correlate by id:
+// collect the ids of all assistant `confirmSend` tool calls, then check whether
+// any `role:"tool"` message answers one of them (`toolCallId` match). This is
+// robust against the name being stripped and against the toolCallId being a
+// random uuid generated per run.
 function approvalResolved(input: any): boolean {
   const msgs = input?.messages ?? [];
+
+  const confirmSendCallIds = new Set<string>();
+  for (const m of msgs) {
+    if (m?.role === "assistant" && Array.isArray(m.toolCalls)) {
+      for (const tc of m.toolCalls) {
+        if (tc?.function?.name === "confirmSend" && tc?.id) {
+          confirmSendCallIds.add(tc.id);
+        }
+      }
+    }
+  }
+
   return msgs.some(
     (m: any) =>
       m?.role === "tool" &&
-      (m?.name === "confirmSend" || m?.toolName === "confirmSend")
+      typeof m?.toolCallId === "string" &&
+      confirmSendCallIds.has(m.toolCallId),
   );
 }
 

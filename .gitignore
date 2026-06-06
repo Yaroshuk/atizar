@@ -8,3 +8,4 @@ build/
 .vite/
 coverage/
 .code-review/
+.playwright-mcp/

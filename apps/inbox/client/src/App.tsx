@@ -26,10 +26,32 @@ function Spike() {
   // Map over assistant messages and render any tool calls they carry. The mock
   // agent's first turn emits a text message, then a `renderLead` tool call, then
   // a `confirmSend` tool call — so this surface shows the LeadCard on START.
+  //
+  // For each tool call we also look up the matching `role:"tool"` message (by
+  // `toolCallId`) and pass it as `toolMessage`. This matters for the
+  // human-in-the-loop `confirmSend` call: while the run is paused awaiting the
+  // human, the framework marks the tool call "executing" (via
+  // `executingToolCallIds`) so `useRenderToolCall` renders it with a live
+  // `respond` callback. Once the human approves, a tool message exists and the
+  // same render surfaces it as "complete". `useHumanInTheLoop` only exposes
+  // `respond` in the executing state, so this executing-tool-call path — not a
+  // raw render — is what makes the dialog button able to resume the agent.
+  const toolMessageByCallId = new Map<string, any>();
+  for (const msg of agent.messages as any[]) {
+    if (msg.role === "tool" && msg.toolCallId) {
+      toolMessageByCallId.set(msg.toolCallId, msg);
+    }
+  }
+
   const toolCallEls = agent.messages.flatMap((msg: any) =>
     msg.role === "assistant" && Array.isArray(msg.toolCalls)
       ? msg.toolCalls.map((toolCall: any) => (
-          <div key={toolCall.id}>{renderToolCall({ toolCall })}</div>
+          <div key={toolCall.id}>
+            {renderToolCall({
+              toolCall,
+              toolMessage: toolMessageByCallId.get(toolCall.id),
+            })}
+          </div>
         ))
       : [],
   );
