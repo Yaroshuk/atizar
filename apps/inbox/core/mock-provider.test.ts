@@ -40,6 +40,6 @@ describe('mockInboxProvider', () => {
     const events = await collect(provider.run(input(resumed)))
     expect(events).toHaveLength(1)
     expect(events[0].type).toBe(EventType.TEXT_MESSAGE_CHUNK)
-    expect((events[0] as unknown as { delta: string }).delta).toMatch(/done/i)
+    expect((events[0] as unknown as { delta: string }).delta).toMatch(/draft saved/i)
   })
 })

@@ -2,7 +2,11 @@ import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import type { Provider } from './providers.js'
 import { approvalResolved, type Message } from './messages.js'
 
-const LEAD = { id: 42, from: 'ivan@acme.ru', subject: 'Order: 10 units', intent: 'order' }
+const LEAD = {
+  from: 'ivan@acme.ru',
+  subject: 'Order: 10 units',
+  summary: 'Customer wants to order 10 units; asks about delivery time.',
+}
 
 function textChunk(delta: string): BaseEvent {
   return {
@@ -38,7 +42,7 @@ export function createMockInboxProvider(approvalNames: readonly string[]): Provi
       const messages = (runInput?.messages ?? []) as Message[]
 
       if (approvalResolved(messages, approvalNames)) {
-        yield textChunk('Done — reply sent.')
+        yield textChunk('Draft saved to Gmail.')
         return
       }
 
