@@ -10,6 +10,7 @@ export const providerRegistry: ProviderRegistry = defineProviders({
   mock: createMockInboxProvider(inboxAgent.approvals),
   'claude-cli': createClaudeCliProvider({
     approvalNames: inboxAgent.approvals,
+    surfaceTools: inboxAgent.tools,
     instructions: inboxAgent.instructions,
     spawn: claudeSpawn,
   }),

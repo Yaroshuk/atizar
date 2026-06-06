@@ -64,6 +64,28 @@ describe('mapClaudeStream', () => {
 
   const assistantMsg = (content: unknown[]) => JSON.stringify({ type: 'assistant', message: { content } })
 
+  it('filters out non-surface (internal) tool calls like ToolSearch, keeps contract tools', async () => {
+    const out: any[] = []
+    const lines = [
+      toolStart(0, 'tc_search', 'ToolSearch'),
+      toolArgs(0, '{"query":"inbox"}'),
+      blockStop(0),
+      toolStart(1, 'tc_lead', 'mcp__inbox__renderLead'),
+      toolArgs(1, '{"id":42}'),
+      blockStop(1),
+    ]
+    for await (const ev of mapClaudeStream(fromLines(lines), {
+      approvalNames: ['confirmSend'],
+      surfaceTools: ['renderLead', 'confirmSend'],
+    })) {
+      out.push(ev)
+    }
+    const starts = out.filter((e) => e.type === EventType.TOOL_CALL_START)
+    expect(starts).toHaveLength(1)
+    expect(starts[0]).toMatchObject({ toolCallName: 'renderLead' })
+    expect(out.some((e) => e.toolCallName === 'ToolSearch')).toBe(false)
+  })
+
   it('maps a complete top-level assistant message (synthetic/non-streamed turn)', async () => {
     const out = await collect(
       [

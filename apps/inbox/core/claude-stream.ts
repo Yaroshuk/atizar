@@ -33,13 +33,21 @@ type ToolBlock = { id: string; name: string; sawArgs: boolean; startInput: unkno
 // caller then kills the subprocess (turn-1 HITL pause).
 export async function* mapClaudeStream(
   lines: AsyncIterable<string>,
-  opts: { approvalNames: readonly string[] },
+  opts: { approvalNames: readonly string[]; surfaceTools?: readonly string[] },
 ): AsyncGenerator<BaseEvent> {
   const blocks = new Map<number, ToolBlock>()
   const emittedToolIds = new Set<string>()
   // Whether text was streamed via deltas since the last message boundary — if so,
   // skip the complete top-level message's text to avoid double-emitting.
   let streamedText = false
+
+  // Only surface tool calls that are part of the agent's contract (the names the
+  // client can render). Internal/built-in tools the model may use to reach them
+  // (e.g. ToolSearch) are machinery — never show them to the consumer. When
+  // `surfaceTools` is omitted, all tool calls pass through (back-compat).
+  function shouldSurface(name: string): boolean {
+    return !opts.surfaceTools || opts.surfaceTools.includes(name)
+  }
 
   // Emits START/ARGS/END for a tool call (used by both the complete-message path
   // and as a helper). Returns true if it was an approval tool (caller should stop).
@@ -97,7 +105,7 @@ export async function* mapClaudeStream(
         if (b.type === 'text' && b.text && !streamedText && !synthetic) {
           yield textChunk(b.text)
         }
-        if (b.type === 'tool_use' && b.id && !emittedToolIds.has(b.id)) {
+        if (b.type === 'tool_use' && b.id && !emittedToolIds.has(b.id) && shouldSurface(stripMcpPrefix(b.name ?? ''))) {
           const argsJson =
             b.input && typeof b.input === 'object' && Object.keys(b.input as object).length > 0
               ? JSON.stringify(b.input)
@@ -125,8 +133,11 @@ export async function* mapClaudeStream(
     }
 
     if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
-      const id = ev.content_block.id ?? crypto.randomUUID()
       const name = stripMcpPrefix(ev.content_block.name ?? '')
+      // Internal/built-in tool (e.g. ToolSearch) — don't track or emit it; its
+      // later args/stop lines find no block and are harmlessly ignored.
+      if (!shouldSurface(name)) continue
+      const id = ev.content_block.id ?? crypto.randomUUID()
       blocks.set(index, { id, name, sawArgs: false, startInput: ev.content_block.input })
       emittedToolIds.add(id)
       yield {

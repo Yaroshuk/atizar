@@ -46,7 +46,7 @@ describe('createClaudeCliProvider', () => {
         ],
       },
     ])
-    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], instructions: 'do it', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], surfaceTools: ['renderLead', 'confirmSend'], instructions: 'do it', spawn })
     const out = await drain(provider.run(runInput([])))
     const callNames = out.filter((e) => e.type === EventType.TOOL_CALL_START).map((e) => e.toolCallName)
     expect(callNames).toEqual(['renderLead', 'confirmSend'])
@@ -56,7 +56,7 @@ describe('createClaudeCliProvider', () => {
 
   it('resume: when approval is resolved, re-primes and streams done text', async () => {
     const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('Done — reply sent.')] }])
-    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], instructions: 'do it', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], surfaceTools: ['renderLead', 'confirmSend'], instructions: 'do it', spawn })
     const messages = [
       { role: 'assistant', toolCalls: [{ id: 'tc_ok', function: { name: 'confirmSend' } }] },
       { role: 'tool', toolCallId: 'tc_ok' },
@@ -69,7 +69,7 @@ describe('createClaudeCliProvider', () => {
 
   it('emits a readable error chunk when spawn throws', async () => {
     const spawn: ClaudeSpawn = () => { throw new Error('claude not found') }
-    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], instructions: 'x', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], surfaceTools: ['renderLead', 'confirmSend'], instructions: 'x', spawn })
     const out = await drain(provider.run(runInput([])))
     expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK })
     expect(out[0].delta).toMatch(/error/i)

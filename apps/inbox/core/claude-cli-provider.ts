@@ -21,7 +21,8 @@ function firstPrompt(instructions: string): string {
     '',
     'Call renderLead with that email to surface it to the user, then call',
     'confirmSend with { leadId, message } to ask the human before replying.',
-    'Do not send anything yourself.',
+    'Do not send anything yourself. Do not narrate your tool usage or mention',
+    'tools/schemas — keep any text brief and user-facing.',
   ].join('\n')
 }
 
@@ -46,10 +47,13 @@ function errorChunk(message: string): BaseEvent {
 
 export function createClaudeCliProvider(opts: {
   approvalNames: readonly string[]
+  // The agent's renderable tool names — only these surface to the client; the
+  // model's internal tools (e.g. ToolSearch) are filtered out of the thread.
+  surfaceTools: readonly string[]
   instructions: string
   spawn: ClaudeSpawn
 }): Provider {
-  const { approvalNames, instructions, spawn } = opts
+  const { approvalNames, surfaceTools, instructions, spawn } = opts
   return {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input?.messages ?? []) as Message[]
@@ -62,7 +66,7 @@ export function createClaudeCliProvider(opts: {
         return
       }
       try {
-        yield* mapClaudeStream(child.lines, { approvalNames: resuming ? [] : approvalNames })
+        yield* mapClaudeStream(child.lines, { approvalNames: resuming ? [] : approvalNames, surfaceTools })
       } catch (err) {
         yield errorChunk(err instanceof Error ? err.message : String(err))
       } finally {
