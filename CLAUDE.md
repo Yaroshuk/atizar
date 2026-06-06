@@ -86,6 +86,17 @@ mode-2 visual/chat editor.
 - `defineAgent` validates STRUCTURE only (`approvals ⊆ tools`, `renders` keys ⊆ `tools`). Provider-existence is enforced by `registry.resolve(def.provider)` at wiring time, not in the passport.
 - `defineAgent(def)` param is typed as `AgentDefinition` (the output type), not `unknown` — deliberate: the only caller is a hand-authored literal that benefits from compile-time field checks, and `parse()` still runs the cross-field rules. Switch to `unknown` (+ `.strict()`) when config is loaded from file/DB (deferred).
 - `zod` is now an explicit dependency of `apps/inbox` (was transitive); `core/defineAgent.ts` uses it directly. zod v3 API.
+- **Tooling: Prettier + ESLint, adopted from the Magma house style** (`parents-web`/`teachers-web`).
+  Prettier (`.prettierrc`): `semi:false`, single quotes, `trailingComma:"es5"`, `printWidth:100`. ESLint
+  flat config (`eslint.config.js`) modeled on `parents-web` (web-only — RN handler rules dropped);
+  `eslint-config-prettier` last so ESLint owns CORRECTNESS, Prettier owns FORMATTING. Overrides: `any`
+  allowed in `**/*.test.*`, `console` allowed in `server/**`. **Lint stays green** — findings are fixed
+  or justified with a scoped `eslint-disable` + comment, never left red.
+- **`useAgentStatus` re-syncs messages on `agent` change in the RENDER PHASE** (prev-agent `useRef` guard +
+  `setMessages`), NOT in an effect. Reason: `agent.messages` is mutated IN PLACE by CopilotKit core
+  (`splice`), so `useSyncExternalStore` over `() => agent.messages` would miss updates (stable ref) and need
+  a cached-ref/2nd-subscription workaround. The render-phase reset is the React "adjust state on prop change"
+  pattern — clears `react-hooks/set-state-in-effect` and avoids painting a stale frame, with one subscription.
 - AgentCard status is a **string literal union, deliberately NOT a TS `enum`** (zero runtime cost, value IS the wire string, `Record<Status,…>` gives exhaustiveness — enum adds a runtime object + `const enum`/bundler footguns). Single source of truth: `client/src/status.ts` — `STATUSES` (`as const` array, also a runtime list) → `Status` (derived union) → `Lifecycle` (`Exclude<Status,"awaiting_approval">`, the run-lifecycle subset). Client-only: server/provider never reference status, so it lives in `client/`, not `core/`.
 
 ### CopilotKit v2 API — CONFIRMED against installed packages
@@ -204,3 +215,5 @@ Run from `apps/inbox/`:
 - `npm run build` — vite production build.
 - `npm run typecheck` — `tsc --noEmit`.
 - `npm test` — run vitest (unit tests).
+- `npm run lint` — ESLint (must be GREEN; we do not leave it red).
+- `npm run format` / `npm run format:check` — Prettier write / check.
