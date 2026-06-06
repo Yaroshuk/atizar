@@ -52,6 +52,7 @@ describe('createClaudeCliProvider', () => {
     expect(callNames).toEqual(['renderLead', 'saveDraft'])
     expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
     expect(calls[0].killed).toBe(true)
+    expect(calls[0].prompt).toContain('get_latest_email')
   })
 
   it('resume: when approval is resolved, re-primes and streams done text', async () => {

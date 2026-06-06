@@ -14,11 +14,11 @@ function firstPrompt(instructions: string): string {
   return [
     instructions,
     '',
-    'Read the single most recent email in the inbox using the Gmail tools',
-    '(search the inbox, then get that thread). Then call renderLead with',
+    'Call get_latest_email to read the single most recent email in the inbox',
+    '(it returns { threadId, from, subject, body }). Then call renderLead with',
     '{ from, subject, summary } to surface it, and draft a short reply.',
-    'Then call saveDraft with { threadId, body } — threadId is the Gmail thread',
-    'id of that email, body is your drafted reply — to ask the human before saving.',
+    'Then call saveDraft with { threadId, body } — threadId from the email, body',
+    'is your drafted reply — to ask the human before saving.',
     'Do NOT create the draft yet and do NOT send anything. Do not narrate your',
     'tool usage or mention tools/schemas — keep any text brief and user-facing.',
   ].join('\n')
