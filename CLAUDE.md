@@ -9,6 +9,27 @@ inbound flows (email/leads → qualify → human approval → action).
 with each item marked BUILT / DESIGN INTENT / DEFERRED. This file is the
 operational index; that file is the big picture.
 
+## ⏭️ Handoff — start here (next session)
+
+**Done & merged to `master`:** the first real provider, **`claude-cli`** (runs the real
+`claude` CLI as a subprocess). Full HITL happy path browser-verified: START → real model
+reads the canned lead → drafts a reply → `renderLead` + `confirmSend` → pause → approve →
+resume → real "done". A loading spinner shows while running. See **"First real provider"**
+section below for files + design, and `docs/superpowers/specs|plans/2026-06-06-first-real-provider*`.
+
+**Pick next (suggested order):**
+1. *Quick polish (see the TODO block in the provider section):* steer the model away from
+   the built-in `ToolSearch` via tool-restriction config, and tune `firstPrompt` so it stops
+   narrating ("I'll load the inbox tool schemas…"). Keeps the consumer thread clean.
+2. *Then the roadmap:* real agentic loop (**Mastra**) → one real integration (**Gmail/MCP**)
+   — this is where the canned lead becomes a real inbox. Brainstorm → spec → plan → TDD.
+
+**Don't-rediscover gotchas:** never pass `--bare` to `claude` (it skips keychain reads →
+"Not logged in"); auth is the **subscription** via macOS keychain, no API key; `core/` must
+stay **Node-free** (the real provider's `spawn` is injected, lives in `server/`); the HITL
+contract is **client-held, two requests** (don't change the client/transport — the provider
+conforms to it). Run from `apps/inbox/`: `npm run dev`, `npm test`, `npm run lint`.
+
 ## Agent-First Project — Continuous Learning
 
 This is an **agent-first project**. Every correction or decision that
