@@ -16,7 +16,7 @@
  * @returns {{ threadId: string, from: string, subject: string, body: string }}
  */
 export function parseLatestMessage(message) {
-  const { threadId, snippet, payload } = message
+  const { threadId, snippet, payload = {} } = message
   const { headers = [], body: payloadBody = {}, parts } = payload
 
   const getHeader = (name) => {
@@ -73,8 +73,10 @@ export function parseLatestMessage(message) {
  * @returns {string}  base64url-encoded RFC822 message.
  */
 export function buildReplyRaw({ to, subject, body }) {
-  // Prefix subject with "Re: " unless it already starts with it (case-insensitive).
-  const rePrefix = /^re:/i
+  // Prefix subject with "Re: " unless it already starts with a well-formed "Re: "
+  // (case-insensitive, space required).  A malformed "re:NoSpace" is NOT treated as
+  // already-prefixed so it gets a proper "Re: " prepended.
+  const rePrefix = /^re:\s/i
   const finalSubject = rePrefix.test(subject) ? subject : `Re: ${subject}`
 
   const CRLF = '\r\n'

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { parseLatestMessage, buildReplyRaw } from './gmail-format.mjs'
 
@@ -152,6 +153,19 @@ describe('parseLatestMessage', () => {
 
     expect(result.body).toBe('Nested plain text')
   })
+
+  it('does not throw when payload is missing; falls back to snippet', () => {
+    // Real Gmail edge case: metadata-format messages and some drafts omit payload.
+    const result = parseLatestMessage({ threadId: 't1', snippet: 'just a preview' })
+
+    expect(result).toEqual({ threadId: 't1', from: '', subject: '', body: 'just a preview' })
+  })
+
+  it('does not throw when payload and snippet are both missing; body is empty string', () => {
+    const result = parseLatestMessage({ threadId: 't1' })
+
+    expect(result).toEqual({ threadId: 't1', from: '', subject: '', body: '' })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -205,7 +219,9 @@ describe('buildReplyRaw', () => {
     expect(decoded).not.toContain('Subject: Re: Re:')
   })
 
-  it('does not double-prefix subject starting with Re: (case-insensitive, no space)', () => {
+  it('prepends Re: to a malformed subject with no space after the colon', () => {
+    // "re:Already replied" has no space after the colon — it is NOT treated as
+    // already-prefixed (regex requires /^re:\s/i), so a proper "Re: " is added.
     const raw = buildReplyRaw({
       to: 'ivan@acme.ru',
       subject: 're:Already replied',
@@ -215,8 +231,7 @@ describe('buildReplyRaw', () => {
 
     const decoded = decode(raw)
 
-    // Should not add another Re: prefix — keep as-is
-    expect(decoded).not.toContain('Subject: Re: re:')
+    expect(decoded).toContain('Subject: Re: re:Already replied')
   })
 
   it('returns a valid base64url string (no standard base64 characters +/=)', () => {
