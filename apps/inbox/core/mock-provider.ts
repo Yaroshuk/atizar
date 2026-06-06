@@ -30,7 +30,7 @@ async function* toolCall(name: string, args: unknown): AsyncGenerator<BaseEvent>
 }
 
 // The fake "model": on turn 1 it streams text → a renderLead tool call → a
-// confirmSend approval; on resume (the approval has been answered) it emits the
+// saveDraft approval; on resume (the approval has been answered) it emits the
 // done text. `approvalNames` comes from the agent definition, not a hardcode.
 export function createMockInboxProvider(approvalNames: readonly string[]): Provider {
   return {
@@ -44,7 +44,7 @@ export function createMockInboxProvider(approvalNames: readonly string[]): Provi
 
       yield textChunk('Checking inbox… found a lead.')
       yield* toolCall('renderLead', LEAD)
-      yield* toolCall('confirmSend', { leadId: LEAD.id, message: 'Send a reply to this lead?' })
+      yield* toolCall('saveDraft', { threadId: 'thread_demo', body: 'Thanks for reaching out — here is a reply.' })
     },
   }
 }

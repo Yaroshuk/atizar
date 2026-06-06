@@ -7,7 +7,7 @@ describe('inbox.agent wiring', () => {
   it('the passport validates and references the claude-cli provider', () => {
     expect(inboxAgent.id).toBe('inbox')
     expect(inboxAgent.provider).toBe('claude-cli')
-    expect(inboxAgent.approvals).toEqual(['confirmSend'])
+    expect(inboxAgent.approvals).toEqual(['saveDraft'])
   })
 
   it('a registry built from the passport approvals resolves a provider', () => {
