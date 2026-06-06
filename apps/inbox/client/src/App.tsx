@@ -1,6 +1,7 @@
 import {
   CopilotKit,
   useAgent,
+  useCopilotKit,
   UseAgentUpdate,
   useRenderToolCall,
 } from "@copilotkit/react-core/v2";
@@ -10,6 +11,23 @@ function Spike() {
   // Register the generative-UI renderers (renderLead -> LeadCard, etc.).
   // Must run inside <CopilotKit>.
   useInboxActions();
+
+  // The CopilotKitCore singleton. Runs MUST be driven through
+  // `copilotkit.runAgent({ agent })` — NOT the bare `agent.runAgent()`.
+  //
+  // `agent.runAgent()` (the AG-UI AbstractAgent method) only streams one turn
+  // and accumulates messages on the agent; it does NOT run CopilotKit's
+  // frontend-tool pipeline. The human-in-the-loop resume lives in
+  // `CopilotKitCore.runAgent` -> `processAgentResult`: that is what invokes the
+  // `useHumanInTheLoop` tool handler (whose Promise `respond` resolves), splices
+  // the resulting `role:"tool"` message into `agent.messages`, and — because
+  // `followUp` defaults on — fires the follow-up `runAgent({ agent })`. Since
+  // that follow-up re-runs the SAME agent, `prepareRunAgentInput` reads the now
+  // populated `agent.messages` (history + the confirmSend tool call + the tool
+  // result), so the resume POST carries the full conversation instead of `[]`.
+  // Calling the bare `agent.runAgent()` bypasses all of that, which is why the
+  // resume run previously sent `messages: []` and the agent re-emitted turn 1.
+  const { copilotkit } = useCopilotKit();
 
   // v2: useAgent({ agentId }) returns { agent }. The agent (an AG-UI
   // AbstractAgent) carries `messages` and the `runAgent()` method. Subscribe to
@@ -58,7 +76,7 @@ function Spike() {
 
   return (
     <div>
-      <button onClick={() => agent.runAgent()}>START</button>
+      <button onClick={() => void copilotkit.runAgent({ agent })}>START</button>
       <div>{toolCallEls}</div>
       <pre>{JSON.stringify(agent.messages, null, 2)}</pre>
     </div>
