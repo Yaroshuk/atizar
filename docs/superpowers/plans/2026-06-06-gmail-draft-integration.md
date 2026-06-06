@@ -573,3 +573,111 @@ git commit -m "docs: Gmail draft integration built and browser-verified end-to-e
 - Spec "rename confirmSend → saveDraft": Task 1. ✅
 - Spec "headless remote-OAuth is the first gate": Task 6, STOP-on-fail. ✅
 - Spec Prerequisite (Google Cloud): Prerequisite P (manual). ✅
+
+---
+
+## REVISED Phase B/C — A2: own thin Gmail MCP (2026-06-07)
+
+**Supersedes the original Tasks 6–8.** The spike proved the architecture (headless
+`claude -p` + remote MCP + token reuse works), but the official `gmailmcp.googleapis.com`
+is Workspace-preview-gated (403 on personal accounts) and the community GongRzhe
+package is archived + classifier-blocked. Pivot: a thin stdio Gmail MCP we own,
+reusing the OAuth client + token already at `~/.gmail-mcp/` (`gcp-oauth.keys.json` +
+`credentials.json`, scope `gmail.modify`). Phase A (Tasks 1–5) stands unchanged. See
+the spec's "Update 2026-06-07" section.
+
+Status of the original tasks: **Task 6 (spike) — DONE** (verdict above, recorded in
+the spec). Original Tasks 7–8 are replaced by Tasks 6a–6d below.
+
+### Task 6a: Pure helpers for the Gmail MCP (TDD)
+
+**Files:**
+- Create: `apps/inbox/mcp/gmail-format.mjs` (pure, no googleapis/network)
+- Create: `apps/inbox/mcp/gmail-format.test.mjs` (or `.test.ts` if vitest picks `.mjs` up — match repo test config)
+
+Two pure functions:
+- `parseLatestMessage(gmailMessage)` → `{ threadId, from, subject, body }` — given a
+  Gmail `users.messages.get` payload (format `full`), extract `threadId`, the `From`
+  header, the `Subject` header, and the decoded text body (walk `payload.parts` for
+  `text/plain`, base64url-decode; fall back to `payload.body`/`snippet`).
+- `buildReplyRaw({ to, subject, body, threadId })` → a base64url-encoded RFC822
+  string for a reply: `To:`, `Subject:` prefixed `Re: ` (don't double-prefix if it
+  already starts with `Re:`), a plain-text body. (Headers `In-Reply-To`/`References`
+  optional — skip for the thin version; threading is carried by the draft's
+  `threadId` at create time.)
+
+- [ ] **Step 1: Write failing tests** for both functions (decode a small fixture
+  Gmail message → assert extracted fields; build a reply → assert `To`/`Subject: Re: `
+  present and body round-trips after base64url-decode; assert no double `Re: Re:`).
+- [ ] **Step 2: Run, verify they fail.** `npm test -- gmail-format`
+- [ ] **Step 3: Implement** the two pure functions.
+- [ ] **Step 4: Run, verify pass.** `npm test -- gmail-format`
+- [ ] **Step 5: Commit.** `git add apps/inbox/mcp/gmail-format.* && git commit -m "feat(gmail): pure helpers — parse latest message + build reply MIME"`
+
+### Task 6b: The thin Gmail stdio MCP server
+
+**Files:**
+- Modify: `apps/inbox/package.json` (add `googleapis` dependency)
+- Create: `apps/inbox/mcp/gmail-tools.mjs`
+
+- [ ] **Step 1: Add the dep.** `cd apps/inbox && npm install googleapis`
+- [ ] **Step 2: Write `mcp/gmail-tools.mjs`** — a stdio MCP server (mirror
+  `mcp/inbox-tools.mjs` structure: `McpServer` + `StdioServerTransport`). Build an
+  `google.auth.OAuth2` from `gcp-oauth.keys.json` (`installed`/`web` client id+secret)
+  and set credentials from `credentials.json` (access + refresh token); paths default
+  to `~/.gmail-mcp/gcp-oauth.keys.json` and `~/.gmail-mcp/credentials.json`,
+  overridable via env `GMAIL_OAUTH_KEYS` / `GMAIL_OAUTH_CREDENTIALS`. Register two
+  tools, using the Task 6a helpers:
+  - `get_latest_email` (no args) → `users.messages.list({userId:'me', q:'in:inbox', maxResults:1})`
+    → `users.messages.get({id, format:'full'})` → `parseLatestMessage` → return JSON
+    `{ threadId, from, subject, body }` as the tool text.
+  - `create_draft` (`{ threadId: string, body: string }`) → `users.messages.get` the
+    latest message in `threadId` to derive `to` (its `From`) + `subject` →
+    `buildReplyRaw` → `users.drafts.create({ userId:'me', requestBody:{ message:{ raw, threadId } } })`
+    → return a short confirmation (e.g. the draft id). **Never** call `messages.send`.
+  Surface tool errors as a JSON `{ error: message }` tool result (so the model can
+  report them), not an uncaught throw.
+- [ ] **Step 3: Typecheck/lint** (the `.mjs` is plain Node; ensure `npm run lint` is
+  clean or the file is covered by the right lint config). `npm run typecheck && npm run lint`
+- [ ] **Step 4: Commit.** `git add apps/inbox/package.json apps/inbox/package-lock.json apps/inbox/mcp/gmail-tools.mjs && git commit -m "feat(gmail): thin stdio Gmail MCP — get_latest_email + create_draft"`
+
+### Task 6c: Align provider prompts to the real tool names
+
+**Files:**
+- Modify: `apps/inbox/core/claude-cli-provider.ts`
+- Modify: `apps/inbox/core/claude-cli-provider.test.ts`
+
+- [ ] **Step 1:** In `firstPrompt`, replace the generic "search the inbox, then get
+  that thread" wording with: call `get_latest_email` to read the most recent email,
+  then `renderLead {from, subject, summary}`, draft a reply, then `saveDraft
+  {threadId, body}`. In `resumePrompt`, keep the `create_draft` instruction (already
+  there) — ensure it names `create_draft` with `{threadId, body}`.
+- [ ] **Step 2:** Update any provider test asserting prompt text (the resume test
+  asserts `create_draft` — keep; add/adjust a firstPrompt assertion for
+  `get_latest_email` if useful). Run `npm test -- claude-cli-provider`.
+- [ ] **Step 3: Commit.** `git add apps/inbox/core/claude-cli-provider.* && git commit -m "feat(provider): prompts call get_latest_email / create_draft (own Gmail MCP)"`
+
+### Task 6d: Wire the Gmail MCP into the spawn
+
+**Files:**
+- Modify: `apps/inbox/server/claude-spawn.ts`
+
+- [ ] **Step 1:** Add the gmail stdio server to the temp `--mcp-config` alongside
+  `inbox`: `gmail: { type: 'stdio', command: 'node', args: [GMAIL_SERVER] }` where
+  `GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mjs', import.meta.url))`.
+  Add to the permission `allow` list: `mcp__gmail__get_latest_email`,
+  `mcp__gmail__create_draft`. Keep `--strict-mcp-config`.
+- [ ] **Step 2: Typecheck/lint.** `npm run typecheck && npm run lint`
+- [ ] **Step 3: Commit.** `git add apps/inbox/server/claude-spawn.ts && git commit -m "feat(server): wire the thin Gmail MCP into the claude spawn"`
+
+### Task 6e: Live spike + end-to-end (controller-run, not a subagent)
+
+- [ ] **Live read+draft probe** (headless, our own MCP — not classifier-blocked):
+  `claude -p` with a temp `--mcp-config` containing `node mcp/gmail-tools.mjs`,
+  `--allowedTools "mcp__gmail"` — confirm `get_latest_email` returns a real
+  subject/sender and `create_draft` lands a draft in Gmail (check Drafts).
+- [ ] **Browser e2e on the real provider:** `npm run dev`, START → real latest email
+  in LeadCard → drafted reply + "Save draft" → approve → "Draft saved to Gmail." →
+  confirm the draft exists in Gmail, not sent.
+- [ ] **Docs:** flip CLAUDE.md's Gmail "next" framing to "BUILT (A2, own thin Gmail
+  MCP)" with the spike verdict + the official/community detour gotcha. Commit.

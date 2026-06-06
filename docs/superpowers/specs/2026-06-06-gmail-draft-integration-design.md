@@ -143,3 +143,65 @@ work cleanly, we revisit (e.g. a thin local proxy MCP, or a different auth path)
    wiring prompts (`search_threads` vs `get_thread` for "latest message"; the
    `create_draft` reply/threading fields).
 3. Pin the OAuth client type + redirect URI once the wiring is known.
+
+---
+
+## Update 2026-06-07 — spike result + pivot to A2 (own thin Gmail MCP)
+
+**Spike verdict (the gate): the architecture works.** A headless `claude -p` run
+reached a remote Gmail MCP and reused a stored OAuth token — tools loaded and were
+*called* headless. So "headless + remote MCP + token reuse" is proven. What blocked
+us was **not** architecture but two real-world facts about the chosen server:
+
+1. **The official Google Gmail MCP (`gmailmcp.googleapis.com`) is a Google
+   Workspace _Developer Preview_ feature.** With everything correct on a personal
+   account — project `landing-a3649`, both APIs enabled, scopes `gmail.readonly`+
+   `gmail.compose` granted (verified on the account's Connections page), user added
+   as a test user — every tool call still returned `PERMISSION_DENIED ("the caller
+   does not have permission")`. It is gated to Workspace/preview; a personal
+   `@gmail.com` cannot use it.
+2. **The proven community server `@gongrzhe/server-gmail-autoauth-mcp` is archived
+   (unmaintained) and is blocked by the Claude Code safety classifier** as untrusted
+   external code. Its OAuth flow does work (it produced a valid token at
+   `~/.gmail-mcp/credentials.json`, scope `gmail.modify gmail.settings.basic`), but
+   running the package is the wrong long-term dependency anyway.
+
+**Decision — A2: our own thin stdio Gmail MCP.** Reuse the OAuth client + token
+already obtained (`~/.gmail-mcp/gcp-oauth.keys.json` + `credentials.json`). It is our
+own repo code (no supply-chain risk, not classifier-blocked), durable, exactly our
+two operations, and fits plan A. This supersedes the "official Google Gmail MCP"
+decision above; the detour is recorded so it isn't repeated.
+
+### The thin Gmail MCP — `apps/inbox/mcp/gmail-tools.mjs`
+
+A sibling of `inbox-tools.mjs` (separate Node stdio process; **NOT** imported by
+`core/`, so `core/` stays Node-free).
+
+- **Dependency:** `googleapis` (server-side only).
+- **Auth:** an OAuth2 client from `gcp-oauth.keys.json` (client id/secret) + the
+  stored `credentials.json` (access/refresh token); paths default to `~/.gmail-mcp/`,
+  overridable via env (`GMAIL_OAUTH_KEYS`, `GMAIL_OAUTH_CREDENTIALS`). Auto-refresh
+  via the refresh token.
+- **Tools:**
+  - `get_latest_email` → `{ threadId, from, subject, body }` of the most recent
+    inbox message.
+  - `create_draft { threadId, body }` → fetches the thread's latest message to derive
+    `To` (original sender) and `Subject` (`Re: …`), builds a reply MIME, creates a
+    Gmail **draft** in that thread. Never sends.
+- **Tested:** pure helpers (reply-MIME builder; Gmail-message → `{from,subject,body}`
+  parser) are unit-tested; the `googleapis` calls are thin and verified live.
+
+### Adjustments to earlier sections
+
+- **Prompts:** `firstPrompt` instructs `get_latest_email` → `renderLead
+  {from,subject,summary}` → draft → `saveDraft {threadId,body}`; `resumePrompt`
+  instructs `create_draft {threadId,body}`. (Replaces the earlier generic
+  `search_threads`/`get_thread` wording from the official-server plan.)
+- **Spawn (Phase C):** `--mcp-config` lists `gmail` (stdio `node mcp/gmail-tools.mjs`)
+  + `inbox`; permission allow-list adds `mcp__gmail__get_latest_email` and
+  `mcp__gmail__create_draft`. The headless-remote-OAuth risk is **moot** under A2 —
+  the token is file-based and read by our own stdio server.
+- **Scope note:** the obtained token is `gmail.modify` (broader than the
+  `readonly`+`compose` we'd ideally use) because that's what the now-abandoned
+  GongRzhe auth requested. `modify` covers read + draft; tightening to
+  `readonly`+`compose` is a later cleanup (re-consent with our own scope set).
