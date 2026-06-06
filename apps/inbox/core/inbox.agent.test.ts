@@ -1,15 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { inboxAgent, providerRegistry } from './inbox.agent.js'
+import { inboxAgent } from './inbox.agent.js'
+import { defineProviders } from './providers.js'
+import { createMockInboxProvider } from './mock-provider.js'
 
 describe('inbox.agent wiring', () => {
-  it('the passport validates and references the mock provider', () => {
+  it('the passport validates and references the claude-cli provider', () => {
     expect(inboxAgent.id).toBe('inbox')
-    expect(inboxAgent.provider).toBe('mock')
+    expect(inboxAgent.provider).toBe('claude-cli')
     expect(inboxAgent.approvals).toEqual(['confirmSend'])
   })
 
-  it("the registry resolves the agent's provider", () => {
-    const provider = providerRegistry.resolve(inboxAgent.provider)
-    expect(typeof provider.run).toBe('function')
+  it('a registry built from the passport approvals resolves a provider', () => {
+    const reg = defineProviders({ mock: createMockInboxProvider(inboxAgent.approvals) })
+    expect(typeof reg.resolve('mock').run).toBe('function')
   })
 })

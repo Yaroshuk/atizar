@@ -1,7 +1,8 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { CopilotRuntime, createCopilotEndpoint, InMemoryAgentRunner } from '@copilotkit/runtime/v2'
-import { inboxAgent, providerRegistry } from '../core/inbox.agent.js'
+import { inboxAgent } from '../core/inbox.agent.js'
+import { providerRegistry } from './providers.js'
 import { buildAgent } from './build-agent.js'
 
 const runtime = new CopilotRuntime({
