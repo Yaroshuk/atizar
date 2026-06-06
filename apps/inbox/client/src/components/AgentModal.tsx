@@ -30,7 +30,7 @@ type AgentModalProps = {
 export const AgentModal = ({ agent, renderToolCall, loading, onClose }: AgentModalProps) => {
   // Index tool result messages by toolCallId so each assistant tool call can be
   // paired with its matching `role:"tool"` result (used to surface a completed
-  // confirmSend as done).
+  // saveDraft as done).
   const toolMessageByCallId = pairToolResults(agent.messages)
 
   const thread = agent.messages.flatMap((msg: Message, i: number) => {
