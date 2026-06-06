@@ -48,10 +48,24 @@ Server (import from `@copilotkit/runtime/v2`):
 - `new BuiltInAgent({ type: "custom", factory })` — custom factory yields raw AG-UI `BaseEvent`s.
   Factory signature: `(ctx: { input: RunAgentInput; abortController; abortSignal }) => AsyncIterable<BaseEvent>`.
   (The `({ input })` destructure works but isn't required for the spike.)
-- `createCopilotEndpoint({ runtime, basePath: "/api/copilotkit" })` returns a **Hono app** (HonoBase) with the
-  route `ALL ${basePath}/*` already baked in. Mount it with `app.route("/", copilot)` (NOT a raw fetch handler,
-  NOT `app.all(...)(c.req.raw)`). `createCopilotEndpoint` is a deprecated alias of `createCopilotHonoHandler`.
-  Dedicated subpath also exists: `@copilotkit/runtime/v2/hono`.
+- `createCopilotEndpoint({ runtime, basePath, mode })` returns a **Hono app** (HonoBase) whose ONLY route is
+  `ALL ${basePath}/*` (`new Hono().basePath(basePath).all("*", c => handler(c.req.raw))`). Mount it with
+  `app.route("/", copilot)`. That wildcard DOES match the bare `/api/copilotkit` (verified) — all real routing
+  happens INSIDE `handler` (`createCopilotRuntimeHandler`), keyed off `mode`. `createCopilotEndpoint` is a
+  deprecated alias of `createCopilotHonoHandler`. Dedicated subpath also exists: `@copilotkit/runtime/v2/hono`.
+- **`mode` MUST match the client transport — this is the connection-handshake gotcha:**
+  - `mode: "multi-route"` (the library default) exposes REST paths: `GET ${basePath}/info`,
+    `POST ${basePath}/agent/:id/run`, etc. There is **no route at the bare `${basePath}`** → bare POST = 404.
+  - `mode: "single-route"` exposes ONE endpoint: `POST ${basePath}` dispatched by a JSON envelope
+    `{ method, params?, body? }` (e.g. `{ "method": "info" }`).
+  - The v2 React client (`@copilotkit/react-core/v2`) defaults to the **single-endpoint transport**
+    (`CopilotKitProvider` sets `useSingleEndpoint ?? true`; `@copilotkit/core` maps that to `transport: "single"`).
+    Its handshake is `POST <runtimeUrl>` with body `{ "method": "info" }` (NOT `GET <runtimeUrl>/info`). So the
+    server must be created with **`mode: "single-route"`**, else that bare POST 404s and the client logs
+    `Runtime info request failed with status 404`.
+  - **Decision: server uses `mode: "single-route"`** with `basePath: "/api/copilotkit"`; client keeps
+    `runtimeUrl="/api/copilotkit"` (no client change needed). Verified headlessly:
+    `curl -X POST :4000/api/copilotkit -d '{"method":"info"}'` → 200, and `{"method":"agent/run",...}` → 200 stream.
 - AG-UI events from `@ag-ui/client`: `EventType.TEXT_MESSAGE_CHUNK` with fields `{ type, role, messageId, delta }`
   (all optional in schema). `BaseEvent` type imported from the same package.
 
