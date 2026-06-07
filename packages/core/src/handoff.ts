@@ -17,10 +17,25 @@ export const HandoffPayloadSchema = z.object({
 
 export type HandoffPayload = z.infer<typeof HandoffPayloadSchema>
 
+export const TicketHandoffPayloadSchema = z.object({
+  repo: z.string(),
+  number: z.number(),
+  title: z.string(),
+  status: z.string(),
+  priority: z.string(),
+  body: z.string(),
+  lastComment: z.object({ author: z.string(), body: z.string() }).nullable(),
+  recommendation: z.string(),
+  url: z.string(),
+})
+
+export type TicketHandoffPayload = z.infer<typeof TicketHandoffPayloadSchema>
+
 const MARKER = '[handoff]'
 
-// Encode a payload as the seed user message the target run will carry.
-export function encodeHandoff(payload: HandoffPayload): Message {
+// Encode any payload as the seed user message the target run will carry. The shape
+// is the caller's concern; decode validates it back with the matching schema.
+export function encodeHandoff(payload: unknown): Message {
   return {
     id: crypto.randomUUID(),
     role: 'user',
@@ -28,16 +43,16 @@ export function encodeHandoff(payload: HandoffPayload): Message {
   } as Message
 }
 
-// Decode the most recent handoff payload from a run input, or null if there is no
-// seed / it is unparseable. The reply prompt strategy calls this — it never sniffs
-// the marker string itself.
-export function decodeHandoff(input: RunAgentInput): HandoffPayload | null {
+// Decode the most recent handoff payload from a run input, validated against the
+// passed schema, or null if there is no seed / it does not match the schema.
+export function decodeHandoff<T>(input: RunAgentInput, schema: z.ZodType<T>): T | null {
   const messages = (input?.messages ?? []) as Message[]
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
     if (m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(MARKER)) {
       try {
-        return HandoffPayloadSchema.parse(JSON.parse(m.content.slice(MARKER.length).trim()))
+        const parsed = schema.safeParse(JSON.parse(m.content.slice(MARKER.length).trim()))
+        return parsed.success ? parsed.data : null
       } catch {
         return null
       }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type RunAgentInput } from '@ag-ui/client'
-import { decodeHandoff, type PromptStrategy } from '@platform/core'
+import { decodeHandoff, HandoffPayloadSchema, type PromptStrategy } from '@platform/core'
 import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider.js'
 
 // Local PromptStrategy fixture. The real reply-agent prompts live in the app
@@ -12,7 +12,7 @@ import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider
 //   - resume returns null when threadId/body are missing (the "Resume failed" path)
 const createReplyPrompts = (instructions: string): PromptStrategy => ({
   buildFirst(input: RunAgentInput): string {
-    const h = decodeHandoff(input)
+    const h = decodeHandoff(input, HandoffPayloadSchema)
     if (h) {
       return [
         instructions,

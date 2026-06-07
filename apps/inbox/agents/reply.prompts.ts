@@ -1,5 +1,10 @@
 import type { RunAgentInput } from '@ag-ui/client'
-import { decodeHandoff, type PromptStrategy, type HandoffPayload } from '@platform/core'
+import {
+  decodeHandoff,
+  HandoffPayloadSchema,
+  type PromptStrategy,
+  type HandoffPayload,
+} from '@platform/core'
 
 // Launched manually with no handoff. The reply agent is a WRITER only — it cannot
 // read the inbox (no get_latest_email in its allow-list). There is one entry point
@@ -50,7 +55,7 @@ function resume(instructions: string, threadId: string, body: string): string {
 export function createReplyPrompts(instructions: string): PromptStrategy {
   return {
     buildFirst(input: RunAgentInput): string {
-      const h = decodeHandoff(input)
+      const h = decodeHandoff(input, HandoffPayloadSchema)
       return h ? handoffFirst(instructions, h) : noLeadFirst(instructions)
     },
     buildResume(args: Record<string, unknown>): string | null {
