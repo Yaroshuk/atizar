@@ -230,10 +230,19 @@ posted, commented, or modified on GitHub. Spec:
   `TicketHandoffPayloadSchema` (`repo, number, title, status, priority, body, lastComment, recommendation, url`).
   `encodeHandoff(payload: unknown)`.
 - **Read-only adapter (`apps/inbox/mcp/github-tools.mjs` + pure `github-format.mjs`):** shells `gh`
-  via `execFile`. `list_my_tickets` → `gh project item-list` scoped to the assignee, excludes Done,
-  enriches each ticket's last comment + a `needsReply` flag (someone else commented last), bodies
-  trimmed to 1500 chars. `get_ticket` (TRIAGE only) reads one issue, trimmed. Render acks
+  via `execFile`. `list_my_tickets` → ONE `gh api graphql` **search** query scoped to the user's
+  open issues (it does NOT page the whole 1785-item board — that exhausted the hourly GraphQL
+  budget; see the follow-up below), pulling each ticket's board Status/Priority + last comment
+  inline. Keeps only `Todo / In progress / On pluto / Ready for mars`, caps at 20; couriered
+  body/comment trimmed small (400/240) so the model can re-emit them without stalling the run.
+  `get_ticket` (TRIAGE only) reads one issue, trimmed. Render acks
   `render_triage`/`render_ticket_result`/`render_reply_draft`. NO mutating `gh` call anywhere.
+  (Pure parser: `mapSearchNodes`.) **Follow-up after first ship:** the original cut paged the full
+  board via `gh project item-list` and enriched comments over REST (N+1) — a handful of triage runs
+  exhausted the 5000-point/hr GraphQL budget; the search query above replaced it. The triage card
+  also went from three route buttons to one (the recommended route) + an "Open in browser" link,
+  and each agent shows a "what I'm doing" intro bubble plus chronological handoff notes
+  (receiver "← Received …" at top, sender "→ Handed …" at bottom).
 - **Single board reader:** only TRIAGE has `list_my_tickets`/`get_ticket`. FEATURE/BUG-FIX/REPLY-DRAFT
   have **no GitHub tool at all** — they work from the (self-contained) handoff payload TRIAGE
   couriers through `render_triage`. Enforced by the per-agent allow-lists in `server/index.ts`

@@ -6,7 +6,7 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
-**On `feat/github-triage-workflow` (BUILT, browser-verified, NOT yet merged):** the **GitHub triage
+**On `master` (MERGED, BUILT, browser-verified on the real board):** the **GitHub triage
 workflow** — a second workflow beside the Lead inbox, built on the **real** Magma Board (GitHub
 Projects v2, `matteappen` #8) via `gh`, **strictly read-only**. A **TRIAGE** agent (the only board
 reader) lists the user's 27 assigned tickets, buckets them by real Status + a "needs reply" flag,
@@ -19,7 +19,7 @@ tests green; browser-verified E2E on the real board (20 tickets bucketed → rou
 read-only confirmed — comment count unchanged) and Gmail re-verified intact. Detail →
 `docs/BUILD-LOG.md` §7; spec → `docs/superpowers/specs/2026-06-07-github-triage-workflow-design.md`;
 plan → `docs/superpowers/plans/2026-06-07-github-triage-workflow.md`.
-**Next:** merge this branch to `master`, then the planned **workflow-separation** pass.
+**Next:** the planned **workflow-separation** pass.
 
 **Previously on `master` (MERGED `56c8454`, BUILT, browser-verified):** the **consumer desktop
 re-skin** — Smedja design system on `apps/inbox/client`; flat two-card view → **two-panel desktop**
@@ -40,12 +40,11 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
 5. **`@platform/*` package split** — `core` + `providers` + `integrations` as yarn-classic
    workspace packages consumed as raw TS source. — §5
 6. **Consumer desktop re-skin** (`56c8454`) — above. — §6
-7. **GitHub triage workflow** (`feat/github-triage-workflow`) — real read-only Magma Board, N-agent
+7. **GitHub triage workflow** (MERGED) — real read-only Magma Board, N-agent
    desktop + switcher. — §7
 
-## 🧭 PLANNED NEXT — workflow separation + merge
+## 🧭 PLANNED NEXT — workflow separation
 
-- **Merge `feat/github-triage-workflow` to `master`** (browser-verified, read-only, 103 tests green).
 - **Workflow-separation pass** (the user flagged this comes after GitHub triage): right now both
   workflows coexist in one `CopilotRuntime` and one client `workflows` registry, switched by tabs.
   The user wants a cleaner separation of flows — likely per-workflow config/routing/desktop chrome
