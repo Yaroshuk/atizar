@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { parseLatestMessage, buildReplyRaw } from './gmail-format.mjs'
+import { parseLatestMessage, buildReplyRaw } from './format.mjs'
 
 // ---------------------------------------------------------------------------
 // Fixture helpers

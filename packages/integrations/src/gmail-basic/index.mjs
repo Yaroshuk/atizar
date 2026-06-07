@@ -6,12 +6,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { google } from 'googleapis'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import { parseLatestMessage, buildReplyRaw } from './gmail-format.mjs'
+import { parseLatestMessage, buildReplyRaw } from './format.mjs'
+import { optionalPeerError } from '../optional-peer.mjs'
 
 // ---------------------------------------------------------------------------
 // Auth setup — lazy, so missing/malformed config files surface as tool errors
@@ -27,9 +27,22 @@ const credsPath =
 // a handler {error:…} JSON instead of a startup crash. The refreshed access
 // token is held in memory only (not persisted back to disk) — fine for
 // short-lived per-run MCP servers.
+// Lazily import the OPTIONAL peer `googleapis`. A missing install surfaces as an
+// actionable error (via optionalPeerError); any other import failure rethrows.
+async function loadGoogleapis() {
+  try {
+    return (await import('googleapis')).google
+  } catch (err) {
+    const mapped = optionalPeerError(err, { name: 'googleapis', install: 'yarn add googleapis' })
+    if (mapped) throw mapped
+    throw err
+  }
+}
+
 let _gmail
-function getGmail() {
+async function getGmail() {
   if (_gmail) return _gmail
+  const google = await loadGoogleapis()
   const keys = JSON.parse(readFileSync(keysPath, 'utf8'))
   const clientData = keys.installed || keys.web
   if (!clientData)
@@ -71,7 +84,7 @@ server.registerTool(
   },
   async () => {
     try {
-      const gmail = getGmail()
+      const gmail = await getGmail()
       const list = await gmail.users.messages.list({ userId: 'me', q: 'in:inbox', maxResults: 1 })
       if (!list.data.messages?.length) {
         return {
@@ -104,7 +117,7 @@ server.registerTool(
   },
   async ({ threadId, body }) => {
     try {
-      const gmail = getGmail()
+      const gmail = await getGmail()
       // Fetch thread metadata to derive To + Subject from the last message.
       const thread = await gmail.users.threads.get({
         userId: 'me',
