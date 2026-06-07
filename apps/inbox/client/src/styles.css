@@ -866,3 +866,41 @@ button {
   color: #fff;
   border-color: #111;
 }
+
+/* The hardcoded "what I'm doing" message renders as a normal chat bubble, just
+   outlined so it reads as the run's opening message. */
+.bubble.intro {
+  border: 1px solid var(--accent, #0a7);
+  background: #f0faf6;
+}
+
+/* Handoff lines: what an agent handed off / received, so the flow is legible. */
+.thread-note {
+  font-size: 12px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: #f5f5f7;
+  color: var(--muted);
+}
+.thread-note strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.thread-note.sent {
+  border-left: 3px solid var(--accent, #0a7);
+}
+.thread-note.received {
+  border-left: 3px solid #f0c000;
+}
+
+/* "Open in browser" link on each triage row. */
+.triage-link {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.triage-link:hover {
+  color: var(--text);
+}

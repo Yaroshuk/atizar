@@ -3,7 +3,7 @@ import { useCopilotKit, useRenderToolCall } from '@copilotkit/react-core/v2'
 import { useInboxActions } from './actions'
 import { useGithubActions } from './githubActions'
 import { AgentCard } from './components/AgentCard'
-import { AgentModal } from './components/AgentModal'
+import { AgentModal, type HandoffNote } from './components/AgentModal'
 import { AgentRuntime, type AgentHandle } from './components/AgentRuntime'
 import { PipelineColumn } from './components/PipelineColumn'
 import { WorkflowSwitcher } from './components/WorkflowSwitcher'
@@ -18,8 +18,15 @@ export const InboxView = () => {
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
   const [openId, setOpenId] = useState<string | null>(null)
   const [handles, setHandles] = useState<Record<string, AgentHandle>>({})
+  // Per-agent handoff lines (sent/received) shown atop each agent's modal thread.
+  const [handoffNotes, setHandoffNotes] = useState<Record<string, HandoffNote[]>>({})
 
   const workflow = workflows.find((w) => w.id === activeWorkflowId) ?? workflows[0]
+
+  // Mirror the active workflow so the (stable) handoff callback can resolve agent
+  // names without depending on `workflow` (which would break its stable identity).
+  const workflowRef = useRef(workflow)
+  workflowRef.current = workflow
 
   // Agents that are some other agent's handoff target are launched BY that agent —
   // they get no START button. Computed over the active workflow only.
@@ -52,6 +59,30 @@ export const InboxView = () => {
       target.messages.splice(0, target.messages.length, seed)
       void copilotkit.runAgent({ agent: target })
       setOpenId(targetId)
+
+      // Record the handoff on both sides so each thread shows what moved where.
+      const wf = workflowRef.current
+      const source = wf.agents.find((a) => (a.handoffs ?? []).includes(targetId))
+      const targetName = wf.agents.find((a) => a.id === targetId)?.name ?? targetId
+      const p = payload as { number?: number; title?: string; subject?: string }
+      const label =
+        typeof p.number === 'number'
+          ? `#${p.number} ${p.title ?? ''}`.trim()
+          : (p.subject ?? 'item')
+      setHandoffNotes((prev) => {
+        const next = { ...prev }
+        if (source) {
+          next[source.id] = [
+            ...(prev[source.id] ?? []),
+            { dir: 'sent', otherName: targetName, label },
+          ]
+        }
+        next[targetId] = [
+          ...(prev[targetId] ?? []),
+          { dir: 'received', otherName: source?.name ?? 'an agent', label },
+        ]
+        return next
+      })
     },
     [copilotkit]
   )
@@ -96,6 +127,7 @@ export const InboxView = () => {
           // agent id can't be served a stale handle; the new workflow's AgentRuntimes
           // re-publish theirs on mount.
           setHandles({})
+          setHandoffNotes({})
           setActiveWorkflowId(id)
         }}
       />
@@ -156,6 +188,8 @@ export const InboxView = () => {
             renderToolCall={renderToolCall}
             loading={statusOf(openAgentDef.id) === 'running'}
             canStart={canStart(openAgentDef.id)}
+            intro={META[openAgentDef.id].intro}
+            notes={handoffNotes[openAgentDef.id] ?? []}
             onStart={() => {
               const agent = agentOf(openAgentDef.id)
               if (agent) void copilotkit.runAgent({ agent })

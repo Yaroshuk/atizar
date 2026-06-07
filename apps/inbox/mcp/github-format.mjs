@@ -1,25 +1,42 @@
-// Pure transforms over `gh project item-list --format json` output. No I/O, so it is
-// unit-tested; the MCP adapter (github-tools.mjs) does the gh shelling + comment
-// enrichment around this. Scopes to one assignee, drops draft items (no issue number)
-// and excluded statuses, and trims bodies so the couriered handoff stays bounded.
-export function mapItems(itemList, { assignee, excludeStatuses = [], bodyMax = 1500 }) {
-  // Compare statuses case-insensitively, like the assignee match — the `gh` Status
-  // field is title-case ("In progress", "Done") but callers shouldn't depend on that.
-  const exclude = new Set(excludeStatuses.map((s) => s.toLowerCase()))
+// Pure transform over the GraphQL `search` result the MCP adapter (github-tools.mjs)
+// runs. No I/O, so it is unit-tested. One cheap search query returns the user's open
+// issues already scoped to them, each carrying its project Status/Priority and last
+// comment — so this just shapes them, keeps only the wanted statuses, trims bodies, and
+// caps the count. (We deliberately do NOT scan the whole project board — that paged
+// GraphQL pull of ~1785 items burned the hourly point budget.)
+//
+// `node.projectItems` lists every project the issue sits in; we read Status/Priority
+// from the one matching `project` (the board we triage). Issues not on that board, or
+// whose status isn't in `allowedStatuses`, are dropped.
+export function mapSearchNodes(
+  search,
+  { project, allowedStatuses, max, assignee, bodyMax = 1500, commentMax = 600 }
+) {
+  const allowed = new Set(allowedStatuses.map((s) => s.toLowerCase()))
   const me = assignee.toLowerCase()
-  return (itemList.items ?? [])
-    .filter((it) => (it.assignees ?? []).some((a) => a.toLowerCase() === me))
-    .filter((it) => !exclude.has((it.status ?? '').toLowerCase()))
-    .filter((it) => typeof it.content?.number === 'number')
-    .map((it) => ({
-      repo: it.content.repository ?? '',
-      number: it.content.number,
-      title: it.content.title ?? '',
-      status: it.status ?? '',
-      priority: it.priority ?? '',
-      body: (it.content.body ?? '').slice(0, bodyMax),
-      url: it.content.url ?? '',
-      lastComment: null,
-      needsReply: false,
-    }))
+  const out = []
+  for (const n of search.nodes ?? []) {
+    const item = (n.projectItems?.nodes ?? []).find((pi) => pi.project?.number === project)
+    const status = item?.status?.name ?? ''
+    if (!allowed.has(status.toLowerCase())) continue
+
+    const last = n.comments?.nodes?.[0]
+    const lastComment = last
+      ? { author: last.author?.login ?? '', body: (last.body ?? '').slice(0, commentMax) }
+      : null
+
+    out.push({
+      repo: n.repository?.nameWithOwner ?? '',
+      number: n.number,
+      title: n.title ?? '',
+      status,
+      priority: item?.priority?.name ?? '',
+      body: (n.body ?? '').slice(0, bodyMax),
+      url: n.url ?? '',
+      lastComment,
+      needsReply: !!(lastComment && lastComment.author.toLowerCase() !== me),
+    })
+    if (out.length >= max) break
+  }
+  return out
 }

@@ -14,6 +14,10 @@ import { Icon, type IconName } from './Icon'
 // This is the SAME generative-UI surface as before; only the markup/classes
 // changed (Smedja design). The human-in-the-loop approval button keeps its live
 // `respond` callback (sourced from the executing tool-call state, not toolMessage).
+// A handoff line shown at the top of an agent's thread so the flow is legible:
+// the sender notes what it handed off, the receiver notes what it received.
+export type HandoffNote = { dir: 'sent' | 'received'; otherName: string; label: string }
+
 type AgentModalProps = {
   agent: { messages: Message[] }
   title: string
@@ -26,6 +30,10 @@ type AgentModalProps = {
   // Whether this agent can be launched directly. Handoff-only agents (reply) show no
   // START. When true, START appears in the footer too (mirrors the card) unless running.
   canStart: boolean
+  // A hardcoded one-line "what I'm doing" shown once the agent has started.
+  intro: string
+  // Handoff lines (sent and/or received) to show above the thread.
+  notes: HandoffNote[]
   onStart: () => void
   onClose: () => void
 }
@@ -38,6 +46,8 @@ export const AgentModal = ({
   renderToolCall,
   loading,
   canStart,
+  intro,
+  notes,
   onStart,
   onClose,
 }: AgentModalProps) => {
@@ -45,6 +55,11 @@ export const AgentModal = ({
   // paired with its matching `role:"tool"` result (used to surface a completed
   // saveDraft as done).
   const toolMessageByCallId = pairToolResults(agent.messages)
+
+  // Chronology: a receiver shows "← Received …" at the TOP (its first event); a sender
+  // shows "→ Handed …" at the BOTTOM (the last thing it did), so the thread reads as history.
+  const received = notes.filter((n) => n.dir === 'received')
+  const sent = notes.filter((n) => n.dir === 'sent')
 
   const thread = agent.messages.flatMap((msg: Message, i: number) => {
     if (msg.role !== 'assistant') return []
@@ -99,7 +114,25 @@ export const AgentModal = ({
         </div>
 
         <div className='thread'>
+          {received.map((note, i) => (
+            <div className='thread-note received' key={`rcv-${i}`}>
+              ← Received <strong>{note.label}</strong> from {note.otherName}
+            </div>
+          ))}
+          {status !== 'idle' && (
+            <div className='thread-item bubble-row'>
+              <span className='agent-glyph'>
+                <Icon name='sparkle' size={15} />
+              </span>
+              <div className='bubble intro'>{intro}</div>
+            </div>
+          )}
           {thread}
+          {sent.map((note, i) => (
+            <div className='thread-note sent' key={`snt-${i}`}>
+              → Handed <strong>{note.label}</strong> to {note.otherName}
+            </div>
+          ))}
           {loading && (
             <div className='thread-item bubble-row'>
               <span className='agent-glyph'>
