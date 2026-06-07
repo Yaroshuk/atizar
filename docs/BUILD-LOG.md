@@ -208,3 +208,56 @@ pipeline lit qualifier-green while reply sat at amber). Spec:
 `docs/superpowers/specs/2026-06-07-consumer-desktop-reskin-design.md`. The design bundle
 (reference) also carries a richer v2/v3 (Lead Manager fan-out, multi-lead triage, dispatch card)
 we did NOT build.
+
+## 7 · GitHub triage workflow — real Magma Board, read-only (BUILT, `feat/github-triage-workflow`, browser-verified)
+
+A second workflow beside the Lead inbox, and the N-agent desktop it forced. **TRIAGE** reads the
+user's own open tickets off the **real** GitHub Projects v2 board (`matteappen` org, project #8 —
+"Magma Board") via `gh`, buckets them by Status, and recommends a route per ticket; the manager
+routes one (manual handoff, reusing `handoff.ts`) to **FEATURE**, **BUG-FIX**, or **REPLY-DRAFT**,
+which analyze/draft **purely from the handoff payload**. **Strictly read-only** — nothing is ever
+posted, commented, or modified on GitHub. Spec:
+`docs/superpowers/specs/2026-06-07-github-triage-workflow-design.md`; plan:
+`docs/superpowers/plans/2026-06-07-github-triage-workflow.md`.
+
+- **Why real `gh`, no mock:** the `claude-cli` provider runs the real `claude` binary, and `gh` is
+  authenticated (`Yaroshuk`, `read:project`/`project` scopes). The board has 1785 items; the user
+  is assigned 27. So "real GitHub" needed only a thin **read-only adapter** — the planned mock MCP
+  was dropped. The model has **no Bash** (it's in the spawn deny-list), so the MCP adapter is the
+  ONLY path to GitHub, and it exposes no write tool → read-only by construction.
+- **Core (`packages/core/src/handoff.ts`):** generalized `decodeHandoff(input, schema)` to take the
+  zod schema (the Gmail caller passes `HandoffPayloadSchema`; no behavior change) + added
+  `TicketHandoffPayloadSchema` (`repo, number, title, status, priority, body, lastComment, recommendation, url`).
+  `encodeHandoff(payload: unknown)`.
+- **Read-only adapter (`apps/inbox/mcp/github-tools.mjs` + pure `github-format.mjs`):** shells `gh`
+  via `execFile`. `list_my_tickets` → `gh project item-list` scoped to the assignee, excludes Done,
+  enriches each ticket's last comment + a `needsReply` flag (someone else commented last), bodies
+  trimmed to 1500 chars. `get_ticket` (TRIAGE only) reads one issue, trimmed. Render acks
+  `render_triage`/`render_ticket_result`/`render_reply_draft`. NO mutating `gh` call anywhere.
+- **Single board reader:** only TRIAGE has `list_my_tickets`/`get_ticket`. FEATURE/BUG-FIX/REPLY-DRAFT
+  have **no GitHub tool at all** — they work from the (self-contained) handoff payload TRIAGE
+  couriers through `render_triage`. Enforced by the per-agent allow-lists in `server/index.ts`
+  (`TRIAGE_TOOLS`/`FEATURE_TOOLS`/`BUGFIX_TOOLS`/`REPLY_DRAFT_TOOLS`). No agent has any approval.
+- **N-agent desktop + workflow switcher:** generalized `InboxView` from two hardcoded `useAgent`
+  calls to map over a `workflows` registry (`client/src/workflows.ts`: Lead inbox = [qualifier,
+  reply]; GitHub triage = [triage, feature, bugfix, reply-draft]). Each agent's hooks live in a
+  child `AgentRuntime` (one `useAgent`+`useAgentStatus`, publishes `{agent,status}` up) — the
+  rules-of-hooks fix for a variable agent count. `WorkflowSwitcher` tabs between them; both
+  workflows' render tools register unconditionally. New cards `TriageCard` (groups by real Status
+  via pure `buckets.ts`, needs-reply pills, route buttons), `TicketResultCard`, `ReplyDraftCard`.
+- **Subtle bug caught by review + browser, NOT by types/tests:** `useRenderTool`'s effect deps
+  stringify a function to `"[null]"`, so its render closure is captured ONCE. The first cut made
+  `requestHandoff` depend on `handles` state → it froze the initial empty map → every handoff
+  silently no-opped. Fix: read handles via a `useRef` mirror, keep `requestHandoff` stable
+  (`[copilotkit]`), pass it directly to the action hooks. (This is exactly why the project's
+  always-run-browser-E2E rule exists — green types + 103 unit tests would have shipped a dead
+  pipeline.)
+
+103 unit tests, tsc+lint+format+build green. **Browser-verified E2E on the real board:** GitHub
+triage → START → TriageCard with the real 20 open tickets grouped by Status (Backlog → Todo →
+In progress → On pluto → …) with needs-reply pills → route #4403 to BUG-FIX → analysis card built
+only from the payload (it cited the "can't reproduce on Mars" last comment, made no `gh` call) →
+**read-only confirmed: #4403 comment count unchanged**. Gmail workflow re-verified intact (qualifier
+→ verdict sales/hot → Draft reply handoff → reply draft → amber approval; pipeline lit qualifier
+Working → reply Approve). Follow-up deferred: a proper workflow-separation pass (the user flagged
+splitting flows comes later) and per-workflow desktop chrome.

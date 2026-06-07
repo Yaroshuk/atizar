@@ -12,6 +12,9 @@ export type IconName =
   | 'alert'
   | 'sparkle'
   | 'close'
+  | 'git'
+  | 'bug'
+  | 'wrench'
 
 type IconProps = {
   name: IconName
@@ -66,6 +69,23 @@ const PATHS: Record<IconName, ReactNode> = {
       <line x1='18' y1='6' x2='6' y2='18' />
       <line x1='6' y1='6' x2='18' y2='18' />
     </>
+  ),
+  git: (
+    <>
+      <circle cx='12' cy='6' r='3' />
+      <circle cx='6' cy='18' r='3' />
+      <circle cx='18' cy='18' r='3' />
+      <path d='M12 9v3a6 6 0 0 1-6 6M12 12a6 6 0 0 0 6 6' />
+    </>
+  ),
+  bug: (
+    <>
+      <rect x='8' y='6' width='8' height='14' rx='4' />
+      <path d='M19 7l-3 2M5 7l3 2M3 13h3M18 13h3M19 19l-3-2M5 19l3-2M12 2v4' />
+    </>
+  ),
+  wrench: (
+    <path d='M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z' />
   ),
 }
 
