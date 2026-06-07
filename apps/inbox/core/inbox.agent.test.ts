@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { qualifierAgent, replyAgent, agents } from './inbox.agent.js'
-import { defineProviders } from './providers.js'
+import { defineProviders } from '@platform/core'
 import { createMockInboxProvider } from './mock-provider.js'
 
 describe('inbox agents wiring', () => {

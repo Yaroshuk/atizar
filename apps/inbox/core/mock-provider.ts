@@ -1,6 +1,5 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import type { Provider } from './providers.js'
-import { approvalResolved, type Message } from './messages.js'
+import { approvalResolved, type Provider, type Message } from '@platform/core'
 
 const LEAD = {
   from: 'ivan@acme.ru',

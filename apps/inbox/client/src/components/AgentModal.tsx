@@ -4,7 +4,7 @@ import {
   type Message,
   type ToolCall,
   type ToolMessage,
-} from '../../../core/messages'
+} from '@platform/core'
 
 // AgentModal renders the conversation thread in an overlay panel.
 //

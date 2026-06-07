@@ -1,4 +1,4 @@
 {
   "files": [],
-  "references": [{ "path": "./apps/inbox" }]
+  "references": [{ "path": "./packages/core" }, { "path": "./apps/inbox" }]
 }

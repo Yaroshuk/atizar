@@ -1,4 +1,4 @@
-import { defineProviders, type ProviderRegistry } from '../core/providers.js'
+import { defineProviders, type ProviderRegistry } from '@platform/core'
 import { createMockInboxProvider } from '../core/mock-provider.js'
 import { createClaudeCliProvider } from '../core/claude-cli-provider.js'
 import { claudeSpawn } from './claude-spawn.js'
