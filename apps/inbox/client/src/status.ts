@@ -10,6 +10,15 @@ export const STATUSES = ['idle', 'running', 'awaiting_approval', 'done', 'error'
 
 export type Status = (typeof STATUSES)[number]
 
+// Human-facing label per status (shown on the card status pill + modal header).
+export const STATUS_LABEL: Record<Status, string> = {
+  idle: 'Idle',
+  running: 'Working…',
+  awaiting_approval: 'Awaiting approval',
+  done: 'Done',
+  error: 'Error',
+}
+
 // The subset that comes from the agent run lifecycle. `awaiting_approval` is
 // derived from message state (hasPendingApproval), never a lifecycle event.
 export type Lifecycle = Exclude<Status, 'awaiting_approval'>

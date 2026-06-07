@@ -48,16 +48,16 @@ function ToolCallSurface() {
 
 describe('renderLead generative-UI mapping', () => {
   it('renders the LeadCard from a streamed renderLead tool call in agent.messages', () => {
-    render(
+    const { container } = render(
       <CopilotKit runtimeUrl='/api/copilotkit'>
         <ToolCallSurface />
       </CopilotKit>
     )
 
-    // The LeadCard must visibly paint: subject, the envelope + sender, and summary.
+    // The LeadCard must visibly paint: subject, the envelope tile + sender, and summary.
     expect(screen.getByText('Order: 10 units')).toBeInTheDocument()
     expect(screen.getByText(/ivan@acme\.ru/)).toBeInTheDocument()
-    expect(screen.getByText(/✉️/)).toBeInTheDocument()
+    expect(container.querySelector('.lead-env')).toBeInTheDocument()
     expect(screen.getByText(/order 10 units/i)).toBeInTheDocument()
   })
 })

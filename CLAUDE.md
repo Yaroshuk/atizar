@@ -11,7 +11,28 @@ operational index; that file is the big picture.
 
 ## ⏭️ Handoff — start here (next session)
 
-**On `feat/platform-package-split` now (BUILT, browser-verified):** **the `@platform/*` package
+**On `feat/consumer-desktop-reskin` now (BUILT, browser-verified):** **the consumer desktop
+re-skin** — the Smedja design system (exported from Claude Design; bundle decoded from the
+`api.anthropic.com/v1/design/...` gzip→tar) is applied to `apps/inbox/client`. The flat two-card
+view is now a **two-panel desktop**: a left **Pipeline** column + a right **Your agents** grid,
+each under the SAME thin `.comp-head` (icon + title). Tokens (`#f5f5f7`/`#fff`/teal `#0a7`/amber,
+radii, soft shadows, system-ui) live in `client/src/styles.css`; the 5 components (`AgentCard`,
+`AgentModal`, `LeadCard`, `VerdictCard`, `ApprovalDialog`) were re-skinned (markup+classes only,
+CopilotKit/AG-UI logic untouched). New: `components/Icon.tsx` (one component + `Record<IconName,
+paths>` line icons), `components/PipelineColumn.tsx` + pure `pipeline.ts` (`activePipeline`:
+**shows only launched agents — status ≠ idle — ordered source-before-target by `def.handoffs`,
+tinted green/amber/red, connected by a ↓**). `status.ts` gained `STATUS_LABEL`. Per-agent
+subtitle+icon are passed client-side from `InboxView` (core `defineAgent` passport left untouched
+— a `subtitle`/`icon` field is deferred). **DROPPED by the user** (in the design but not wanted):
+left icon rail/sidebar, global top bar, Manager/Admin, account, notifications, admin settings,
+Leads table, run history. Browser-verified E2E on real Gmail just now (qualifier → verdict
+sales/hot → handoff → reply draft → amber approval → real Gmail draft id returned; pipeline lit
+qualifier-green then reply-amber with the connector). 84 unit tests (+5 `pipeline`), tsc+lint+
+format+build green. Spec: `docs/superpowers/specs/2026-06-07-consumer-desktop-reskin-design.md`.
+Design bundle (reference, gitignored under /tmp): chats + `Consumer Desktop v2.html` + `styles.css`
+also carry a richer v2/v3 (Lead Manager fan-out, multi-lead triage, dispatch card) we did NOT build.
+
+**Previously on `feat/platform-package-split` (BUILT, browser-verified):** **the `@platform/*` package
 split** — the library is extracted into a **yarn-classic (1.22) workspace**. `core` +
 `providers` + `integrations` are now real packages (`@platform/core`, `@platform/providers`,
 `@platform/integrations`) consumed by `apps/inbox` by name; the contract is validated. Internal

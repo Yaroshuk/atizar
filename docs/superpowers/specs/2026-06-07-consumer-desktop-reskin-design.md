@@ -1,6 +1,10 @@
 # Consumer Desktop re-skin — Smedja design system
 
-_Spec · 2026-06-07 · branch `feat/consumer-desktop-reskin`_
+_Spec · 2026-06-07 · branch `feat/consumer-desktop-reskin` · **BUILT, browser-verified**_
+
+> Status: implemented and verified end-to-end on real Gmail (qualifier → verdict
+> sales/hot → handoff → reply draft → approve → real Gmail draft id returned). 84 unit
+> tests, tsc + lint + format + build green.
 
 ## Goal
 
