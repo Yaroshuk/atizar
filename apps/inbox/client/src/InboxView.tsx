@@ -1,64 +1,54 @@
 import { useCallback, useRef, useState } from 'react'
-import {
-  useAgent,
-  useCopilotKit,
-  UseAgentUpdate,
-  useRenderToolCall,
-} from '@copilotkit/react-core/v2'
+import { useCopilotKit, useRenderToolCall } from '@copilotkit/react-core/v2'
 import { useInboxActions } from './actions'
+import { useGithubActions } from './githubActions'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal } from './components/AgentModal'
+import { AgentRuntime, type AgentHandle } from './components/AgentRuntime'
 import { PipelineColumn } from './components/PipelineColumn'
-import { Icon, type IconName } from './components/Icon'
-import { useAgentStatus } from './useAgentStatus'
+import { WorkflowSwitcher } from './components/WorkflowSwitcher'
+import { Icon } from './components/Icon'
 import type { PipelineNode } from './pipeline'
-import { agents, qualifierAgent, replyAgent } from '../../agents/inbox.agent'
-import { encodeHandoff, type HandoffPayload, type Message } from '@platform/core'
+import type { Status } from './status'
+import { workflows, META } from './workflows'
+import { encodeHandoff, type Message } from '@platform/core'
 
-// An agent that is some other agent's handoff target is launched BY that agent, not
-// directly (e.g. reply, started by the qualifier) — so it gets no START button.
-const handoffTargets = new Set(agents.flatMap((a) => a.handoffs ?? []))
-const canStart = (id: string) => !handoffTargets.has(id)
-
-// Per-agent display chrome (icon + one-line subtitle). Lives client-side for now —
-// adding subtitle/icon to the core `defineAgent` passport is deferred to the framework
-// phase (see spec). Keyed by agent id.
-const META: Record<string, { subtitle: string; iconName: IconName }> = {
-  [qualifierAgent.id]: { subtitle: 'Reads inbox, qualifies the lead', iconName: 'inbox' },
-  [replyAgent.id]: { subtitle: 'Drafts a reply for your approval', iconName: 'pen' },
-}
-
-// The consumer desktop: a left Pipeline panel (live runs, tinted + connected) beside a
-// right "Your agents" grid + a conversation modal. Two agents are known statically
-// (qualifier, reply), so they are wired explicitly rather than mapped — N-agent mapping
-// over a registry is deferred to the framework phase. Must render inside <CopilotKit>.
 export const InboxView = () => {
   const { copilotkit } = useCopilotKit()
+  const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [handles, setHandles] = useState<Record<string, AgentHandle>>({})
 
-  const { agent: qualifier } = useAgent({
-    agentId: qualifierAgent.id,
-    updates: [UseAgentUpdate.OnMessagesChanged],
-  })
-  const { agent: reply } = useAgent({
-    agentId: replyAgent.id,
-    updates: [UseAgentUpdate.OnMessagesChanged],
-  })
+  const workflow = workflows.find((w) => w.id === activeWorkflowId) ?? workflows[0]
 
-  // Keep the latest agent objects reachable from the (stable) handoff callback.
-  const agentsRef = useRef<Record<string, typeof reply>>({})
-  agentsRef.current[qualifierAgent.id] = qualifier
-  agentsRef.current[replyAgent.id] = reply
+  // Agents that are some other agent's handoff target are launched BY that agent —
+  // they get no START button. Computed over the active workflow only.
+  const handoffTargets = new Set(workflow.agents.flatMap((a) => a.handoffs ?? []))
+  const canStart = (id: string) => !handoffTargets.has(id)
 
-  // The handoff seam — human trigger today. Mechanism (encode) lives in core, so a
-  // future agent-initiated/server trigger reuses it. Seed the target run with the
-  // payload, launch it through CopilotKitCore, open its modal.
+  const onAgentChange = useCallback((id: string, handle: AgentHandle) => {
+    setHandles((prev) => {
+      const cur = prev[id]
+      if (cur && cur.agent === handle.agent && cur.status === handle.status) return prev
+      return { ...prev, [id]: handle }
+    })
+  }, [])
+
+  // Mirror the latest handles into a ref so the (stable) handoff callback always reads
+  // fresh agents. requestHandoff MUST be stable: useRenderTool captures its render
+  // closure once (its effect deps stringify a function to "[null]", so it never
+  // re-runs), so a handles-dependent requestHandoff would freeze the initial empty map
+  // and every handoff would silently no-op.
+  const handlesRef = useRef(handles)
+  handlesRef.current = handles
+
+  // The handoff seam (human trigger). Seed the target run with the payload, launch it,
+  // open its modal. Works for both payload shapes — encode is schema-agnostic.
   const requestHandoff = useCallback(
-    (targetId: string, payload: HandoffPayload) => {
-      const target = agentsRef.current[targetId]
+    (targetId: string, payload: unknown) => {
+      const target = handlesRef.current[targetId]?.agent
       if (!target) return
       const seed = encodeHandoff(payload) as Message
-      // Fresh handoff run: replace any prior history with just the seed.
       target.messages.splice(0, target.messages.length, seed)
       void copilotkit.runAgent({ agent: target })
       setOpenId(targetId)
@@ -66,110 +56,110 @@ export const InboxView = () => {
     [copilotkit]
   )
 
-  // Register the generative-UI renderers once (renderLead/saveDraft for reply,
-  // renderVerdict for the qualifier). renderVerdict's "Draft reply" forwards here.
+  // Both workflows' render tools register unconditionally (globally-unique tool names,
+  // stable hook order). requestHandoff is stable and accepts either payload shape, so
+  // it is passed directly (no inline wrapper, which would defeat the stable identity).
   useInboxActions(requestHandoff)
+  useGithubActions(requestHandoff)
 
   const renderToolCall = useRenderToolCall()
-  const qualifierStatus = useAgentStatus(qualifier, qualifierAgent.approvals)
-  const replyStatus = useAgentStatus(reply, replyAgent.approvals)
 
-  const pipelineNodes: PipelineNode[] = [
-    {
-      id: qualifierAgent.id,
-      name: qualifierAgent.name,
-      subtitle: META[qualifierAgent.id].subtitle,
-      iconName: META[qualifierAgent.id].iconName,
-      status: qualifierStatus,
-      handoffsTo: qualifierAgent.handoffs ?? [],
-    },
-    {
-      id: replyAgent.id,
-      name: replyAgent.name,
-      subtitle: META[replyAgent.id].subtitle,
-      iconName: META[replyAgent.id].iconName,
-      status: replyStatus,
-      handoffsTo: replyAgent.handoffs ?? [],
-    },
-  ]
+  const statusOf = (id: string): Status => handles[id]?.status ?? 'idle'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agentOf = (id: string): any => handles[id]?.agent
+
+  const pipelineNodes: PipelineNode[] = workflow.agents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    subtitle: META[a.id].subtitle,
+    iconName: META[a.id].iconName,
+    status: statusOf(a.id),
+    handoffsTo: a.handoffs ?? [],
+  }))
+
+  const openAgentDef = openId ? workflow.agents.find((a) => a.id === openId) : undefined
 
   return (
-    <div className='workspace-body'>
-      <PipelineColumn nodes={pipelineNodes} onOpen={setOpenId} />
+    <>
+      {/* Hidden hook owners — one per agent in the active workflow. Keyed by id so a
+          workflow switch unmounts the old set and mounts the new (hooks reset cleanly). */}
+      {workflow.agents.map((a) => (
+        <AgentRuntime key={`${workflow.id}:${a.id}`} def={a} onChange={onAgentChange} />
+      ))}
 
-      <div className='main'>
-        <div className='comp-head'>
-          <span className='ch-label'>
-            <Icon name='layers' size={14} />
-            Your agents
-          </span>
-          <span className='ch-spacer' />
-          <span className='legend'>
-            <span className='legend-item'>
-              <span className='dot idle' />
-              Idle
-            </span>
-            <span className='legend-item'>
-              <span className='dot done' />
-              Running / done
-            </span>
-            <span className='legend-item'>
-              <span className='dot awaiting_approval' />
-              Awaiting approval
-            </span>
-          </span>
-        </div>
+      <WorkflowSwitcher
+        workflows={workflows}
+        activeId={activeWorkflowId}
+        onSelect={(id) => {
+          setOpenId(null)
+          setActiveWorkflowId(id)
+        }}
+      />
 
-        <div className='main-scroll'>
-          <div className='agent-grid'>
-            <AgentCard
-              name={qualifierAgent.name}
-              subtitle={META[qualifierAgent.id].subtitle}
-              iconName={META[qualifierAgent.id].iconName}
-              status={qualifierStatus}
-              canStart={canStart(qualifierAgent.id)}
-              onStart={() => void copilotkit.runAgent({ agent: qualifier })}
-              onOpen={() => setOpenId(qualifierAgent.id)}
-            />
-            <AgentCard
-              name={replyAgent.name}
-              subtitle={META[replyAgent.id].subtitle}
-              iconName={META[replyAgent.id].iconName}
-              status={replyStatus}
-              canStart={canStart(replyAgent.id)}
-              onStart={() => void copilotkit.runAgent({ agent: reply })}
-              onOpen={() => setOpenId(replyAgent.id)}
-            />
+      <div className='workspace-body'>
+        <PipelineColumn nodes={pipelineNodes} onOpen={setOpenId} />
+
+        <div className='main'>
+          <div className='comp-head'>
+            <span className='ch-label'>
+              <Icon name='layers' size={14} />
+              Your agents
+            </span>
+            <span className='ch-spacer' />
+            <span className='legend'>
+              <span className='legend-item'>
+                <span className='dot idle' />
+                Idle
+              </span>
+              <span className='legend-item'>
+                <span className='dot done' />
+                Running / done
+              </span>
+              <span className='legend-item'>
+                <span className='dot awaiting_approval' />
+                Awaiting approval
+              </span>
+            </span>
+          </div>
+
+          <div className='main-scroll'>
+            <div className='agent-grid'>
+              {workflow.agents.map((a) => {
+                const agent = agentOf(a.id)
+                return (
+                  <AgentCard
+                    key={a.id}
+                    name={a.name}
+                    subtitle={META[a.id].subtitle}
+                    iconName={META[a.id].iconName}
+                    status={statusOf(a.id)}
+                    canStart={canStart(a.id)}
+                    onStart={() => agent && void copilotkit.runAgent({ agent })}
+                    onOpen={() => setOpenId(a.id)}
+                  />
+                )
+              })}
+            </div>
           </div>
         </div>
-      </div>
 
-      {openId === qualifierAgent.id && (
-        <AgentModal
-          agent={qualifier}
-          title={qualifierAgent.name}
-          iconName={META[qualifierAgent.id].iconName}
-          status={qualifierStatus}
-          renderToolCall={renderToolCall}
-          loading={qualifierStatus === 'running'}
-          canStart={canStart(qualifierAgent.id)}
-          onStart={() => void copilotkit.runAgent({ agent: qualifier })}
-          onClose={() => setOpenId(null)}
-        />
-      )}
-      {openId === replyAgent.id && (
-        <AgentModal
-          agent={reply}
-          title={replyAgent.name}
-          iconName={META[replyAgent.id].iconName}
-          status={replyStatus}
-          renderToolCall={renderToolCall}
-          loading={replyStatus === 'running'}
-          canStart={canStart(replyAgent.id)}
-          onStart={() => void copilotkit.runAgent({ agent: reply })}
-          onClose={() => setOpenId(null)}
-        />
-      )}
-    </div>
+        {openAgentDef && agentOf(openAgentDef.id) && (
+          <AgentModal
+            agent={agentOf(openAgentDef.id)}
+            title={openAgentDef.name}
+            iconName={META[openAgentDef.id].iconName}
+            status={statusOf(openAgentDef.id)}
+            renderToolCall={renderToolCall}
+            loading={statusOf(openAgentDef.id) === 'running'}
+            canStart={canStart(openAgentDef.id)}
+            onStart={() => {
+              const agent = agentOf(openAgentDef.id)
+              if (agent) void copilotkit.runAgent({ agent })
+            }}
+            onClose={() => setOpenId(null)}
+          />
+        )}
+      </div>
+    </>
   )
 }
