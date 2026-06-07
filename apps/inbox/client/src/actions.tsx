@@ -44,31 +44,25 @@ export const useInboxActions = (
         reason: z.string(),
       }),
       render: ({ parameters }) => {
-        const p = parameters
+        const { threadId, from, subject, summary, category, priority, reason } = parameters
         if (
-          p.threadId === undefined ||
-          p.from === undefined ||
-          p.subject === undefined ||
-          p.summary === undefined ||
-          p.category === undefined ||
-          p.priority === undefined ||
-          p.reason === undefined
+          threadId === undefined ||
+          from === undefined ||
+          subject === undefined ||
+          summary === undefined ||
+          category === undefined ||
+          priority === undefined ||
+          reason === undefined
         )
           return <></>
+        const data = { threadId, from, subject, summary, category, priority, reason }
         const Verdict = renderRegistry[qualifierAgent.renders.renderVerdict]
         const target = qualifierAgent.handoffs?.[0] ?? 'reply'
         return (
           <Verdict
-            data={p}
+            data={data}
             onDraftReply={() =>
-              onHandoff?.(target, {
-                threadId: p.threadId,
-                from: p.from,
-                subject: p.subject,
-                summary: p.summary,
-                category: p.category,
-                priority: p.priority,
-              })
+              onHandoff?.(target, { threadId, from, subject, summary, category, priority })
             }
           />
         )
