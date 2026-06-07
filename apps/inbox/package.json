@@ -9,7 +9,7 @@
     "dev:client": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run -c ../../vitest.config.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
