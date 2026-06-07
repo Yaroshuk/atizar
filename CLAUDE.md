@@ -11,35 +11,42 @@ operational index; that file is the big picture.
 
 ## ⏭️ Handoff — start here (next session)
 
-**On `master` now (MERGED, `56f07d0`):** **two agents + manual handoff + strict single
-entry point** — the "second consumer" that validates the `core/` contract for the library.
-A **LEAD QUALIFIER** (the **only** inbox reader: `get_latest_email` → `renderVerdict` →
+**On `feat/platform-package-split` now (BUILT, browser-verified):** **the `@platform/*` package
+split** — the library is extracted into a **yarn-classic (1.22) workspace**. `core` +
+`providers` + `integrations` are now real packages (`@platform/core`, `@platform/providers`,
+`@platform/integrations`) consumed by `apps/inbox` by name; the contract is validated. Internal
+packages are consumed as **raw TS source** (no build step — Vite/tsx/vitest transpile workspace
+deps directly; typecheck = `tsc --build` composite project references). Commands now run from the
+**repo root** with `yarn`. **Browser-verified end-to-end on real Gmail just now:** qualifier read
+a real "Order: 10 units — delivery question" → sales/hot → handoff → reply drafted from the
+payload (no inbox re-read) → approved → real Gmail draft (draft+thread id returned, not sent). 79
+unit tests, tsc+lint+format:check+build green. See the "Packages" section below.
+
+**Previously on `master` (MERGED, `56f07d0`):** **two agents + manual handoff + strict single
+entry point** — the "second consumer" that validated the `core/` contract (the precondition for
+the split). A **LEAD QUALIFIER** (the **only** inbox reader: `get_latest_email` → `renderVerdict` →
 VerdictCard) sits beside the **REPLY AGENT** (a writer: `renderLead`/`saveDraft`/`create_draft`,
 **no inbox access**) on a two-card desktop. Manager clicks **"Draft reply"** on the verdict →
 **handoff**: reply runs **seeded with the verdict** (no inbox re-read) → `saveDraft` → approve
-→ real Gmail draft. Handoff _mechanism_ is in **`core/handoff.ts`** (`encode/decodeHandoff`,
+→ real Gmail draft. Handoff _mechanism_ is in **`@platform/core` (`handoff.ts`)** (`encode/decodeHandoff`,
 pure) so a future agent/server trigger reuses it; only the human _trigger_ is client-side. The
 boundary is **hard** (per-agent MCP allow-list in `server/index.ts` → `buildAgent(...,
 allowedTools)` → spawn), not prompt-only. Provider seam = per-agent `PromptStrategy` factories
-(`ProviderFactory`) — **Mastra-ready**. **Browser-verified end-to-end on real Gmail**
-(`sjuser95@gmail.com`): real "Order: 10 units" lead → sales/hot → handoff → contextual reply
-drafted from payload → approved → real draft (thread+draft id returned). 77 unit tests,
-tsc+lint+format green. See the "Two agents + manual handoff" section below +
+(`ProviderFactory`) — **Mastra-ready**. See the "Two agents + manual handoff" section below +
 `docs/superpowers/specs|plans/2026-06-07-two-agents-handoff*`. (Also on `master`: the prior
 **Gmail draft agent**, `feat/gmail-draft-integration` @ `de8f7f4`, + the `claude-cli` provider.)
 
-**Pick next (suggested order) — we are "ready to start the library":**
+**Pick next (suggested order) — the library split (core+providers+integrations) is DONE:**
 
-1. **The library (`@platform/*` split):** the `core/` contract is now validated on TWO agents
-   - a handoff (the documented precondition). Extract `apps/inbox/core/` into a package
-     (`@platform/core` or similar): message layer, `Provider`/registry, `defineAgent`,
-     `core/handoff`. Decide the boundary (what's framework vs. app), wire `apps/inbox` to consume
-     it. This is the headline goal the user has been driving toward — brainstorm the package
-     shape first.
+1. **Finish the split — `@platform/react` + `@platform/server` extraction (deferred):** the
+   client React layer (`renderRegistry`, `actions`, hooks, `AgentModal`) and the Hono/BFF +
+   spawn server layer still live in `apps/inbox/`. Extract them into packages when the app/
+   framework boundary there settles (don't over-invest early). The `@platform/*` scope is a
+   **placeholder** — rename before any npm publish.
 2. **Multi-provider / Mastra** (can interleave): add a `mastra` (or `claude-api`) factory beside
-   `claude-cli` behind the existing `Provider` seam. The seam is already a lowest-common-
-   denominator (history-in → AG-UI-events-out; pause = stop; resume = new run) — no seam change
-   needed. Needs an API key. See the Mastra-coexistence rules in the two-agents spec.
+   `claude-cli` behind the existing `Provider` seam in `@platform/providers`. The seam is already a
+   lowest-common-denominator (history-in → AG-UI-events-out; pause = stop; resume = new run) — no
+   seam change needed. Needs an API key. See the Mastra-coexistence rules in the two-agents spec.
 3. _Polish (cosmetic, deferred):_ the model still narrates a bit ("I'll load the tool schemas…")
    AND the qualifier/reply verdict prints as plain markdown paragraphs in the modal alongside
    the card — strip pre-tool / duplicate chatter client-side or via prompt. Tighten Gmail scope
@@ -69,7 +76,24 @@ tsc+lint+format green. See the "Two agents + manual handoff" section below +
   `git switch`): an inspection subagent did this and left the repo on `master` mid-run (work was
   safe on the branch, but confusing). Tell review/inspection agents to use `git show <sha>:path`
   / `git diff` only and verify `git rev-parse --abbrev-ref HEAD` before finishing.
-- Run from `apps/inbox/`: `npm run dev`, `npm test`, `npm run lint`.
+- **tsx + `allowJs` + packages that ship `.ts` source:** with `allowJs:true` in
+  `apps/inbox/tsconfig.json`, tsx rewrote `node_modules/fast-json-patch/index.js` to its sibling
+  `index.ts` (the package ships both), which `require()`s an unshipped `./src/core` → server
+  **crashed at boot** with `MODULE_NOT_FOUND`. Fix: do NOT set `allowJs` in `apps/inbox/tsconfig.json`;
+  keep `.mjs` runtime files out of the TS `include`. (Invisible to unit tests + `/info` probe —
+  only running the app catches it → always browser-verify.)
+- **yarn-classic does not auto-install peer deps** (npm did): `@testing-library/dom` had to be
+  added explicitly to root devDeps to keep the React tests green.
+- **Per-package `outDir`/`tsBuildInfoFile`:** under `tsc --build`, the base's relative `outDir`
+  made two packages collide on `dist-types/index.d.ts` (TS5055). `@platform/providers` +
+  `@platform/integrations` set a package-local `outDir`+`tsBuildInfoFile`; `@platform/core` relies
+  on the base and "owns" the root dist-types (a known minor asymmetry — do NOT fix now).
+- **vitest from the app dir** needs `-c ../../vitest.config.ts` (its `test` script has this) —
+  vitest stops at `apps/inbox/vite.config.ts` (no test block) and won't walk up. Root `yarn test`
+  is the canonical path.
+- Run from the **repo root** with yarn: `yarn dev`, `yarn test`, `yarn typecheck`, `yarn lint`,
+  `yarn build`, `yarn format` / `yarn format:check`. (`yarn install` may need `--ignore-engines`
+  on Node 20.14 because `@eslint/js@10` wants 20.19+.)
 
 ## Agent-First Project — Continuous Learning
 
@@ -97,21 +121,54 @@ Hard-won API gotchas are distilled into rule files for quick recall:
 
 - `.claude/skills/rules/copilotkit-v2.md` — CopilotKit v2 + AG-UI must-not-rediscover rules
 
+## Packages (`@platform/*` split — BUILT)
+
+The library is extracted into a **yarn-classic (1.22) workspace** (`feat/platform-package-split`,
+browser-verified). Layout:
+
+```
+/ (root package.json: private, "workspaces":["packages/*","apps/*"], shared dev tooling + scripts)
+  tsconfig.base.json (shared compiler opts: composite, emitDeclarationOnly, moduleResolution bundler)
+  tsconfig.json (solution: references all packages + apps/inbox)
+  vitest.config.ts, eslint.config.js, .prettierrc, .prettierignore  (all at ROOT now)
+packages/
+  core/         @platform/core         (isomorphic: messages, defineAgent, providers[contract], handoff) deps: @ag-ui/client, zod
+  providers/    @platform/providers    (isomorphic; claude-stream, claude-cli-provider, mock-provider; spawn INJECTED) deps: @platform/core, @ag-ui/client
+  integrations/ @platform/integrations (node-only batteries) subpath exports: "./gmail-basic" + "./gmail-basic/format"; deps @modelcontextprotocol/sdk + zod; googleapis = OPTIONAL peer
+apps/inbox/     "inbox" — depends on the three @platform/* by name ("*"); concrete agents in apps/inbox/agents/; server/, client/, mcp/inbox-tools.mjs
+```
+
+- **Dependency direction:** everything depends on `@platform/core`; **core depends on nothing
+  concrete** (just `@ag-ui/client` + `zod`). `@platform/providers` is **isomorphic** (the
+  `spawn` is INJECTED, so it stays Node-free). `@platform/integrations` is **node-only batteries**
+  with **subpath exports** (`./gmail-basic`, `./gmail-basic/format`) + **optional peer deps**
+  (`googleapis` is loaded lazily inside the MCP server via `optional-peer.mjs` → `optionalPeerError`,
+  fail-fast; the app installs it because it uses the entrypoint).
+- **No build step — consume raw TS source:** each package's `exports` points at `./src/index.ts`;
+  Vite + tsx + vitest transpile workspace deps directly. Typecheck = `tsc --build` (composite
+  project references).
+- `apps/inbox/server/claude-spawn.ts` resolves the gmail MCP server via
+  `require.resolve('@platform/integrations/gmail-basic')` (createRequire), not a relative path. The
+  app's OWN generative-UI tools `mcp/inbox-tools.mjs` stayed in the app (contract, not integration).
+- The contract (`@platform/core`) is what enables third-party extension. **`@platform/*` is a
+  placeholder scope — rename before any npm publish.** `@platform/react` + `@platform/server` are
+  deferred (client + server layers still live in `apps/inbox/`).
+
 ## Current State
 
 **COMPLETE — browser-verified.** The vertical slice loop works AND the reusable
-core layer is extracted under `apps/inbox/core/`:
+core layer is extracted into `@platform/core` (was `apps/inbox/core/`):
 
-- `core/messages.ts` — typed message layer over `@ag-ui` (`hasPendingApproval`,
+- `@platform/core` (`messages.ts`) — typed message layer over `@ag-ui` (`hasPendingApproval`,
   `approvalResolved`, `pairToolResults`, guards). Replaces the `toolCallId↔toolMessage`
   logic that was duplicated in 3 files; no more `any`.
-- `core/providers.ts` + `core/mock-provider.ts` — `Provider` interface
-  (`run(input) → AsyncIterable<BaseEvent>`) + `defineProviders` registry + one fake
-  provider that emits the scripted inbox stream.
-- `core/defineAgent.ts` + `core/inbox.agent.ts` — the Zod-validated agent passport +
-  the concrete inbox instance (`inboxAgent`, `providerRegistry`).
-- Threaded through both sides: server (`server/build-agent.ts`) builds the
-  `BuiltInAgent` from the passport + registry; client (`client/src/renderRegistry.tsx`,
+- `@platform/core` (`providers.ts` contract) + `@platform/providers` (`mock-provider.ts`) —
+  `Provider` interface (`run(input) → AsyncIterable<BaseEvent>`) + `defineProviders` registry +
+  one fake provider that emits the scripted inbox stream.
+- `@platform/core` (`defineAgent.ts`) + `apps/inbox/agents/` — the Zod-validated agent passport +
+  the concrete inbox instances (`replyAgent`/`qualifierAgent`, registries).
+- Threaded through both sides: server (`apps/inbox/server/build-agent.ts`) builds the
+  `BuiltInAgent` from the passport + registry; client (`apps/inbox/client/src/renderRegistry.tsx`,
   `actions.tsx`, `useAgentStatus.ts`, `AgentModal.tsx`, `App.tsx`) reads the passport.
   The hardcoded `"confirmSend"`/`"renderLead"`/`"LeadCard"` strings are gone.
 
@@ -404,12 +461,14 @@ Toolchain note: Vite 8 uses rolldown; npm did not auto-install the platform bind
 
 ## Commands
 
-Run from `apps/inbox/`:
+Run from the **repo root** with `yarn` (yarn-classic 1.22 workspace):
 
-- `npm run dev` — server (tsx watch, :4000) + client (vite, :5173) via concurrently; `/api` proxied to :4000.
-- `npm run dev:server` / `npm run dev:client` — run each half separately.
-- `npm run build` — vite production build.
-- `npm run typecheck` — `tsc --noEmit`.
-- `npm test` — run vitest (unit tests).
-- `npm run lint` — ESLint (must be GREEN; we do not leave it red).
-- `npm run format` / `npm run format:check` — Prettier write / check.
+- `yarn dev` — server (tsx watch, :4000) + client (vite, :5173) via concurrently; `/api` proxied to :4000.
+- `yarn dev:server` / `yarn dev:client` — run each half separately.
+- `yarn build` — vite production build.
+- `yarn typecheck` — `tsc --build` (composite project references across all packages + apps/inbox).
+- `yarn test` — run vitest (unit tests) across the workspace.
+- `yarn lint` — ESLint (must be GREEN; we do not leave it red).
+- `yarn format` / `yarn format:check` — Prettier write / check.
+
+(`yarn install` may need `--ignore-engines` on Node 20.14 because `@eslint/js@10` wants 20.19+.)
