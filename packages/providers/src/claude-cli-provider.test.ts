@@ -1,7 +1,43 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type RunAgentInput } from '@ag-ui/client'
+import { decodeHandoff, type PromptStrategy } from '@platform/core'
 import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider.js'
-import { createReplyPrompts } from './agents/reply.prompts.js'
+
+// Local PromptStrategy fixture. The real reply-agent prompts live in the app
+// (apps/inbox/core/agents) and move into their own package in a later task — the
+// providers package must NOT depend on the app (that would be a backwards/cyclic
+// dependency). This fixture reproduces the prompt SHAPE the provider relies on:
+//   - standalone first turn (no handoff) → mentions the "qualifier" entry point
+//   - resume turn → "APPROVED" + the saved threadId/body + a `create_draft` call
+//   - resume returns null when threadId/body are missing (the "Resume failed" path)
+const createReplyPrompts = (instructions: string): PromptStrategy => ({
+  buildFirst(input: RunAgentInput): string {
+    const h = decodeHandoff(input)
+    if (h) {
+      return [
+        instructions,
+        `A colleague already qualified this lead — category "${h.category}".`,
+        `Email from ${h.from}, subject "${h.subject}". Summary: ${h.summary}`,
+      ].join('\n')
+    }
+    return [
+      instructions,
+      'No lead has been handed off to you. Tell the user to start from the Lead',
+      'Qualifier and click "Draft reply" on a verdict.',
+    ].join('\n')
+  },
+  buildResume(args: Record<string, unknown>): string | null {
+    const threadId = typeof args.threadId === 'string' ? args.threadId : ''
+    const body = typeof args.body === 'string' ? args.body : ''
+    if (!threadId || !body) return null
+    return [
+      instructions,
+      'The human APPROVED saving this reply. Create it as a Gmail DRAFT now by',
+      `calling create_draft, replying within thread "${threadId}", with body:`,
+      body,
+    ].join('\n')
+  },
+})
 
 const line = (o: unknown) => JSON.stringify(o)
 const textDelta = (t: string) =>

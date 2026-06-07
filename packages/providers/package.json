@@ -1,0 +1,13 @@
+{
+  "name": "@platform/providers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ag-ui/client": "^0.0.55",
+    "@platform/core": "*"
+  }
+}

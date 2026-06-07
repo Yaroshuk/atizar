@@ -5,7 +5,7 @@ import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ClaudeSpawn } from '../core/claude-cli-provider.js'
+import type { ClaudeSpawn } from '@platform/providers'
 
 // Absolute path to the stdio MCP server scripts.
 const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.url))
