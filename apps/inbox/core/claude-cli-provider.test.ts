@@ -128,7 +128,7 @@ describe('createClaudeCliProvider', () => {
 
   it('emits a readable error chunk when spawn throws', async () => {
     const spawn: ClaudeSpawn = () => { throw new Error('claude not found') }
-    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'x', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], prompts: createReplyPrompts('x'), spawn })
     const out = await drain(provider.run(runInput([])))
     expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK })
     expect(out[0].delta).toMatch(/error/i)
