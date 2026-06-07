@@ -27,4 +27,21 @@ server.registerTool(
   async () => ({ content: [{ type: 'text', text: 'Awaiting human approval.' }] }),
 )
 
+server.registerTool(
+  'renderVerdict',
+  {
+    description: 'Surface a qualified lead verdict as a card in the UI.',
+    inputSchema: {
+      threadId: z.string(),
+      from: z.string(),
+      subject: z.string(),
+      summary: z.string(),
+      category: z.string(),
+      priority: z.string(),
+      reason: z.string(),
+    },
+  },
+  async () => ({ content: [{ type: 'text', text: 'Verdict surfaced to the user.' }] }),
+)
+
 await server.connect(new StdioServerTransport())
