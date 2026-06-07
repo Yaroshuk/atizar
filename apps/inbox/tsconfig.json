@@ -3,10 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "types": ["node"],
-    "noEmit": false,
-    "allowJs": true,
-    "checkJs": false
+    "noEmit": false
   },
-  "include": ["client/src", "server", "agents", "mcp"],
+  "include": ["client/src", "server", "agents"],
   "references": []
 }
