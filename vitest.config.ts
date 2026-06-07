@@ -12,10 +12,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./apps/inbox/client/src/test/setup.ts'],
-    include: [
-      'apps/inbox/**/*.test.{ts,tsx}',
-      'packages/*/src/**/*.test.{ts,tsx}',
-    ],
+    include: ['apps/inbox/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.{ts,tsx}'],
     css: true,
     server: {
       deps: {

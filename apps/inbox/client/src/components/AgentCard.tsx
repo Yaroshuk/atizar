@@ -53,7 +53,7 @@ export const AgentCard = ({ name, status, onStart, onOpen }: AgentCardProps) => 
           }}
         >
           {status === 'running' ? (
-            <span className="spinner" />
+            <span className='spinner' />
           ) : (
             <span
               style={{

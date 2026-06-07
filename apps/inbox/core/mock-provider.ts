@@ -48,7 +48,10 @@ export function createMockInboxProvider(approvalNames: readonly string[]): Provi
 
       yield textChunk('Checking inbox… found a lead.')
       yield* toolCall('renderLead', LEAD)
-      yield* toolCall('saveDraft', { threadId: 'thread_demo', body: 'Thanks for reaching out — here is a reply.' })
+      yield* toolCall('saveDraft', {
+        threadId: 'thread_demo',
+        body: 'Thanks for reaching out — here is a reply.',
+      })
     },
   }
 }

@@ -32,9 +32,14 @@ function getGmail() {
   if (_gmail) return _gmail
   const keys = JSON.parse(readFileSync(keysPath, 'utf8'))
   const clientData = keys.installed || keys.web
-  if (!clientData) throw new Error('gcp-oauth.keys.json has neither "installed" nor "web" client config')
+  if (!clientData)
+    throw new Error('gcp-oauth.keys.json has neither "installed" nor "web" client config')
   const { client_id, client_secret, redirect_uris } = clientData
-  const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris?.[0] || 'http://localhost:3000/oauth2callback')
+  const auth = new google.auth.OAuth2(
+    client_id,
+    client_secret,
+    redirect_uris?.[0] || 'http://localhost:3000/oauth2callback'
+  )
   const creds = JSON.parse(readFileSync(credsPath, 'utf8'))
   auth.setCredentials(creds)
   _gmail = google.gmail({ version: 'v1', auth })
@@ -69,7 +74,9 @@ server.registerTool(
       const gmail = getGmail()
       const list = await gmail.users.messages.list({ userId: 'me', q: 'in:inbox', maxResults: 1 })
       if (!list.data.messages?.length) {
-        return { content: [{ type: 'text', text: JSON.stringify({ error: 'No emails found in inbox.' }) }] }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ error: 'No emails found in inbox.' }) }],
+        }
       }
       const full = await gmail.users.messages.get({
         userId: 'me',
@@ -83,7 +90,7 @@ server.registerTool(
         content: [{ type: 'text', text: JSON.stringify({ error: errText(err) }) }],
       }
     }
-  },
+  }
 )
 
 // Tool: create_draft
@@ -92,8 +99,7 @@ server.registerTool(
 server.registerTool(
   'create_draft',
   {
-    description:
-      'Create a Gmail draft reply for the given thread. Does NOT send — draft only.',
+    description: 'Create a Gmail draft reply for the given thread. Does NOT send — draft only.',
     inputSchema: { threadId: z.string(), body: z.string() },
   },
   async ({ threadId, body }) => {
@@ -120,7 +126,16 @@ server.registerTool(
       const subject = findHeader('Subject')
 
       if (!to) {
-        return { content: [{ type: 'text', text: JSON.stringify({ error: 'Could not derive a recipient from the thread (no From header).' }) }] }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                error: 'Could not derive a recipient from the thread (no From header).',
+              }),
+            },
+          ],
+        }
       }
 
       const raw = buildReplyRaw({ to, subject, body, threadId })
@@ -138,7 +153,7 @@ server.registerTool(
         content: [{ type: 'text', text: JSON.stringify({ error: errText(err) }) }],
       }
     }
-  },
+  }
 )
 
 await server.connect(new StdioServerTransport())

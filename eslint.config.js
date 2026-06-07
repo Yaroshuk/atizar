@@ -59,6 +59,7 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      '**/dist-types/**',
       '**/coverage/**',
       '**/.playwright-mcp/**',
       '**/*.config.*',

@@ -17,8 +17,8 @@ A **LEAD QUALIFIER** (the **only** inbox reader: `get_latest_email` → `renderV
 VerdictCard) sits beside the **REPLY AGENT** (a writer: `renderLead`/`saveDraft`/`create_draft`,
 **no inbox access**) on a two-card desktop. Manager clicks **"Draft reply"** on the verdict →
 **handoff**: reply runs **seeded with the verdict** (no inbox re-read) → `saveDraft` → approve
-→ real Gmail draft. Handoff *mechanism* is in **`core/handoff.ts`** (`encode/decodeHandoff`,
-pure) so a future agent/server trigger reuses it; only the human *trigger* is client-side. The
+→ real Gmail draft. Handoff _mechanism_ is in **`core/handoff.ts`** (`encode/decodeHandoff`,
+pure) so a future agent/server trigger reuses it; only the human _trigger_ is client-side. The
 boundary is **hard** (per-agent MCP allow-list in `server/index.ts` → `buildAgent(...,
 allowedTools)` → spawn), not prompt-only. Provider seam = per-agent `PromptStrategy` factories
 (`ProviderFactory`) — **Mastra-ready**. **Browser-verified end-to-end on real Gmail**
@@ -29,35 +29,37 @@ tsc+lint+format green. See the "Two agents + manual handoff" section below +
 **Gmail draft agent**, `feat/gmail-draft-integration` @ `de8f7f4`, + the `claude-cli` provider.)
 
 **Pick next (suggested order) — we are "ready to start the library":**
+
 1. **The library (`@platform/*` split):** the `core/` contract is now validated on TWO agents
-   + a handoff (the documented precondition). Extract `apps/inbox/core/` into a package
-   (`@platform/core` or similar): message layer, `Provider`/registry, `defineAgent`,
-   `core/handoff`. Decide the boundary (what's framework vs. app), wire `apps/inbox` to consume
-   it. This is the headline goal the user has been driving toward — brainstorm the package
-   shape first.
+   - a handoff (the documented precondition). Extract `apps/inbox/core/` into a package
+     (`@platform/core` or similar): message layer, `Provider`/registry, `defineAgent`,
+     `core/handoff`. Decide the boundary (what's framework vs. app), wire `apps/inbox` to consume
+     it. This is the headline goal the user has been driving toward — brainstorm the package
+     shape first.
 2. **Multi-provider / Mastra** (can interleave): add a `mastra` (or `claude-api`) factory beside
    `claude-cli` behind the existing `Provider` seam. The seam is already a lowest-common-
    denominator (history-in → AG-UI-events-out; pause = stop; resume = new run) — no seam change
    needed. Needs an API key. See the Mastra-coexistence rules in the two-agents spec.
-3. *Polish (cosmetic, deferred):* the model still narrates a bit ("I'll load the tool schemas…")
+3. _Polish (cosmetic, deferred):_ the model still narrates a bit ("I'll load the tool schemas…")
    AND the qualifier/reply verdict prints as plain markdown paragraphs in the modal alongside
    the card — strip pre-tool / duplicate chatter client-side or via prompt. Tighten Gmail scope
    `gmail.modify`→`readonly`+`compose`.
 
 **Don't-rediscover gotchas:**
-- **Gmail MCP:** the *official* Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
+
+- **Gmail MCP:** the _official_ Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
   Developer Preview** — it 403s (`caller does not have permission`) for personal `@gmail.com`
   even with everything configured. The proven community pkg `@gongrzhe/server-gmail-autoauth-mcp`
   is **archived** AND **blocked by the Claude Code safety classifier** (untrusted external code).
   → We use **our own thin stdio Gmail MCP** (`mcp/gmail-tools.mjs`) on the standard Gmail API.
 - **OAuth setup is reused, not re-done:** client + token live at `~/.gmail-mcp/gcp-oauth.keys.json`
-  + `credentials.json` (scope `gmail.modify`); the keys/secret are also in gitignored `.env.local`.
+  - `credentials.json` (scope `gmail.modify`); the keys/secret are also in gitignored `.env.local`.
 - never pass `--bare` to `claude` (skips keychain → "Not logged in"); auth is the **subscription**
   via macOS keychain, no API key; `core/` stays **Node-free** (Node lives in `server/` + `mcp/`);
   HITL is **client-held, two requests** (don't change client/transport — the provider conforms).
 - **`<CopilotKit>` needs `agent={...}`** (see `App.tsx`): it binds internal listeners to
   `props.agent ?? 'default'`. We register `qualifier`/`reply`, NOT `'default'` — omit the prop
-  and the whole tree throws *"Agent 'default' not found"* at runtime (invisible to unit tests +
+  and the whole tree throws _"Agent 'default' not found"_ at runtime (invisible to unit tests +
   the server `/info` probe; **only the browser catches it** → always browser-verify).
 - **Per-agent tool boundary lives in `server/index.ts`** (`QUALIFIER_TOOLS`/`REPLY_TOOLS`,
   threaded via `buildAgent(def, prompts, registry, allowedTools)`). Adding/removing an MCP tool
@@ -84,7 +86,7 @@ isn't persisted is one that will repeat.
 All project content — docs, code, comments, identifiers, and user-facing/demo
 strings — is written in English, regardless of the language used in chat.
 
-**Code style → `docs/CONVENTIONS.md`** — the *how we write code* rules Prettier/ESLint
+**Code style → `docs/CONVENTIONS.md`** — the _how we write code_ rules Prettier/ESLint
 can't enforce (arrow-const named-export components, `type {Name}Props`, strict
 one-component-per-file, naming, import grouping), distilled from the Magma house
 style and filtered to this stack. Read it before writing client code.
@@ -92,12 +94,14 @@ style and filtered to this stack. Read it before writing client code.
 ## Skills / Rules
 
 Hard-won API gotchas are distilled into rule files for quick recall:
+
 - `.claude/skills/rules/copilotkit-v2.md` — CopilotKit v2 + AG-UI must-not-rediscover rules
 
 ## Current State
 
 **COMPLETE — browser-verified.** The vertical slice loop works AND the reusable
 core layer is extracted under `apps/inbox/core/`:
+
 - `core/messages.ts` — typed message layer over `@ag-ui` (`hasPendingApproval`,
   `approvalResolved`, `pairToolResults`, guards). Replaces the `toolCallId↔toolMessage`
   logic that was duplicated in 3 files; no more `any`.
@@ -114,15 +118,17 @@ core layer is extracted under `apps/inbox/core/`:
 Behavior is identical to the slice (closed card Idle → Working → Awaiting approval →
 Done; modal thread = assistant text + LeadCard + ApprovalDialog; approve → resume →
 "Done — reply sent."). 28 unit tests pass; browser click-through re-verified. See:
+
 - Slice: `docs/superpowers/specs/2026-06-06-inbox-vertical-slice-design.md` (+ plan)
 - Core layer: `docs/superpowers/specs/2026-06-06-core-layer-design.md`
-  + `docs/superpowers/plans/2026-06-06-core-layer.md`
+  - `docs/superpowers/plans/2026-06-06-core-layer.md`
 
 ## First real provider — `claude-cli` (BUILT on branch `feat/claude-cli-provider`)
 
 The first real provider is built: it runs the **real `claude` CLI as a subprocess**
 behind the `Provider` seam (we chose `claude-cli` over `claude-api` — no API key; the
 binary uses the Claude Code subscription login). Files (`apps/inbox`):
+
 - `core/claude-stream.ts` — pure NDJSON→AG-UI parser (isomorphic). Handles BOTH
   streamed `stream_event` deltas and complete top-level `assistant` messages (deduped),
   strips the `mcp__inbox__` tool prefix, surfaces `result` errors as text, and STOPS
@@ -131,7 +137,7 @@ binary uses the Claude Code subscription login). Files (`apps/inbox`):
   (keeps `core/` Node-free). Turn 1 = canned-lead prompt → stream → stop at `confirmSend`,
   kill. Resume (approval resolved) = **stateless re-prime** (fresh run, "human approved").
 - `server/claude-spawn.ts` — the real Node spawn (`claude -p … --mcp-config …
-  --output-format stream-json`), 120s timeout, spawn-error/timeout surfaced as a result
+--output-format stream-json`), 120s timeout, spawn-error/timeout surfaced as a result
   line, temp config dir cleaned up, `ANTHROPIC_API_KEY` deleted (force subscription auth).
   **Do NOT pass `--bare`** — it skips keychain reads, so the subscription OAuth token
   (stored in the macOS keychain) isn't found → every run returns "Not logged in".
@@ -152,9 +158,10 @@ Spec/plan: `docs/superpowers/specs/2026-06-06-first-real-provider-design.md` +
 for a spinner and the modal shows a trailing "Working…" — real runs take seconds.
 
 **TODO — later, play with prompts/restrictions (not blocking):**
+
 - The model reaches the MCP tools via a built-in `ToolSearch` step. We already filter
   non-contract tool calls out of the thread (`surfaceTools` in `claude-stream.ts`), so the
-  "ToolSearch Running" chip no longer shows — but the model still *uses* ToolSearch and
+  "ToolSearch Running" chip no longer shows — but the model still _uses_ ToolSearch and
   sometimes narrates it. Do NOT hard-disallow `ToolSearch` (that's how it finds the tools
   here); instead tighten the available-tool set / permission config so it goes straight to
   the tools.
@@ -167,6 +174,7 @@ for a spinner and the modal shows a trailing "Working…" — real runs take sec
 The first real integration. The inbox agent reads your **latest real Gmail email** and,
 on one human click, saves a **draft reply** in Gmail (variant B — never sends; the human
 sends from Gmail). Browser-verified end-to-end on a real account. Files (`apps/inbox`):
+
 - `mcp/gmail-format.mjs` — **pure** helpers (unit-tested): `parseLatestMessage` (Gmail full
   message → `{threadId, from, subject, body}`, base64url decode + text/plain walk) and
   `buildReplyRaw` (RFC822 reply MIME, `Re:`-no-double-prefix, base64url).
@@ -177,7 +185,7 @@ sends from Gmail). Browser-verified end-to-end on a real account. Files (`apps/i
 - `server/claude-spawn.ts` — `--mcp-config` now lists **both** `inbox` + `gmail` stdio
   servers; allow-list adds `mcp__gmail__get_latest_email` / `mcp__gmail__create_draft`.
 - Tool contract renamed `confirmSend` → `saveDraft`; `renderLead` carries `{from, subject,
-  summary}`, `saveDraft` carries `{threadId, body}`. Provider prompts call `get_latest_email`
+summary}`, `saveDraft` carries `{threadId, body}`. Provider prompts call `get_latest_email`
   / `create_draft`. HITL (detect-and-kill + stateless re-prime) unchanged — the resume run
   reads `{threadId, body}` from the thread's `saveDraft` call (`lastApprovalArgs`).
 
@@ -191,6 +199,7 @@ The **second consumer** that proves the `core/` contract is reusable (the precon
 the `@platform/*` split). A **LEAD QUALIFIER** agent beside the **REPLY AGENT** on a
 two-card desktop; the manager hands the qualifier's verdict to the reply agent with one
 click. Browser-verified end-to-end on the real account. Files (`apps/inbox`):
+
 - `core/handoff.ts` — **pure, isomorphic** handoff contract: `HandoffPayloadSchema`
   (`{threadId, from, subject, summary, category, priority}`), `encodeHandoff(payload)` →
   a seed `role:'user'` message with a `[handoff]` marker, `decodeHandoff(input)` → payload
@@ -210,7 +219,7 @@ click. Browser-verified end-to-end on the real account. Files (`apps/inbox`):
   registers factory entries; `index.ts` registers BOTH agents by id + validates handoff
   targets at startup.
 - `mcp/inbox-tools.mjs` — adds `renderVerdict {threadId, from, subject, summary, category,
-  priority, reason}`; `server/claude-spawn.ts` allow-lists `mcp__inbox__renderVerdict`.
+priority, reason}`; `server/claude-spawn.ts` allow-lists `mcp__inbox__renderVerdict`.
 - `client/` — `VerdictCard` (+ registry); `actions.tsx` `useInboxActions(onHandoff?)`
   registers `renderVerdict` and forwards "Draft reply" → `onHandoff`. `InboxView.tsx` is a
   two-agent desktop: per-agent `useAgent`/status/modal + `requestHandoff(targetId, payload)`
@@ -262,7 +271,7 @@ auth/RBAC/audit, the `@platform/*` package split, mode-2 visual/chat editor.
 - First real provider = **`claude-cli`** (subprocess), not `claude-api` (no API key; binary uses the Claude Code subscription). HITL = **detect the `confirmSend` tool call in the stream-json and kill the process** (we do NOT hold the CLI open awaiting a human — that would fight CopilotKit's client-held two-request pause). Resume = **stateless re-prime** (fresh run, "human approved"), no server-side session. The runtime **registry lives in `server/`** (not `core/`) because the real provider needs Node and `core/` is imported by the client; the injected `spawn` keeps `core/claude-cli-provider.ts` Node-free. Custom tools (`renderLead`/`confirmSend`) are exposed to the CLI via a **stdio MCP server** (`mcp/inbox-tools.mjs`); tool names arrive prefixed `mcp__inbox__…` and are stripped to the bare names the client registered.
 - Core layer lives in `apps/inbox/core/` (shared by client+server, no React/runtime imports). NOT a package yet — `@platform/*` split deferred until the contract settles and a 2nd consumer exists.
 - Message layer reuses `@ag-ui` types IN FULL (import `Message`/`ToolCall` from `@ag-ui/client`; derive per-role types via `Extract<Message,{role}>` — `@ag-ui/client` doesn't export `AssistantMessage`/`ToolMessage` by name). We add behavior (pure functions), not a parallel domain model. Approval tool names are a PARAMETER (from `def.approvals`), never hardcoded.
-- `defineAgent.renders` is keyed BY TOOL NAME (`{ renderLead: "LeadCard", confirmSend: "ApprovalDialog" }`), refining the doc's abstract `key→component`; it drives client registration directly. Values are component *names*; the client `renderRegistry` maps name→React component (keeps `core/` React-free).
+- `defineAgent.renders` is keyed BY TOOL NAME (`{ renderLead: "LeadCard", confirmSend: "ApprovalDialog" }`), refining the doc's abstract `key→component`; it drives client registration directly. Values are component _names_; the client `renderRegistry` maps name→React component (keeps `core/` React-free).
 - `defineAgent` validates STRUCTURE only (`approvals ⊆ tools`, `renders` keys ⊆ `tools`). Provider-existence is enforced by `registry.resolve(def.provider)` at wiring time, not in the passport.
 - `defineAgent(def)` param is typed as `AgentDefinition` (the output type), not `unknown` — deliberate: the only caller is a hand-authored literal that benefits from compile-time field checks, and `parse()` still runs the cross-field rules. Switch to `unknown` (+ `.strict()`) when config is loaded from file/DB (deferred).
 - `zod` is now an explicit dependency of `apps/inbox` (was transitive); `core/defineAgent.ts` uses it directly. zod v3 API.
@@ -282,6 +291,7 @@ auth/RBAC/audit, the `@platform/*` package split, mode-2 visual/chat editor.
 ### CopilotKit v2 API — CONFIRMED against installed packages
 
 Installed versions (note: package version is 1.59.5, but a real `/v2` subpath ships inside it):
+
 - `@copilotkit/runtime` 1.59.5
 - `@copilotkit/react-core` 1.59.5
 - `@ag-ui/client` 0.0.55 (re-exports `@ag-ui/core`)
@@ -290,6 +300,7 @@ Installed versions (note: package version is 1.59.5, but a real `/v2` subpath sh
 client hooks come from `@copilotkit/react-core/v2` (NOT the package root).
 
 Server (import from `@copilotkit/runtime/v2`):
+
 - `new CopilotRuntime({ agents: { default: agent }, runner: new InMemoryAgentRunner() })` — `runner` is optional.
 - `new BuiltInAgent({ type: "custom", factory })` — custom factory yields raw AG-UI `BaseEvent`s.
   Factory signature: `(ctx: { input: RunAgentInput; abortController; abortSignal }) => AsyncIterable<BaseEvent>`.
@@ -309,6 +320,7 @@ Server (import from `@copilotkit/runtime/v2`):
 - AG-UI events from `@ag-ui/client`: `EventType.TEXT_MESSAGE_CHUNK` with fields `{ type, role, messageId, delta }`.
 
 Client (import from `@copilotkit/react-core/v2`):
+
 - `<CopilotKit runtimeUrl="/api/copilotkit">` provider.
 - `useAgent({ agentId: "default", updates: [UseAgentUpdate.OnMessagesChanged] })` returns **`{ agent }`**
   (an AG-UI `AbstractAgent`). Read messages via `agent.messages`; subscribe to lifecycle events via
@@ -335,6 +347,7 @@ v2 mechanism: **`useRenderTool`** and **`useHumanInTheLoop`** (NOT `useCopilotAc
 under `<CopilotKit>`. Registrations live in `client/src/actions.tsx`, exported as `useInboxActions()`.
 
 Tool registrations (both REAL and working):
+
 - **`renderLead`** — `useRenderTool({ name, parameters, render })`: pure generative UI, maps to `<LeadCard />`.
   `render` receives `{ name, toolCallId, parameters, status, result }`. `parameters` is `Partial<T>` while
   `inProgress`, full `T` once `executing`/`complete`. Note: historical tool calls surfaced via
@@ -354,6 +367,7 @@ matching `role:"tool"` message by `toolCallId` and calls `renderToolCall({ toolC
 ### Human-in-the-Loop + Resume
 
 The HITL flow (verified end-to-end):
+
 1. Server emits `confirmSend` tool call events. Client-side `useHumanInTheLoop` intercepts it, returns an
    `<ApprovalDialog>` with `respond` live.
 2. User clicks approve → `respond("approved")`. `CopilotKitCore` splices a `role:"tool"` message into
@@ -367,6 +381,7 @@ The HITL flow (verified end-to-end):
 ### Status Derivation
 
 `useAgentStatus(agent)` in `client/src/useAgentStatus.ts`:
+
 - **Lifecycle** (`running`/`done`/`error`) comes from `agent.subscribe({ onRunStartedEvent, onRunFinalized, onRunFailed })`.
 - **`awaiting_approval`** is derived from MESSAGE STATE via pure `hasPendingApproval(messages)`:
   a `confirmSend` tool call exists in messages with no matching `role:"tool"` result.
@@ -390,6 +405,7 @@ Toolchain note: Vite 8 uses rolldown; npm did not auto-install the platform bind
 ## Commands
 
 Run from `apps/inbox/`:
+
 - `npm run dev` — server (tsx watch, :4000) + client (vite, :5173) via concurrently; `/api` proxied to :4000.
 - `npm run dev:server` / `npm run dev:client` — run each half separately.
 - `npm run build` — vite production build.

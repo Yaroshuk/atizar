@@ -33,7 +33,7 @@ type ToolBlock = { id: string; name: string; sawArgs: boolean; startInput: unkno
 // caller then kills the subprocess (turn-1 HITL pause).
 export async function* mapClaudeStream(
   lines: AsyncIterable<string>,
-  opts: { approvalNames: readonly string[]; surfaceTools?: readonly string[] },
+  opts: { approvalNames: readonly string[]; surfaceTools?: readonly string[] }
 ): AsyncGenerator<BaseEvent> {
   const blocks = new Map<number, ToolBlock>()
   const emittedToolIds = new Set<string>()
@@ -51,7 +51,11 @@ export async function* mapClaudeStream(
 
   // Emits START/ARGS/END for a tool call (used by both the complete-message path
   // and as a helper). Returns true if it was an approval tool (caller should stop).
-  function* emitToolCall(id: string, rawName: string, argsJson: string | undefined): Generator<BaseEvent> {
+  function* emitToolCall(
+    id: string,
+    rawName: string,
+    argsJson: string | undefined
+  ): Generator<BaseEvent> {
     const name = stripMcpPrefix(rawName)
     emittedToolIds.add(id)
     yield {
@@ -101,11 +105,22 @@ export async function* mapClaudeStream(
     if (obj.type === 'assistant' && obj.message?.content) {
       const synthetic = obj.message.model === '<synthetic>'
       for (const block of obj.message.content) {
-        const b = block as { type?: string; text?: string; id?: string; name?: string; input?: unknown }
+        const b = block as {
+          type?: string
+          text?: string
+          id?: string
+          name?: string
+          input?: unknown
+        }
         if (b.type === 'text' && b.text && !streamedText && !synthetic) {
           yield textChunk(b.text)
         }
-        if (b.type === 'tool_use' && b.id && !emittedToolIds.has(b.id) && shouldSurface(stripMcpPrefix(b.name ?? ''))) {
+        if (
+          b.type === 'tool_use' &&
+          b.id &&
+          !emittedToolIds.has(b.id) &&
+          shouldSurface(stripMcpPrefix(b.name ?? ''))
+        ) {
           const argsJson =
             b.input && typeof b.input === 'object' && Object.keys(b.input as object).length > 0
               ? JSON.stringify(b.input)
@@ -159,7 +174,11 @@ export async function* mapClaudeStream(
         const block = blocks.get(index)
         if (block) {
           block.sawArgs = true
-          yield { type: EventType.TOOL_CALL_ARGS, toolCallId: block.id, delta: ev.delta.partial_json } as BaseEvent
+          yield {
+            type: EventType.TOOL_CALL_ARGS,
+            toolCallId: block.id,
+            delta: ev.delta.partial_json,
+          } as BaseEvent
         }
         continue
       }
@@ -175,7 +194,11 @@ export async function* mapClaudeStream(
         typeof block.startInput === 'object' &&
         Object.keys(block.startInput as object).length > 0
       ) {
-        yield { type: EventType.TOOL_CALL_ARGS, toolCallId: block.id, delta: JSON.stringify(block.startInput) } as BaseEvent
+        yield {
+          type: EventType.TOOL_CALL_ARGS,
+          toolCallId: block.id,
+          delta: JSON.stringify(block.startInput),
+        } as BaseEvent
       }
       yield { type: EventType.TOOL_CALL_END, toolCallId: block.id } as BaseEvent
       blocks.delete(index)

@@ -10,3 +10,4 @@ coverage/
 .code-review/
 .playwright-mcp/
 e2e-*.png
+dist-types/
