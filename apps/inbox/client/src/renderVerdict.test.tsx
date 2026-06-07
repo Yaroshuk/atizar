@@ -27,15 +27,12 @@ const messages = [
   },
 ]
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function Surface({ onHandoff }: { onHandoff: (t: string, p: any) => void }) {
   useInboxActions(onHandoff)
   const renderToolCall = useRenderToolCall()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const els = messages.flatMap((m: any) =>
     m.role === 'assistant' && Array.isArray(m.toolCalls)
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        m.toolCalls.map((tc: any) => <div key={tc.id}>{renderToolCall({ toolCall: tc })}</div>)
+      ? m.toolCalls.map((tc: any) => <div key={tc.id}>{renderToolCall({ toolCall: tc })}</div>)
       : []
   )
   return <div>{els}</div>

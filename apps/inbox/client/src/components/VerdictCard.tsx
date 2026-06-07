@@ -25,12 +25,24 @@ export const VerdictCard = ({ data, onDraftReply }: VerdictCardProps) => {
       <div style={{ fontWeight: 600 }}>{data.subject}</div>
       <div style={{ display: 'flex', gap: 6, margin: '6px 0' }}>
         <span
-          style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: '#eef', color: '#225' }}
+          style={{
+            fontSize: 12,
+            padding: '2px 8px',
+            borderRadius: 12,
+            background: '#eef',
+            color: '#225',
+          }}
         >
           {data.category}
         </span>
         <span
-          style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: '#fee', color: '#a33' }}
+          style={{
+            fontSize: 12,
+            padding: '2px 8px',
+            borderRadius: 12,
+            background: '#fee',
+            color: '#a33',
+          }}
         >
           {data.priority}
         </span>

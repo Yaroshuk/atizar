@@ -30,4 +30,3 @@ export const qualifierAgent = defineAgent({
 // The desktop's agent registry — server (runtime registration + handoff validation)
 // and tests map over it. The client references the passports directly (two agents).
 export const agents = [qualifierAgent, replyAgent]
-

@@ -24,8 +24,11 @@ describe('inbox agents wiring', () => {
 
   it('a registry of factories resolves a runnable provider', () => {
     const reg = defineProviders({ mock: (cfg) => createMockInboxProvider(cfg.approvalNames) })
-    const provider = reg
-      .resolve('mock')({ approvalNames: [], surfaceTools: [], prompts: { buildFirst: () => '' } })
+    const provider = reg.resolve('mock')({
+      approvalNames: [],
+      surfaceTools: [],
+      prompts: { buildFirst: () => '' },
+    })
     expect(typeof provider.run).toBe('function')
   })
 })

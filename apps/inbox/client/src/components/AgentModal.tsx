@@ -107,8 +107,8 @@ export const AgentModal = ({ agent, title, renderToolCall, loading, onClose }: A
         </div>
         <div>{thread}</div>
         {loading && (
-          <div className="inbox-working">
-            <span className="spinner" />
+          <div className='inbox-working'>
+            <span className='spinner' />
             Working…
           </div>
         )}

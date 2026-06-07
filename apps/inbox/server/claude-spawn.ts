@@ -22,7 +22,7 @@ const RUN_TIMEOUT_MS = 120_000
 // the process fails to spawn or times out.
 async function* readLines(
   child: ChildProcessByStdio<null, Readable, Readable>,
-  onDone: () => void,
+  onDone: () => void
 ): AsyncGenerator<string> {
   let spawnError: Error | null = null
   let timedOut = false
@@ -64,7 +64,7 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
         inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
         gmail: { type: 'stdio', command: 'node', args: [GMAIL_SERVER] },
       },
-    }),
+    })
   )
   writeFileSync(
     settings,
@@ -79,7 +79,7 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
         ],
         deny: BUILTINS,
       },
-    }),
+    })
   )
 
   const env = { ...process.env }
@@ -104,7 +104,7 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
       '--verbose',
       '--include-partial-messages',
     ],
-    { env, stdio: ['ignore', 'pipe', 'pipe'] },
+    { env, stdio: ['ignore', 'pipe', 'pipe'] }
   )
 
   // Remove the temp config dir once the run ends (success, kill, or error).
