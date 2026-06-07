@@ -14,7 +14,7 @@ server.registerTool(
     description: 'Surface the incoming email as a card in the UI.',
     inputSchema: { from: z.string(), subject: z.string(), summary: z.string() },
   },
-  async () => ({ content: [{ type: 'text', text: 'Email surfaced to the user.' }] }),
+  async () => ({ content: [{ type: 'text', text: 'Email surfaced to the user.' }] })
 )
 
 server.registerTool(
@@ -24,7 +24,24 @@ server.registerTool(
       'Ask the human to approve saving a draft reply. Args carry the Gmail thread id and the proposed reply body.',
     inputSchema: { threadId: z.string(), body: z.string() },
   },
-  async () => ({ content: [{ type: 'text', text: 'Awaiting human approval.' }] }),
+  async () => ({ content: [{ type: 'text', text: 'Awaiting human approval.' }] })
+)
+
+server.registerTool(
+  'renderVerdict',
+  {
+    description: 'Surface a qualified lead verdict as a card in the UI.',
+    inputSchema: {
+      threadId: z.string(),
+      from: z.string(),
+      subject: z.string(),
+      summary: z.string(),
+      category: z.string(),
+      priority: z.string(),
+      reason: z.string(),
+    },
+  },
+  async () => ({ content: [{ type: 'text', text: 'Verdict surfaced to the user.' }] })
 )
 
 await server.connect(new StdioServerTransport())

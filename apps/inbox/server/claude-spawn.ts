@@ -22,7 +22,7 @@ const RUN_TIMEOUT_MS = 120_000
 // the process fails to spawn or times out.
 async function* readLines(
   child: ChildProcessByStdio<null, Readable, Readable>,
-  onDone: () => void,
+  onDone: () => void
 ): AsyncGenerator<string> {
   let spawnError: Error | null = null
   let timedOut = false
@@ -53,7 +53,7 @@ async function* readLines(
 // Real spawn: writes a temp mcp-config + permission settings, runs `claude` in
 // stream-json mode, exposes stdout as an async line iterator. Auth = the Claude
 // Code subscription login; ANTHROPIC_API_KEY is removed so it can't override.
-export const claudeSpawn: ClaudeSpawn = (prompt) => {
+export const claudeSpawn: ClaudeSpawn = (prompt, allowedTools) => {
   const dir = mkdtempSync(join(tmpdir(), 'inbox-claude-'))
   const mcpConfig = join(dir, 'mcp.json')
   const settings = join(dir, 'settings.json')
@@ -64,21 +64,18 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
         inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
         gmail: { type: 'stdio', command: 'node', args: [GMAIL_SERVER] },
       },
-    }),
+    })
   )
   writeFileSync(
     settings,
     JSON.stringify({
       permissions: {
-        allow: [
-          'mcp__inbox__renderLead',
-          'mcp__inbox__saveDraft',
-          'mcp__gmail__get_latest_email',
-          'mcp__gmail__create_draft',
-        ],
+        // Per-agent allow-list (the hard single-entry-point boundary): the qualifier
+        // gets the inbox reader, the reply agent gets the writers — never both.
+        allow: [...allowedTools],
         deny: BUILTINS,
       },
-    }),
+    })
   )
 
   const env = { ...process.env }
@@ -103,7 +100,7 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
       '--verbose',
       '--include-partial-messages',
     ],
-    { env, stdio: ['ignore', 'pipe', 'pipe'] },
+    { env, stdio: ['ignore', 'pipe', 'pipe'] }
   )
 
   // Remove the temp config dir once the run ends (success, kill, or error).

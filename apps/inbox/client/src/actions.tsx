@@ -1,18 +1,20 @@
 import { useHumanInTheLoop, useRenderTool } from '@copilotkit/react-core/v2'
 import { z } from 'zod'
-import { inboxAgent } from '../../core/inbox.agent'
+import { qualifierAgent, replyAgent } from '../../core/inbox.agent'
+import type { HandoffPayload } from '../../core/handoff'
 import { renderRegistry } from './renderRegistry'
 
-// Generative-UI registration for the inbox agent, derived from the passport:
+// Generative-UI registration for the desktop, derived from the passports:
 // `renders` maps tool name → component name; `approvals` decides which tool pauses
-// the run (useHumanInTheLoop) vs. pure render (useRenderTool).
+// the run (useHumanInTheLoop) vs. pure render (useRenderTool). Tool names are
+// globally unique, so all three are registered once here.
 //
-// The literal tool names below ("renderLead", "saveDraft") and their arg schemas
-// must match `inboxAgent.tools` — the CopilotKit hooks need a static name + Zod
-// shape, so this is the one place tool identity is restated. The component, though,
-// is resolved via the passport (`renders`) through `renderRegistry`; a missing
-// registry entry surfaces (renders undefined) rather than silently falling back.
-export const useInboxActions = () => {
+// `onHandoff` is the human-trigger seam: the qualifier's VerdictCard calls it to
+// hand the verdict to the reply agent. The mechanism (encode/launch) lives in the
+// desktop + core; this only forwards the click.
+export const useInboxActions = (
+  onHandoff?: (targetId: string, payload: HandoffPayload) => void
+) => {
   // renderLead -> <LeadCard /> (pure generative UI).
   useRenderTool(
     {
@@ -21,11 +23,52 @@ export const useInboxActions = () => {
       render: ({ parameters }) => {
         const { from, subject, summary } = parameters
         if (from === undefined || subject === undefined || summary === undefined) return <></>
-        const Lead = renderRegistry[inboxAgent.renders.renderLead]
+        const Lead = renderRegistry[replyAgent.renders.renderLead]
         return <Lead lead={{ from, subject, summary }} />
       },
     },
     []
+  )
+
+  // renderVerdict -> <VerdictCard /> (pure generative UI + manual handoff trigger).
+  useRenderTool(
+    {
+      name: 'renderVerdict',
+      parameters: z.object({
+        threadId: z.string(),
+        from: z.string(),
+        subject: z.string(),
+        summary: z.string(),
+        category: z.string(),
+        priority: z.string(),
+        reason: z.string(),
+      }),
+      render: ({ parameters }) => {
+        const { threadId, from, subject, summary, category, priority, reason } = parameters
+        if (
+          threadId === undefined ||
+          from === undefined ||
+          subject === undefined ||
+          summary === undefined ||
+          category === undefined ||
+          priority === undefined ||
+          reason === undefined
+        )
+          return <></>
+        const data = { threadId, from, subject, summary, category, priority, reason }
+        const Verdict = renderRegistry[qualifierAgent.renders.renderVerdict]
+        const target = qualifierAgent.handoffs?.[0] ?? 'reply'
+        return (
+          <Verdict
+            data={data}
+            onDraftReply={() =>
+              onHandoff?.(target, { threadId, from, subject, summary, category, priority })
+            }
+          />
+        )
+      },
+    },
+    [onHandoff]
   )
 
   // saveDraft -> <ApprovalDialog /> (human-in-the-loop pause).
@@ -36,7 +79,7 @@ export const useInboxActions = () => {
       render: ({ args, status, respond }) => {
         if (args.threadId === undefined || args.body === undefined) return <></>
         const data = { threadId: args.threadId, body: args.body }
-        const Approval = renderRegistry[inboxAgent.renders.saveDraft]
+        const Approval = renderRegistry[replyAgent.renders.saveDraft]
         return (
           <Approval
             data={data}

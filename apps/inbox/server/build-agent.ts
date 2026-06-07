@@ -1,13 +1,24 @@
 import { BuiltInAgent } from '@copilotkit/runtime/v2'
 import type { AgentDefinition } from '../core/defineAgent.js'
-import type { ProviderRegistry } from '../core/providers.js'
+import type { ProviderRegistry, PromptStrategy } from '../core/providers.js'
 
-// Builds the CopilotKit BuiltInAgent for an agent passport: resolves the
-// provider from the registry by `def.provider` and delegates the event stream to
-// `provider.run(input)`. All approval/turn logic lives in the provider (which
-// reads `def.approvals`), so there is no hardcoded tool name here.
-export function buildAgent(def: AgentDefinition, registry: ProviderRegistry): BuiltInAgent {
-  const provider = registry.resolve(def.provider)
+// Builds the CopilotKit BuiltInAgent for an agent passport: resolves the provider
+// FACTORY from the registry by `def.provider`, then constructs the provider from the
+// passport (approvals/tools) plus this agent's prompt strategy. All approval/turn
+// logic lives in the provider, so there is no hardcoded tool name here.
+export function buildAgent(
+  def: AgentDefinition,
+  prompts: PromptStrategy,
+  registry: ProviderRegistry,
+  allowedTools: readonly string[]
+): BuiltInAgent {
+  const makeProvider = registry.resolve(def.provider)
+  const provider = makeProvider({
+    approvalNames: def.approvals,
+    surfaceTools: def.tools,
+    allowedTools,
+    prompts,
+  })
   return new BuiltInAgent({
     type: 'custom',
     factory: ({ input }) => provider.run(input),

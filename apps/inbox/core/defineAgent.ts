@@ -12,6 +12,9 @@ export const AgentDefinitionSchema = z
     tools: z.array(z.string()),
     approvals: z.array(z.string()),
     renders: z.record(z.string()),
+    // Target agent ids this agent may hand off to. Structure only — membership in
+    // the agent registry is checked at wiring time (a passport doesn't know it).
+    handoffs: z.array(z.string()).optional(),
   })
   .superRefine((def, ctx) => {
     for (const name of def.approvals) {

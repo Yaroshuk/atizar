@@ -1,17 +1,20 @@
 import { defineProviders, type ProviderRegistry } from '../core/providers.js'
 import { createMockInboxProvider } from '../core/mock-provider.js'
 import { createClaudeCliProvider } from '../core/claude-cli-provider.js'
-import { inboxAgent } from '../core/inbox.agent.js'
 import { claudeSpawn } from './claude-spawn.js'
 
-// Runtime registry (server-only — claude-cli needs Node). Agents reference a
-// provider by name; `mock` stays available for fallback / manual testing.
+// Runtime registry (server-only — claude-cli needs Node). Each entry is a FACTORY
+// built per agent from its passport-derived config. `mock` ignores prompts (it
+// scripts its own stream); `claude-cli` uses the injected PromptStrategy + spawn.
+// A future Mastra backend is one more factory here.
 export const providerRegistry: ProviderRegistry = defineProviders({
-  mock: createMockInboxProvider(inboxAgent.approvals),
-  'claude-cli': createClaudeCliProvider({
-    approvalNames: inboxAgent.approvals,
-    surfaceTools: inboxAgent.tools,
-    instructions: inboxAgent.instructions,
-    spawn: claudeSpawn,
-  }),
+  mock: (config) => createMockInboxProvider(config.approvalNames),
+  'claude-cli': (config) =>
+    createClaudeCliProvider({
+      approvalNames: config.approvalNames,
+      surfaceTools: config.surfaceTools,
+      allowedTools: config.allowedTools,
+      prompts: config.prompts,
+      spawn: claudeSpawn,
+    }),
 })
