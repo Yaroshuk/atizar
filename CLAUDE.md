@@ -11,26 +11,33 @@ operational index; that file is the big picture.
 
 ## ⏭️ Handoff — start here (next session)
 
-**Done on branch `feat/gmail-draft-integration` (NOT yet merged):** the first real
-integration — a **Gmail draft agent**. START → real `claude` reads your **latest real
-Gmail email** (`get_latest_email`) → renders it (`renderLead` → LeadCard) → drafts a
-contextual reply → asks approval (`saveDraft` → ApprovalDialog, button "Save draft") →
-pause → approve → resume → **creates a real Gmail draft in the thread** (`create_draft`,
-**never sends**) → Done. **Browser-verified end-to-end on real Gmail** (account
-`sjuser95@gmail.com`). See "Gmail draft integration" section below + `docs/superpowers/
-specs|plans/2026-06-06-gmail-draft-integration*`.
+**Done on branch `feat/two-agents-handoff` (NOT yet merged):** a **second agent +
+manual handoff** — the "second consumer" that validates the `core/` contract for the
+library. A **LEAD QUALIFIER** agent (reads the latest email, classifies it →
+`renderVerdict` → VerdictCard with category/priority/reason) sits beside the **REPLY
+AGENT** on a two-card desktop. Manager clicks **"Draft reply"** on the verdict →
+**handoff**: the reply agent runs **seeded with the verdict** (no inbox re-read) →
+`renderLead` → `saveDraft` → approve → real Gmail draft. The handoff *mechanism* lives
+in **`core/handoff.ts`** (`encode/decodeHandoff`, pure) so a future agent-initiated/server
+trigger reuses it; only the human *trigger* is client-side. Provider seam generalized to
+per-agent `PromptStrategy` + factory registry (`ProviderFactory`) — **Mastra-ready** (a
+Mastra factory slots in beside `claude-cli`, no seam change). **Browser-verified
+end-to-end on real Gmail** (`sjuser95@gmail.com`): qualifier classified a real AliExpress
+blast as spam/cold → handoff → reply drafted a polite decline → approved → draft saved.
+77 unit tests, tsc+lint green. See `docs/superpowers/specs|plans/2026-06-07-two-agents-handoff*`.
 
-**On `master`:** the `claude-cli` provider with the canned-lead happy path (prior phase).
+**On `master`:** the **Gmail draft agent** (single reply agent, `feat/gmail-draft-integration`
+merged at `de8f7f4`) + the `claude-cli` provider. See "Gmail draft integration" section below.
 
 **Pick next (suggested order):**
-1. **Merge `feat/gmail-draft-integration`** (review the branch first).
-2. *Polish:* the model still narrates ToolSearch ("I'll load the tool schemas…") in the
-   consumer thread — steer it via tool-restriction config / prompt or strip pre-tool
-   chatter client-side. Cosmetic. (Also: tighten the Gmail scope from `gmail.modify` to
-   `readonly`+`compose`; clean stale `confirmSend` mentions in client comments +
-   `core/claude-stream.test.ts`/`messages.test.ts` fixtures — name-agnostic, harmless.)
-3. *Roadmap:* multi-provider / API-key path (**Mastra** or `claude-api`) so the same agent
-   runs on models beyond the subscription CLI. Deferred while the CLI subscription suffices.
+1. **Merge `feat/two-agents-handoff`** into `main` (review the branch first).
+2. *Roadmap (the library):* the contract is now validated on two agents + a handoff — extract
+   `core/` toward the `@platform/*` package split. And/or the multi-provider / API-key path
+   (**Mastra** or `claude-api`) behind the existing `Provider` seam (factory already in place).
+3. *Polish (cosmetic, deferred):* the model still narrates ToolSearch / verdict text in the
+   thread; tighten Gmail scope `gmail.modify`→`readonly`+`compose`; the qualifier's verdict
+   text also prints as plain markdown paragraphs in the modal (the model narrating alongside
+   the card) — strip pre-tool/duplicate chatter client-side or via prompt.
 
 **Don't-rediscover gotchas:**
 - **Gmail MCP:** the *official* Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
@@ -160,6 +167,45 @@ sends from Gmail). Browser-verified end-to-end on a real account. Files (`apps/i
 Why our own MCP (not the official Google one or a community pkg): see the **gotchas** in the
 Handoff above (official = Workspace-preview-gated; GongRzhe = archived + classifier-blocked).
 Spec/plan: `docs/superpowers/specs/2026-06-06-gmail-draft-integration-design.md` (+ plan).
+
+## Two agents + manual handoff — BUILT (branch `feat/two-agents-handoff`)
+
+The **second consumer** that proves the `core/` contract is reusable (the precondition for
+the `@platform/*` split). A **LEAD QUALIFIER** agent beside the **REPLY AGENT** on a
+two-card desktop; the manager hands the qualifier's verdict to the reply agent with one
+click. Browser-verified end-to-end on the real account. Files (`apps/inbox`):
+- `core/handoff.ts` — **pure, isomorphic** handoff contract: `HandoffPayloadSchema`
+  (`{threadId, from, subject, summary, category, priority}`), `encodeHandoff(payload)` →
+  a seed `role:'user'` message with a `[handoff]` marker, `decodeHandoff(input)` → payload
+  | null. The SINGLE place that knows how a payload rides a run input — client trigger AND
+  any future server/agent trigger call these; nobody hand-rolls the marker.
+- `core/providers.ts` — generalized seam: `PromptStrategy` (`buildFirst(input)` +
+  optional `buildResume(args)`), `ProviderConfig`, **`ProviderFactory = (config)=>Provider`**;
+  `defineProviders` now holds factories. claude-cli quirks (spawn, prompts) stay out of the
+  seam → a Mastra factory slots in beside `claude-cli` with no seam change.
+- `core/agents/{reply,qualifier}.prompts.ts` — per-agent prompt strategies. Reply's
+  `buildFirst` branches on `decodeHandoff`: handoff → use the verdict, skip `get_latest_email`;
+  else standalone. `core/claude-cli-provider.ts` takes `prompts` (no baked text).
+- `core/inbox.agent.ts` — `replyAgent` (id `reply`) + `qualifierAgent` (id `qualifier`,
+  `tools:[renderVerdict]`, `approvals:[]`, `handoffs:['reply']`) + `agents` registry.
+  `defineAgent` gained optional `handoffs`. The old `inboxAgent` is gone.
+- `server/` — `buildAgent(def, prompts, registry)` builds via the factory; `providers.ts`
+  registers factory entries; `index.ts` registers BOTH agents by id + validates handoff
+  targets at startup.
+- `mcp/inbox-tools.mjs` — adds `renderVerdict {threadId, from, subject, summary, category,
+  priority, reason}`; `server/claude-spawn.ts` allow-lists `mcp__inbox__renderVerdict`.
+- `client/` — `VerdictCard` (+ registry); `actions.tsx` `useInboxActions(onHandoff?)`
+  registers `renderVerdict` and forwards "Draft reply" → `onHandoff`. `InboxView.tsx` is a
+  two-agent desktop: per-agent `useAgent`/status/modal + `requestHandoff(targetId, payload)`
+  = `encodeHandoff` → seed `target.messages` → `copilotkit.runAgent` → open modal. `AgentModal`
+  takes a `title`. **`App.tsx` must pass `agent={qualifierAgent.id}`** to `<CopilotKit>` — it
+  binds internal listeners to `props.agent ?? 'default'`, and we no longer register `'default'`
+  (crashes the tree otherwise). Found via browser E2E.
+
+Decisions: handoff is **manual now, agent-initiated later** — the trigger is swappable, the
+mechanism is fixed in `core/`. Desktop wires two agents **explicitly** (not mapped over the
+registry) — N-agent mapping is deferred to the framework phase (don't over-invest early).
+77 unit tests; tsc+lint+format green. Spec/plan: `docs/superpowers/specs|plans/2026-06-07-two-agents-handoff*`.
 
 ## Next after that
 
