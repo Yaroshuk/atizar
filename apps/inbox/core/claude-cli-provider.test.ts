@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type RunAgentInput } from '@ag-ui/client'
 import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider.js'
+import { createReplyPrompts } from './agents/reply.prompts.js'
 
 const line = (o: unknown) => JSON.stringify(o)
 const textDelta = (t: string) => line({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } } })
@@ -46,7 +47,7 @@ describe('createClaudeCliProvider', () => {
         ],
       },
     ])
-    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'do it', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], prompts: createReplyPrompts('do it'), spawn })
     const out = await drain(provider.run(runInput([])))
     const callNames = out.filter((e) => e.type === EventType.TOOL_CALL_START).map((e) => e.toolCallName)
     expect(callNames).toEqual(['renderLead', 'saveDraft'])
@@ -57,7 +58,7 @@ describe('createClaudeCliProvider', () => {
 
   it('resume: when approval is resolved, re-primes and streams done text', async () => {
     const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('Done — reply sent.')] }])
-    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'do it', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], prompts: createReplyPrompts('do it'), spawn })
     const messages = [
       { role: 'assistant', toolCalls: [{ id: 'tc_ok', type: 'function', function: { name: 'saveDraft', arguments: '{"threadId":"t_1","body":"Hello"}' } }] },
       { role: 'tool', toolCallId: 'tc_ok', content: 'approved' },
@@ -80,7 +81,7 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
-      instructions: 'x',
+      prompts: createReplyPrompts('x'),
       spawn,
     })
     const messages = [
@@ -107,7 +108,7 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
-      instructions: 'x',
+      prompts: createReplyPrompts('x'),
       spawn,
     })
     // saveDraft call present (so approvalResolved is true) but args lack threadId/body
