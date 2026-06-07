@@ -1,15 +1,25 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { CopilotRuntime, createCopilotEndpoint, InMemoryAgentRunner } from '@copilotkit/runtime/v2'
-import { qualifierAgent, replyAgent, agents } from '../agents/inbox.agent.js'
+import { qualifierAgent, replyAgent, agents as inboxAgents } from '../agents/inbox.agent.js'
+import {
+  triageAgent,
+  featureAgent,
+  bugfixAgent,
+  replyDraftAgent,
+  githubAgents,
+} from '../agents/github.agent.js'
 import { createQualifierPrompts } from '../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../agents/reply.prompts.js'
+import { createTriagePrompts } from '../agents/triage.prompts.js'
+import { createTicketPrompts } from '../agents/ticket.prompts.js'
 import { providerRegistry } from './providers.js'
 import { buildAgent } from './build-agent.js'
 
 // Wiring-time check: a passport must not hand off to an agent that isn't registered.
-const knownIds = new Set(agents.map((a) => a.id))
-for (const a of agents) {
+const allAgents = [...inboxAgents, ...githubAgents]
+const knownIds = new Set(allAgents.map((a) => a.id))
+for (const a of allAgents) {
   for (const target of a.handoffs ?? []) {
     if (!knownIds.has(target)) {
       throw new Error(`Agent "${a.id}" hands off to unknown agent "${target}"`)
@@ -24,6 +34,14 @@ for (const a of agents) {
 // the React-free passport.)
 const QUALIFIER_TOOLS = ['mcp__inbox__renderVerdict', 'mcp__gmail__get_latest_email']
 const REPLY_TOOLS = ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft']
+const TRIAGE_TOOLS = [
+  'mcp__github__list_my_tickets',
+  'mcp__github__get_ticket',
+  'mcp__github__render_triage',
+]
+const FEATURE_TOOLS = ['mcp__github__render_ticket_result']
+const BUGFIX_TOOLS = ['mcp__github__render_ticket_result']
+const REPLY_DRAFT_TOOLS = ['mcp__github__render_reply_draft']
 
 const runtime = new CopilotRuntime({
   agents: {
@@ -38,6 +56,39 @@ const runtime = new CopilotRuntime({
       createReplyPrompts(replyAgent.instructions),
       providerRegistry,
       REPLY_TOOLS
+    ),
+    [triageAgent.id]: buildAgent(
+      triageAgent,
+      createTriagePrompts(triageAgent.instructions),
+      providerRegistry,
+      TRIAGE_TOOLS
+    ),
+    [featureAgent.id]: buildAgent(
+      featureAgent,
+      createTicketPrompts(featureAgent.instructions, {
+        renderTool: 'render_ticket_result',
+        kind: 'feature',
+      }),
+      providerRegistry,
+      FEATURE_TOOLS
+    ),
+    [bugfixAgent.id]: buildAgent(
+      bugfixAgent,
+      createTicketPrompts(bugfixAgent.instructions, {
+        renderTool: 'render_ticket_result',
+        kind: 'bug',
+      }),
+      providerRegistry,
+      BUGFIX_TOOLS
+    ),
+    [replyDraftAgent.id]: buildAgent(
+      replyDraftAgent,
+      createTicketPrompts(replyDraftAgent.instructions, {
+        renderTool: 'render_reply_draft',
+        kind: 'reply',
+      }),
+      providerRegistry,
+      REPLY_DRAFT_TOOLS
     ),
   },
   runner: new InMemoryAgentRunner(),
