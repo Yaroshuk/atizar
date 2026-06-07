@@ -809,3 +809,37 @@ button {
     transition: none !important;
   }
 }
+
+.triage-group {
+  margin-top: 12px;
+}
+.triage-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.triage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #eee;
+}
+.triage-row-title {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.triage-routes {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.triage-routes .btn {
+  padding: 3px 10px;
+  font-size: 12px;
+}
