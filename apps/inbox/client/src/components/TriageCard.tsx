@@ -15,6 +15,13 @@ const RECO_TO_ROUTE: Record<string, Route> = {
   reply: 'reply-draft',
 }
 
+// Triage already decided the route, so we show ONE action button for it (not all three).
+const ROUTE_LABEL: Record<Route, string> = {
+  feature: 'Send to Feature',
+  bugfix: 'Send to Bug-fix',
+  'reply-draft': 'Draft reply',
+}
+
 export const TriageCard = ({ tickets, onRoute }: TriageCardProps) => {
   const groups = groupByStatus(tickets)
   return (
@@ -37,15 +44,18 @@ export const TriageCard = ({ tickets, onRoute }: TriageCardProps) => {
                   {ticket.number} {ticket.title}
                 </div>
                 <div className='triage-routes'>
-                  {(['feature', 'bugfix', 'reply-draft'] as Route[]).map((route) => (
-                    <button
-                      key={route}
-                      className={route === suggested ? 'btn btn-primary' : 'btn'}
-                      onClick={() => onRoute(route, ticket)}
-                    >
-                      {route === 'reply-draft' ? 'reply' : route}
-                    </button>
-                  ))}
+                  <a
+                    className='triage-link'
+                    href={ticket.url}
+                    target='_blank'
+                    rel='noreferrer'
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Open in browser
+                  </a>
+                  <button className='btn btn-primary' onClick={() => onRoute(suggested, ticket)}>
+                    {ROUTE_LABEL[suggested]}
+                  </button>
                 </div>
               </div>
             )
