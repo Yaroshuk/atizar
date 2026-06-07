@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hasPendingApproval, type Message } from '../../core/messages'
+import { hasPendingApproval, type Message } from '@platform/core'
 
 // `hasPendingApproval` is the render-INDEPENDENT predicate that decides whether
 // the AgentCard should show "Awaiting approval" (awaiting_approval). It reads

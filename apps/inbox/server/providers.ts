@@ -1,6 +1,5 @@
-import { defineProviders, type ProviderRegistry } from '../core/providers.js'
-import { createMockInboxProvider } from '../core/mock-provider.js'
-import { createClaudeCliProvider } from '../core/claude-cli-provider.js'
+import { defineProviders, type ProviderRegistry } from '@platform/core'
+import { createMockInboxProvider, createClaudeCliProvider } from '@platform/providers'
 import { claudeSpawn } from './claude-spawn.js'
 
 // Runtime registry (server-only — claude-cli needs Node). Each entry is a FACTORY

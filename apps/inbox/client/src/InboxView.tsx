@@ -9,9 +9,8 @@ import { useInboxActions } from './actions'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal } from './components/AgentModal'
 import { useAgentStatus } from './useAgentStatus'
-import { qualifierAgent, replyAgent } from '../../core/inbox.agent'
-import { encodeHandoff, type HandoffPayload } from '../../core/handoff'
-import type { Message } from '../../core/messages'
+import { qualifierAgent, replyAgent } from '../../agents/inbox.agent'
+import { encodeHandoff, type HandoffPayload, type Message } from '@platform/core'
 
 // The consumer desktop: one card per agent + a conversation modal. Two agents are
 // known statically (qualifier, reply), so they are wired explicitly rather than

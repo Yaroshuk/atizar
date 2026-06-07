@@ -1,6 +1,6 @@
 import { CopilotKit } from '@copilotkit/react-core/v2'
 import { InboxView } from './InboxView'
-import { qualifierAgent } from '../../core/inbox.agent'
+import { qualifierAgent } from '../../agents/inbox.agent'
 
 export const App = () => {
   // `agent` sets CopilotKit's default chat-configuration agent — the one its

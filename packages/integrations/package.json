@@ -1,0 +1,22 @@
+{
+  "name": "@platform/integrations",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./gmail-basic": "./src/gmail-basic/index.mjs",
+    "./gmail-basic/format": "./src/gmail-basic/format.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "googleapis": "^173.0.0"
+  },
+  "peerDependenciesMeta": {
+    "googleapis": {
+      "optional": true
+    }
+  }
+}

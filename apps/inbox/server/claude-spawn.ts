@@ -5,11 +5,14 @@ import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ClaudeSpawn } from '../core/claude-cli-provider.js'
+import { createRequire } from 'node:module'
+import type { ClaudeSpawn } from '@platform/providers'
+
+const require = createRequire(import.meta.url)
 
 // Absolute path to the stdio MCP server scripts.
 const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.url))
-const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mjs', import.meta.url))
+const GMAIL_SERVER = require.resolve('@platform/integrations/gmail-basic')
 
 // Built-in tools the model must not use — only our two MCP tools are allowed.
 const BUILTINS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']

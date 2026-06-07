@@ -1,4 +1,4 @@
-import { defineAgent } from './defineAgent.js'
+import { defineAgent } from '@platform/core'
 
 // The reply agent (formerly the single inbox agent). Reads an email and drafts a
 // reply for human approval. Runs standalone OR seeded by a handoff from the qualifier.

@@ -1,6 +1,5 @@
 import { BuiltInAgent } from '@copilotkit/runtime/v2'
-import type { AgentDefinition } from '../core/defineAgent.js'
-import type { ProviderRegistry, PromptStrategy } from '../core/providers.js'
+import type { AgentDefinition, ProviderRegistry, PromptStrategy } from '@platform/core'
 
 // Builds the CopilotKit BuiltInAgent for an agent passport: resolves the provider
 // FACTORY from the registry by `def.provider`, then constructs the provider from the

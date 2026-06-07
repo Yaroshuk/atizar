@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { qualifierAgent, replyAgent, agents } from './inbox.agent.js'
-import { defineProviders } from './providers.js'
-import { createMockInboxProvider } from './mock-provider.js'
+import { defineProviders } from '@platform/core'
+import { createMockInboxProvider } from '@platform/providers'
 
 describe('inbox agents wiring', () => {
   it('reply passport validates and references the claude-cli provider', () => {

@@ -1,6 +1,11 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import type { Provider, PromptStrategy } from './providers.js'
-import { approvalResolved, lastApprovalArgs, type Message } from './messages.js'
+import {
+  approvalResolved,
+  lastApprovalArgs,
+  type Provider,
+  type PromptStrategy,
+  type Message,
+} from '@platform/core'
 import { mapClaudeStream } from './claude-stream.js'
 
 // Spawns a `claude` run for a prompt and exposes stdout as NDJSON lines + kill().

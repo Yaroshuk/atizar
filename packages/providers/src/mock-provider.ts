@@ -1,6 +1,5 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import type { Provider } from './providers.js'
-import { approvalResolved, type Message } from './messages.js'
+import { approvalResolved, type Provider, type Message } from '@platform/core'
 
 const LEAD = {
   from: 'ivan@acme.ru',
@@ -48,7 +47,10 @@ export function createMockInboxProvider(approvalNames: readonly string[]): Provi
 
       yield textChunk('Checking inbox… found a lead.')
       yield* toolCall('renderLead', LEAD)
-      yield* toolCall('saveDraft', { threadId: 'thread_demo', body: 'Thanks for reaching out — here is a reply.' })
+      yield* toolCall('saveDraft', {
+        threadId: 'thread_demo',
+        body: 'Thanks for reaching out — here is a reply.',
+      })
     },
   }
 }

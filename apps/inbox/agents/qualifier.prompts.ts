@@ -1,4 +1,4 @@
-import type { PromptStrategy } from '../providers.js'
+import type { PromptStrategy } from '@platform/core'
 
 function qualifierFirst(instructions: string): string {
   return [
