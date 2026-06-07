@@ -92,6 +92,10 @@ export const InboxView = () => {
         activeId={activeWorkflowId}
         onSelect={(id) => {
           setOpenId(null)
+          // Drop the previous workflow's handles so a future workflow that reuses an
+          // agent id can't be served a stale handle; the new workflow's AgentRuntimes
+          // re-publish theirs on mount.
+          setHandles({})
           setActiveWorkflowId(id)
         }}
       />

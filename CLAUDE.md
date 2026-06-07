@@ -73,7 +73,9 @@ scope — rename before any npm publish**. `@platform/react` + `@platform/server
   mutate anything on GitHub — not in the `github-tools.mjs` adapter (it exposes only `gh project
 item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT only _drafts_ a
   suggested comment as generative UI; nothing is posted. The model also has no Bash (deny-list), so
-  the adapter is the only GitHub path. This is a hard user rule.
+  the adapter is the only GitHub path. This is a hard user rule. The board/owner/assignee are env
+  knobs (`GH_PROJECT=8`, `GH_OWNER=matteappen`, `GH_ASSIGNEE=Yaroshuk` — defaults in
+  `github-tools.mjs`, overridable via the shell env `claude-spawn.ts` passes through).
 - **Generative-UI render closures are captured ONCE.** `useRenderTool`'s effect deps stringify a
   function to `"[null]"`, so the render callback you pass is frozen on first registration. Any
   callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads

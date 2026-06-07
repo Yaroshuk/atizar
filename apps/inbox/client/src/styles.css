@@ -854,9 +854,9 @@ button {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   font-size: 13px;
   cursor: pointer;
   color: var(--muted);
