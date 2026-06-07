@@ -68,6 +68,18 @@ scope — rename before any npm publish**. `@platform/react` + `@platform/server
 
 ## Don't-rediscover gotchas
 
+- **GitHub is STRICTLY READ-ONLY.** The GitHub triage workflow reads the real Magma Board
+  (`matteappen` Projects v2 #8) + issues via `gh`. NEVER post/comment/edit/close/label/move or
+  mutate anything on GitHub — not in the `github-tools.mjs` adapter (it exposes only `gh project
+item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT only _drafts_ a
+  suggested comment as generative UI; nothing is posted. The model also has no Bash (deny-list), so
+  the adapter is the only GitHub path. This is a hard user rule.
+- **Generative-UI render closures are captured ONCE.** `useRenderTool`'s effect deps stringify a
+  function to `"[null]"`, so the render callback you pass is frozen on first registration. Any
+  callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads
+  changing state via a `useRef` mirror — a state-dependent callback freezes its initial snapshot and
+  silently no-ops. Invisible to typecheck + unit tests → **only the browser catches it**.
+
 - **Gmail MCP:** the _official_ Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
   Developer Preview** — it 403s (`caller does not have permission`) for personal `@gmail.com`
   even with everything configured. The proven community pkg `@gongrzhe/server-gmail-autoauth-mcp`

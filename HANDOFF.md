@@ -6,13 +6,26 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
-**On `master` (MERGED `56c8454`, BUILT, browser-verified):** the **consumer desktop re-skin** —
-the Smedja design system applied to `apps/inbox/client`. The flat two-card view is now a
-**two-panel desktop**: a left **Pipeline** column + a right **Your agents** grid, each under the
-SAME thin `.comp-head`. Pipeline shows only active agents (tinted, connected by handoff ↓) and
-**keeps a handoff parent visible as Working while its subagent is active**; reply is handoff-only
-(no START). 88 unit tests, all green, browser-verified on real Gmail. Detail →
-`docs/BUILD-LOG.md` §6; spec → `docs/superpowers/specs/2026-06-07-consumer-desktop-reskin-design.md`.
+**On `feat/github-triage-workflow` (BUILT, browser-verified, NOT yet merged):** the **GitHub triage
+workflow** — a second workflow beside the Lead inbox, built on the **real** Magma Board (GitHub
+Projects v2, `matteappen` #8) via `gh`, **strictly read-only**. A **TRIAGE** agent (the only board
+reader) lists the user's 27 assigned tickets, buckets them by real Status + a "needs reply" flag,
+and recommends a route; the manager routes one via the existing `handoff.ts` seam to **FEATURE /
+BUG-FIX / REPLY-DRAFT**, which analyze/draft **purely from the handoff payload** (no GitHub access).
+This forced the **N-agent desktop**: `InboxView` → `WorkflowView` mapping over a `workflows`
+registry, each agent's hooks owned by a child `AgentRuntime` (rules-of-hooks fix), with a
+**WorkflowSwitcher** (Lead inbox ↔ GitHub triage). Gmail workflow unchanged in behavior. 103 unit
+tests green; browser-verified E2E on the real board (20 tickets bucketed → route → analysis;
+read-only confirmed — comment count unchanged) and Gmail re-verified intact. Detail →
+`docs/BUILD-LOG.md` §7; spec → `docs/superpowers/specs/2026-06-07-github-triage-workflow-design.md`;
+plan → `docs/superpowers/plans/2026-06-07-github-triage-workflow.md`.
+**Next:** merge this branch to `master`, then the planned **workflow-separation** pass.
+
+**Previously on `master` (MERGED `56c8454`, BUILT, browser-verified):** the **consumer desktop
+re-skin** — Smedja design system on `apps/inbox/client`; flat two-card view → **two-panel desktop**
+(left **Pipeline** column + right **Your agents** grid under the same thin `.comp-head`). Pipeline
+shows only active agents (tinted, ↓-connected) and **keeps a handoff parent visible as Working
+while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md` §6.
 
 **Recently built (deep dives → `docs/BUILD-LOG.md`):**
 
@@ -27,41 +40,19 @@ SAME thin `.comp-head`. Pipeline shows only active agents (tinted, connected by 
 5. **`@platform/*` package split** — `core` + `providers` + `integrations` as yarn-classic
    workspace packages consumed as raw TS source. — §5
 6. **Consumer desktop re-skin** (`56c8454`) — above. — §6
+7. **GitHub triage workflow** (`feat/github-triage-workflow`) — real read-only Magma Board, N-agent
+   desktop + switcher. — §7
 
-## 🧭 PLANNED NEXT — GitHub triage workflow (NOT STARTED; design agreed, no code)
+## 🧭 PLANNED NEXT — workflow separation + merge
 
-The next real case the user wants, built on the re-skinned desktop. **The triage idea is
-the same shape as the lead qualifier → reply handoff, generalized to N downstream agents.**
-
-- **TRIAGE agent** (the board reader, single entry point): reads a ticket board, buckets
-  tickets by status — **In progress · Waiting your reply · To do** — reading each ticket's
-  status + last comment. Surfaces a **TriageCard**: the bucketed list, each ticket with a
-  routing recommendation + route buttons.
-- **Routing** (manual now, human trigger; agent-initiated later — reuse `handoff.ts`): the
-  manager routes each ticket to a downstream agent via the existing handoff seam, but the
-  payload is **ticket-shaped** (so `handoff.ts` needs a generic/second payload, or a
-  `TicketHandoffPayload`). Three downstream agents:
-  - **FEATURE agent** — gets a ticket link, reads the description, returns an analysis/plan
-    (dumb for now: read → render result).
-  - **BUG-FIX agent** — same shape, bug-oriented.
-  - **REPLY agent** — when the last comment is a question / needs an answer, drafts a
-    suggested reply comment for human approval (mirror the Gmail reply HITL).
-- **Data is MOCKED** (user OK'd it): a thin **mock GitHub stdio MCP** (`mcp/github-tools.mjs`,
-  mirroring `mcp/inbox-tools.mjs`) with canned tickets + `list_tickets` / `get_ticket` +
-  generative tools (`render_triage`, `render_ticket_result`, `post_comment`). Real
-  claude-cli provider drives it (same as the Gmail case — only the data source is mock).
-  A real GitHub MCP (Projects v2 = GraphQL, or Issues = REST) can swap in later.
-- **Desktop:** this forces the **N-agent desktop** (deferred until now): generalize
-  `InboxView` to map over a workflow's agent list instead of hardcoding two, and add a
-  **lightweight workflow switcher** (Lead inbox ↔ GitHub triage) — the design's "workflow
-  tabs" minus the dropped top bar. Keep the Gmail workflow intact.
-- **Boundary:** TRIAGE = the only board reader; downstream agents are writers/analyzers
-  with no `list_tickets` — enforce via the per-agent MCP allow-list in `server/index.ts`
-  (same pattern as `QUALIFIER_TOOLS`/`REPLY_TOOLS`).
-
-A first half-built attempt (mock MCP + a `buckets.ts` grouping helper) was discarded — start
-fresh. Brainstorm/visual-companion mocks for the two-panel layout live (gitignored) under
-`.superpowers/brainstorm/`.
+- **Merge `feat/github-triage-workflow` to `master`** (browser-verified, read-only, 103 tests green).
+- **Workflow-separation pass** (the user flagged this comes after GitHub triage): right now both
+  workflows coexist in one `CopilotRuntime` and one client `workflows` registry, switched by tabs.
+  The user wants a cleaner separation of flows — likely per-workflow config/routing/desktop chrome
+  rather than one shared `WorkflowView`. Scope to be brainstormed when started.
+- The GitHub data path is **real and read-only by construction**. A real-time refresh, broader
+  scoping (beyond the single assignee), or Projects-v2 status writes are explicitly **out of scope**
+  unless the read-only constraint is revisited (it is a hard rule — see CLAUDE.md / memory).
 
 ## Other next-ups (suggested order)
 
