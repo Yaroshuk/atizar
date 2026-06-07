@@ -18,6 +18,12 @@ export interface PromptStrategy {
 export interface ProviderConfig {
   approvalNames: readonly string[]
   surfaceTools: readonly string[]
+  // The fully-qualified MCP tool names this agent is permitted to call
+  // (e.g. `mcp__inbox__renderLead`, `mcp__gmail__get_latest_email`). This is the
+  // HARD per-agent boundary: the qualifier is the only reader of the inbox, the
+  // reply agent is a writer with no `get_latest_email`. Enforced at the permission
+  // layer, not just via prompts. The mock provider ignores it.
+  allowedTools: readonly string[]
   prompts: PromptStrategy
 }
 

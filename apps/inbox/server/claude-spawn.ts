@@ -53,7 +53,7 @@ async function* readLines(
 // Real spawn: writes a temp mcp-config + permission settings, runs `claude` in
 // stream-json mode, exposes stdout as an async line iterator. Auth = the Claude
 // Code subscription login; ANTHROPIC_API_KEY is removed so it can't override.
-export const claudeSpawn: ClaudeSpawn = (prompt) => {
+export const claudeSpawn: ClaudeSpawn = (prompt, allowedTools) => {
   const dir = mkdtempSync(join(tmpdir(), 'inbox-claude-'))
   const mcpConfig = join(dir, 'mcp.json')
   const settings = join(dir, 'settings.json')
@@ -70,13 +70,9 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
     settings,
     JSON.stringify({
       permissions: {
-        allow: [
-          'mcp__inbox__renderLead',
-          'mcp__inbox__renderVerdict',
-          'mcp__inbox__saveDraft',
-          'mcp__gmail__get_latest_email',
-          'mcp__gmail__create_draft',
-        ],
+        // Per-agent allow-list (the hard single-entry-point boundary): the qualifier
+        // gets the inbox reader, the reply agent gets the writers — never both.
+        allow: [...allowedTools],
         deny: BUILTINS,
       },
     })

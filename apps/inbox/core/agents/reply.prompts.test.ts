@@ -15,10 +15,10 @@ const payload: HandoffPayload = {
 describe('reply prompt strategy', () => {
   const prompts = createReplyPrompts('Reply to leads.')
 
-  it('standalone first prompt calls get_latest_email', () => {
+  it('no-handoff first prompt does NOT read the inbox and points to the qualifier', () => {
     const p = prompts.buildFirst(input([]))
-    expect(p).toContain('get_latest_email')
-    expect(p).toContain('saveDraft')
+    expect(p).not.toContain('get_latest_email')
+    expect(p).toMatch(/qualifier/i)
   })
 
   it('handoff first prompt uses the payload and skips get_latest_email', () => {

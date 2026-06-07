@@ -4,8 +4,13 @@ import { approvalResolved, lastApprovalArgs, type Message } from './messages.js'
 import { mapClaudeStream } from './claude-stream.js'
 
 // Spawns a `claude` run for a prompt and exposes stdout as NDJSON lines + kill().
-// Injectable so the Node implementation stays server-side and tests use a fake.
-export type ClaudeSpawn = (prompt: string) => {
+// `allowedTools` is the agent's permission allow-list (fully-qualified MCP names) —
+// the hard per-agent boundary on which tools the model may call. Injectable so the
+// Node implementation stays server-side and tests use a fake.
+export type ClaudeSpawn = (
+  prompt: string,
+  allowedTools: readonly string[]
+) => {
   lines: AsyncIterable<string>
   kill: () => void
 }
@@ -26,10 +31,12 @@ export function createClaudeCliProvider(opts: {
   // The agent's renderable tool names — only these surface to the client; the
   // model's internal tools (e.g. ToolSearch) are filtered out of the thread.
   surfaceTools: readonly string[]
+  // The agent's permission allow-list (fully-qualified MCP names) — passed to spawn.
+  allowedTools: readonly string[]
   prompts: PromptStrategy
   spawn: ClaudeSpawn
 }): Provider {
-  const { approvalNames, surfaceTools, prompts, spawn } = opts
+  const { approvalNames, surfaceTools, allowedTools, prompts, spawn } = opts
   return {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input?.messages ?? []) as Message[]
@@ -48,7 +55,7 @@ export function createClaudeCliProvider(opts: {
         } else {
           prompt = prompts.buildFirst(input)
         }
-        child = spawn(prompt)
+        child = spawn(prompt, allowedTools)
       } catch (err) {
         yield errorChunk(err instanceof Error ? err.message : String(err))
         return

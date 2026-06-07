@@ -27,6 +27,7 @@ describe('inbox agents wiring', () => {
     const provider = reg.resolve('mock')({
       approvalNames: [],
       surfaceTools: [],
+      allowedTools: [],
       prompts: { buildFirst: () => '' },
     })
     expect(typeof provider.run).toBe('function')

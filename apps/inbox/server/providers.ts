@@ -13,6 +13,7 @@ export const providerRegistry: ProviderRegistry = defineProviders({
     createClaudeCliProvider({
       approvalNames: config.approvalNames,
       surfaceTools: config.surfaceTools,
+      allowedTools: config.allowedTools,
       prompts: config.prompts,
       spawn: claudeSpawn,
     }),

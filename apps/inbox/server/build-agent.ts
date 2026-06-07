@@ -9,12 +9,14 @@ import type { ProviderRegistry, PromptStrategy } from '../core/providers.js'
 export function buildAgent(
   def: AgentDefinition,
   prompts: PromptStrategy,
-  registry: ProviderRegistry
+  registry: ProviderRegistry,
+  allowedTools: readonly string[]
 ): BuiltInAgent {
   const makeProvider = registry.resolve(def.provider)
   const provider = makeProvider({
     approvalNames: def.approvals,
     surfaceTools: def.tools,
+    allowedTools,
     prompts,
   })
   return new BuiltInAgent({

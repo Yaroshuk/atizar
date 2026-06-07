@@ -76,6 +76,7 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
       prompts: createReplyPrompts('do it'),
       spawn,
     })
@@ -86,7 +87,7 @@ describe('createClaudeCliProvider', () => {
     expect(callNames).toEqual(['renderLead', 'saveDraft'])
     expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
     expect(calls[0].killed).toBe(true)
-    expect(calls[0].prompt).toContain('get_latest_email')
+    expect(calls[0].prompt).toMatch(/qualifier/i)
   })
 
   it('resume: when approval is resolved, re-primes and streams done text', async () => {
@@ -96,6 +97,7 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
       prompts: createReplyPrompts('do it'),
       spawn,
     })
@@ -133,6 +135,7 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
       prompts: createReplyPrompts('x'),
       spawn,
     })
@@ -170,6 +173,7 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
       prompts: createReplyPrompts('x'),
       spawn,
     })
@@ -199,11 +203,32 @@ describe('createClaudeCliProvider', () => {
     const provider = createClaudeCliProvider({
       approvalNames: ['saveDraft'],
       surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
       prompts: createReplyPrompts('x'),
       spawn,
     })
     const out = await drain(provider.run(runInput([])))
     expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK })
     expect(out[0].delta).toMatch(/error/i)
+  })
+
+  it('passes the agent allow-list through to spawn (the per-agent boundary)', async () => {
+    let seen: { prompt: string; allowedTools: readonly string[] } | null = null
+    const spawn: ClaudeSpawn = (prompt, allowedTools) => {
+      seen = { prompt, allowedTools }
+      async function* lines() {
+        yield textDelta('ok')
+      }
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__gmail__create_draft'],
+      prompts: createReplyPrompts('x'),
+      spawn,
+    })
+    await drain(provider.run(runInput([])))
+    expect(seen!.allowedTools).toEqual(['mcp__inbox__renderLead', 'mcp__gmail__create_draft'])
   })
 })
