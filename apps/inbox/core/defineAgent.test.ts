@@ -6,16 +6,16 @@ const valid = {
   name: 'EMAIL AGENT',
   provider: 'mock',
   instructions: 'Process inbound leads.',
-  tools: ['renderLead', 'confirmSend'],
-  approvals: ['confirmSend'],
-  renders: { renderLead: 'LeadCard', confirmSend: 'ApprovalDialog' },
+  tools: ['renderLead', 'saveDraft'],
+  approvals: ['saveDraft'],
+  renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
 }
 
 describe('defineAgent', () => {
   it('returns the parsed definition for a valid passport', () => {
     const def = defineAgent(valid)
     expect(def.name).toBe('EMAIL AGENT')
-    expect(def.approvals).toEqual(['confirmSend'])
+    expect(def.approvals).toEqual(['saveDraft'])
   })
 
   it('rejects an approval that is not in tools', () => {

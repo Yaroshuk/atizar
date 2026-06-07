@@ -21,10 +21,9 @@ const messages = [
         function: {
           name: 'renderLead',
           arguments: JSON.stringify({
-            id: 42,
             from: 'ivan@acme.ru',
             subject: 'Order: 10 units',
-            intent: 'order',
+            summary: 'Customer wants to order 10 units; asks about delivery time.',
           }),
         },
       },
@@ -55,10 +54,10 @@ describe('renderLead generative-UI mapping', () => {
       </CopilotKit>
     )
 
-    // The LeadCard must visibly paint: subject, the envelope + sender, and intent.
+    // The LeadCard must visibly paint: subject, the envelope + sender, and summary.
     expect(screen.getByText('Order: 10 units')).toBeInTheDocument()
     expect(screen.getByText(/ivan@acme\.ru/)).toBeInTheDocument()
     expect(screen.getByText(/✉️/)).toBeInTheDocument()
-    expect(screen.getByText('order')).toBeInTheDocument()
+    expect(screen.getByText(/order 10 units/i)).toBeInTheDocument()
   })
 })

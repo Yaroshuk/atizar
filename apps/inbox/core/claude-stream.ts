@@ -1,7 +1,7 @@
 import { EventType, type BaseEvent } from '@ag-ui/client'
 
 // Claude Code MCP tools surface as `mcp__<server>__<tool>`; the client registered
-// the bare names (`renderLead`, `confirmSend`), so strip the prefix.
+// the bare names (`renderLead`, `saveDraft`), so strip the prefix.
 function stripMcpPrefix(name: string): string {
   if (!name.startsWith('mcp__')) return name
   const rest = name.slice('mcp__'.length)

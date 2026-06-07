@@ -7,8 +7,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ClaudeSpawn } from '../core/claude-cli-provider.js'
 
-// Absolute path to the stdio MCP server script.
+// Absolute path to the stdio MCP server scripts.
 const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.url))
+const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mjs', import.meta.url))
 
 // Built-in tools the model must not use — only our two MCP tools are allowed.
 const BUILTINS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']
@@ -58,13 +59,23 @@ export const claudeSpawn: ClaudeSpawn = (prompt) => {
   const settings = join(dir, 'settings.json')
   writeFileSync(
     mcpConfig,
-    JSON.stringify({ mcpServers: { inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] } } }),
+    JSON.stringify({
+      mcpServers: {
+        inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
+        gmail: { type: 'stdio', command: 'node', args: [GMAIL_SERVER] },
+      },
+    }),
   )
   writeFileSync(
     settings,
     JSON.stringify({
       permissions: {
-        allow: ['mcp__inbox__renderLead', 'mcp__inbox__confirmSend'],
+        allow: [
+          'mcp__inbox__renderLead',
+          'mcp__inbox__saveDraft',
+          'mcp__gmail__get_latest_email',
+          'mcp__gmail__create_draft',
+        ],
         deny: BUILTINS,
       },
     }),

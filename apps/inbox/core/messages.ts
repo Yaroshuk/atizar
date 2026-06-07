@@ -58,6 +58,27 @@ export function pairToolResults(messages: readonly Message[]): Map<string, ToolM
   return byCallId
 }
 
+// The parsed arguments of the most recent assistant tool call whose name is in
+// `approvalNames`, or null if none / unparseable. Used to re-prime a stateless
+// resume run from the approval the human just answered.
+export function lastApprovalArgs(
+  messages: readonly Message[],
+  approvalNames: readonly string[]
+): Record<string, unknown> | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    for (const tc of toolCallsOf(messages[i])) {
+      if (approvalNames.includes(tc.function.name)) {
+        try {
+          return JSON.parse(tc.function.arguments) as Record<string, unknown>
+        } catch {
+          return null
+        }
+      }
+    }
+  }
+  return null
+}
+
 // The resume-detection counterpart of hasPendingApproval, viewed from the other
 // end: true when some role:"tool" message answers an approval tool call. Used by
 // the (server-side) provider to decide turn-1 vs resume. Correlates by

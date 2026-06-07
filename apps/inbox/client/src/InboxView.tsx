@@ -18,7 +18,7 @@ export const InboxView = () => {
   const [open, setOpen] = useState(false)
 
   // Register the generative-UI renderers (renderLead -> LeadCard,
-  // confirmSend -> ApprovalDialog). Must run inside <CopilotKit>. The
+  // saveDraft -> ApprovalDialog). Must run inside <CopilotKit>. The
   // "awaiting_approval" status is no longer sourced from here — it is derived
   // from agent.messages in useAgentStatus, so it is reported even when the
   // ApprovalDialog (and modal) are not mounted.
@@ -35,7 +35,7 @@ export const InboxView = () => {
   // the resulting `role:"tool"` message into `agent.messages`, and — because
   // `followUp` defaults on — fires the follow-up `runAgent({ agent })`. Since
   // that follow-up re-runs the SAME agent, `prepareRunAgentInput` reads the now
-  // populated `agent.messages` (history + the confirmSend tool call + the tool
+  // populated `agent.messages` (history + the saveDraft tool call + the tool
   // result), so the resume POST carries the full conversation instead of `[]`.
   // Calling the bare `agent.runAgent()` bypasses all of that, which is why the
   // resume run previously sent `messages: []` and the agent re-emitted turn 1.
@@ -59,7 +59,7 @@ export const InboxView = () => {
 
   // Status comes from the agent's real run lifecycle (onRunStartedEvent ->
   // running, onRunFinalized -> done, onRunFailed -> error) with a pending
-  // confirmSend tool call (derived from agent.messages) overriding to
+  // saveDraft tool call (derived from agent.messages) overriding to
   // "awaiting_approval" — render-independent, so the CLOSED card shows it.
   const status = useAgentStatus(agent, inboxAgent.approvals)
 

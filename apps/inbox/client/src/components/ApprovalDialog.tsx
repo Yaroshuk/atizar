@@ -1,4 +1,4 @@
-type ApprovalData = { leadId: number; message: string }
+type ApprovalData = { threadId: string; body: string }
 
 type ApprovalDialogProps = { data: ApprovalData; onApprove: () => void }
 
@@ -13,7 +13,7 @@ export const ApprovalDialog = ({ data, onApprove }: ApprovalDialogProps) => {
         margin: '8px 0',
       }}
     >
-      <div style={{ marginBottom: 8 }}>{data.message}</div>
+      <div style={{ marginBottom: 8, whiteSpace: 'pre-wrap' }}>{data.body}</div>
       <button
         onClick={onApprove}
         style={{
@@ -24,7 +24,7 @@ export const ApprovalDialog = ({ data, onApprove }: ApprovalDialogProps) => {
           padding: '6px 14px',
         }}
       >
-        Send
+        Save draft
       </button>
     </div>
   )

@@ -6,6 +6,7 @@ import {
   hasPendingApproval,
   approvalResolved,
   pairToolResults,
+  lastApprovalArgs,
   type Message,
 } from './messages.js'
 
@@ -105,5 +106,32 @@ describe('guards', () => {
     expect(toolCallsOf(assistantWithToolCall('confirmSend'))).toHaveLength(1)
     expect(toolCallsOf(assistantText('hi'))).toEqual([])
     expect(toolCallsOf(toolResult('tc1'))).toEqual([])
+  })
+})
+
+describe('lastApprovalArgs', () => {
+  const APPROVALS = ['saveDraft']
+
+  function assistantWithArgs(name: string, args: string, id = 'tc1'): Message {
+    return {
+      role: 'assistant',
+      id: 'a1',
+      toolCalls: [{ id, type: 'function', function: { name, arguments: args } }],
+    }
+  }
+
+  it('returns parsed args of the most recent matching approval tool call', () => {
+    const msgs = [assistantWithArgs('saveDraft', '{"threadId":"t_9","body":"Hello"}')]
+    expect(lastApprovalArgs(msgs, APPROVALS)).toEqual({ threadId: 't_9', body: 'Hello' })
+  })
+
+  it('returns null when no matching approval tool call exists', () => {
+    const msgs = [assistantWithToolCall('renderLead')]
+    expect(lastApprovalArgs(msgs, APPROVALS)).toBeNull()
+  })
+
+  it('returns null when the args are not valid JSON', () => {
+    const msgs = [assistantWithArgs('saveDraft', '{bad')]
+    expect(lastApprovalArgs(msgs, APPROVALS)).toBeNull()
   })
 })

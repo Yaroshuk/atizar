@@ -37,6 +37,23 @@ export default tseslint.config(
       'no-console': 'off',
     },
   },
+  {
+    // MCP server scripts run in Node — expose Node built-in globals (Buffer, etc.)
+    // and allow console for MCP stdio logging.
+    files: ['mcp/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly',
+        process: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
   prettier,
   {
     ignores: ['node_modules', 'dist', 'coverage', '.playwright-mcp', '*.config.*'],

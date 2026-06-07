@@ -31,7 +31,7 @@ async function drain(it: AsyncIterable<any>) {
 }
 
 describe('createClaudeCliProvider', () => {
-  it('turn 1: streams text + renderLead + confirmSend, then stops and kills', async () => {
+  it('turn 1: streams text + renderLead + saveDraft, then stops and kills', async () => {
     const { spawn, calls } = fakeSpawn([
       {
         when: () => true,
@@ -40,26 +40,27 @@ describe('createClaudeCliProvider', () => {
           toolStart(0, 'tc_lead', 'mcp__inbox__renderLead'),
           toolArgs(0, '{"id":42}'),
           stop(0),
-          toolStart(1, 'tc_ok', 'mcp__inbox__confirmSend'),
-          toolArgs(1, '{"leadId":42,"message":"Send a reply?"}'),
+          toolStart(1, 'tc_ok', 'mcp__inbox__saveDraft'),
+          toolArgs(1, '{"threadId":"thread_demo","body":"Thanks for reaching out."}'),
           stop(1),
         ],
       },
     ])
-    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], surfaceTools: ['renderLead', 'confirmSend'], instructions: 'do it', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'do it', spawn })
     const out = await drain(provider.run(runInput([])))
     const callNames = out.filter((e) => e.type === EventType.TOOL_CALL_START).map((e) => e.toolCallName)
-    expect(callNames).toEqual(['renderLead', 'confirmSend'])
+    expect(callNames).toEqual(['renderLead', 'saveDraft'])
     expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
     expect(calls[0].killed).toBe(true)
+    expect(calls[0].prompt).toContain('get_latest_email')
   })
 
   it('resume: when approval is resolved, re-primes and streams done text', async () => {
     const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('Done — reply sent.')] }])
-    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], surfaceTools: ['renderLead', 'confirmSend'], instructions: 'do it', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'do it', spawn })
     const messages = [
-      { role: 'assistant', toolCalls: [{ id: 'tc_ok', function: { name: 'confirmSend' } }] },
-      { role: 'tool', toolCallId: 'tc_ok' },
+      { role: 'assistant', toolCalls: [{ id: 'tc_ok', type: 'function', function: { name: 'saveDraft', arguments: '{"threadId":"t_1","body":"Hello"}' } }] },
+      { role: 'tool', toolCallId: 'tc_ok', content: 'approved' },
     ]
     const out = await drain(provider.run(runInput(messages)))
     expect(out).toHaveLength(1)
@@ -67,9 +68,66 @@ describe('createClaudeCliProvider', () => {
     expect(calls[0].prompt).toMatch(/APPROVED/)
   })
 
+  it('resume: re-primes from the saveDraft args in the thread', async () => {
+    let seenPrompt = ''
+    const spawn: ClaudeSpawn = (prompt) => {
+      seenPrompt = prompt
+      async function* lines() {
+        yield textDelta('Draft saved to Gmail.')
+      }
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['renderLead', 'saveDraft'],
+      instructions: 'x',
+      spawn,
+    })
+    const messages = [
+      {
+        role: 'assistant',
+        id: 'a1',
+        toolCalls: [{ id: 'tc_d', type: 'function', function: { name: 'saveDraft', arguments: '{"threadId":"t_42","body":"Hi Ivan"}' } }],
+      },
+      { role: 'tool', id: 't1', content: 'approved', toolCallId: 'tc_d' },
+    ]
+    for await (const _ of provider.run(runInput(messages))) { /* drain */ }
+    expect(seenPrompt).toContain('t_42')
+    expect(seenPrompt).toContain('Hi Ivan')
+    expect(seenPrompt).toContain('create_draft')
+  })
+
+  it('resume: surfaces an error when the thread has no usable draft args', async () => {
+    let spawned = false
+    const spawn: ClaudeSpawn = () => {
+      spawned = true
+      async function* lines() { /* no lines */ }
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['renderLead', 'saveDraft'],
+      instructions: 'x',
+      spawn,
+    })
+    // saveDraft call present (so approvalResolved is true) but args lack threadId/body
+    const messages = [
+      {
+        role: 'assistant',
+        id: 'a1',
+        toolCalls: [{ id: 'tc_d', type: 'function', function: { name: 'saveDraft', arguments: '{}' } }],
+      },
+      { role: 'tool', id: 't1', content: 'approved', toolCallId: 'tc_d' },
+    ]
+    const out = await drain(provider.run(runInput(messages)))
+    const errorEvent = out.find((e) => e.type === EventType.TEXT_MESSAGE_CHUNK && e.delta?.includes('Resume failed'))
+    expect(errorEvent).toBeDefined()
+    expect(spawned).toBe(false)
+  })
+
   it('emits a readable error chunk when spawn throws', async () => {
     const spawn: ClaudeSpawn = () => { throw new Error('claude not found') }
-    const provider = createClaudeCliProvider({ approvalNames: ['confirmSend'], surfaceTools: ['renderLead', 'confirmSend'], instructions: 'x', spawn })
+    const provider = createClaudeCliProvider({ approvalNames: ['saveDraft'], surfaceTools: ['renderLead', 'saveDraft'], instructions: 'x', spawn })
     const out = await drain(provider.run(runInput([])))
     expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK })
     expect(out[0].delta).toMatch(/error/i)
