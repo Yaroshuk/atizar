@@ -8,15 +8,19 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mapItems } from './github-format.mjs'
+import { mapSearchNodes } from './github-format.mjs'
 
 const execFileP = promisify(execFile)
 
-const PROJECT = process.env.GH_PROJECT || '8'
+const PROJECT = Number(process.env.GH_PROJECT || '8')
 const OWNER = process.env.GH_OWNER || 'matteappen'
 const ASSIGNEE = process.env.GH_ASSIGNEE || 'Yaroshuk'
 const BODY_MAX = 1500
 const COMMENT_MAX = 600
+// Triage only surfaces tickets in these board statuses, capped to the most recent few —
+// everything else (Backlog, Done, deployed lanes) is noise for "what needs attention".
+const ALLOWED_STATUSES = ['Todo', 'In progress', 'On pluto', 'Ready for mars']
+const MAX_TICKETS = 20
 
 const gh = async (args) => {
   const { stdout } = await execFileP('gh', args, { maxBuffer: 32 * 1024 * 1024 })
@@ -25,55 +29,62 @@ const gh = async (args) => {
 
 const errText = (err) => err?.stderr?.toString?.() || err?.message || String(err)
 
-// Read the last comment of one issue (author + trimmed body), or null.
-async function lastComment(repo, number) {
-  try {
-    const out = await gh(['issue', 'view', String(number), '-R', repo, '--json', 'comments'])
-    const comments = JSON.parse(out).comments ?? []
-    if (!comments.length) return null
-    const last = comments[comments.length - 1]
-    return { author: last.author?.login ?? '', body: (last.body ?? '').slice(0, COMMENT_MAX) }
-  } catch {
-    return null // a single unreadable issue must not fail the whole list
+// One cheap GraphQL query: search the user's open issues in the org (scoped server-side,
+// so we never page the whole board), and for each pull its board Status/Priority + last
+// comment inline. `$q` is a GitHub issue-search string. Read-only.
+const SEARCH_QUERY = `
+query($q: String!) {
+  search(query: $q, type: ISSUE, first: 50) {
+    nodes {
+      ... on Issue {
+        number
+        title
+        body
+        url
+        repository { nameWithOwner }
+        comments(last: 1) { nodes { author { login } body } }
+        projectItems(first: 10) {
+          nodes {
+            project { number }
+            status: fieldValueByName(name: "Status") {
+              ... on ProjectV2ItemFieldSingleSelectValue { name }
+            }
+            priority: fieldValueByName(name: "Priority") {
+              ... on ProjectV2ItemFieldSingleSelectValue { name }
+            }
+          }
+        }
+      }
+    }
   }
-}
+}`
 
 const server = new McpServer({ name: 'github', version: '1.0.0' })
 
-// list_my_tickets — the board read. TRIAGE only. Scopes to ASSIGNEE, excludes Done,
-// enriches each ticket with its last comment + a needsReply flag (someone other than
-// me commented last). Returns { tickets: [...] }.
+// list_my_tickets — the board read. TRIAGE only. One search query returns the user's open
+// issues (scoped to them server-side) with each ticket's status, priority, trimmed body,
+// last comment, and a needsReply flag; kept to ALLOWED_STATUSES and capped at MAX_TICKETS.
 server.registerTool(
   'list_my_tickets',
   {
     description:
-      "List the current user's open tickets on the GitHub project board (excludes Done), each with status, priority, a trimmed body, and the last comment. Read-only.",
+      "List the current user's open tickets on the GitHub project board, each with status, priority, a trimmed body, and the last comment. Read-only.",
     inputSchema: {},
   },
   async () => {
     try {
-      const out = await gh([
-        'project',
-        'item-list',
-        PROJECT,
-        '--owner',
-        OWNER,
-        '--format',
-        'json',
-        '--limit',
-        '2000',
-      ])
-      const tickets = mapItems(JSON.parse(out), {
+      const q = `assignee:${ASSIGNEE} org:${OWNER} is:issue is:open`
+      const out = await gh(['api', 'graphql', '-f', `query=${SEARCH_QUERY}`, '-f', `q=${q}`])
+      const parsed = JSON.parse(out)
+      if (parsed.errors) throw new Error(parsed.errors.map((e) => e.message).join('; '))
+      const tickets = mapSearchNodes(parsed.data?.search ?? { nodes: [] }, {
+        project: PROJECT,
+        allowedStatuses: ALLOWED_STATUSES,
+        max: MAX_TICKETS,
         assignee: ASSIGNEE,
-        excludeStatuses: ['Done'],
         bodyMax: BODY_MAX,
+        commentMax: COMMENT_MAX,
       })
-      for (const t of tickets) {
-        t.lastComment = await lastComment(t.repo, t.number)
-        t.needsReply = !!(
-          t.lastComment && t.lastComment.author.toLowerCase() !== ASSIGNEE.toLowerCase()
-        )
-      }
       return { content: [{ type: 'text', text: JSON.stringify({ tickets }) }] }
     } catch (err) {
       return { content: [{ type: 'text', text: JSON.stringify({ error: errText(err) }) }] }
