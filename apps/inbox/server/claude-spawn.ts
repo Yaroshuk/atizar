@@ -19,7 +19,9 @@ const GITHUB_SERVER = fileURLToPath(new URL('../mcp/github-tools.mjs', import.me
 const BUILTINS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']
 
 // A whole run shouldn't outlive a human-scale interaction; kill stuck processes.
-const RUN_TIMEOUT_MS = 120_000
+// Triage couriers ~13 tickets into render_triage, which is token-heavy, so give the
+// model headroom beyond the original 120s before we consider it stuck.
+const RUN_TIMEOUT_MS = 180_000
 
 // Yields stdout lines, and — so the provider never silently ends on a broken run —
 // appends a synthetic `result` error line (which the parser surfaces as text) when

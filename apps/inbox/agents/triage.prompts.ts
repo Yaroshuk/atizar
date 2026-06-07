@@ -12,7 +12,9 @@ function triageFirst(instructions: string): string {
     '- "reply": needsReply is true / the last comment asks the user something.',
     'Then call render_triage with { tickets } — pass every ticket through UNCHANGED',
     'and add a "recommendation" field to each. Do not drop or invent tickets.',
-    'Do not narrate your tool usage or mention tools/schemas — keep any text brief.',
+    'After render_triage, STOP: reply with at most ONE short sentence. Do NOT list or',
+    'summarize the tickets again (the card already shows them) and do not narrate tools —',
+    'repeating them wastes time and can stall the run.',
   ].join('\n')
 }
 

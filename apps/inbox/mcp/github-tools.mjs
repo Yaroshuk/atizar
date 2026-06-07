@@ -15,8 +15,14 @@ const execFileP = promisify(execFile)
 const PROJECT = Number(process.env.GH_PROJECT || '8')
 const OWNER = process.env.GH_OWNER || 'matteappen'
 const ASSIGNEE = process.env.GH_ASSIGNEE || 'Yaroshuk'
-const BODY_MAX = 1500
+const BODY_MAX = 1500 // get_ticket: a full single-issue read
 const COMMENT_MAX = 600
+// list_my_tickets is COURIERED through the model (it re-emits every ticket into
+// render_triage token-by-token), so keep each ticket small or the run is slow and can
+// hit the kill timeout. The triage card shows neither body nor comment text — these
+// excerpts only ride along for the downstream handoff payload.
+const LIST_BODY_MAX = 400
+const LIST_COMMENT_MAX = 240
 // Triage only surfaces tickets in these board statuses, capped to the most recent few —
 // everything else (Backlog, Done, deployed lanes) is noise for "what needs attention".
 const ALLOWED_STATUSES = ['Todo', 'In progress', 'On pluto', 'Ready for mars']
@@ -82,8 +88,8 @@ server.registerTool(
         allowedStatuses: ALLOWED_STATUSES,
         max: MAX_TICKETS,
         assignee: ASSIGNEE,
-        bodyMax: BODY_MAX,
-        commentMax: COMMENT_MAX,
+        bodyMax: LIST_BODY_MAX,
+        commentMax: LIST_COMMENT_MAX,
       })
       return { content: [{ type: 'text', text: JSON.stringify({ tickets }) }] }
     } catch (err) {
