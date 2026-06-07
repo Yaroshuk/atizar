@@ -11,33 +11,38 @@ operational index; that file is the big picture.
 
 ## ⏭️ Handoff — start here (next session)
 
-**Done on branch `feat/two-agents-handoff` (NOT yet merged):** a **second agent +
-manual handoff** — the "second consumer" that validates the `core/` contract for the
-library. A **LEAD QUALIFIER** agent (reads the latest email, classifies it →
-`renderVerdict` → VerdictCard with category/priority/reason) sits beside the **REPLY
-AGENT** on a two-card desktop. Manager clicks **"Draft reply"** on the verdict →
-**handoff**: the reply agent runs **seeded with the verdict** (no inbox re-read) →
-`renderLead` → `saveDraft` → approve → real Gmail draft. The handoff *mechanism* lives
-in **`core/handoff.ts`** (`encode/decodeHandoff`, pure) so a future agent-initiated/server
-trigger reuses it; only the human *trigger* is client-side. Provider seam generalized to
-per-agent `PromptStrategy` + factory registry (`ProviderFactory`) — **Mastra-ready** (a
-Mastra factory slots in beside `claude-cli`, no seam change). **Browser-verified
-end-to-end on real Gmail** (`sjuser95@gmail.com`): qualifier classified a real AliExpress
-blast as spam/cold → handoff → reply drafted a polite decline → approved → draft saved.
-77 unit tests, tsc+lint green. See `docs/superpowers/specs|plans/2026-06-07-two-agents-handoff*`.
+**On `master` now (MERGED, `56f07d0`):** **two agents + manual handoff + strict single
+entry point** — the "second consumer" that validates the `core/` contract for the library.
+A **LEAD QUALIFIER** (the **only** inbox reader: `get_latest_email` → `renderVerdict` →
+VerdictCard) sits beside the **REPLY AGENT** (a writer: `renderLead`/`saveDraft`/`create_draft`,
+**no inbox access**) on a two-card desktop. Manager clicks **"Draft reply"** on the verdict →
+**handoff**: reply runs **seeded with the verdict** (no inbox re-read) → `saveDraft` → approve
+→ real Gmail draft. Handoff *mechanism* is in **`core/handoff.ts`** (`encode/decodeHandoff`,
+pure) so a future agent/server trigger reuses it; only the human *trigger* is client-side. The
+boundary is **hard** (per-agent MCP allow-list in `server/index.ts` → `buildAgent(...,
+allowedTools)` → spawn), not prompt-only. Provider seam = per-agent `PromptStrategy` factories
+(`ProviderFactory`) — **Mastra-ready**. **Browser-verified end-to-end on real Gmail**
+(`sjuser95@gmail.com`): real "Order: 10 units" lead → sales/hot → handoff → contextual reply
+drafted from payload → approved → real draft (thread+draft id returned). 77 unit tests,
+tsc+lint+format green. See the "Two agents + manual handoff" section below +
+`docs/superpowers/specs|plans/2026-06-07-two-agents-handoff*`. (Also on `master`: the prior
+**Gmail draft agent**, `feat/gmail-draft-integration` @ `de8f7f4`, + the `claude-cli` provider.)
 
-**On `master`:** the **Gmail draft agent** (single reply agent, `feat/gmail-draft-integration`
-merged at `de8f7f4`) + the `claude-cli` provider. See "Gmail draft integration" section below.
-
-**Pick next (suggested order):**
-1. **Merge `feat/two-agents-handoff`** into `main` (review the branch first).
-2. *Roadmap (the library):* the contract is now validated on two agents + a handoff — extract
-   `core/` toward the `@platform/*` package split. And/or the multi-provider / API-key path
-   (**Mastra** or `claude-api`) behind the existing `Provider` seam (factory already in place).
-3. *Polish (cosmetic, deferred):* the model still narrates ToolSearch / verdict text in the
-   thread; tighten Gmail scope `gmail.modify`→`readonly`+`compose`; the qualifier's verdict
-   text also prints as plain markdown paragraphs in the modal (the model narrating alongside
-   the card) — strip pre-tool/duplicate chatter client-side or via prompt.
+**Pick next (suggested order) — we are "ready to start the library":**
+1. **The library (`@platform/*` split):** the `core/` contract is now validated on TWO agents
+   + a handoff (the documented precondition). Extract `apps/inbox/core/` into a package
+   (`@platform/core` or similar): message layer, `Provider`/registry, `defineAgent`,
+   `core/handoff`. Decide the boundary (what's framework vs. app), wire `apps/inbox` to consume
+   it. This is the headline goal the user has been driving toward — brainstorm the package
+   shape first.
+2. **Multi-provider / Mastra** (can interleave): add a `mastra` (or `claude-api`) factory beside
+   `claude-cli` behind the existing `Provider` seam. The seam is already a lowest-common-
+   denominator (history-in → AG-UI-events-out; pause = stop; resume = new run) — no seam change
+   needed. Needs an API key. See the Mastra-coexistence rules in the two-agents spec.
+3. *Polish (cosmetic, deferred):* the model still narrates a bit ("I'll load the tool schemas…")
+   AND the qualifier/reply verdict prints as plain markdown paragraphs in the modal alongside
+   the card — strip pre-tool / duplicate chatter client-side or via prompt. Tighten Gmail scope
+   `gmail.modify`→`readonly`+`compose`.
 
 **Don't-rediscover gotchas:**
 - **Gmail MCP:** the *official* Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
@@ -50,6 +55,18 @@ merged at `de8f7f4`) + the `claude-cli` provider. See "Gmail draft integration" 
 - never pass `--bare` to `claude` (skips keychain → "Not logged in"); auth is the **subscription**
   via macOS keychain, no API key; `core/` stays **Node-free** (Node lives in `server/` + `mcp/`);
   HITL is **client-held, two requests** (don't change client/transport — the provider conforms).
+- **`<CopilotKit>` needs `agent={...}`** (see `App.tsx`): it binds internal listeners to
+  `props.agent ?? 'default'`. We register `qualifier`/`reply`, NOT `'default'` — omit the prop
+  and the whole tree throws *"Agent 'default' not found"* at runtime (invisible to unit tests +
+  the server `/info` probe; **only the browser catches it** → always browser-verify).
+- **Per-agent tool boundary lives in `server/index.ts`** (`QUALIFIER_TOOLS`/`REPLY_TOOLS`,
+  threaded via `buildAgent(def, prompts, registry, allowedTools)`). Adding/removing an MCP tool
+  for an agent = edit that agent's list there (not the shared spawn). Qualifier = reader, reply
+  = writer; keep them disjoint on the inbox-read tool.
+- **Subagents must NOT switch git branches** to inspect history (`git checkout <sha>` /
+  `git switch`): an inspection subagent did this and left the repo on `master` mid-run (work was
+  safe on the branch, but confusing). Tell review/inspection agents to use `git show <sha>:path`
+  / `git diff` only and verify `git rev-parse --abbrev-ref HEAD` before finishing.
 - Run from `apps/inbox/`: `npm run dev`, `npm test`, `npm run lint`.
 
 ## Agent-First Project — Continuous Learning
