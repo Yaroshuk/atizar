@@ -1,88 +1,71 @@
-import type { Status } from '../status'
-
-const LABEL: Record<Status, string> = {
-  idle: 'Idle',
-  running: 'Working…',
-  awaiting_approval: 'Awaiting approval',
-  done: 'Done',
-  error: 'Error',
-}
-const DOT: Record<Status, string> = {
-  idle: '#bbb',
-  running: '#0a7',
-  awaiting_approval: '#f0c000',
-  done: '#0a7',
-  error: '#e33',
-}
+import { STATUS_LABEL, type Status } from '../status'
+import { Icon, type IconName } from './Icon'
 
 type AgentCardProps = {
   name: string
+  subtitle: string
+  iconName: IconName
   status: Status
+  // Whether this agent can be launched directly. Handoff-only agents (e.g. reply,
+  // started by the qualifier) are not launchable and show no START button.
+  canStart: boolean
   onStart: () => void
   onOpen: () => void
 }
 
-export const AgentCard = ({ name, status, onStart, onOpen }: AgentCardProps) => {
+export const AgentCard = ({
+  name,
+  subtitle,
+  iconName,
+  status,
+  canStart,
+  onStart,
+  onOpen,
+}: AgentCardProps) => {
+  const start = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onStart()
+  }
+
+  const renderFoot = () => {
+    if (status === 'running') {
+      return (
+        <span className='run-foot'>
+          <Icon name='sparkle' size={15} />
+          Running… tap to view
+        </span>
+      )
+    }
+    if (!canStart) {
+      return <span className='foot-hint'>Runs from a handoff</span>
+    }
+    return (
+      <div className='card-foot'>
+        <button className='btn btn-primary' onClick={start}>
+          START
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div
-      onClick={onOpen}
-      style={{
-        width: 280,
-        border: '1px solid #ddd',
-        borderRadius: 12,
-        padding: 16,
-        background: '#fff',
-        cursor: 'pointer',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <strong>{name}</strong>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 12,
-            color: '#666',
-          }}
-        >
-          {status === 'running' ? (
-            <span className='spinner' />
-          ) : (
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 8,
-                background: DOT[status],
-              }}
-            />
-          )}
-          {LABEL[status]}
+    <div className='agent-card' onClick={onOpen}>
+      <div className='card-top'>
+        <div className='card-icon'>
+          <Icon name={iconName} size={20} />
+        </div>
+        <span className={`status s-${status}`}>
+          <span className={`dot ${status}`} />
+          {STATUS_LABEL[status]}
         </span>
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onStart()
-        }}
-        style={{
-          marginTop: 12,
-          padding: '6px 16px',
-          borderRadius: 6,
-          border: 0,
-          background: '#111',
-          color: '#fff',
-        }}
-      >
-        START
-      </button>
+
+      <div className='card-headtext'>
+        <p className='agent-name'>{name}</p>
+        <p className='agent-sub'>{subtitle}</p>
+      </div>
+
+      {renderFoot()}
     </div>
   )
 }

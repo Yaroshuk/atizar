@@ -8,14 +8,30 @@ import {
 import { useInboxActions } from './actions'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal } from './components/AgentModal'
+import { PipelineColumn } from './components/PipelineColumn'
+import { Icon, type IconName } from './components/Icon'
 import { useAgentStatus } from './useAgentStatus'
-import { qualifierAgent, replyAgent } from '../../agents/inbox.agent'
+import type { PipelineNode } from './pipeline'
+import { agents, qualifierAgent, replyAgent } from '../../agents/inbox.agent'
 import { encodeHandoff, type HandoffPayload, type Message } from '@platform/core'
 
-// The consumer desktop: one card per agent + a conversation modal. Two agents are
-// known statically (qualifier, reply), so they are wired explicitly rather than
-// mapped — N-agent mapping over a registry is deferred to the framework phase.
-// Must render inside <CopilotKit> (see App).
+// An agent that is some other agent's handoff target is launched BY that agent, not
+// directly (e.g. reply, started by the qualifier) — so it gets no START button.
+const handoffTargets = new Set(agents.flatMap((a) => a.handoffs ?? []))
+const canStart = (id: string) => !handoffTargets.has(id)
+
+// Per-agent display chrome (icon + one-line subtitle). Lives client-side for now —
+// adding subtitle/icon to the core `defineAgent` passport is deferred to the framework
+// phase (see spec). Keyed by agent id.
+const META: Record<string, { subtitle: string; iconName: IconName }> = {
+  [qualifierAgent.id]: { subtitle: 'Reads inbox, qualifies the lead', iconName: 'inbox' },
+  [replyAgent.id]: { subtitle: 'Drafts a reply for your approval', iconName: 'pen' },
+}
+
+// The consumer desktop: a left Pipeline panel (live runs, tinted + connected) beside a
+// right "Your agents" grid + a conversation modal. Two agents are known statically
+// (qualifier, reply), so they are wired explicitly rather than mapped — N-agent mapping
+// over a registry is deferred to the framework phase. Must render inside <CopilotKit>.
 export const InboxView = () => {
   const { copilotkit } = useCopilotKit()
   const [openId, setOpenId] = useState<string | null>(null)
@@ -58,26 +74,86 @@ export const InboxView = () => {
   const qualifierStatus = useAgentStatus(qualifier, qualifierAgent.approvals)
   const replyStatus = useAgentStatus(reply, replyAgent.approvals)
 
+  const pipelineNodes: PipelineNode[] = [
+    {
+      id: qualifierAgent.id,
+      name: qualifierAgent.name,
+      subtitle: META[qualifierAgent.id].subtitle,
+      iconName: META[qualifierAgent.id].iconName,
+      status: qualifierStatus,
+      handoffsTo: qualifierAgent.handoffs ?? [],
+    },
+    {
+      id: replyAgent.id,
+      name: replyAgent.name,
+      subtitle: META[replyAgent.id].subtitle,
+      iconName: META[replyAgent.id].iconName,
+      status: replyStatus,
+      handoffsTo: replyAgent.handoffs ?? [],
+    },
+  ]
+
   return (
-    <div style={{ display: 'flex', gap: 16, padding: 24, flexWrap: 'wrap' }}>
-      <AgentCard
-        name={qualifierAgent.name}
-        status={qualifierStatus}
-        onStart={() => void copilotkit.runAgent({ agent: qualifier })}
-        onOpen={() => setOpenId(qualifierAgent.id)}
-      />
-      <AgentCard
-        name={replyAgent.name}
-        status={replyStatus}
-        onStart={() => void copilotkit.runAgent({ agent: reply })}
-        onOpen={() => setOpenId(replyAgent.id)}
-      />
+    <div className='workspace-body'>
+      <PipelineColumn nodes={pipelineNodes} onOpen={setOpenId} />
+
+      <div className='main'>
+        <div className='comp-head'>
+          <span className='ch-label'>
+            <Icon name='layers' size={14} />
+            Your agents
+          </span>
+          <span className='ch-spacer' />
+          <span className='legend'>
+            <span className='legend-item'>
+              <span className='dot idle' />
+              Idle
+            </span>
+            <span className='legend-item'>
+              <span className='dot done' />
+              Running / done
+            </span>
+            <span className='legend-item'>
+              <span className='dot awaiting_approval' />
+              Awaiting approval
+            </span>
+          </span>
+        </div>
+
+        <div className='main-scroll'>
+          <div className='agent-grid'>
+            <AgentCard
+              name={qualifierAgent.name}
+              subtitle={META[qualifierAgent.id].subtitle}
+              iconName={META[qualifierAgent.id].iconName}
+              status={qualifierStatus}
+              canStart={canStart(qualifierAgent.id)}
+              onStart={() => void copilotkit.runAgent({ agent: qualifier })}
+              onOpen={() => setOpenId(qualifierAgent.id)}
+            />
+            <AgentCard
+              name={replyAgent.name}
+              subtitle={META[replyAgent.id].subtitle}
+              iconName={META[replyAgent.id].iconName}
+              status={replyStatus}
+              canStart={canStart(replyAgent.id)}
+              onStart={() => void copilotkit.runAgent({ agent: reply })}
+              onOpen={() => setOpenId(replyAgent.id)}
+            />
+          </div>
+        </div>
+      </div>
+
       {openId === qualifierAgent.id && (
         <AgentModal
           agent={qualifier}
           title={qualifierAgent.name}
+          iconName={META[qualifierAgent.id].iconName}
+          status={qualifierStatus}
           renderToolCall={renderToolCall}
           loading={qualifierStatus === 'running'}
+          canStart={canStart(qualifierAgent.id)}
+          onStart={() => void copilotkit.runAgent({ agent: qualifier })}
           onClose={() => setOpenId(null)}
         />
       )}
@@ -85,8 +161,12 @@ export const InboxView = () => {
         <AgentModal
           agent={reply}
           title={replyAgent.name}
+          iconName={META[replyAgent.id].iconName}
+          status={replyStatus}
           renderToolCall={renderToolCall}
           loading={replyStatus === 'running'}
+          canStart={canStart(replyAgent.id)}
+          onStart={() => void copilotkit.runAgent({ agent: reply })}
           onClose={() => setOpenId(null)}
         />
       )}
