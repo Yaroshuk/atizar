@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   useAgent,
   useCopilotKit,
@@ -9,74 +9,86 @@ import { useInboxActions } from './actions'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal } from './components/AgentModal'
 import { useAgentStatus } from './useAgentStatus'
-import { inboxAgent } from '../../core/inbox.agent'
+import { qualifierAgent, replyAgent } from '../../core/inbox.agent'
+import { encodeHandoff, type HandoffPayload } from '../../core/handoff'
+import type { Message } from '../../core/messages'
 
-// The inbox agent surface: the closed AgentCard + the conversation modal, wired
-// to the CopilotKit/AG-UI agent. Must render inside <CopilotKit> (see App).
+// The consumer desktop: one card per agent + a conversation modal. Two agents are
+// known statically (qualifier, reply), so they are wired explicitly rather than
+// mapped — N-agent mapping over a registry is deferred to the framework phase.
+// Must render inside <CopilotKit> (see App).
 export const InboxView = () => {
-  // Modal open state.
-  const [open, setOpen] = useState(false)
-
-  // Register the generative-UI renderers (renderLead -> LeadCard,
-  // saveDraft -> ApprovalDialog). Must run inside <CopilotKit>. The
-  // "awaiting_approval" status is no longer sourced from here — it is derived
-  // from agent.messages in useAgentStatus, so it is reported even when the
-  // ApprovalDialog (and modal) are not mounted.
-  useInboxActions()
-
-  // The CopilotKitCore singleton. Runs MUST be driven through
-  // `copilotkit.runAgent({ agent })` — NOT the bare `agent.runAgent()`.
-  //
-  // `agent.runAgent()` (the AG-UI AbstractAgent method) only streams one turn
-  // and accumulates messages on the agent; it does NOT run CopilotKit's
-  // frontend-tool pipeline. The human-in-the-loop resume lives in
-  // `CopilotKitCore.runAgent` -> `processAgentResult`: that is what invokes the
-  // `useHumanInTheLoop` tool handler (whose Promise `respond` resolves), splices
-  // the resulting `role:"tool"` message into `agent.messages`, and — because
-  // `followUp` defaults on — fires the follow-up `runAgent({ agent })`. Since
-  // that follow-up re-runs the SAME agent, `prepareRunAgentInput` reads the now
-  // populated `agent.messages` (history + the saveDraft tool call + the tool
-  // result), so the resume POST carries the full conversation instead of `[]`.
-  // Calling the bare `agent.runAgent()` bypasses all of that, which is why the
-  // resume run previously sent `messages: []` and the agent re-emitted turn 1.
   const { copilotkit } = useCopilotKit()
+  const [openId, setOpenId] = useState<string | null>(null)
 
-  // v2: useAgent({ agentId }) returns { agent }. The agent (an AG-UI
-  // AbstractAgent) carries `messages` and the `runAgent()` method. Subscribe to
-  // OnMessagesChanged so React re-renders as the stream mutates agent.messages.
-  const { agent } = useAgent({
-    agentId: 'default',
+  const { agent: qualifier } = useAgent({
+    agentId: qualifierAgent.id,
+    updates: [UseAgentUpdate.OnMessagesChanged],
+  })
+  const { agent: reply } = useAgent({
+    agentId: replyAgent.id,
     updates: [UseAgentUpdate.OnMessagesChanged],
   })
 
-  // useRenderToolCall() returns a function that renders a single AG-UI tool call
-  // using the renderers registered via useRenderTool() (see actions.tsx). The
-  // mapping over `agent.messages[].toolCalls[]` (pairing each with its matching
-  // `role:"tool"` message by toolCallId) now lives in <AgentModal>; the live
-  // `respond` for the ApprovalDialog comes from the executing-tool-call state,
-  // not from `toolMessage`, so it keeps working inside the modal.
-  const renderToolCall = useRenderToolCall()
+  // Keep the latest agent objects reachable from the (stable) handoff callback.
+  const agentsRef = useRef<Record<string, typeof reply>>({})
+  agentsRef.current[qualifierAgent.id] = qualifier
+  agentsRef.current[replyAgent.id] = reply
 
-  // Status comes from the agent's real run lifecycle (onRunStartedEvent ->
-  // running, onRunFinalized -> done, onRunFailed -> error) with a pending
-  // saveDraft tool call (derived from agent.messages) overriding to
-  // "awaiting_approval" — render-independent, so the CLOSED card shows it.
-  const status = useAgentStatus(agent, inboxAgent.approvals)
+  // The handoff seam — human trigger today. Mechanism (encode) lives in core, so a
+  // future agent-initiated/server trigger reuses it. Seed the target run with the
+  // payload, launch it through CopilotKitCore, open its modal.
+  const requestHandoff = useCallback(
+    (targetId: string, payload: HandoffPayload) => {
+      const target = agentsRef.current[targetId]
+      if (!target) return
+      const seed = encodeHandoff(payload) as Message
+      // Fresh handoff run: replace any prior history with just the seed.
+      target.messages.splice(0, target.messages.length, seed)
+      void copilotkit.runAgent({ agent: target })
+      setOpenId(targetId)
+    },
+    [copilotkit]
+  )
+
+  // Register the generative-UI renderers once (renderLead/saveDraft for reply,
+  // renderVerdict for the qualifier). renderVerdict's "Draft reply" forwards here.
+  useInboxActions(requestHandoff)
+
+  const renderToolCall = useRenderToolCall()
+  const qualifierStatus = useAgentStatus(qualifier, qualifierAgent.approvals)
+  const replyStatus = useAgentStatus(reply, replyAgent.approvals)
 
   return (
-    <div>
+    <div style={{ display: 'flex', gap: 16, padding: 24, flexWrap: 'wrap' }}>
       <AgentCard
-        name={inboxAgent.name}
-        status={status}
-        onStart={() => void copilotkit.runAgent({ agent })}
-        onOpen={() => setOpen(true)}
+        name={qualifierAgent.name}
+        status={qualifierStatus}
+        onStart={() => void copilotkit.runAgent({ agent: qualifier })}
+        onOpen={() => setOpenId(qualifierAgent.id)}
       />
-      {open && (
+      <AgentCard
+        name={replyAgent.name}
+        status={replyStatus}
+        onStart={() => void copilotkit.runAgent({ agent: reply })}
+        onOpen={() => setOpenId(replyAgent.id)}
+      />
+      {openId === qualifierAgent.id && (
         <AgentModal
-          agent={agent}
+          agent={qualifier}
+          title={qualifierAgent.name}
           renderToolCall={renderToolCall}
-          loading={status === 'running'}
-          onClose={() => setOpen(false)}
+          loading={qualifierStatus === 'running'}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+      {openId === replyAgent.id && (
+        <AgentModal
+          agent={reply}
+          title={replyAgent.name}
+          renderToolCall={renderToolCall}
+          loading={replyStatus === 'running'}
+          onClose={() => setOpenId(null)}
         />
       )}
     </div>

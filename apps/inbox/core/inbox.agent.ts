@@ -31,5 +31,3 @@ export const qualifierAgent = defineAgent({
 // and tests map over it. The client references the passports directly (two agents).
 export const agents = [qualifierAgent, replyAgent]
 
-// Backward-compat alias used by client/ until it migrates to replyAgent (T8–T16).
-export const inboxAgent = replyAgent
