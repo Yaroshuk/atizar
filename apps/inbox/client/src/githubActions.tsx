@@ -47,7 +47,9 @@ export const useGithubActions = (
         return (
           <Triage
             tickets={tickets}
-            onRoute={(target: string, ticket: TriageTicket) => onHandoff?.(target, toPayload(ticket))}
+            onRoute={(target: string, ticket: TriageTicket) =>
+              onHandoff?.(target, toPayload(ticket))
+            }
           />
         )
       },
