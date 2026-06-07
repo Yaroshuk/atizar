@@ -11,7 +11,7 @@ operational index; that file is the big picture.
 
 ## ⏭️ Handoff — start here (next session)
 
-**On `feat/consumer-desktop-reskin` now (BUILT, browser-verified):** **the consumer desktop
+**On `master` now (MERGED `56c8454`, BUILT, browser-verified):** **the consumer desktop
 re-skin** — the Smedja design system (exported from Claude Design; bundle decoded from the
 `api.anthropic.com/v1/design/...` gzip→tar) is applied to `apps/inbox/client`. The flat two-card
 view is now a **two-panel desktop**: a left **Pipeline** column + a right **Your agents** grid,
@@ -31,6 +31,41 @@ qualifier-green then reply-amber with the connector). 84 unit tests (+5 `pipelin
 format+build green. Spec: `docs/superpowers/specs/2026-06-07-consumer-desktop-reskin-design.md`.
 Design bundle (reference, gitignored under /tmp): chats + `Consumer Desktop v2.html` + `styles.css`
 also carry a richer v2/v3 (Lead Manager fan-out, multi-lead triage, dispatch card) we did NOT build.
+
+### 🧭 PLANNED NEXT — GitHub triage workflow (NOT STARTED; design agreed, no code)
+
+The next real case the user wants, built on the re-skinned desktop. **The triage idea is
+the same shape as the lead qualifier → reply handoff, generalized to N downstream agents.**
+
+- **TRIAGE agent** (the board reader, single entry point): reads a ticket board, buckets
+  tickets by status — **In progress · Waiting your reply · To do** — reading each ticket's
+  status + last comment. Surfaces a **TriageCard**: the bucketed list, each ticket with a
+  routing recommendation + route buttons.
+- **Routing** (manual now, human trigger; agent-initiated later — reuse `handoff.ts`): the
+  manager routes each ticket to a downstream agent via the existing handoff seam, but the
+  payload is **ticket-shaped** (so `handoff.ts` needs a generic/second payload, or a
+  `TicketHandoffPayload`). Three downstream agents:
+  - **FEATURE agent** — gets a ticket link, reads the description, returns an analysis/plan
+    (dumb for now: read → render result).
+  - **BUG-FIX agent** — same shape, bug-oriented.
+  - **REPLY agent** — when the last comment is a question / needs an answer, drafts a
+    suggested reply comment for human approval (mirror the Gmail reply HITL).
+- **Data is MOCKED** (user OK'd it): a thin **mock GitHub stdio MCP** (`mcp/github-tools.mjs`,
+  mirroring `mcp/inbox-tools.mjs`) with canned tickets + `list_tickets` / `get_ticket` +
+  generative tools (`render_triage`, `render_ticket_result`, `post_comment`). Real
+  claude-cli provider drives it (same as the Gmail case — only the data source is mock).
+  A real GitHub MCP (Projects v2 = GraphQL, or Issues = REST) can swap in later.
+- **Desktop:** this forces the **N-agent desktop** (deferred until now): generalize
+  `InboxView` to map over a workflow's agent list instead of hardcoding two, and add a
+  **lightweight workflow switcher** (Lead inbox ↔ GitHub triage) — the design's "workflow
+  tabs" minus the dropped top bar. Keep the Gmail workflow intact.
+- **Boundary:** TRIAGE = the only board reader; downstream agents are writers/analyzers
+  with no `list_tickets` — enforce via the per-agent MCP allow-list in `server/index.ts`
+  (same pattern as `QUALIFIER_TOOLS`/`REPLY_TOOLS`).
+
+A first half-built attempt (mock MCP + a `buckets.ts` grouping helper) was discarded — start
+fresh. Brainstorm/visual-companion mocks for the two-panel layout live (gitignored) under
+`.superpowers/brainstorm/`.
 
 **Previously on `feat/platform-package-split` (BUILT, browser-verified):** **the `@platform/*` package
 split** — the library is extracted into a **yarn-classic (1.22) workspace**. `core` +
