@@ -310,7 +310,8 @@ beyond the subscription CLI, behind the existing `Provider` seam. **Still deferr
 auth/RBAC/audit, the `@platform/*` package split, mode-2 visual/chat editor.
 
 **Read before starting:** this file (Decisions + the CopilotKit v2 API notes below),
-`.claude/skills/rules/copilotkit-v2.md`, `docs/ARCHITECTURE.md`, and `apps/inbox/core/`.
+`.claude/skills/rules/copilotkit-v2.md`, `docs/ARCHITECTURE.md`, and `packages/core/src/`
+(+ `packages/providers/src/`, `packages/integrations/src/`, `apps/inbox/agents/`).
 
 ## Stack
 
@@ -326,7 +327,7 @@ auth/RBAC/audit, the `@platform/*` package split, mode-2 visual/chat editor.
 - Config split (later): structure in files, manager-editable text fields in DB; secrets in env only.
 - Models accessed via a separate provider registry (CLI / API); agents reference a provider by name.
 - First real provider = **`claude-cli`** (subprocess), not `claude-api` (no API key; binary uses the Claude Code subscription). HITL = **detect the `confirmSend` tool call in the stream-json and kill the process** (we do NOT hold the CLI open awaiting a human — that would fight CopilotKit's client-held two-request pause). Resume = **stateless re-prime** (fresh run, "human approved"), no server-side session. The runtime **registry lives in `server/`** (not `core/`) because the real provider needs Node and `core/` is imported by the client; the injected `spawn` keeps `core/claude-cli-provider.ts` Node-free. Custom tools (`renderLead`/`confirmSend`) are exposed to the CLI via a **stdio MCP server** (`mcp/inbox-tools.mjs`); tool names arrive prefixed `mcp__inbox__…` and are stripped to the bare names the client registered.
-- Core layer lives in `apps/inbox/core/` (shared by client+server, no React/runtime imports). NOT a package yet — `@platform/*` split deferred until the contract settles and a 2nd consumer exists.
+- Core layer is now the **`@platform/core`** package (`packages/core/src/`, shared by client+server, no React/Node imports). The `@platform/*` split happened once the 2nd-consumer precondition was met (two agents + handoff): `@platform/core` (contract) + `@platform/providers` + `@platform/integrations`, in a yarn-classic workspace. `@platform/react`/`@platform/server` remain deferred. See the "Packages" section above.
 - Message layer reuses `@ag-ui` types IN FULL (import `Message`/`ToolCall` from `@ag-ui/client`; derive per-role types via `Extract<Message,{role}>` — `@ag-ui/client` doesn't export `AssistantMessage`/`ToolMessage` by name). We add behavior (pure functions), not a parallel domain model. Approval tool names are a PARAMETER (from `def.approvals`), never hardcoded.
 - `defineAgent.renders` is keyed BY TOOL NAME (`{ renderLead: "LeadCard", confirmSend: "ApprovalDialog" }`), refining the doc's abstract `key→component`; it drives client registration directly. Values are component _names_; the client `renderRegistry` maps name→React component (keeps `core/` React-free).
 - `defineAgent` validates STRUCTURE only (`approvals ⊆ tools`, `renders` keys ⊆ `tools`). Provider-existence is enforced by `registry.resolve(def.provider)` at wiring time, not in the passport.

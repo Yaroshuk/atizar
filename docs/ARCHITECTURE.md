@@ -79,8 +79,8 @@ merge stays trivial. **Deferred** — it's a solution to a problem we don't have
 ## 4. The `defineAgent` contract ✅ (core built; `fields` deferred)
 
 A single object describes an agent; the UI, pauses, and rendering all *derive* from it.
-Built in `apps/inbox/core/defineAgent.ts` (Zod-validated) + the concrete instance in
-`apps/inbox/core/inbox.agent.ts`:
+Built in `@platform/core` (`packages/core/src/defineAgent.ts`, Zod-validated) + the concrete
+instance in `apps/inbox/agents/inbox.agent.ts`:
 
 ```ts
 defineAgent({
@@ -107,9 +107,10 @@ defineAgent({
 ## 5. Provider registry ✅ (interface + registry + mock + `claude-cli` built)
 
 Models are not hardcoded in the agent. A separate registry defines providers; agents
-reference one by name. Built in `apps/inbox/core/providers.ts` (the `Provider` interface +
-`defineProviders` with name-based `resolve`), `core/mock-provider.ts` (fake), and the real
-`claude-cli` provider. The registry now lives **server-side** (`server/providers.ts`):
+reference one by name. The `Provider` interface + `defineProviders` live in `@platform/core`
+(`packages/core/src/providers.ts`); the concrete providers — `mock-provider` (fake) and the
+real `claude-cli` provider — live in `@platform/providers` (`packages/providers/src/`). The
+runtime registry that wires them lives **server-side** (`apps/inbox/server/providers.ts`):
 
 ```ts
 defineProviders({
