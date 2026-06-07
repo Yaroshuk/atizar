@@ -1,9 +1,9 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { CopilotRuntime, createCopilotEndpoint, InMemoryAgentRunner } from '@copilotkit/runtime/v2'
-import { qualifierAgent, replyAgent, agents } from '../core/inbox.agent.js'
-import { createQualifierPrompts } from '../core/agents/qualifier.prompts.js'
-import { createReplyPrompts } from '../core/agents/reply.prompts.js'
+import { qualifierAgent, replyAgent, agents } from '../agents/inbox.agent.js'
+import { createQualifierPrompts } from '../agents/qualifier.prompts.js'
+import { createReplyPrompts } from '../agents/reply.prompts.js'
 import { providerRegistry } from './providers.js'
 import { buildAgent } from './build-agent.js'
 

@@ -1,6 +1,6 @@
 import { useHumanInTheLoop, useRenderTool } from '@copilotkit/react-core/v2'
 import { z } from 'zod'
-import { qualifierAgent, replyAgent } from '../../core/inbox.agent'
+import { qualifierAgent, replyAgent } from '../../agents/inbox.agent'
 import type { HandoffPayload } from '@platform/core'
 import { renderRegistry } from './renderRegistry'
 

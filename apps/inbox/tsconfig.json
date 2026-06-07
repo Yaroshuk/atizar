@@ -7,6 +7,6 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["client/src", "server", "core", "mcp"],
+  "include": ["client/src", "server", "agents", "mcp"],
   "references": []
 }
