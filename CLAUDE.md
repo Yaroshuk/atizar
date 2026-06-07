@@ -202,6 +202,18 @@ click. Browser-verified end-to-end on the real account. Files (`apps/inbox`):
   binds internal listeners to `props.agent ?? 'default'`, and we no longer register `'default'`
   (crashes the tree otherwise). Found via browser E2E.
 
+**Strict single entry point (hard boundary):** the **qualifier is the ONLY inbox reader**
+(`get_latest_email`+`renderVerdict`); the **reply agent is a writer** (`renderLead`+`saveDraft`+
+`create_draft`) with **no `get_latest_email`** — enforced at the permission layer via a
+**per-agent MCP allow-list** (`ProviderConfig.allowedTools`, threaded passport →
+`buildAgent(def, prompts, registry, allowedTools)` → `claude-cli` provider → `spawn(prompt,
+allowedTools)`; lists live in `server/index.ts`: `QUALIFIER_TOOLS`/`REPLY_TOOLS`). Not just
+prompts. Reply stays **launchable/openable** (manual START + click-to-open) and the card shows
+**Awaiting approval**; a reply run with **no handoff** does NOT read mail — it tells the user to
+start from the qualifier (`reply.prompts.ts` `noLeadFirst`). Browser-verified end-to-end on the
+real account (qualifier read a real "Order: 10 units" lead → sales/hot → handoff → reply drafted
+from the payload with no inbox access → approved → real Gmail draft, thread+draft id returned).
+
 Decisions: handoff is **manual now, agent-initiated later** — the trigger is swappable, the
 mechanism is fixed in `core/`. Desktop wires two agents **explicitly** (not mapped over the
 registry) — N-agent mapping is deferred to the framework phase (don't over-invest early).
