@@ -4,7 +4,7 @@
 export function optionalPeerError(err, { name, install }) {
   if (err?.code === 'ERR_MODULE_NOT_FOUND') {
     return new Error(
-      `@platform/integrations requires the optional peer '${name}'. Install it in your app:  ${install}`
+      `Missing optional peer '${name}'. Install it:  ${install}`
     )
   }
   return null

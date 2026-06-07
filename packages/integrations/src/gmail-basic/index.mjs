@@ -23,10 +23,6 @@ const keysPath =
 const credsPath =
   process.env.GMAIL_OAUTH_CREDENTIALS || join(homedir(), '.gmail-mcp', 'credentials.json')
 
-// Memoized gmail client. Built on first tool call so any config error becomes
-// a handler {error:…} JSON instead of a startup crash. The refreshed access
-// token is held in memory only (not persisted back to disk) — fine for
-// short-lived per-run MCP servers.
 // Lazily import the OPTIONAL peer `googleapis`. A missing install surfaces as an
 // actionable error (via optionalPeerError); any other import failure rethrows.
 async function loadGoogleapis() {
@@ -39,6 +35,10 @@ async function loadGoogleapis() {
   }
 }
 
+// Memoized gmail client. Built on first tool call so any config error becomes
+// a handler {error:…} JSON instead of a startup crash. The refreshed access
+// token is held in memory only (not persisted back to disk) — fine for
+// short-lived per-run MCP servers.
 let _gmail
 async function getGmail() {
   if (_gmail) return _gmail
