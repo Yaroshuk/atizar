@@ -1,10 +1,5 @@
 import type { ReactNode } from 'react'
-import {
-  pairToolResults,
-  type Message,
-  type ToolCall,
-  type ToolMessage,
-} from '@platform/core'
+import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@platform/core'
 
 // AgentModal renders the conversation thread in an overlay panel.
 //
