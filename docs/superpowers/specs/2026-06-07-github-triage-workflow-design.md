@@ -134,7 +134,21 @@ the decode to be schema-parameterized and add a ticket payload:
   - `REPLY_DRAFT_TOOLS = [mcp__github__render_reply_draft]`
 - Register the 4 new agents in the same `CopilotRuntime.agents` map; both workflows
   coexist server-side (the client decides which subset to show).
-- No agent ever receives a GitHub write tool or a write `gh` Bash specifier.
+- No agent ever receives a GitHub write tool. **Note:** Bash/Edit/Write/Read/Glob/Grep
+  are already in the spawn `deny`-list (`claude-spawn.ts` `BUILTINS`), so the model has
+  no shell at all — `gh` is invoked only by the MCP adapter process (not bound by the
+  model's tool permissions). Read-only is enforced by the adapter exposing no write tool;
+  there is no `Bash(gh …)` specifier (Bash is denied outright).
+
+### 5a. Payload boundedness (refinement)
+
+Because downstream agents never fetch, the ticket **body** must ride in the handoff
+payload, and TRIAGE is the courier (same pattern as `renderVerdict`: the model passes
+display data into the render tool's args). To keep the couriered payload bounded:
+`list_my_tickets` **excludes `Done`** by default (triage is about what needs attention)
+and **truncates each `body` to ~1500 chars** in the adapter. `render_triage` carries the
+(trimmed) ticket array; a route click builds the `TicketHandoffPayload` from that ticket
+row — self-contained, so FEATURE/BUG-FIX/REPLY-DRAFT analyze without any GitHub call.
 
 ### 6. Buckets — real Status + derived "needs your reply"
 
