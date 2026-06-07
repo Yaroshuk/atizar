@@ -25,4 +25,9 @@ describe('defineAgent', () => {
   it('rejects a render key that is not in tools', () => {
     expect(() => defineAgent({ ...valid, renders: { ghostTool: 'LeadCard' } })).toThrow()
   })
+
+  it('accepts an optional handoffs array', () => {
+    const def = defineAgent({ ...valid, handoffs: ['other'] })
+    expect(def.handoffs).toEqual(['other'])
+  })
 })
