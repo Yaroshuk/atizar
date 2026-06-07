@@ -843,3 +843,26 @@ button {
   padding: 3px 10px;
   font-size: 12px;
 }
+
+.workflow-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+}
+.workflow-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.workflow-tab.active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
