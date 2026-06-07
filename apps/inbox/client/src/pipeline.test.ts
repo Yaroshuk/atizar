@@ -17,6 +17,16 @@ describe('activePipeline', () => {
     expect(result.map((n) => n.id)).toEqual(['reply'])
   })
 
+  it('drops done agents (finished, no active subagents to watch)', () => {
+    const result = activePipeline([node('qualifier', 'done'), node('reply', 'awaiting_approval')])
+    expect(result.map((n) => n.id)).toEqual(['reply'])
+  })
+
+  it('keeps an error agent (needs attention)', () => {
+    const result = activePipeline([node('qualifier', 'error'), node('reply', 'idle')])
+    expect(result.map((n) => n.id)).toEqual(['qualifier'])
+  })
+
   it('orders a handoff source before its target, regardless of input order', () => {
     // reply listed first, but qualifier hands off TO reply -> qualifier must come first
     const result = activePipeline([

@@ -782,6 +782,25 @@ button {
   white-space: pre-wrap;
 }
 
+/* card foot hint for handoff-only (non-launchable) agents */
+.foot-hint {
+  margin-top: auto;
+  font-size: 12.5px;
+  color: var(--muted-2);
+  font-style: italic;
+  padding: 10px 4px;
+}
+
+/* modal footer (START for launchable agents) */
+.modal-foot {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

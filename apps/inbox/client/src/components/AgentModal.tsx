@@ -23,6 +23,10 @@ type AgentModalProps = {
   // True while the agent run is active — shows a trailing typing indicator. A real
   // model run takes seconds, so the thread can sit empty for a while after START.
   loading: boolean
+  // Whether this agent can be launched directly. Handoff-only agents (reply) show no
+  // START. When true, START appears in the footer too (mirrors the card) unless running.
+  canStart: boolean
+  onStart: () => void
   onClose: () => void
 }
 
@@ -33,6 +37,8 @@ export const AgentModal = ({
   status,
   renderToolCall,
   loading,
+  canStart,
+  onStart,
   onClose,
 }: AgentModalProps) => {
   // Index tool result messages by toolCallId so each assistant tool call can be
@@ -107,6 +113,14 @@ export const AgentModal = ({
             </div>
           )}
         </div>
+
+        {canStart && status !== 'running' && (
+          <div className='modal-foot'>
+            <button className='btn btn-primary' onClick={onStart}>
+              START
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -12,8 +12,13 @@ import { PipelineColumn } from './components/PipelineColumn'
 import { Icon, type IconName } from './components/Icon'
 import { useAgentStatus } from './useAgentStatus'
 import type { PipelineNode } from './pipeline'
-import { qualifierAgent, replyAgent } from '../../agents/inbox.agent'
+import { agents, qualifierAgent, replyAgent } from '../../agents/inbox.agent'
 import { encodeHandoff, type HandoffPayload, type Message } from '@platform/core'
+
+// An agent that is some other agent's handoff target is launched BY that agent, not
+// directly (e.g. reply, started by the qualifier) — so it gets no START button.
+const handoffTargets = new Set(agents.flatMap((a) => a.handoffs ?? []))
+const canStart = (id: string) => !handoffTargets.has(id)
 
 // Per-agent display chrome (icon + one-line subtitle). Lives client-side for now —
 // adding subtitle/icon to the core `defineAgent` passport is deferred to the framework
@@ -122,6 +127,7 @@ export const InboxView = () => {
               subtitle={META[qualifierAgent.id].subtitle}
               iconName={META[qualifierAgent.id].iconName}
               status={qualifierStatus}
+              canStart={canStart(qualifierAgent.id)}
               onStart={() => void copilotkit.runAgent({ agent: qualifier })}
               onOpen={() => setOpenId(qualifierAgent.id)}
             />
@@ -130,6 +136,7 @@ export const InboxView = () => {
               subtitle={META[replyAgent.id].subtitle}
               iconName={META[replyAgent.id].iconName}
               status={replyStatus}
+              canStart={canStart(replyAgent.id)}
               onStart={() => void copilotkit.runAgent({ agent: reply })}
               onOpen={() => setOpenId(replyAgent.id)}
             />
@@ -145,6 +152,8 @@ export const InboxView = () => {
           status={qualifierStatus}
           renderToolCall={renderToolCall}
           loading={qualifierStatus === 'running'}
+          canStart={canStart(qualifierAgent.id)}
+          onStart={() => void copilotkit.runAgent({ agent: qualifier })}
           onClose={() => setOpenId(null)}
         />
       )}
@@ -156,6 +165,8 @@ export const InboxView = () => {
           status={replyStatus}
           renderToolCall={renderToolCall}
           loading={replyStatus === 'running'}
+          canStart={canStart(replyAgent.id)}
+          onStart={() => void copilotkit.runAgent({ agent: reply })}
           onClose={() => setOpenId(null)}
         />
       )}

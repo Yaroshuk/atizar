@@ -12,11 +12,18 @@ export type PipelineNode = {
   handoffsTo: string[]
 }
 
-// The pipeline shows ONLY agents that are actually launched (status ≠ idle), ordered
-// so a handoff source precedes its target (qualifier before reply). Stable for ties
-// (preserves input order) and cycle-safe (a cycle just falls back to input order).
+// The pipeline shows ONLY agents that are actively working: running, awaiting_approval,
+// or error (needs attention). `idle` agents (not launched) and `done` agents (finished,
+// nothing left to watch) drop out. Ordered so a handoff source precedes its target
+// (qualifier before reply). Stable for ties (preserves input order) and cycle-safe.
+//
+// NOTE: "done drops out" assumes no active subagents. When a fan-out agent model lands
+// (e.g. Lead Manager with per-lead instances), a `done` parent with live children should
+// stay — extend the predicate then.
+const PIPELINE_STATUSES = new Set<Status>(['running', 'awaiting_approval', 'error'])
+
 export function activePipeline(nodes: PipelineNode[]): PipelineNode[] {
-  const active = nodes.filter((node) => node.status !== 'idle')
+  const active = nodes.filter((node) => PIPELINE_STATUSES.has(node.status))
   const activeIds = new Set(active.map((node) => node.id))
 
   const incoming = new Map<string, number>()

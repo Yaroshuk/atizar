@@ -6,6 +6,9 @@ type AgentCardProps = {
   subtitle: string
   iconName: IconName
   status: Status
+  // Whether this agent can be launched directly. Handoff-only agents (e.g. reply,
+  // started by the qualifier) are not launchable and show no START button.
+  canStart: boolean
   onStart: () => void
   onOpen: () => void
 }
@@ -15,12 +18,34 @@ export const AgentCard = ({
   subtitle,
   iconName,
   status,
+  canStart,
   onStart,
   onOpen,
 }: AgentCardProps) => {
   const start = (e: React.MouseEvent) => {
     e.stopPropagation()
     onStart()
+  }
+
+  const renderFoot = () => {
+    if (status === 'running') {
+      return (
+        <span className='run-foot'>
+          <Icon name='sparkle' size={15} />
+          Running… tap to view
+        </span>
+      )
+    }
+    if (!canStart) {
+      return <span className='foot-hint'>Runs from a handoff</span>
+    }
+    return (
+      <div className='card-foot'>
+        <button className='btn btn-primary' onClick={start}>
+          START
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -40,18 +65,7 @@ export const AgentCard = ({
         <p className='agent-sub'>{subtitle}</p>
       </div>
 
-      {status === 'running' ? (
-        <span className='run-foot'>
-          <Icon name='sparkle' size={15} />
-          Running… tap to view
-        </span>
-      ) : (
-        <div className='card-foot'>
-          <button className='btn btn-primary' onClick={start}>
-            START
-          </button>
-        </div>
-      )}
+      {renderFoot()}
     </div>
   )
 }
