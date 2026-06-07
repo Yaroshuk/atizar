@@ -32,7 +32,7 @@ export default tseslint.config(
   },
   {
     // Server entry points legitimately log to the console (startup, etc.).
-    files: ['server/**'],
+    files: ['**/server/**'],
     rules: {
       'no-console': 'off',
     },
@@ -40,7 +40,7 @@ export default tseslint.config(
   {
     // MCP server scripts run in Node — expose Node built-in globals (Buffer, etc.)
     // and allow console for MCP stdio logging.
-    files: ['mcp/**/*.mjs'],
+    files: ['**/mcp/**/*.mjs'],
     languageOptions: {
       globals: {
         Buffer: 'readonly',
@@ -56,6 +56,12 @@ export default tseslint.config(
   },
   prettier,
   {
-    ignores: ['node_modules', 'dist', 'coverage', '.playwright-mcp', '*.config.*'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/.playwright-mcp/**',
+      '**/*.config.*',
+    ],
   }
 )
