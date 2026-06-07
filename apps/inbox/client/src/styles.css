@@ -826,7 +826,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 8px 0;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border);
 }
 .triage-row-title {
   font-size: 13px;
