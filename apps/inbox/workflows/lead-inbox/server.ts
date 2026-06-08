@@ -3,8 +3,6 @@ import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
 
-export type { ServerBinding }
-
 export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
     agentId: qualifierAgent.id,

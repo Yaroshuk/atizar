@@ -203,7 +203,8 @@ export const InboxView = () => {
 // whose handoffs include the target; contract → the origin's entry agent (the card that
 // emitted the delivery lives there).
 function sourceAgentOf(origin: string, dest: Destination): string {
-  const wf = workflows.find((w) => w.id === origin)!
+  const wf = workflows.find((w) => w.id === origin)
+  if (!wf) return origin
   if (dest.kind === 'agent') {
     return (
       wf.agents.find((a) => (a.agent.handoffs ?? []).includes(dest.agentId))?.agent.id ??
