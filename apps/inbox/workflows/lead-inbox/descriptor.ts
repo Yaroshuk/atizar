@@ -21,6 +21,7 @@ export const qualifierAgent = defineAgent({
   approvals: [],
   renders: { renderVerdict: 'VerdictCard' },
   handoffs: ['reply'],
+  maxInstances: 1,
 })
 
 export const leadInbox = defineWorkflow({
