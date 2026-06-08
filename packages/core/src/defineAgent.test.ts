@@ -31,3 +31,28 @@ describe('defineAgent', () => {
     expect(def.handoffs).toEqual(['other'])
   })
 })
+
+const base = {
+  id: 'x',
+  name: 'X',
+  provider: 'mock',
+  instructions: '',
+  tools: [],
+  approvals: [],
+  renders: {},
+}
+
+describe('maxInstances', () => {
+  it('defaults to 2 when omitted', () => {
+    expect(defineAgent({ ...base }).maxInstances).toBe(2)
+  })
+  it('keeps an explicit override', () => {
+    expect(defineAgent({ ...base, maxInstances: 1 }).maxInstances).toBe(1)
+  })
+  it('rejects a non-positive cap', () => {
+    expect(() => defineAgent({ ...base, maxInstances: 0 })).toThrow()
+  })
+  it('rejects a non-integer cap', () => {
+    expect(() => defineAgent({ ...base, maxInstances: 1.5 })).toThrow()
+  })
+})
