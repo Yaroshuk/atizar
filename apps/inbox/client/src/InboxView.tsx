@@ -26,6 +26,7 @@ export const InboxView = () => {
   const { copilotkit } = useCopilotKit()
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
   const [openId, setOpenId] = useState<string | null>(null) // a live instance localId
+  const [openTypeId, setOpenTypeId] = useState<string | null>(null) // an agent id (no live instance)
   // Handoff notes keyed by the live instance localId (sent on the source, received on
   // the spawned target). A note is attached when the deliver fires; the source instance
   // exists (dispatchers are cap-1) and the target localId is the freshly spawned copy.
@@ -99,7 +100,13 @@ export const InboxView = () => {
         if (parent) {
           next[parent.localId] = [
             ...(next[parent.localId] ?? []),
-            { dir: 'sent', otherName: def.name, label, targetWorkflow: r.targetWorkflow },
+            {
+              dir: 'sent',
+              otherName: def.name,
+              label,
+              targetWorkflow: r.targetWorkflow,
+              targetLocalId: localId, // present when the target spawned now (not queued)
+            },
           ]
         }
         if (localId) {
@@ -123,7 +130,8 @@ export const InboxView = () => {
     workflow.agents.find((a) => a.agent.id === agentId)?.role === 'input'
 
   // Launch an input agent: spawn a fresh input instance (it reads the inbox itself).
-  const startInput = (agentDef: AgentDefinition) => {
+  // Returns the new instance's localId so a caller can re-open the modal on it.
+  const startInput = (agentDef: AgentDefinition): string | undefined =>
     spawn({
       runtimeKey: iid(agentDef.id),
       agentId: agentDef.id,
@@ -136,6 +144,18 @@ export const InboxView = () => {
       isInput: true,
       payload: null,
     })
+
+  // Open an agent: its first live instance if one exists, else a type view (intro + START)
+  // so an idle card is always clickable. Opening one view clears the other.
+  const openAgent = (agentId: string) => {
+    const live = instances.find((x) => x.workflowId === workflow.id && x.agentId === agentId)
+    if (live) {
+      setOpenTypeId(null)
+      setOpenId(live.localId)
+    } else {
+      setOpenId(null)
+      setOpenTypeId(agentId)
+    }
   }
 
   // Big-card aggregate: reduce an agent's live instance statuses to a single headline.
@@ -165,11 +185,22 @@ export const InboxView = () => {
   const openInstance = openId ? instances.find((x) => x.localId === openId) : undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const openAgentObj: any = openInstance ? copilotkit.getAgent(openInstance.localId) : undefined
+  // The open TYPE view (an idle agent with no live instance).
+  const openTypeAgent = openTypeId
+    ? workflow.agents.find((a) => a.agent.id === openTypeId)?.agent
+    : undefined
 
   const switchWorkflow = (id: string) => {
     setOpenId(null)
+    setOpenTypeId(null)
     setUnread((u) => ({ ...u, [id]: 0 }))
     setActiveWorkflowId(id)
+  }
+
+  // Jump to a live instance by localId (used by a handoff note's "Open" button).
+  const openInstanceById = (localId: string) => {
+    setOpenTypeId(null)
+    setOpenId(localId)
   }
 
   return (
@@ -182,7 +213,13 @@ export const InboxView = () => {
       />
 
       <div className='workspace-body'>
-        <PipelineColumn blocks={blocks} onOpen={(localId) => setOpenId(localId)} />
+        <PipelineColumn
+          blocks={blocks}
+          onOpen={(localId) => {
+            setOpenTypeId(null)
+            setOpenId(localId)
+          }}
+        />
         <div className='main'>
           <div className='comp-head'>
             <span className='ch-label'>
@@ -219,13 +256,7 @@ export const InboxView = () => {
                     aggregateLabel={aggregateLabel(agg)}
                     canStart={canStart(agent.id)}
                     onStart={() => startInput(agent)}
-                    onOpen={() => {
-                      // Open the first live instance of this agent type, if any.
-                      const live = instances.find(
-                        (x) => x.workflowId === workflow.id && x.agentId === agent.id
-                      )
-                      if (live) setOpenId(live.localId)
-                    }}
+                    onOpen={() => openAgent(agent.id)}
                   />
                 )
               })}
@@ -246,11 +277,35 @@ export const InboxView = () => {
             intro={META[openInstance.agentId].intro}
             notes={handoffNotes[openInstance.localId] ?? []}
             onOpenWorkflow={switchWorkflow}
+            onOpenInstance={openInstanceById}
             onStart={() => {
               const def = workflow.agents.find((a) => a.agent.id === openInstance.agentId)?.agent
               if (def) startInput(def)
             }}
             onClose={() => setOpenId(null)}
+          />
+        )}
+
+        {/* Type view: an idle agent (no live instance) is still clickable — shows its
+            intro + START (input) so the card always opens something. */}
+        {!openInstance && openTypeAgent && (
+          <AgentModal
+            agent={{ messages: [] }}
+            title={openTypeAgent.name}
+            iconName={META[openTypeAgent.id].iconName}
+            status='idle'
+            renderToolCall={renderToolCall}
+            renderableToolNames={renderableToolNames}
+            loading={false}
+            canStart={canStart(openTypeAgent.id)}
+            intro={META[openTypeAgent.id].intro}
+            notes={[]}
+            onStart={() => {
+              const id = startInput(openTypeAgent)
+              setOpenTypeId(null)
+              if (id) setOpenId(id) // transition the modal onto the now-running instance
+            }}
+            onClose={() => setOpenTypeId(null)}
           />
         )}
       </div>

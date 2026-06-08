@@ -4,6 +4,7 @@ import { encodeHandoff, type Message } from '@platform/core'
 import { statusFrom } from './statusFrom'
 import { canSpawn, type Routable } from './instancesCore'
 import type { PInstance } from './pipelineModel'
+import type { Status } from './status'
 
 export type SpawnArgs = {
   runtimeKey: string // instanceId(wf, agent) — the server agent id
@@ -66,15 +67,25 @@ export const useAgentInstances = () => {
   const startRef = useRef<(args: SpawnArgs) => string>(() => '')
 
   const onFinalized = useCallback(
-    (localId: string, runtimeKey: string, lifecycle: 'running' | 'done' | 'error') => {
+    (localId: string, runtimeKey: string, finalStatus: Status) => {
       const self = instRef.current.find((x) => x.localId === localId)
       if (!self) return
       const hasLiveChild = instRef.current.some(
         (x) => x.parentLocalId === localId && x.status !== 'done'
       )
-      // Input agents, parents-with-live-children, and errored instances stay; others tear down.
+      // KEEP the instance (don't tear down, don't free its slot) when it still needs a
+      // human or is otherwise live: an input agent (pipeline root), a parent whose child
+      // is still running, an errored run, OR — crucially — a run that finalized while
+      // AWAITING APPROVAL. With the claude-cli provider, HITL kills the process at the
+      // approval tool call, so the run finalizes; the instance must stay visible as
+      // `awaiting_approval` (resume = re-prime on the same proxy), not vanish as "done".
+      const keep =
+        self.isInput ||
+        hasLiveChild ||
+        finalStatus === 'error' ||
+        finalStatus === 'awaiting_approval'
       let freed = false
-      if (!self.isInput && !hasLiveChild && lifecycle !== 'error') {
+      if (!keep) {
         self.subId?.unsubscribe()
         self.unregister()
         remove(localId)
@@ -134,7 +145,10 @@ export const useAgentInstances = () => {
         onRunFinalized: () => {
           if (lifecycle !== 'error') lifecycle = 'done'
           recompute()
-          onFinalized(localId, args.runtimeKey, lifecycle)
+          // Derive the SETTLED status (awaiting_approval/error win over done) so the
+          // teardown decision matches what the pipeline shows.
+          const finalStatus = statusFrom(lifecycle, agent.messages as Message[], args.approvals)
+          onFinalized(localId, args.runtimeKey, finalStatus)
         },
       })
       live.subId = subId
