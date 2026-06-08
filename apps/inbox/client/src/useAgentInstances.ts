@@ -50,10 +50,10 @@ export const useAgentInstances = () => {
   }, [])
 
   // Forward-declared so onFinalized can call drain.
-  const startRef = useRef<(args: SpawnArgs) => void>(() => {})
+  const startRef = useRef<(args: SpawnArgs) => string>(() => '')
 
   const onFinalized = useCallback(
-    (localId: string, runtimeKey: string) => {
+    (localId: string, runtimeKey: string, lifecycle: 'running' | 'done' | 'error') => {
       const self = instRef.current.find((x) => x.localId === localId)
       if (!self) return
       const hasLiveChild = instRef.current.some(
@@ -61,7 +61,7 @@ export const useAgentInstances = () => {
       )
       // Input agents, parents-with-live-children, and errored instances stay; others tear down.
       let freed = false
-      if (!self.isInput && !hasLiveChild && self.status !== 'error') {
+      if (!self.isInput && !hasLiveChild && lifecycle !== 'error') {
         self.subId?.unsubscribe()
         self.unregister()
         remove(localId)
@@ -105,7 +105,9 @@ export const useAgentInstances = () => {
       }
       let lifecycle: 'running' | 'done' | 'error' = 'running'
       const recompute = () =>
-        update(localId, { status: statusFrom(lifecycle, agent.messages as Message[], args.approvals) })
+        update(localId, {
+          status: statusFrom(lifecycle, agent.messages as Message[], args.approvals),
+        })
       const subId = agent.subscribe({
         onRunStartedEvent: () => {
           lifecycle = 'running'
@@ -119,48 +121,46 @@ export const useAgentInstances = () => {
         onRunFinalized: () => {
           if (lifecycle !== 'error') lifecycle = 'done'
           recompute()
-          onFinalized(localId, args.runtimeKey)
+          onFinalized(localId, args.runtimeKey, lifecycle)
         },
       })
       live.subId = subId
       setInstances((prev) => [...prev, live])
       void copilotkit.runAgent({ agent })
+      return localId
     },
     [copilotkit, update, onFinalized]
   )
   startRef.current = start
 
-  // Public: spawn or enqueue based on the cap.
+  // Public: spawn or enqueue based on the cap. Returns the new instance's localId when
+  // it started immediately, or undefined when the item was queued (no instance yet).
   const spawn = useCallback(
-    (args: SpawnArgs) => {
+    (args: SpawnArgs): string | undefined => {
       const routables: Routable[] = instRef.current.map((x) => ({
         runtimeKey: x.runtimeKey,
         status: x.status,
       }))
-      if (canSpawn(routables, args.runtimeKey, args.maxInstances)) start(args)
-      else
-        setQueued((prev) => ({
-          ...prev,
-          [args.runtimeKey]: [...(prev[args.runtimeKey] ?? []), { args }],
-        }))
+      if (canSpawn(routables, args.runtimeKey, args.maxInstances)) return start(args)
+      setQueued((prev) => ({
+        ...prev,
+        [args.runtimeKey]: [...(prev[args.runtimeKey] ?? []), { args }],
+      }))
+      return undefined
     },
     [start]
   )
 
   // queued counts keyed by AGENT id (for the pipeline group), for the active workflow.
-  const queuedByAgent = useCallback(
-    (workflowId: string): Record<string, number> => {
-      const out: Record<string, number> = {}
-      for (const [, items] of Object.entries(queueRef.current)) {
-        for (const p of items) {
-          if (p.args.workflowId === workflowId)
-            out[p.args.agentId] = (out[p.args.agentId] ?? 0) + 1
-        }
+  const queuedByAgent = useCallback((workflowId: string): Record<string, number> => {
+    const out: Record<string, number> = {}
+    for (const [, items] of Object.entries(queueRef.current)) {
+      for (const p of items) {
+        if (p.args.workflowId === workflowId) out[p.args.agentId] = (out[p.args.agentId] ?? 0) + 1
       }
-      return out
-    },
-    []
-  )
+    }
+    return out
+  }, [])
 
   return { instances, spawn, queuedByAgent }
 }

@@ -8,7 +8,11 @@ describe('aggregateAgent', () => {
   })
   it('counts active (running/awaiting/error) and awaiting separately', () => {
     const s: Status[] = ['running', 'awaiting_approval', 'done']
-    expect(aggregateAgent(s)).toEqual({ activeCount: 2, awaitingCount: 1, status: 'awaiting_approval' })
+    expect(aggregateAgent(s)).toEqual({
+      activeCount: 2,
+      awaitingCount: 1,
+      status: 'awaiting_approval',
+    })
   })
   it('priority: awaiting_approval > error > running > done > idle', () => {
     expect(aggregateAgent(['running', 'error']).status).toBe('error')

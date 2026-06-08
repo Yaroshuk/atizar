@@ -6,6 +6,9 @@ type AgentCardProps = {
   subtitle: string
   iconName: IconName
   status: Status
+  // Headline for the type card, e.g. "2 active · 1 awaiting approval" ('' = none live).
+  // When set it replaces the START / hint footer with the live-instance summary.
+  aggregateLabel: string
   // Whether this agent can be launched directly. Handoff-only agents (e.g. reply,
   // started by the qualifier) are not launchable and show no START button.
   canStart: boolean
@@ -18,6 +21,7 @@ export const AgentCard = ({
   subtitle,
   iconName,
   status,
+  aggregateLabel,
   canStart,
   onStart,
   onOpen,
@@ -28,11 +32,11 @@ export const AgentCard = ({
   }
 
   const renderFoot = () => {
-    if (status === 'running') {
+    if (aggregateLabel) {
       return (
         <span className='run-foot'>
           <Icon name='sparkle' size={15} />
-          Running… tap to view
+          {aggregateLabel} · tap to view
         </span>
       )
     }
