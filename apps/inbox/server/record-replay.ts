@@ -41,3 +41,34 @@ export function dropStep(text: string, step: number): string {
     })
     .join('\n')
 }
+
+// A heuristic safety-net scan run BEFORE a cassette is ever shared/committed.
+// Catches mechanically-detectable PII/secrets (emails, phones, token-shaped or
+// keyword-tagged secrets) with line numbers. Names/addresses are NOT reliably
+// detectable here — the human is the final reviewer (see the CLAUDE.md rule).
+export interface Finding {
+  line: number
+  kind: 'email' | 'phone' | 'secret'
+  snippet: string
+}
+
+const PATTERNS: ReadonlyArray<readonly [Finding['kind'], RegExp]> = [
+  ['email', /[\w.+-]+@[\w-]+\.[\w.-]+/g],
+  ['phone', /(?<!\d)\+?\d[\d ()-]{7,}\d(?!\d)/g],
+  [
+    'secret',
+    /\b(?:sk-[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|AIza[A-Za-z0-9_-]{16,})\b|(?:bearer|token|api[_-]?key|secret|password)\s*[:=]\s*\S+/gi,
+  ],
+]
+
+export function scanCassette(text: string): Finding[] {
+  const out: Finding[] = []
+  text.split('\n').forEach((line, i) => {
+    for (const [kind, re] of PATTERNS) {
+      for (const match of line.matchAll(re)) {
+        out.push({ line: i + 1, kind, snippet: match[0] })
+      }
+    }
+  })
+  return out
+}

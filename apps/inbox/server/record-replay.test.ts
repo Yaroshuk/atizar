@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent } from '@ag-ui/client'
-import { encodeLine, parseLine, eventsForStep, dropStep } from './record-replay.js'
+import { encodeLine, parseLine, eventsForStep, dropStep, scanCassette } from './record-replay.js'
 
 const ev = (delta: string): BaseEvent =>
   ({ type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant', messageId: 'm', delta }) as BaseEvent
@@ -29,5 +29,27 @@ describe('cassette line helpers', () => {
     const text = [encodeLine(0, ev('a')), encodeLine(1, ev('b'))].join('\n')
     expect(dropStep(text, 0)).toBe(encodeLine(1, ev('b')))
     expect(dropStep(text, 1)).toBe(encodeLine(0, ev('a')))
+  })
+})
+
+describe('scanCassette', () => {
+  it('flags an email with its 1-based line number', () => {
+    const text = ['clean line', 'contact ivan@acme.ru about it'].join('\n')
+    const found = scanCassette(text)
+    expect(found).toContainEqual({ line: 2, kind: 'email', snippet: 'ivan@acme.ru' })
+  })
+
+  it('flags a token-shaped secret', () => {
+    const found = scanCassette('authorization: ghp_ABCDEFGHIJKLMNOP1234')
+    expect(found.some((f) => f.kind === 'secret')).toBe(true)
+  })
+
+  it('flags a keyword-tagged secret', () => {
+    const found = scanCassette('api_key = supersecretvalue123')
+    expect(found.some((f) => f.kind === 'secret')).toBe(true)
+  })
+
+  it('returns empty on plain prose', () => {
+    expect(scanCassette('the customer asked about delivery time')).toEqual([])
   })
 })
