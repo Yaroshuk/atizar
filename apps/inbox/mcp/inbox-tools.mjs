@@ -32,6 +32,7 @@ server.registerTool(
   {
     description: 'Surface a qualified lead verdict as a card in the UI.',
     inputSchema: {
+      origin: z.string(),
       threadId: z.string(),
       from: z.string(),
       subject: z.string(),

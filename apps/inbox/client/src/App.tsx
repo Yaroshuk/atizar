@@ -1,16 +1,14 @@
 import { CopilotKit } from '@copilotkit/react-core/v2'
+import { instanceId } from '@platform/core'
 import { InboxView } from './InboxView'
-import { qualifierAgent } from '../../agents/inbox.agent'
+import { workflows } from './workflows'
 
 export const App = () => {
-  // `agent` sets CopilotKit's default chat-configuration agent — the one its
-  // internal listeners (CopilotListeners) subscribe to. Without it the provider
-  // falls back to the agent id "default", which we no longer register (we register
-  // `qualifier` + `reply`), and the whole tree throws "Agent 'default' not found".
-  // We drive both agents explicitly via useAgent; this just gives the listeners a
-  // real agent to bind to.
+  // CopilotKit binds its internal listeners to this default agent id; it must be one
+  // we actually register. Use the first workflow's entry agent INSTANCE id.
+  const defaultAgent = instanceId(workflows[0].id, workflows[0].entryAgentId)
   return (
-    <CopilotKit runtimeUrl='/api/copilotkit' agent={qualifierAgent.id}>
+    <CopilotKit runtimeUrl='/api/copilotkit' agent={defaultAgent}>
       <InboxView />
     </CopilotKit>
   )

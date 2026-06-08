@@ -6,20 +6,33 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
-**On `master` (MERGED, BUILT, browser-verified on the real board):** the **GitHub triage
+**On `feat/workflow-separation` (BUILT, browser-verified, not yet merged):** the **workflow-
+separation** pass. Each workflow is now a **self-contained module** (`apps/inbox/workflows/<id>/`
+descriptor+server+client) and workflows are **isolated boxes** that talk only through a typed
+**published contract**. Highlights: `@platform/core` `defineWorkflow` + `instanceId` +
+`Destination`; agent **roles `input`/`worker`** (input = user-startable + only cross-workflow target;
+worker = handoff-only); **all agents of all workflows mounted idle** keyed by instance id (so the same
+agent is reusable as independent copies and a cross-workflow target is always ready — no mount race);
+one **`deliver`** seam that runs the target in the **background** with **no auto-open** and **no
+auto-switch** (cross-workflow raises a tab **badge** + an "Open in <workflow>" button; the human
+navigates); **origin-routed** handoff render tools so reused handoff-emitting agents route to the
+right copy; a concrete demo — TRIAGE's "Treat as lead → Lead inbox" delivers a ticket to the
+lead-inbox `lead` contract and the qualifier re-qualifies the handed lead. 122 unit tests +
+typecheck/lint/prettier green. **Browser-verified E2E** (real Magma board read-only + real Gmail):
+intra-handoff runs target w/ no auto-open; cross-workflow delivery → background run + badge + no
+switch + Open-in; **state persists across workflow switches**. Detail → `docs/BUILD-LOG.md` §8;
+spec → `docs/superpowers/specs/2026-06-08-workflow-separation-design.md`; plan →
+`docs/superpowers/plans/2026-06-08-workflow-separation.md`.
+**Next:** merge `feat/workflow-separation`, then pick from "Other next-ups".
+
+**Previously on `master` (MERGED, BUILT, browser-verified on the real board):** the **GitHub triage
 workflow** — a second workflow beside the Lead inbox, built on the **real** Magma Board (GitHub
 Projects v2, `matteappen` #8) via `gh`, **strictly read-only**. A **TRIAGE** agent (the only board
-reader) lists the user's 27 assigned tickets, buckets them by real Status + a "needs reply" flag,
-and recommends a route; the manager routes one via the existing `handoff.ts` seam to **FEATURE /
+reader) lists the user's assigned tickets, buckets them by real Status + a "needs reply" flag,
+and recommends a route; the manager routes one via the `handoff.ts` seam to **FEATURE /
 BUG-FIX / REPLY-DRAFT**, which analyze/draft **purely from the handoff payload** (no GitHub access).
-This forced the **N-agent desktop**: `InboxView` → `WorkflowView` mapping over a `workflows`
-registry, each agent's hooks owned by a child `AgentRuntime` (rules-of-hooks fix), with a
-**WorkflowSwitcher** (Lead inbox ↔ GitHub triage). Gmail workflow unchanged in behavior. 103 unit
-tests green; browser-verified E2E on the real board (20 tickets bucketed → route → analysis;
-read-only confirmed — comment count unchanged) and Gmail re-verified intact. Detail →
-`docs/BUILD-LOG.md` §7; spec → `docs/superpowers/specs/2026-06-07-github-triage-workflow-design.md`;
+Detail → `docs/BUILD-LOG.md` §7; spec → `docs/superpowers/specs/2026-06-07-github-triage-workflow-design.md`;
 plan → `docs/superpowers/plans/2026-06-07-github-triage-workflow.md`.
-**Next:** the planned **workflow-separation** pass.
 
 **Previously on `master` (MERGED `56c8454`, BUILT, browser-verified):** the **consumer desktop
 re-skin** — Smedja design system on `apps/inbox/client`; flat two-card view → **two-panel desktop**
@@ -42,13 +55,17 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
 6. **Consumer desktop re-skin** (`56c8454`) — above. — §6
 7. **GitHub triage workflow** (MERGED) — real read-only Magma Board, N-agent
    desktop + switcher. — §7
+8. **Workflow separation** (`feat/workflow-separation`, browser-verified, unmerged) — self-contained
+   workflow modules, `input`/`worker` roles, all-mounted-idle instance reuse, published-contract
+   cross-workflow delivery, `deliver` seam with no auto-open/auto-switch. — §8
 
-## 🧭 PLANNED NEXT — workflow separation
+## 🧭 PLANNED NEXT
 
-- **Workflow-separation pass** (the user flagged this comes after GitHub triage): right now both
-  workflows coexist in one `CopilotRuntime` and one client `workflows` registry, switched by tabs.
-  The user wants a cleaner separation of flows — likely per-workflow config/routing/desktop chrome
-  rather than one shared `WorkflowView`. Scope to be brainstormed when started.
+- **Merge `feat/workflow-separation`** (browser-verified; see §8). Optional follow-ups it deferred:
+  URL routing per workflow; per-workflow CopilotKit contexts (full render-tool isolation); Variant 2
+  type-matched contract discovery; a live demo reusing one agent across two workflows; clearing
+  per-instance `handoffNotes` when an agent is re-seeded (cosmetic — a re-seeded agent still shows
+  its prior "sent" note).
 - The GitHub data path is **real and read-only by construction**. A real-time refresh, broader
   scoping (beyond the single assignee), or Projects-v2 status writes are explicitly **out of scope**
   unless the read-only constraint is revisited (it is a hard rule — see CLAUDE.md / memory).

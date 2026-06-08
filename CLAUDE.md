@@ -125,6 +125,18 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   only running the app catches it → always browser-verify.)
 - **yarn-classic does not auto-install peer deps** (npm did): `@testing-library/dom` had to be
   added explicitly to root devDeps to keep the React tests green.
+- **Workflows are modules; agents are registered by INSTANCE id.** (As of `feat/workflow-separation`,
+  §8.) A workflow = `apps/inbox/workflows/<id>/{descriptor,server,client}` + one line per aggregator
+  (`workflows/index.ts`, `server/workflows.ts`, `client/src/workflows.ts`) — agent defs live in the
+  descriptors, NOT `apps/inbox/agents/` (the flat `inbox.agent.ts`/`github.agent.ts` are gone). The
+  server registers every workflow×agent under `instanceId(wf, agent)` = `wf__agent`, and the client
+  `useAgent` uses that id, so the same agent in two workflows = two independent runs (the per-agent
+  `/threads` 405 probes show these instance ids). ALL workflows' agents mount idle for the session
+  (not just the active one) so a cross-workflow target is always ready. Cross-workflow delivery goes
+  ONLY through a workflow's published `inputs` contract (`{name, schema, agentId}`), never a foreign
+  agent id; `deliver` runs the target in the BACKGROUND — no auto-open, no auto-switch (badge + an
+  "Open in <wf>" button instead). Handoff-emitting render tools carry an `origin` param (injected by
+  the per-instance prompt) so one shared render registration routes to the right copy.
 - **Per-package `outDir`/`tsBuildInfoFile`:** under `tsc --build`, the base's relative `outDir`
   made two packages collide on `dist-types/index.d.ts` (TS5055). `@platform/providers` +
   `@platform/integrations` set a package-local `outDir`+`tsBuildInfoFile`; `@platform/core` relies

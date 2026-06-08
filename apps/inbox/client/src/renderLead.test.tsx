@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { CopilotKit, useRenderToolCall } from '@copilotkit/react-core/v2'
-import { useInboxActions } from './actions'
+import { useWorkflowRenders } from './useWorkflowRenders'
 
-// Sample `agent.messages` array, shaped exactly like what the mock agent streams
-// into `agent.messages` (per the bug report): an assistant message carrying a
-// `renderLead` tool call in AG-UI form `{ id, type, function: { name, arguments } }`,
-// where `arguments` is a JSON *string*.
 const messages = [
   {
     role: 'assistant',
@@ -31,10 +27,11 @@ const messages = [
   },
 ]
 
-// Mirror of the exact render surface in App.tsx: register the renderers, then map
-// over assistant messages and call `renderToolCall({ toolCall })` per tool call.
+// Mirror of the real render surface: register the renderers, then map over assistant
+// messages and call renderToolCall({ toolCall }) per tool call. deliver is a no-op here
+// (renderLead has no handoff).
 function ToolCallSurface() {
-  useInboxActions()
+  useWorkflowRenders(() => {})
   const renderToolCall = useRenderToolCall()
   const els = messages.flatMap((msg: any) =>
     msg.role === 'assistant' && Array.isArray(msg.toolCalls)
@@ -53,8 +50,6 @@ describe('renderLead generative-UI mapping', () => {
         <ToolCallSurface />
       </CopilotKit>
     )
-
-    // The LeadCard must visibly paint: subject, the envelope tile + sender, and summary.
     expect(screen.getByText('Order: 10 units')).toBeInTheDocument()
     expect(screen.getByText(/ivan@acme\.ru/)).toBeInTheDocument()
     expect(container.querySelector('.lead-env')).toBeInTheDocument()

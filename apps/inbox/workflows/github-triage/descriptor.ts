@@ -1,7 +1,5 @@
-import { defineAgent } from '@platform/core'
+import { defineAgent, defineWorkflow } from '@platform/core'
 
-// TRIAGE — the ONLY board reader (single entry point). Reads the user's open tickets,
-// buckets them, surfaces a routing recommendation per ticket. Read-only.
 export const triageAgent = defineAgent({
   id: 'triage',
   name: 'TRIAGE',
@@ -13,8 +11,6 @@ export const triageAgent = defineAgent({
   renders: { render_triage: 'TriageCard' },
   handoffs: ['feature', 'bugfix', 'reply-draft'],
 })
-
-// FEATURE — analyzes a routed feature ticket from the handoff payload (no GitHub access).
 export const featureAgent = defineAgent({
   id: 'feature',
   name: 'FEATURE AGENT',
@@ -24,8 +20,6 @@ export const featureAgent = defineAgent({
   approvals: [],
   renders: { render_ticket_result: 'TicketResultCard' },
 })
-
-// BUG-FIX — same shape, bug-oriented.
 export const bugfixAgent = defineAgent({
   id: 'bugfix',
   name: 'BUG-FIX AGENT',
@@ -35,8 +29,6 @@ export const bugfixAgent = defineAgent({
   approvals: [],
   renders: { render_ticket_result: 'TicketResultCard' },
 })
-
-// REPLY-DRAFT — drafts a SUGGESTED reply comment (never posted; read-only flow).
 export const replyDraftAgent = defineAgent({
   id: 'reply-draft',
   name: 'REPLY DRAFT',
@@ -47,4 +39,18 @@ export const replyDraftAgent = defineAgent({
   renders: { render_reply_draft: 'ReplyDraftCard' },
 })
 
-export const githubAgents = [triageAgent, featureAgent, bugfixAgent, replyDraftAgent]
+export const githubTriage = defineWorkflow({
+  id: 'github-triage',
+  label: 'GitHub triage',
+  iconName: 'git',
+  agents: [
+    { agent: triageAgent, role: 'input' },
+    { agent: featureAgent, role: 'worker' },
+    { agent: bugfixAgent, role: 'worker' },
+    { agent: replyDraftAgent, role: 'worker' },
+  ],
+  entryAgentId: triageAgent.id,
+  inputs: [], // triage reads the board itself; no cross-workflow inbound parcel
+})
+
+export const githubTriageAgents = [triageAgent, featureAgent, bugfixAgent, replyDraftAgent]

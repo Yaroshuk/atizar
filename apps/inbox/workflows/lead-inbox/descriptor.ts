@@ -1,7 +1,5 @@
-import { defineAgent } from '@platform/core'
+import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@platform/core'
 
-// The reply agent (formerly the single inbox agent). Reads an email and drafts a
-// reply for human approval. Runs standalone OR seeded by a handoff from the qualifier.
 export const replyAgent = defineAgent({
   id: 'reply',
   name: 'REPLY AGENT',
@@ -13,8 +11,6 @@ export const replyAgent = defineAgent({
   renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
 })
 
-// The lead qualifier. Reads an email, classifies it, and surfaces a verdict the
-// manager can hand off to the reply agent. No approval pause of its own.
 export const qualifierAgent = defineAgent({
   id: 'qualifier',
   name: 'LEAD QUALIFIER',
@@ -27,6 +23,18 @@ export const qualifierAgent = defineAgent({
   handoffs: ['reply'],
 })
 
-// The desktop's agent registry — server (runtime registration + handoff validation)
-// and tests map over it. The client references the passports directly (two agents).
-export const agents = [qualifierAgent, replyAgent]
+export const leadInbox = defineWorkflow({
+  id: 'lead-inbox',
+  label: 'Lead inbox',
+  iconName: 'inbox',
+  agents: [
+    { agent: qualifierAgent, role: 'input' },
+    { agent: replyAgent, role: 'worker' },
+  ],
+  entryAgentId: qualifierAgent.id,
+  // Published contract: another workflow may deliver a lead here; the qualifier
+  // (re-)qualifies it. Shape = the existing lead handoff payload.
+  inputs: [{ name: 'lead', schema: HandoffPayloadSchema, agentId: qualifierAgent.id }],
+})
+
+export const leadInboxAgents = [qualifierAgent, replyAgent]
