@@ -52,4 +52,24 @@ describe('scanCassette', () => {
   it('returns empty on plain prose', () => {
     expect(scanCassette('the customer asked about delivery time')).toEqual([])
   })
+
+  it('flags an Anthropic-style key with hyphens (standalone)', () => {
+    const found = scanCassette('key sk-ant-api03-ABCDEFGHIJKLMNOPQRST1234')
+    expect(found.some((f) => f.kind === 'secret')).toBe(true)
+  })
+
+  it('flags an Authorization: Bearer header', () => {
+    const found = scanCassette('Authorization: Bearer eyJhbGciOiJIUzI1Ni1234')
+    expect(found.some((f) => f.kind === 'secret')).toBe(true)
+  })
+
+  it('flags a real-looking phone number', () => {
+    const found = scanCassette('call +1 (800) 555-1234 today')
+    expect(found.some((f) => f.kind === 'phone')).toBe(true)
+  })
+
+  it('does NOT flag an ISO date as a phone number', () => {
+    const found = scanCassette('{"createdAt":"2024-01-15"}')
+    expect(found.some((f) => f.kind === 'phone')).toBe(false)
+  })
 })

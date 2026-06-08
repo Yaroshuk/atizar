@@ -54,10 +54,16 @@ export interface Finding {
 
 const PATTERNS: ReadonlyArray<readonly [Finding['kind'], RegExp]> = [
   ['email', /[\w.+-]+@[\w-]+\.[\w.-]+/g],
-  ['phone', /(?<!\d)\+?\d[\d ()-]{7,}\d(?!\d)/g],
+  // Phone: requires a +, parens, or spacing — and is guarded against ISO dates
+  // (e.g. 2024-01-15) so timestamps in cassette JSON don't read as phone numbers.
+  ['phone', /(?<![\d-])(?!\d{4}-\d{2}-\d{2})[(]?\+?\d[\d ()-]{7,}\d(?!\d)/g],
+  // Secret: token-shaped (sk-… incl. sk-ant-/sk-proj- hyphens, ghp_…, AIza…, raw
+  // JWTs) OR keyword-tagged (api_key= / Authorization: …). Keyword branch keeps
+  // the :/= requirement so plain prose ("the secret to success") is NOT flagged.
+  // Snippet is length-capped so a huge token doesn't produce a 2000-char finding.
   [
     'secret',
-    /\b(?:sk-[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|AIza[A-Za-z0-9_-]{16,})\b|(?:bearer|token|api[_-]?key|secret|password)\s*[:=]\s*\S+/gi,
+    /\b(?:sk-[\w-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|AIza[A-Za-z0-9_-]{16,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b|(?:bearer|authorization|token|api[_-]?key|secret|password)\s*[:=]\s*\S{1,120}/gi,
   ],
 ]
 
