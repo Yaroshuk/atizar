@@ -17,10 +17,10 @@ const OWNER = process.env.GH_OWNER || 'matteappen'
 const ASSIGNEE = process.env.GH_ASSIGNEE || 'Yaroshuk'
 const BODY_MAX = 1500 // get_ticket: a full single-issue read
 const COMMENT_MAX = 600
-// list_my_tickets is COURIERED through the model (it re-emits every ticket into
-// render_triage token-by-token), so keep each ticket small or the run is slow and can
-// hit the kill timeout. The triage card shows neither body nor comment text — these
-// excerpts only ride along for the downstream handoff payload.
+// The list_my_tickets RESULT is surfaced to the client directly (the provider emits a
+// TOOL_CALL_RESULT — see claude-stream), so the model no longer re-emits every ticket
+// into render_triage. These trims now just keep the streamed result payload modest; the
+// card shows neither body nor comment text — those ride along for the downstream handoff.
 const LIST_BODY_MAX = 400
 const LIST_COMMENT_MAX = 240
 // Triage only surfaces tickets in these board statuses, capped to the most recent few —
@@ -139,24 +139,16 @@ server.registerTool(
 )
 
 // Generative-UI render tools — trivial acks; the UI is driven by the provider stream.
-const ticketShape = {
-  repo: z.string(),
-  number: z.number(),
-  title: z.string(),
-  status: z.string(),
-  priority: z.string(),
-  body: z.string(),
-  url: z.string(),
-  lastComment: z.object({ author: z.string(), body: z.string() }).nullable(),
-  needsReply: z.boolean(),
-  recommendation: z.string(),
-}
-
+// render_triage carries ONLY the per-ticket routing the model decided; the ticket DATA
+// comes from the surfaced list_my_tickets result, so the model doesn't re-emit it.
 server.registerTool(
   'render_triage',
   {
     description: 'Surface the triaged ticket list (grouped by status) as a card in the UI.',
-    inputSchema: { origin: z.string(), tickets: z.array(z.object(ticketShape)) },
+    inputSchema: {
+      origin: z.string(),
+      recommendations: z.array(z.object({ number: z.number(), route: z.string() })),
+    },
   },
   async () => ({ content: [{ type: 'text', text: 'Triage surfaced to the user.' }] })
 )

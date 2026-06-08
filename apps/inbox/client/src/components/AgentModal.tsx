@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@platform/core'
 import { STATUS_LABEL, type Status } from '../status'
+import { isDevMode } from '../devMode'
+import { ThreadResultsContext } from '../threadResults'
 import { Icon, type IconName } from './Icon'
 
 // AgentModal renders the conversation thread in an overlay panel.
@@ -29,6 +31,10 @@ type AgentModalProps = {
   iconName: IconName
   status: Status
   renderToolCall: (args: { toolCall: ToolCall; toolMessage?: ToolMessage }) => ReactNode
+  // Tool names that render as generative-UI cards (the consumer-facing surface). In
+  // normal mode only these are shown; internal data-fetch tools (list_my_tickets,
+  // get_latest_email, …) are hidden. Dev mode (?dev=1) reveals every tool-call chip.
+  renderableToolNames: ReadonlySet<string>
   // True while the agent run is active — shows a trailing typing indicator. A real
   // model run takes seconds, so the thread can sit empty for a while after START.
   loading: boolean
@@ -51,6 +57,7 @@ export const AgentModal = ({
   iconName,
   status,
   renderToolCall,
+  renderableToolNames,
   loading,
   canStart,
   intro,
@@ -63,6 +70,24 @@ export const AgentModal = ({
   // paired with its matching `role:"tool"` result (used to surface a completed
   // saveDraft as done).
   const toolMessageByCallId = pairToolResults(agent.messages)
+
+  // Parsed tool RESULTS of this thread, keyed by tool name — exposed via context so a
+  // generative-UI card can read its data tool's output (e.g. TriageCard reading
+  // list_my_tickets) instead of the model re-emitting it into the render tool.
+  const resultsByToolName: Record<string, unknown> = {}
+  for (const m of agent.messages) {
+    if (m.role !== 'assistant' || !Array.isArray(m.toolCalls)) continue
+    for (const tc of m.toolCalls) {
+      const tm = toolMessageByCallId.get(tc.id)
+      const name = tc.function?.name
+      if (!tm || !name) continue
+      try {
+        resultsByToolName[name] = JSON.parse(String(tm.content))
+      } catch {
+        resultsByToolName[name] = tm.content
+      }
+    }
+  }
 
   // Chronology: a receiver shows "← Received …" at the TOP (its first event); a sender
   // shows "→ Handed …" at the BOTTOM (the last thing it did), so the thread reads as history.
@@ -86,8 +111,11 @@ export const AgentModal = ({
     }
 
     // Assistant tool calls -> generative UI (LeadCard / VerdictCard / ApprovalDialog).
+    // Hide internal plumbing (unregistered data-fetch tools) unless dev mode is on.
     if (Array.isArray(msg.toolCalls)) {
       for (const toolCall of msg.toolCalls) {
+        const name = toolCall.function?.name ?? ''
+        if (!isDevMode && !renderableToolNames.has(name)) continue
         nodes.push(
           <div className='thread-item' key={`tc-${toolCall.id}`}>
             {renderToolCall({
@@ -121,47 +149,49 @@ export const AgentModal = ({
           </button>
         </div>
 
-        <div className='thread'>
-          {received.map((note, i) => (
-            <div className='thread-note received' key={`rcv-${i}`}>
-              ← Received <strong>{note.label}</strong> from {note.otherName}
-            </div>
-          ))}
-          {status !== 'idle' && (
-            <div className='thread-item bubble-row'>
-              <span className='agent-glyph'>
-                <Icon name='sparkle' size={15} />
-              </span>
-              <div className='bubble intro'>{intro}</div>
-            </div>
-          )}
-          {thread}
-          {sent.map((note, i) => (
-            <div className='thread-note sent' key={`snt-${i}`}>
-              → Handed <strong>{note.label}</strong> to {note.otherName}
-              {note.targetWorkflow && (
-                <button
-                  className='note-link'
-                  onClick={() => onOpenWorkflow?.(note.targetWorkflow!)}
-                >
-                  Open in {note.targetWorkflow}
-                </button>
-              )}
-            </div>
-          ))}
-          {loading && (
-            <div className='thread-item bubble-row'>
-              <span className='agent-glyph'>
-                <Icon name='sparkle' size={15} />
-              </span>
-              <div className='typing'>
-                <span />
-                <span />
-                <span />
+        <ThreadResultsContext.Provider value={resultsByToolName}>
+          <div className='thread'>
+            {received.map((note, i) => (
+              <div className='thread-note received' key={`rcv-${i}`}>
+                ← Received <strong>{note.label}</strong> from {note.otherName}
               </div>
-            </div>
-          )}
-        </div>
+            ))}
+            {status !== 'idle' && (
+              <div className='thread-item bubble-row'>
+                <span className='agent-glyph'>
+                  <Icon name='sparkle' size={15} />
+                </span>
+                <div className='bubble intro'>{intro}</div>
+              </div>
+            )}
+            {thread}
+            {sent.map((note, i) => (
+              <div className='thread-note sent' key={`snt-${i}`}>
+                → Handed <strong>{note.label}</strong> to {note.otherName}
+                {note.targetWorkflow && (
+                  <button
+                    className='note-link'
+                    onClick={() => onOpenWorkflow?.(note.targetWorkflow!)}
+                  >
+                    Open in {note.targetWorkflow}
+                  </button>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className='thread-item bubble-row'>
+                <span className='agent-glyph'>
+                  <Icon name='sparkle' size={15} />
+                </span>
+                <div className='typing'>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            )}
+          </div>
+        </ThreadResultsContext.Provider>
 
         {canStart && status !== 'running' && (
           <div className='modal-foot'>

@@ -76,6 +76,27 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   the adapter is the only GitHub path. This is a hard user rule. The board/owner/assignee are env
   knobs (`GH_PROJECT=8`, `GH_OWNER=matteappen`, `GH_ASSIGNEE=Yaroshuk` — defaults in
   `github-tools.mjs`, overridable via the shell env `claude-spawn.ts` passes through).
+- **MCP tool RESULTS are surfaced into the stream (`TOOL_CALL_RESULT`).** The `claude` CLI runs MCP
+  tools internally and feeds results back as a top-level `{type:'user', message:{content:[{type:
+'tool_result', tool_use_id, content}]}}` line. `claude-stream.ts` now emits an AG-UI
+  `TOOL_CALL_RESULT` (→ a `role:'tool'` ToolMessage paired by id) **only for tools we surfaced**
+  (`emittedToolIds`), so internal tool results (ToolSearch) stay hidden. This is the UNIFIED fix for
+  two old symptoms: (1) the default tool chip stuck on "Running" forever (it waits on a `toolMessage`
+  that never arrived) now flips to Done; (2) a data tool's output reaches the client directly, so the
+  model needn't re-emit it into a render tool. Cards read a data tool's result via
+  `ThreadResultsContext` (`AgentModal` parses each result by tool name; `useThreadResult(name)`).
+- **Contiguous text deltas MUST share ONE `messageId`.** AG-UI `TEXT_MESSAGE_CHUNK` closes the open
+  message and starts a new one whenever a chunk's `messageId` differs — so a fresh `randomUUID()` per
+  delta renders one bubble PER delta (the "Draf"/"ted a reply" split). `claude-stream` allocates the
+  id lazily and clears it only at a real boundary (tool call, `message_start`, end of a complete
+  message). Invisible to typecheck; the unit tests assert shared-id + reset-after-tool — but the
+  split itself **only the browser shows** → browser-verify text rendering.
+- **The agent thread is a CONSUMER surface — only cards show by default.** `AgentModal` renders a
+  tool call only if its name is a registered render/HITL tool (`renderableToolNames` from the specs);
+  internal data-fetch tools (`list_my_tickets`, `get_latest_email`, `get_ticket`) are hidden. **Dev
+  mode** (`?dev=1`, persisted to localStorage via `devMode.ts`) reveals every raw tool-call chip for
+  debugging. Adding a new card → register its render spec (so it surfaces); a pure data tool stays
+  hidden by design.
 - **Generative-UI render closures are captured ONCE.** `useRenderTool`'s effect deps stringify a
   function to `"[null]"`, so the render callback you pass is frozen on first registration. Any
   callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads

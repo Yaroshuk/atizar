@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import type { RenderSpec, AgentMeta } from '../../client/src/renderSpecs'
+import type { RenderSpec, AgentMeta, DeliverFn, Registry } from '../../client/src/renderSpecs'
 import type { TriageTicket } from '../../client/src/buckets'
+import { useThreadResult } from '../../client/src/threadResults'
 import type { TicketHandoffPayload } from '@platform/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
 
@@ -27,19 +28,10 @@ export const githubTriageMeta: Record<string, AgentMeta> = {
   },
 }
 
-const lastCommentSchema = z.object({ author: z.string(), body: z.string() }).nullable()
-const ticketSchema = z.object({
-  repo: z.string(),
-  number: z.number(),
-  title: z.string(),
-  status: z.string(),
-  priority: z.string(),
-  body: z.string(),
-  url: z.string(),
-  lastComment: lastCommentSchema,
-  needsReply: z.boolean(),
-  recommendation: z.string(),
-})
+// render_triage now carries ONLY the model's per-ticket routing (tiny + fast). The
+// ticket DATA comes from the list_my_tickets result the provider surfaces into the
+// thread — so the model no longer re-emits every ticket field token-by-token.
+const recommendationSchema = z.object({ number: z.number(), route: z.string() })
 
 const toPayload = (t: TriageTicket): TicketHandoffPayload => ({
   repo: t.repo,
@@ -64,27 +56,57 @@ const toLead = (t: TriageTicket) => ({
   priority: t.priority,
 })
 
+type Recommendation = { number: number; route: string }
+
+// Reads the ticket list from the surfaced list_my_tickets result and merges in the
+// model's per-ticket route (from render_triage args), then renders the card. A hook
+// component (not the inline render fn) so it can subscribe to the thread-results context.
+const TriageCardConnected = ({
+  origin,
+  recommendations,
+  deliver,
+  registry,
+}: {
+  origin: string
+  recommendations: Recommendation[]
+  deliver: DeliverFn
+  registry: Registry
+}) => {
+  const result = useThreadResult<{ tickets?: Omit<TriageTicket, 'recommendation'>[] }>(
+    'list_my_tickets'
+  )
+  const routeByNumber = new Map(recommendations.map((r) => [r.number, r.route]))
+  const tickets: TriageTicket[] = (result?.tickets ?? []).map((t) => ({
+    ...t,
+    recommendation: routeByNumber.get(t.number) ?? (t.needsReply ? 'reply' : 'feature'),
+  }))
+  const Triage = registry['TriageCard']
+  return (
+    <Triage
+      tickets={tickets}
+      onRoute={(target: string, ticket: TriageTicket) =>
+        deliver(origin, { kind: 'agent', agentId: target }, toPayload(ticket))
+      }
+      onTreatAsLead={(ticket: TriageTicket) =>
+        deliver(origin, { kind: 'contract', workflow: 'lead-inbox', input: 'lead' }, toLead(ticket))
+      }
+    />
+  )
+}
+
 export const githubTriageRenders: RenderSpec[] = [
   {
     toolName: 'render_triage',
-    parameters: z.object({ origin: z.string(), tickets: z.array(ticketSchema) }),
+    parameters: z.object({ origin: z.string(), recommendations: z.array(recommendationSchema) }),
     render: ({ parameters }, deliver, registry) => {
-      const { origin, tickets } = parameters
-      if (origin === undefined || tickets === undefined) return <></>
-      const Triage = registry['TriageCard']
+      const { origin, recommendations } = parameters
+      if (origin === undefined || recommendations === undefined) return <></>
       return (
-        <Triage
-          tickets={tickets}
-          onRoute={(target: string, ticket: TriageTicket) =>
-            deliver(origin, { kind: 'agent', agentId: target }, toPayload(ticket))
-          }
-          onTreatAsLead={(ticket: TriageTicket) =>
-            deliver(
-              origin,
-              { kind: 'contract', workflow: 'lead-inbox', input: 'lead' },
-              toLead(ticket)
-            )
-          }
+        <TriageCardConnected
+          origin={origin}
+          recommendations={recommendations}
+          deliver={deliver}
+          registry={registry}
         />
       )
     },

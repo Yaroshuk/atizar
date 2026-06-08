@@ -1,6 +1,6 @@
-// The triage ticket shape the TriageCard renders (the model couriers this from
-// list_my_tickets through render_triage; see github-tools.mjs). Mirrors
-// TicketHandoffPayload minus `recommendation` being optional at render time.
+// The triage ticket shape the TriageCard renders. Ticket DATA comes from the surfaced
+// list_my_tickets RESULT (read via ThreadResultsContext); `recommendation` is merged in
+// from the model's slim render_triage args. See github-triage/client.tsx.
 export type TriageTicket = {
   repo: string
   number: number

@@ -15,4 +15,12 @@ describe('triage prompts', () => {
     const first = p.buildFirst({ messages: [] } as never)
     expect(first).toContain('origin: "github-triage"')
   })
+
+  it('instructs the SLIM payload — number + route per ticket, not echoing ticket text', () => {
+    const p = createTriagePrompts('TRIAGE.', 'github-triage')
+    const first = p.buildFirst({ messages: [] } as never)
+    expect(first).toContain('recommendations')
+    expect(first).toMatch(/\{\s*number,\s*route\s*\}/)
+    expect(first).toMatch(/do not echo the ticket text/i)
+  })
 })

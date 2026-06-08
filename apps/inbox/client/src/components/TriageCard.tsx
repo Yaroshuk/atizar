@@ -41,8 +41,10 @@ export const TriageCard = ({ tickets, onRoute, onTreatAsLead }: TriageCardProps)
             return (
               <div key={`${ticket.repo}#${ticket.number}`} className='triage-row'>
                 <div className='triage-row-title'>
-                  {ticket.needsReply && <span className='pill amber'>needs reply</span>}#
-                  {ticket.number} {ticket.title}
+                  {ticket.needsReply && <span className='pill amber'>needs reply</span>}
+                  <span className='triage-row-name'>
+                    #{ticket.number} {ticket.title}
+                  </span>
                 </div>
                 <div className='triage-routes'>
                   <a
