@@ -1,0 +1,98 @@
+import type { Status } from './status'
+import type { IconName } from './components/Icon'
+
+export type PInstance = {
+  localId: string
+  runtimeKey: string
+  agentId: string
+  name: string
+  iconName: IconName
+  label: string
+  status: Status
+  parentLocalId?: string
+  isInput: boolean
+}
+
+export type AgentGroup = {
+  agentId: string
+  name: string
+  iconName: IconName
+  instances: PInstance[] // ≥1, all the same agentId, all shown
+  queued: number
+}
+
+export type PipelineBlock = {
+  parent: PInstance // the header instance
+  groups: AgentGroup[] // children grouped by agentId; [] => lone header
+}
+
+const ACTIVE: ReadonlySet<Status> = new Set(['running', 'awaiting_approval', 'error'])
+
+// Build the repeated depth-2 block model from the live instances of one workflow.
+// queued: agentId -> count of items waiting for a free slot.
+export function buildPipeline(
+  instances: PInstance[],
+  queued: Record<string, number>
+): PipelineBlock[] {
+  const childrenOf = new Map<string, PInstance[]>()
+  for (const x of instances) {
+    if (!x.parentLocalId) continue
+    const arr = childrenOf.get(x.parentLocalId) ?? []
+    arr.push(x)
+    childrenOf.set(x.parentLocalId, arr)
+  }
+
+  // shown = input agents ∪ active instances, then promote their ancestors (fixpoint).
+  const shown = new Set<string>()
+  for (const x of instances) if (x.isInput || ACTIVE.has(x.status)) shown.add(x.localId)
+  // Promote ancestors of shown nodes (a parent is kept because a child is shown).
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const x of instances) {
+      if (!shown.has(x.localId)) continue
+      if (x.parentLocalId && !shown.has(x.parentLocalId)) {
+        shown.add(x.parentLocalId)
+        changed = true
+      }
+    }
+  }
+
+  // A kept-but-not-active instance displays as Working (running).
+  const view = (x: PInstance): PInstance =>
+    ACTIVE.has(x.status) ? x : { ...x, status: 'running' as Status }
+
+  const isShownChild = (x: PInstance) => shown.has(x.localId)
+  const roots = instances.filter((x) => shown.has(x.localId) && (x.isInput || !x.parentLocalId))
+
+  const blocks: PipelineBlock[] = []
+  const emitted = new Set<string>()
+  const queue = [...roots]
+  while (queue.length) {
+    const parent = queue.shift()!
+    if (emitted.has(parent.localId)) continue
+    emitted.add(parent.localId)
+
+    const kids = (childrenOf.get(parent.localId) ?? []).filter(isShownChild)
+    // group children by agentId, preserving first-seen order
+    const order: string[] = []
+    const groups = new Map<string, AgentGroup>()
+    for (const k of kids) {
+      if (!groups.has(k.agentId)) {
+        order.push(k.agentId)
+        groups.set(k.agentId, {
+          agentId: k.agentId,
+          name: k.name,
+          iconName: k.iconName,
+          instances: [],
+          queued: queued[k.agentId] ?? 0,
+        })
+      }
+      groups.get(k.agentId)!.instances.push(view(k))
+      // a child that is itself a parent of shown instances gets its own block later
+      if ((childrenOf.get(k.localId) ?? []).some(isShownChild)) queue.push(k)
+    }
+    blocks.push({ parent: view(parent), groups: order.map((id) => groups.get(id)!) })
+  }
+  return blocks
+}

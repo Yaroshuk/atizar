@@ -1,0 +1,126 @@
+import { describe, it, expect } from 'vitest'
+import { buildPipeline, type PInstance } from './pipelineModel'
+
+const i = (over: Partial<PInstance>): PInstance => ({
+  localId: 'x',
+  runtimeKey: 'wf__a',
+  agentId: 'a',
+  name: 'A',
+  iconName: 'inbox',
+  label: '',
+  status: 'running',
+  parentLocalId: undefined,
+  isInput: false,
+  ...over,
+})
+
+describe('buildPipeline', () => {
+  it('keeps a done input agent as a lone header', () => {
+    const blocks = buildPipeline(
+      [i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done', label: '' })],
+      {}
+    )
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].parent.localId).toBe('in')
+    expect(blocks[0].groups).toEqual([])
+  })
+
+  it('one child instance renders as a single-instance group', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
+        i({
+          localId: 'c1',
+          agentId: 'feature',
+          name: 'FEATURE',
+          parentLocalId: 'in',
+          label: '#150 CSV',
+          status: 'running',
+        }),
+      ],
+      {}
+    )
+    expect(blocks[0].groups).toHaveLength(1)
+    expect(blocks[0].groups[0].instances.map((x) => x.localId)).toEqual(['c1'])
+  })
+
+  it('two instances of the same agent group together under that agent', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
+        i({
+          localId: 'r1',
+          runtimeKey: 'wf__reply',
+          agentId: 'reply',
+          name: 'REPLY',
+          parentLocalId: 'in',
+          label: '#142',
+          status: 'awaiting_approval',
+        }),
+        i({
+          localId: 'r2',
+          runtimeKey: 'wf__reply',
+          agentId: 'reply',
+          name: 'REPLY',
+          parentLocalId: 'in',
+          label: '#143',
+          status: 'running',
+        }),
+      ],
+      {}
+    )
+    const g = blocks[0].groups.find((x) => x.agentId === 'reply')!
+    expect(g.instances).toHaveLength(2)
+  })
+
+  it('attaches the queued count to its agent group', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
+        i({
+          localId: 'r1',
+          runtimeKey: 'wf__reply',
+          agentId: 'reply',
+          parentLocalId: 'in',
+          status: 'running',
+        }),
+      ],
+      { reply: 2 }
+    )
+    const g = blocks[0].groups.find((x) => x.agentId === 'reply')!
+    expect(g.queued).toBe(2)
+  })
+
+  it('drops a done worker with no active child', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
+        i({ localId: 'c1', agentId: 'feature', parentLocalId: 'in', status: 'done' }),
+      ],
+      {}
+    )
+    expect(blocks[0].groups).toEqual([])
+  })
+
+  it('repeats a parent as its own block (depth-2) when an instance dispatches a child', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
+        i({
+          localId: 'r1',
+          runtimeKey: 'wf__reply',
+          agentId: 'reply',
+          parentLocalId: 'in',
+          status: 'done',
+        }),
+        i({ localId: 'b1', agentId: 'bugfix', parentLocalId: 'r1', status: 'running' }),
+      ],
+      {}
+    )
+    // r1 is done but kept (ancestor of active b1) and appears as a parent block.
+    const parentIds = blocks.map((bl) => bl.parent.localId)
+    expect(parentIds).toContain('r1')
+    const r1Block = blocks.find((bl) => bl.parent.localId === 'r1')!
+    expect(r1Block.groups[0].instances[0].localId).toBe('b1')
+  })
+})
