@@ -384,7 +384,10 @@ Found-and-fixed during build/verify: (1) errored instances were torn down (stale
 gate on local `lifecycle`); (2) the pipeline `shown` set wrongly kept done descendants (dropped the
 buggy downward fixpoint, upward-only); (3) the cap leaked under same-tick deliveries (synchronous
 `instRef`). Known-benign: a transient `Agent <localId> not found` console warning on teardown (an
-unregister/pending-probe race). **Environment lesson** (now in CLAUDE.md): an "app reloads itself ~30s
+unregister/pending-probe race); a queued item gets no "received" handoff note until it actually
+starts (the drain path re-enters `start`, not `deliver`) — the "sent" note on the source is unaffected.
+The folded-away `AgentRuntime.tsx`/`useAgentStatus.ts` (their status logic now lives in `statusFrom.ts`,
+which `useAgentInstances` subscribes to directly) were deleted as part of this work. **Environment lesson** (now in CLAUDE.md): an "app reloads itself ~30s
 into a run" symptom was 5 stale dev stacks contending for `:5173` → Vite `vite:ws:disconnect →
 location.reload`, not a feature bug; the kill pattern pointed at the wrong (`apps/inbox`) `node_modules`
 path — binaries are hoisted to the workspace root.
