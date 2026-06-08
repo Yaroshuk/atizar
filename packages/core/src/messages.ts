@@ -113,15 +113,5 @@ export function approvalResolved(
   messages: readonly Message[],
   approvalNames: readonly string[]
 ): boolean {
-  const approvalCallIds = new Set<string>()
-  for (const m of messages) {
-    for (const tc of toolCallsOf(m)) {
-      if (approvalNames.includes(tc.function.name) && typeof tc.id === 'string') {
-        approvalCallIds.add(tc.id)
-      }
-    }
-  }
-  return messages.some(
-    (m) => isToolMessage(m) && typeof m.toolCallId === 'string' && approvalCallIds.has(m.toolCallId)
-  )
+  return resolvedApprovalCount(messages, approvalNames) > 0
 }
