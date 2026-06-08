@@ -6,7 +6,7 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
-**On `feat/workflow-separation` (BUILT, browser-verified, not yet merged):** the **workflow-
+**On `master` (MERGED `3a92241`, BUILT, browser-verified):** the **workflow-
 separation** pass. Each workflow is now a **self-contained module** (`apps/inbox/workflows/<id>/`
 descriptor+server+client) and workflows are **isolated boxes** that talk only through a typed
 **published contract**. Highlights: `@platform/core` `defineWorkflow` + `instanceId` +
@@ -17,13 +17,13 @@ one **`deliver`** seam that runs the target in the **background** with **no auto
 auto-switch** (cross-workflow raises a tab **badge** + an "Open in <workflow>" button; the human
 navigates); **origin-routed** handoff render tools so reused handoff-emitting agents route to the
 right copy; a concrete demo — TRIAGE's "Treat as lead → Lead inbox" delivers a ticket to the
-lead-inbox `lead` contract and the qualifier re-qualifies the handed lead. 122 unit tests +
+lead-inbox `lead` contract and the qualifier re-qualifies the handed lead. 120 unit tests +
 typecheck/lint/prettier green. **Browser-verified E2E** (real Magma board read-only + real Gmail):
 intra-handoff runs target w/ no auto-open; cross-workflow delivery → background run + badge + no
 switch + Open-in; **state persists across workflow switches**. Detail → `docs/BUILD-LOG.md` §8;
 spec → `docs/superpowers/specs/2026-06-08-workflow-separation-design.md`; plan →
 `docs/superpowers/plans/2026-06-08-workflow-separation.md`.
-**Next:** merge `feat/workflow-separation`, then pick from "Other next-ups".
+**Next:** pick from "Other next-ups" / "PLANNED NEXT" below.
 
 **Previously on `master` (MERGED, BUILT, browser-verified on the real board):** the **GitHub triage
 workflow** — a second workflow beside the Lead inbox, built on the **real** Magma Board (GitHub
@@ -61,11 +61,12 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
 
 ## 🧭 PLANNED NEXT
 
-- **Merge `feat/workflow-separation`** (browser-verified; see §8). Optional follow-ups it deferred:
-  URL routing per workflow; per-workflow CopilotKit contexts (full render-tool isolation); Variant 2
-  type-matched contract discovery; a live demo reusing one agent across two workflows; clearing
-  per-instance `handoffNotes` when an agent is re-seeded (cosmetic — a re-seeded agent still shows
-  its prior "sent" note).
+- **Workflow-separation follow-ups it deferred** (all optional, nothing blocking): URL routing per
+  workflow; per-workflow CopilotKit contexts (full render-tool isolation); Variant 2 type-matched
+  contract discovery (source emits a typed parcel, system offers compatible workflows — no naming);
+  a live demo reusing one agent across two workflows; clearing per-instance `handoffNotes` when an
+  agent is re-seeded (cosmetic — a re-seeded agent still shows its prior "sent" note); show the
+  workflow *label* instead of the raw id in the "Open in" button / handoff notes.
 - The GitHub data path is **real and read-only by construction**. A real-time refresh, broader
   scoping (beyond the single assignee), or Projects-v2 status writes are explicitly **out of scope**
   unless the read-only constraint is revisited (it is a hard rule — see CLAUDE.md / memory).
