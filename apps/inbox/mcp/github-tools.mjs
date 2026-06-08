@@ -156,7 +156,7 @@ server.registerTool(
   'render_triage',
   {
     description: 'Surface the triaged ticket list (grouped by status) as a card in the UI.',
-    inputSchema: { tickets: z.array(z.object(ticketShape)) },
+    inputSchema: { origin: z.string(), tickets: z.array(z.object(ticketShape)) },
   },
   async () => ({ content: [{ type: 'text', text: 'Triage surfaced to the user.' }] })
 )

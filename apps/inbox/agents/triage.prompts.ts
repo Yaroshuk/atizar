@@ -1,6 +1,6 @@
 import type { PromptStrategy } from '@platform/core'
 
-function triageFirst(instructions: string): string {
+function triageFirst(instructions: string, origin: string): string {
   return [
     instructions,
     '',
@@ -10,18 +10,19 @@ function triageFirst(instructions: string): string {
     '- "feature": a feature/enhancement request to analyze,',
     '- "bugfix": a bug to investigate,',
     '- "reply": needsReply is true / the last comment asks the user something.',
-    'Then call render_triage with { tickets } — pass every ticket through UNCHANGED',
-    'and add a "recommendation" field to each. Do not drop or invent tickets.',
+    `Then call render_triage with { origin: "${origin}", tickets } — set origin to`,
+    `EXACTLY "${origin}", pass every ticket through UNCHANGED, and add a`,
+    '"recommendation" field to each. Do not drop or invent tickets.',
     'After render_triage, STOP: reply with at most ONE short sentence. Do NOT list or',
     'summarize the tickets again (the card already shows them) and do not narrate tools —',
     'repeating them wastes time and can stall the run.',
   ].join('\n')
 }
 
-export function createTriagePrompts(instructions: string): PromptStrategy {
+export function createTriagePrompts(instructions: string, origin: string): PromptStrategy {
   return {
     buildFirst(): string {
-      return triageFirst(instructions)
+      return triageFirst(instructions, origin)
     },
     // No buildResume: triage has no approvals.
   }
