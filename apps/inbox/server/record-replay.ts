@@ -1,6 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import type { BaseEvent } from '@ag-ui/client'
+import type { BaseEvent, RunAgentInput } from '@ag-ui/client'
+import { resolvedApprovalCount, type Provider, type Message } from '@platform/core'
 
 // A cassette file is JSONL: one recorded AG-UI event per line, tagged with its
 // step. Step = how many human approvals are already behind us (see
@@ -125,5 +127,54 @@ export class CassetteStore {
     const tmp = `${this.file()}.${step}.tmp`
     await writeFile(tmp, body + '\n', 'utf8')
     await rename(tmp, this.file())
+  }
+}
+
+export type RecordReplayMode = 'replay' | 'record'
+
+// Reads the dev toggle. unset → null (no wrapping, pure production path).
+// "record" → force-overwrite; anything else truthy ("1"/"replay") → auto
+// (replay a step if recorded, else record it).
+export function recordReplayMode(): RecordReplayMode | null {
+  const v = process.env.DEV_RECORD_REPLAY
+  if (!v) return null
+  return v === 'record' ? 'record' : 'replay'
+}
+
+// apps/inbox/.cassettes/ — resolved relative to this module (server/), so it does
+// not depend on the process cwd.
+export function cassettesDir(): string {
+  return fileURLToPath(new URL('../.cassettes/', import.meta.url))
+}
+
+// Wraps a real provider. Per run: step = resolved-approval count. In "replay"
+// mode a recorded step is yielded without touching the real provider; a miss (or
+// "record" mode) calls the real provider, passes every event through unchanged,
+// and writes that step to disk.
+export function withRecordReplay(
+  provider: Provider,
+  opts: { key: string; approvalNames: readonly string[]; dir: string; mode: RecordReplayMode }
+): Provider {
+  return {
+    async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
+      const messages = (input?.messages ?? []) as Message[]
+      const step = resolvedApprovalCount(messages, opts.approvalNames)
+      const store = new CassetteStore(opts.dir, opts.key)
+
+      if (opts.mode === 'replay') {
+        const recorded = await store.readStep(step)
+        if (recorded) {
+          yield* recorded
+          return
+        }
+      }
+
+      const captured: BaseEvent[] = []
+      for await (const event of provider.run(input)) {
+        captured.push(event)
+        yield event
+      }
+      await store.writeStep(step, captured)
+    },
   }
 }

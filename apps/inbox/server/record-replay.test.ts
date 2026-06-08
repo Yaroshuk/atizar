@@ -1,8 +1,10 @@
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent } from '@ag-ui/client'
+import type { Provider } from '@platform/core'
+import type { RunAgentInput } from '@ag-ui/client'
 import {
   encodeLine,
   parseLine,
@@ -10,6 +12,7 @@ import {
   dropStep,
   scanCassette,
   CassetteStore,
+  withRecordReplay,
 } from './record-replay.js'
 
 const ev = (delta: string): BaseEvent =>
@@ -122,5 +125,106 @@ describe('CassetteStore', () => {
     await store.writeStep(0, [ev('a')])
     await store.writeStep(0, [])
     expect(await store.readStep(0)).toEqual([ev('a')])
+  })
+})
+
+// A fake real provider that records how many times it was actually invoked.
+function fakeProvider(events: BaseEvent[]) {
+  let calls = 0
+  const provider: Provider = {
+    async *run() {
+      calls++
+      for (const e of events) yield e
+    },
+  }
+  return { provider, calls: () => calls }
+}
+
+const APPROVALS = ['confirmSend']
+const step0Input = { messages: [] } as unknown as RunAgentInput
+// messages with one resolved approval → resolvedApprovalCount === 1 → step 1
+const step1Input = {
+  messages: [
+    {
+      role: 'assistant',
+      id: 'a1',
+      toolCalls: [
+        { id: 'x1', type: 'function', function: { name: 'confirmSend', arguments: '{}' } },
+      ],
+    },
+    { role: 'tool', id: 't1', content: 'ok', toolCallId: 'x1' },
+  ],
+} as unknown as RunAgentInput
+
+async function collect(it: AsyncIterable<BaseEvent>): Promise<BaseEvent[]> {
+  const out: BaseEvent[] = []
+  for await (const e of it) out.push(e)
+  return out
+}
+
+describe('withRecordReplay', () => {
+  it('miss → calls the real provider, passes events through, and records', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('hi')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'replay',
+    })
+    const out = await collect(wrapped.run(step0Input))
+    expect(out).toEqual([ev('hi')])
+    expect(fake.calls()).toBe(1)
+    expect(await new CassetteStore(dir, 'wf__a').readStep(0)).toEqual([ev('hi')])
+  })
+
+  it('hit → replays from disk WITHOUT calling the real provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('hi')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'replay',
+    })
+    await collect(wrapped.run(step0Input)) // records (calls === 1)
+    const out = await collect(wrapped.run(step0Input)) // replays
+    expect(out).toEqual([ev('hi')])
+    expect(fake.calls()).toBe(1) // NOT called again
+  })
+
+  it('mode "record" → overwrites even when a recording exists', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('fresh')])
+    await new CassetteStore(dir, 'wf__a').writeStep(0, [ev('stale')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'record',
+    })
+    const out = await collect(wrapped.run(step0Input))
+    expect(out).toEqual([ev('fresh')])
+    expect(fake.calls()).toBe(1)
+    expect(await new CassetteStore(dir, 'wf__a').readStep(0)).toEqual([ev('fresh')])
+  })
+
+  it('replays step 0 but records step 1 on the resume run', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('done')])
+    await new CassetteStore(dir, 'wf__a').writeStep(0, [ev('card')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'replay',
+    })
+    const out0 = await collect(wrapped.run(step0Input))
+    expect(out0).toEqual([ev('card')])
+    expect(fake.calls()).toBe(0) // step 0 was a hit
+    const out1 = await collect(wrapped.run(step1Input))
+    expect(out1).toEqual([ev('done')])
+    expect(fake.calls()).toBe(1) // step 1 was a miss → recorded
+    expect(await new CassetteStore(dir, 'wf__a').readStep(1)).toEqual([ev('done')])
   })
 })
