@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { BaseEvent } from '@ag-ui/client'
 
@@ -84,8 +84,9 @@ export function scanCassette(text: string): Finding[] {
 async function readFileOrNull(path: string): Promise<string | null> {
   try {
     return await readFile(path, 'utf8')
-  } catch {
-    return null // ENOENT (or unreadable) → treat as "no recording yet"
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null // no recording yet
+    throw err // a real error (e.g. EACCES) must surface, not be treated as "empty"
   }
 }
 
@@ -96,7 +97,11 @@ export class CassetteStore {
   constructor(
     private readonly dir: string,
     private readonly key: string
-  ) {}
+  ) {
+    if (/[/\\]|\.\./.test(key)) {
+      throw new Error(`Invalid cassette key (path separators not allowed): ${key}`)
+    }
+  }
 
   private file(): string {
     return join(this.dir, `${this.key}.jsonl`)
@@ -110,11 +115,15 @@ export class CassetteStore {
   }
 
   async writeStep(step: number, events: BaseEvent[]): Promise<void> {
+    if (events.length === 0) return // nothing captured → don't clobber/empty the step
     const existing = (await readFileOrNull(this.file())) ?? ''
     const kept = dropStep(existing, step)
     const added = events.map((e) => encodeLine(step, e)).join('\n')
     const body = [kept, added].filter((s) => s.length > 0).join('\n')
     await mkdir(this.dir, { recursive: true })
-    await writeFile(this.file(), body + '\n', 'utf8')
+    // Atomic write: a Ctrl-C mid-write must not corrupt an existing cassette.
+    const tmp = `${this.file()}.${step}.tmp`
+    await writeFile(tmp, body + '\n', 'utf8')
+    await rename(tmp, this.file())
   }
 }

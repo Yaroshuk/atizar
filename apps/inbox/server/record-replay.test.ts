@@ -115,4 +115,12 @@ describe('CassetteStore', () => {
     await store.writeStep(0, [ev('new')])
     expect(await store.readStep(0)).toEqual([ev('new')])
   })
+
+  it('writeStep with no events is a no-op (does not clobber an existing step)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const store = new CassetteStore(dir, 'wf__agent')
+    await store.writeStep(0, [ev('a')])
+    await store.writeStep(0, [])
+    expect(await store.readStep(0)).toEqual([ev('a')])
+  })
 })
