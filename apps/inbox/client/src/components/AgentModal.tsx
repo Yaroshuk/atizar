@@ -23,6 +23,7 @@ export type HandoffNote = {
   otherName: string
   label: string
   targetWorkflow?: string // present on a cross-workflow 'sent' note
+  targetLocalId?: string // the spawned target instance (intra-workflow jump), if it started
 }
 
 type AgentModalProps = {
@@ -47,6 +48,8 @@ type AgentModalProps = {
   notes: HandoffNote[]
   // Switch to the target workflow when a cross-workflow 'sent' note is clicked.
   onOpenWorkflow?: (id: string) => void
+  // Jump to a live target instance (intra-workflow 'sent' note) by its localId.
+  onOpenInstance?: (localId: string) => void
   onStart: () => void
   onClose: () => void
 }
@@ -63,6 +66,7 @@ export const AgentModal = ({
   intro,
   notes,
   onOpenWorkflow,
+  onOpenInstance,
   onStart,
   onClose,
 }: AgentModalProps) => {
@@ -156,25 +160,35 @@ export const AgentModal = ({
                 ← Received <strong>{note.label}</strong> from {note.otherName}
               </div>
             ))}
-            {status !== 'idle' && (
-              <div className='thread-item bubble-row'>
-                <span className='agent-glyph'>
-                  <Icon name='sparkle' size={15} />
-                </span>
-                <div className='bubble intro'>{intro}</div>
-              </div>
-            )}
+            {/* Always show the intro — for a running instance it heads the thread; for a
+                type view (idle, no instance) it's the agent's description so the card opens
+                to something meaningful rather than a blank panel. */}
+            <div className='thread-item bubble-row'>
+              <span className='agent-glyph'>
+                <Icon name='sparkle' size={15} />
+              </span>
+              <div className='bubble intro'>{intro}</div>
+            </div>
             {thread}
             {sent.map((note, i) => (
               <div className='thread-note sent' key={`snt-${i}`}>
                 → Handed <strong>{note.label}</strong> to {note.otherName}
-                {note.targetWorkflow && (
+                {note.targetWorkflow ? (
                   <button
                     className='note-link'
                     onClick={() => onOpenWorkflow?.(note.targetWorkflow!)}
                   >
                     Open in {note.targetWorkflow}
                   </button>
+                ) : (
+                  note.targetLocalId && (
+                    <button
+                      className='note-link'
+                      onClick={() => onOpenInstance?.(note.targetLocalId!)}
+                    >
+                      Open {note.otherName}
+                    </button>
+                  )
                 )}
               </div>
             ))}

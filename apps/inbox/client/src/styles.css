@@ -245,6 +245,260 @@ button {
   color: var(--border-strong);
 }
 
+/* ----- instance pipeline blocks (parent → bordered container of groups) ----- */
+.pl-block {
+  margin-bottom: 14px;
+}
+.pl-block:last-child {
+  margin-bottom: 0;
+}
+/* The mini row must allow the label to shrink so the state pill stays put. */
+.mini {
+  min-width: 0;
+}
+.mini .m-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini .m-state {
+  flex: 0 0 auto;
+}
+.pl-cont {
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* single-instance agent: ONE card, no header */
+.pl-single {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s,
+    transform 0.12s;
+}
+/* instance picker (an agent running ≥2 instances opens to a list of these cards) */
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+}
+.picker-hint {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pl-single:hover {
+  box-shadow: var(--shadow-pop);
+  transform: translateX(1px);
+}
+.pl-single .m-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  background: #f3f3f5;
+  display: grid;
+  place-items: center;
+  color: #5a5a62;
+  border: 1px solid rgba(17, 17, 17, 0.05);
+}
+.pl-single .m-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+.pl-single .m-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-single .m-state {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.pl-single.run {
+  background: rgba(0, 170, 119, 0.075);
+  border-color: rgba(0, 170, 119, 0.28);
+}
+.pl-single.run .m-state {
+  color: var(--teal-deep);
+}
+.pl-single.await {
+  background: rgba(240, 192, 0, 0.11);
+  border-color: rgba(240, 192, 0, 0.45);
+}
+.pl-single.await .m-state {
+  color: var(--amber-ink);
+}
+.pl-single.err {
+  background: rgba(214, 69, 58, 0.07);
+  border-color: rgba(214, 69, 58, 0.32);
+}
+.pl-single.err .m-state {
+  color: var(--red-ink);
+}
+/* multi-instance agent: header + nested instances with L-connectors */
+.pl-group {
+  display: flex;
+  flex-direction: column;
+}
+.pl-ahead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+.pl-ahead .m-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  background: #f1f2f1;
+  display: grid;
+  place-items: center;
+  color: #5a5a62;
+  border: 1px solid rgba(17, 17, 17, 0.05);
+}
+.pl-aname {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.pl-acount {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--teal-deep);
+}
+.pl-kids {
+  position: relative;
+  margin-left: 15px;
+}
+.pl-kid {
+  position: relative;
+  margin-left: 20px;
+  margin-top: 8px;
+}
+.pl-kid:before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: -9px;
+  width: 2px;
+  height: calc(50% + 9px);
+  background: var(--border-strong);
+}
+.pl-kid:not(:last-child):after {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 2px;
+  bottom: -9px;
+  background: var(--border-strong);
+}
+.pl-hstub {
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  background: var(--border-strong);
+}
+.pl-inst {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s,
+    transform 0.12s;
+}
+.pl-inst:hover {
+  box-shadow: var(--shadow-pop);
+  transform: translateX(1px);
+}
+.pl-inst .m-state {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.pl-inst.run {
+  background: rgba(0, 170, 119, 0.075);
+  border-color: rgba(0, 170, 119, 0.28);
+}
+.pl-inst.run .m-state {
+  color: var(--teal-deep);
+}
+.pl-inst.await {
+  background: rgba(240, 192, 0, 0.11);
+  border-color: rgba(240, 192, 0, 0.45);
+}
+.pl-inst.await .m-state {
+  color: var(--amber-ink);
+}
+.pl-inst.err {
+  background: rgba(214, 69, 58, 0.07);
+  border-color: rgba(214, 69, 58, 0.32);
+}
+.pl-inst.err .m-state {
+  color: var(--red-ink);
+}
+.pl-iname {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pl-queued {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 8px 0 0 35px;
+}
+
 /* tint legend at the panel foot */
 .tint-legend {
   border-top: 1px solid var(--border);

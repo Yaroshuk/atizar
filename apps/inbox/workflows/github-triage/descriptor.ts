@@ -10,6 +10,7 @@ export const triageAgent = defineAgent({
   approvals: [],
   renders: { render_triage: 'TriageCard' },
   handoffs: ['feature', 'bugfix', 'reply-draft'],
+  maxInstances: 1,
 })
 export const featureAgent = defineAgent({
   id: 'feature',

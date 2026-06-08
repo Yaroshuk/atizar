@@ -6,6 +6,42 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
+### 🐞 Known bugs — agent instances (NEXT, not yet fixed)
+
+- **One-time deliveries spawn duplicate instances.** Some handoffs are a one-shot action on a single
+  item — e.g. the email agent gets ONE email and the human clicks "Draft reply" 3×; today that spawns
+  3 reply instances for the same email. A one-time/idempotent delivery should dedupe (one instance per
+  source item) — clicking again should focus/no-op, not spawn a duplicate. (Dedupe was deferred in the
+  spec; promote it.) Needs a delivery identity (e.g. source item id / threadId on the payload).
+- **Second awaiting-approval instance's approve button is dead.** With two reply instances both in
+  `awaiting_approval`, approving one worked; on the OTHER the "Save draft" / approve button did nothing.
+  Likely the HITL `respond` callback is captured for only one instance (the active/last one) — the
+  generative-UI render/HITL registration is shared and may not route `respond` to the right proxy when
+  multiple instances await at once. Investigate `useWorkflowRenders`/`useHumanInTheLoop` + per-instance
+  routing (cf. the `origin`-param pattern) so each awaiting instance's approval resumes ITS own run.
+
+**On `feat/agent-instances` (BUILT, browser-verified, unmerged):** **dynamic agent instances** — a
+busy agent now spawns additional concurrent copies for new handed-off items instead of overwriting the
+in-flight run. Each instance is a client-side **proxied agent** (`copilotkit.registerProxiedAgent`,
+localId `wf__agent#<seq>`) created on demand, run, and `unregister`'d on finalize; the server is
+unchanged (one agent per `wf__agent`). Concurrency is bounded per-agent by `defineAgent.maxInstances`
+(default 2; `triage`+`qualifier` = 1); overflow waits in a per-agent queue that auto-drains on a freed
+slot. The pipeline is rebuilt as an **instance tree** (`pipelineModel.buildPipeline`): repeated depth-2
+`parent → [children grouped by agentId]` blocks — 1 instance = a single card, ≥2 = an agent header
+(`N active`) + L-connected nested cards + a `queued: N` line; the right-grid "type" card shows the
+aggregate (`N active · M awaiting approval`). Pure, unit-tested core: `instancesCore` (cap),
+`statusFrom`, `aggregate`, `pipelineModel`; integration in `useAgentInstances` + `InboxView` +
+`PipelineColumn` + `AgentCard`. **137 unit tests + typecheck/lint/prettier green.** **Browser-verified
+E2E** on the real Magma board: routed 3 tickets at once → **2 active + `queued: 1`** (cap held against a
+same-tick burst after a `synchronous instRef` fix), queue drained when a slot freed, single-instance
+renders as one card, input agent kept, done workers torn down — **no page reload throughout**. Spec →
+`docs/superpowers/specs/2026-06-08-agent-instances-design.md`; plan →
+`docs/superpowers/plans/2026-06-08-agent-instances.md`; detail → `docs/BUILD-LOG.md` §9.
+**Lesson logged (CLAUDE.md):** an "app reloads itself ~30s into a run" symptom was NOT a feature bug —
+it was 5 stale dev stacks contending for `:5173` and tripping Vite's `vite:ws:disconnect → location.reload`
+(the kill pattern in CLAUDE.md pointed at the wrong `node_modules` path; now fixed). **Next:** merge to
+`master`; optional follow-ups below.
+
 **On `master` (MERGED `8b67b83`, BUILT, browser-verified):** the **tool-result surfacing +
 consumer-thread polish** pass. Root cause unified three symptoms: MCP tool RESULTS never
 reached the client (`claude-stream` emitted only START/ARGS/END). Now the provider emits
@@ -78,6 +114,9 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
 8. **Workflow separation** (`feat/workflow-separation`, browser-verified, unmerged) — self-contained
    workflow modules, `input`/`worker` roles, all-mounted-idle instance reuse, published-contract
    cross-workflow delivery, `deliver` seam with no auto-open/auto-switch. — §8
+9. **Dynamic agent instances** (`feat/agent-instances`, browser-verified) — a busy agent spawns
+   concurrent proxied copies (cap `maxInstances`, default 2; overflow queued), shown as a nested
+   instance tree in the pipeline. — §9
 
 ## 🧭 PLANNED NEXT
 

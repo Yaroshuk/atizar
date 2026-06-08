@@ -15,6 +15,8 @@ export const AgentDefinitionSchema = z
     // Target agent ids this agent may hand off to. Structure only — membership in
     // the agent registry is checked at wiring time (a passport doesn't know it).
     handoffs: z.array(z.string()).optional(),
+    // Max concurrent runtime copies of this agent. A cap of 1 = singleton.
+    maxInstances: z.number().int().positive().default(2),
   })
   .superRefine((def, ctx) => {
     for (const name of def.approvals) {
@@ -36,7 +38,8 @@ export const AgentDefinitionSchema = z
   })
 
 export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>
+export type AgentDefinitionInput = z.input<typeof AgentDefinitionSchema>
 
-export function defineAgent(def: AgentDefinition): AgentDefinition {
+export function defineAgent(def: AgentDefinitionInput): AgentDefinition {
   return AgentDefinitionSchema.parse(def)
 }
