@@ -29,6 +29,8 @@ same approval flow.
 DEV_RECORD_REPLAY=1 yarn dev
 ```
 
+`=replay` is an alias for `=1` — both select the same auto (replay-or-record) mode.
+
 The first run of each agent scenario calls the real `claude` (slow, ~30s) and writes a
 recording. Every run after replays instantly from disk. The recording fills in
 incrementally: run the qualifier once to record step 0, click approve to record step 1 —

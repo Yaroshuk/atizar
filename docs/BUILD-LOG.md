@@ -444,7 +444,7 @@ real `claude` CLI each time.
   `'phone'`, or `'secret'`. The `email` pattern matches standard addresses; `phone` requires
   a `+`, parentheses, or spacing gaps (and guards against ISO date strings so `2024-01-15`
   does not read as a phone number); `secret` covers token-shaped prefixes (`sk-…` including
-  `sk-ant-`/`sk-proj-` hyphens, `ghp_…`/`gho_…`/`ghu_…`/`ghs_…`/`gpr_…`, `AIza…`, raw
+  `sk-ant-`/`sk-proj-` hyphens, `ghp_…`/`gho_…`/`ghu_…`/`ghs_…`/`ghr_…`, `AIza…`, raw
   JWTs) as well as keyword-tagged values (`api_key=`, `Authorization:`, `bearer`, `token`,
   `secret`, `password` followed by `:` or `=`). Plain prose is not flagged because the
   keyword branch requires the `:=` separator. Snippet length is capped so a long token does
