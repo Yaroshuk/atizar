@@ -7,6 +7,7 @@ import {
   approvalResolved,
   pairToolResults,
   lastApprovalArgs,
+  resolvedApprovalCount,
   type Message,
 } from './messages.js'
 
@@ -133,5 +134,39 @@ describe('lastApprovalArgs', () => {
   it('returns null when the args are not valid JSON', () => {
     const msgs = [assistantWithArgs('saveDraft', '{bad')]
     expect(lastApprovalArgs(msgs, APPROVALS)).toBeNull()
+  })
+})
+
+describe('resolvedApprovalCount', () => {
+  const APPROVALS = ['confirmSend']
+
+  it('0 when no approval has been answered', () => {
+    expect(resolvedApprovalCount([assistantWithToolCall('confirmSend', 'x1')], APPROVALS)).toBe(0)
+  })
+
+  it('1 when one approval call has a matching tool result', () => {
+    const msgs = [assistantWithToolCall('confirmSend', 'x1'), toolResult('x1')]
+    expect(resolvedApprovalCount(msgs, APPROVALS)).toBe(1)
+  })
+
+  it('counts distinct resolved approvals, ignores non-approvals', () => {
+    const msgs = [
+      assistantWithToolCall('confirmSend', 'x1'),
+      toolResult('x1'),
+      assistantWithToolCall('renderLead', 'r1'),
+      toolResult('r1'),
+      assistantWithToolCall('confirmSend', 'x2'),
+      toolResult('x2'),
+    ]
+    expect(resolvedApprovalCount(msgs, APPROVALS)).toBe(2)
+  })
+
+  it('does not count an unanswered approval call', () => {
+    const msgs = [
+      assistantWithToolCall('confirmSend', 'x1'),
+      toolResult('x1'),
+      assistantWithToolCall('confirmSend', 'x2'),
+    ]
+    expect(resolvedApprovalCount(msgs, APPROVALS)).toBe(1)
   })
 })

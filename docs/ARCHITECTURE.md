@@ -132,6 +132,36 @@ are different execution models normalized behind it; the runtime is swappable be
 registry. **Decided:** wire `claude-cli` first (no API key; subscription login). `claude-api`
 and a real agentic loop (Mastra) remain 💤.
 
+## 5a. Dev record/replay layer ✅ (BUILT, `feat/dev-record-replay`)
+
+A development-speed tool that wraps the real provider in a `Provider → Provider` decorator
+(`withRecordReplay`) toggled by the `DEV_RECORD_REPLAY` env var. When set, every agent's
+provider is wrapped at build time (`apps/inbox/server/build-agent.ts`); when unset the
+production path is byte-identical.
+
+**Cassette identity:** keyed by `wf__agent` (the runtime instance id — same agent in two
+workflows = two files; dynamic client instances `wf__agent#N` collapse to the one server key)
+PLUS **step** = `resolvedApprovalCount(input)` from `@platform/core` — the number of human
+approvals already resolved in the run input. HITL splits one logical run into multiple provider
+requests; step 0 = first run, step 1 = after the first approval, etc.
+
+**Storage:** one JSONL file per `wf__agent` under `apps/inbox/.cassettes/`, each line
+`{step, event}` (an AG-UI event). `CassetteStore` handles per-step read/write with atomic
+writes (temp + rename) and never clobbers on an empty capture or a non-ENOENT read error.
+`apps/inbox/.cassettes/` is in `.gitignore` — recordings hold real captured data.
+
+**Mode toggle:** `DEV_RECORD_REPLAY=1` (or `=replay`) → auto (replay a recorded step, else
+call the real provider and record); `=record` → force-overwrite always; unset → no wrapper.
+
+**Share-safety:** `scanCassette(text): Finding[]` (pure, exported from
+`apps/inbox/server/record-replay.ts`) performs a regex/keyword pass flagging emails, phones,
+and token/secret-shaped strings with `{line, kind, snippet}`. It backs the mandatory agent
+scan rule in `CLAUDE.md`. Names and addresses are not reliably regex-detectable — the human
+is the final reviewer.
+
+Spec: `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`. Developer guide (the
+skill seed): `docs/dev-record-replay.md`. Build narrative: `docs/BUILD-LOG.md` §10.
+
 ## 6. Generative UI & the consumer UX 🎯 (slice is a first cut ✅)
 
 **Rendering:** the agent emits tool calls that map to React components via a registry

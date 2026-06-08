@@ -6,6 +6,21 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
+**On `feat/dev-record-replay` (BUILT, browser E2E pending merge):** **dev record/replay** — a
+`Provider → Provider` decorator (`withRecordReplay`) toggled by `DEV_RECORD_REPLAY` that records
+each real provider run to disk once and replays it instantly on every subsequent run. Recordings
+are one JSONL file per `wf__agent` under `apps/inbox/.cassettes/` (gitignored), each line
+`{step, event}`; the **step** is `resolvedApprovalCount(input)` (new pure helper in
+`@platform/core`) — the number of human approvals already resolved, so HITL's multi-request
+split is handled transparently. Mode toggle: `=1`/`=replay` → auto (replay if recorded, else
+record); `=record` → force-overwrite; unset → pure production path. `CassetteStore` uses atomic
+writes; a provider error does not write. `scanCassette` backs a mandatory agent share-safety scan
+(now a hard rule in `CLAUDE.md`). The `buildAgent` wiring passes the `wf__agent` instance key as
+the cassette key; the server is otherwise unchanged. Developer guide → `docs/dev-record-replay.md`;
+spec → `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`; plan →
+`docs/superpowers/plans/2026-06-08-dev-record-replay.md`; build narrative →
+`docs/BUILD-LOG.md` §10.
+
 ### 🐞 Known bugs — agent instances (NEXT, not yet fixed)
 
 - **One-time deliveries spawn duplicate instances.** Some handoffs are a one-shot action on a single

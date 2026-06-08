@@ -79,14 +79,15 @@ export function lastApprovalArgs(
   return null
 }
 
-// The resume-detection counterpart of hasPendingApproval, viewed from the other
-// end: true when some role:"tool" message answers an approval tool call. Used by
-// the (server-side) provider to decide turn-1 vs resume. Correlates by
-// toolCallId because AG-UI strips the tool name from tool result messages.
-export function approvalResolved(
+// The number of DISTINCT approval tool calls that have a matching role:"tool"
+// result — i.e. how many human approvals are already behind us in this run.
+// Used by the dev record/replay layer as the "step" index (step 0 = first run,
+// step 1 = after the 1st approval, …). Counterpart of approvalResolved (which is
+// just `resolvedApprovalCount(...) > 0`). Approval names come from def.approvals.
+export function resolvedApprovalCount(
   messages: readonly Message[],
   approvalNames: readonly string[]
-): boolean {
+): number {
   const approvalCallIds = new Set<string>()
   for (const m of messages) {
     for (const tc of toolCallsOf(m)) {
@@ -95,7 +96,22 @@ export function approvalResolved(
       }
     }
   }
-  return messages.some(
-    (m) => isToolMessage(m) && typeof m.toolCallId === 'string' && approvalCallIds.has(m.toolCallId)
-  )
+  const answered = new Set<string>()
+  for (const m of messages) {
+    if (isToolMessage(m) && typeof m.toolCallId === 'string' && approvalCallIds.has(m.toolCallId)) {
+      answered.add(m.toolCallId)
+    }
+  }
+  return answered.size
+}
+
+// The resume-detection counterpart of hasPendingApproval, viewed from the other
+// end: true when some role:"tool" message answers an approval tool call. Used by
+// the (server-side) provider to decide turn-1 vs resume. Correlates by
+// toolCallId because AG-UI strips the tool name from tool result messages.
+export function approvalResolved(
+  messages: readonly Message[],
+  approvalNames: readonly string[]
+): boolean {
+  return resolvedApprovalCount(messages, approvalNames) > 0
 }

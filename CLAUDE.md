@@ -199,6 +199,21 @@ wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, 
 - **vitest from the app dir** needs `-c ../../vitest.config.ts` (its `test` script has this) —
   vitest stops at `apps/inbox/vite.config.ts` (no test block) and won't walk up. Root `yarn test`
   is the canonical path.
+- **Dev record/replay loop:** `DEV_RECORD_REPLAY=1` wraps every agent's provider in a record/replay
+  decorator (`apps/inbox/server/record-replay.ts`); cassettes are one JSONL per `wf__agent` under
+  `apps/inbox/.cassettes/` (gitignored), keyed by step (= resolved-approval count from
+  `resolvedApprovalCount` in `@platform/core`). First run of each scenario hits real `claude` and
+  writes the cassette; every subsequent run replays instantly. Delete a file or set
+  `DEV_RECORD_REPLAY=record` to force-refresh after a prompt change. Unset = pure production path
+  (no wrapper, byte-identical). Detail → `docs/dev-record-replay.md`; build narrative →
+  `docs/BUILD-LOG.md` §10.
+- **Cassette share-safety (HARD RULE):** a cassette holds REAL captured email/ticket data. Whenever
+  the user asks to commit/push/share/un-gitignore a cassette, the agent MUST: (1) warn explicitly
+  that the file contains real captured data; (2) run `scanCassette` (exported from
+  `apps/inbox/server/record-replay.ts`) over the file(s) and report every finding with `file:line`
+  and the offending snippet; (3) wait for the user to confirm or scrub before proceeding. If the
+  scan finds nothing, say so plainly. Names and postal addresses are not regex-detectable — the
+  human is the final reviewer. **Never share a cassette silently.**
 - Run from the **repo root** with yarn: `yarn dev`, `yarn test`, `yarn typecheck`, `yarn lint`,
   `yarn build`, `yarn format` / `yarn format:check`. (`yarn install` may need `--ignore-engines`
   on Node 20.14 because `@eslint/js@10` wants 20.19+.)

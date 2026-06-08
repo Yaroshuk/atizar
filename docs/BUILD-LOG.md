@@ -402,3 +402,87 @@ location.reload`, not a feature bug; the kill pattern pointed at the wrong (`app
 path — binaries are hoisted to the workspace root.
 Spec: `docs/superpowers/specs/2026-06-08-agent-instances-design.md`; plan:
 `docs/superpowers/plans/2026-06-08-agent-instances.md`.
+
+---
+
+## 10 · Dev record/replay (BUILT, `feat/dev-record-replay`)
+
+A development-speed layer that records each real provider run to disk once, then replays it
+instantly on every subsequent run — so workflow developers iterate without waiting ~30s on the
+real `claude` CLI each time.
+
+**What was built:**
+
+- **`resolvedApprovalCount(messages, approvalNames): number`** — a new pure helper in
+  `@platform/core` (`packages/core/src/messages.ts`), beside the existing `approvalResolved`.
+  It counts the number of distinct approval tool calls that have a matching `role:'tool'`
+  result in the message thread. This becomes the **step index**: step 0 = first run (no
+  approvals answered), step 1 = after the first approval, etc. Because the `claude-cli`
+  provider kills the process at each HITL pause and resumes with a stateless re-prime, a
+  single logical run becomes multiple sequential provider requests; the step count threads
+  those requests into a single coherent recording. Pure and isomorphic; 4 new unit tests.
+
+- **JSONL cassette helpers** — `encodeLine(step, event)`, `parseLine(line)`,
+  `eventsForStep(text, step)`, `dropStep(text, step)` in
+  `apps/inbox/server/record-replay.ts`. All pure functions. Each line in a cassette file is
+  `JSON.stringify({step, event})` — an AG-UI `BaseEvent` tagged with its step index. The
+  JSONL format was chosen over a JSON array so individual step writes do not rewrite the
+  whole file, diffs stay readable, and the format mirrors the line-delimited `stream-json`
+  the `claude` CLI already emits. 5 unit tests.
+
+- **`CassetteStore`** — a class that reads and writes one JSONL file per agent under
+  `apps/inbox/.cassettes/`. `readStep(step)` returns `BaseEvent[] | null` (null when no
+  events recorded for that step). `writeStep(step, events)` replaces just that step's lines,
+  preserving all other steps in the same file. Write is atomic: a temp file is written then
+  `rename`d, so a Ctrl-C mid-write cannot corrupt an existing cassette. A write with zero
+  events is a no-op (an empty capture does not clobber the step). `readFileOrNull` surfaces
+  only `ENOENT` as null; any other read error (`EACCES`, etc.) re-throws rather than silently
+  treating the file as absent. 4 unit tests.
+
+- **`scanCassette(text): Finding[]`** — a pure heuristic safety scan run before a cassette is
+  ever shared or committed. Returns `{line, kind, snippet}[]` where `kind` is `'email'`,
+  `'phone'`, or `'secret'`. The `email` pattern matches standard addresses; `phone` requires
+  a `+`, parentheses, or spacing gaps (and guards against ISO date strings so `2024-01-15`
+  does not read as a phone number); `secret` covers token-shaped prefixes (`sk-…` including
+  `sk-ant-`/`sk-proj-` hyphens, `ghp_…`/`gho_…`/`ghu_…`/`ghs_…`/`ghr_…`, `AIza…`, raw
+  JWTs) as well as keyword-tagged values (`api_key=`, `Authorization:`, `bearer`, `token`,
+  `secret`, `password` followed by `:` or `=`). Plain prose is not flagged because the
+  keyword branch requires the `:=` separator. Snippet length is capped so a long token does
+  not produce a multi-kilobyte finding. Names and postal addresses are deliberately NOT
+  covered — they are not reliably regex-detectable; the CLAUDE.md rule makes the human the
+  final reviewer. 4 unit tests.
+
+- **`withRecordReplay(provider, {key, approvalNames, dir, mode}): Provider`** — the
+  `Provider → Provider` decorator. Per run: compute `step = resolvedApprovalCount(input)`;
+  in `'replay'` mode check for a recorded step and yield it if present (skips the real
+  provider entirely); on a miss (or in `'record'` mode) call the real provider, pass every
+  event through to the client unchanged, and write the collected events once the run
+  completes normally. A provider error unwinds past the write — the cassette is not written
+  on a failed run. `recordReplayMode()` reads `process.env.DEV_RECORD_REPLAY`: unset → `null`
+  (no wrapping); `='record'` → `'record'`; anything else truthy (`'1'`, `'replay'`) →
+  `'replay'`. `cassettesDir()` resolves `apps/inbox/.cassettes/` relative to the module
+  file, not the process cwd. 4 unit tests (miss, hit, force-record overwrite, per-step
+  split across steps 0 and 1).
+
+- **Wiring in `build-agent.ts` / `index.ts`** — `buildAgent` gained a fifth parameter,
+  `instanceKey: string` (the `wf__agent` runtime instance id, already computed in
+  `server/index.ts` and now passed through). After constructing the real provider,
+  `buildAgent` calls `recordReplayMode()` and, if non-null, wraps the provider with
+  `withRecordReplay`. When `DEV_RECORD_REPLAY` is unset the wrapping is skipped entirely —
+  the production path is byte-identical.
+
+- **`.gitignore`** — `apps/inbox/.cassettes/` added. Recordings hold real captured
+  email/ticket data and are never committed by default.
+
+All files: `packages/core/src/messages.ts` (+ test), `apps/inbox/server/record-replay.ts`
+(+ test), `apps/inbox/server/build-agent.ts`, `apps/inbox/server/index.ts`, `.gitignore`.
+Total new unit tests: 17 (in addition to the existing 137 = 154 total).
+
+**Share-safety rule (now in CLAUDE.md, permanent):** before any cassette leaves the machine
+(commit, push, share, un-gitignore) the agent MUST warn, run `scanCassette` and report every
+finding with `file:line`, and wait for the user to confirm or scrub. This rule is in
+`CLAUDE.md` (don't-rediscover gotchas) so it survives across sessions.
+
+Developer guide (the skill seed): `docs/dev-record-replay.md`. Spec:
+`docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`; plan:
+`docs/superpowers/plans/2026-06-08-dev-record-replay.md`.
