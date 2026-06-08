@@ -2,7 +2,7 @@ import { defineAgent, defineWorkflow } from '@platform/core'
 
 export const triageAgent = defineAgent({
   id: 'triage', name: 'TRIAGE', provider: 'claude-cli',
-  instructions: 'Read the user's open tickets on the project board and recommend how to route each.',
+  instructions: 'Read the user’s open tickets on the project board and recommend how to route each.',
   tools: ['list_my_tickets', 'get_ticket', 'render_triage'],
   approvals: [], renders: { render_triage: 'TriageCard' },
   handoffs: ['feature', 'bugfix', 'reply-draft'],
