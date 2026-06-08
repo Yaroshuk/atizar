@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { qualifierAgent, replyAgent, agents } from './inbox.agent.js'
+import { qualifierAgent, replyAgent, leadInboxAgents } from '../workflows/lead-inbox/descriptor.js'
 import { defineProviders } from '@platform/core'
 import { createMockInboxProvider } from '@platform/providers'
 
@@ -18,8 +18,8 @@ describe('inbox agents wiring', () => {
   })
 
   it('every handoff target is a known agent id', () => {
-    const ids = new Set(agents.map((a) => a.id))
-    for (const a of agents) for (const t of a.handoffs ?? []) expect(ids.has(t)).toBe(true)
+    const ids = new Set(leadInboxAgents.map((a) => a.id))
+    for (const a of leadInboxAgents) for (const t of a.handoffs ?? []) expect(ids.has(t)).toBe(true)
   })
 
   it('a registry of factories resolves a runnable provider', () => {

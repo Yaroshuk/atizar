@@ -1,6 +1,6 @@
 import { createTriagePrompts } from '../../agents/triage.prompts.js'
 import { createTicketPrompts } from '../../agents/ticket.prompts.js'
-import type { ServerBinding } from '../lead-inbox/server.js'
+import type { ServerBinding } from '../server-binding.js'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor.js'
 
 export const githubTriageServer = (origin: string): ServerBinding[] => [

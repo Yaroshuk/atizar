@@ -1,12 +1,9 @@
-import type { PromptStrategy } from '@platform/core'
+import type { ServerBinding } from '../server-binding.js'
 import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
 
-// Per-agent server runtime bindings: the prompt strategy + the fully-qualified MCP
-// allow-list (the single-entry-point boundary). `origin` is the workflow id, woven
-// into handoff-emitting render prompts so reused copies route correctly.
-export type ServerBinding = { agentId: string; prompts: PromptStrategy; allowedTools: string[] }
+export type { ServerBinding }
 
 export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
