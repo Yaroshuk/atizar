@@ -52,13 +52,17 @@ export function defineWorkflow(def: WorkflowDescriptor): WorkflowDescriptor {
   const allIds = new Set(ids)
 
   if (!inputAgentIds.has(def.entryAgentId)) {
-    throw new Error(`workflow "${def.id}": entry agent "${def.entryAgentId}" is not a role:input agent`)
+    throw new Error(
+      `workflow "${def.id}": entry agent "${def.entryAgentId}" is not a role:input agent`
+    )
   }
 
   for (const a of def.agents) {
     for (const target of a.agent.handoffs ?? []) {
       if (!allIds.has(target)) {
-        throw new Error(`workflow "${def.id}": agent "${a.agent.id}" hands off to "${target}" which is not in this workflow`)
+        throw new Error(
+          `workflow "${def.id}": agent "${a.agent.id}" hands off to "${target}" which is not in this workflow`
+        )
       }
     }
   }
@@ -69,7 +73,9 @@ export function defineWorkflow(def: WorkflowDescriptor): WorkflowDescriptor {
 
   for (const input of def.inputs) {
     if (!inputAgentIds.has(input.agentId)) {
-      throw new Error(`workflow "${def.id}": input "${input.name}" is bound to "${input.agentId}" which is not a role:input agent`)
+      throw new Error(
+        `workflow "${def.id}": input "${input.name}" is bound to "${input.agentId}" which is not a role:input agent`
+      )
     }
   }
 

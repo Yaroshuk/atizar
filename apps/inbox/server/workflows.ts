@@ -5,7 +5,10 @@ import { githubTriageServer } from '../workflows/github-triage/server.js'
 import type { ServerBinding } from '../workflows/server-binding.js'
 import type { WorkflowDescriptor } from '@platform/core'
 
-export type WorkflowServer = { descriptor: WorkflowDescriptor; bindings: (origin: string) => ServerBinding[] }
+export type WorkflowServer = {
+  descriptor: WorkflowDescriptor
+  bindings: (origin: string) => ServerBinding[]
+}
 
 // Add a workflow = add one entry here.
 export const workflowServers: WorkflowServer[] = [

@@ -5,22 +5,52 @@ import type { TicketHandoffPayload } from '@platform/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
 
 export const githubTriageMeta: Record<string, AgentMeta> = {
-  [triageAgent.id]: { subtitle: 'Reads your board, recommends routing', iconName: 'git', intro: 'Reading your board and triaging your open tickets…' },
-  [featureAgent.id]: { subtitle: 'Plans a routed feature ticket', iconName: 'wrench', intro: 'Analyzing the routed ticket as a feature and drafting a plan…' },
-  [bugfixAgent.id]: { subtitle: 'Analyzes a routed bug ticket', iconName: 'bug', intro: 'Investigating the routed ticket as a bug…' },
-  [replyDraftAgent.id]: { subtitle: 'Drafts a suggested reply (never posts)', iconName: 'pen', intro: 'Drafting a suggested reply to the routed ticket…' },
+  [triageAgent.id]: {
+    subtitle: 'Reads your board, recommends routing',
+    iconName: 'git',
+    intro: 'Reading your board and triaging your open tickets…',
+  },
+  [featureAgent.id]: {
+    subtitle: 'Plans a routed feature ticket',
+    iconName: 'wrench',
+    intro: 'Analyzing the routed ticket as a feature and drafting a plan…',
+  },
+  [bugfixAgent.id]: {
+    subtitle: 'Analyzes a routed bug ticket',
+    iconName: 'bug',
+    intro: 'Investigating the routed ticket as a bug…',
+  },
+  [replyDraftAgent.id]: {
+    subtitle: 'Drafts a suggested reply (never posts)',
+    iconName: 'pen',
+    intro: 'Drafting a suggested reply to the routed ticket…',
+  },
 }
 
 const lastCommentSchema = z.object({ author: z.string(), body: z.string() }).nullable()
 const ticketSchema = z.object({
-  repo: z.string(), number: z.number(), title: z.string(), status: z.string(),
-  priority: z.string(), body: z.string(), url: z.string(), lastComment: lastCommentSchema,
-  needsReply: z.boolean(), recommendation: z.string(),
+  repo: z.string(),
+  number: z.number(),
+  title: z.string(),
+  status: z.string(),
+  priority: z.string(),
+  body: z.string(),
+  url: z.string(),
+  lastComment: lastCommentSchema,
+  needsReply: z.boolean(),
+  recommendation: z.string(),
 })
 
 const toPayload = (t: TriageTicket): TicketHandoffPayload => ({
-  repo: t.repo, number: t.number, title: t.title, status: t.status, priority: t.priority,
-  body: t.body, lastComment: t.lastComment, recommendation: t.recommendation, url: t.url,
+  repo: t.repo,
+  number: t.number,
+  title: t.title,
+  status: t.status,
+  priority: t.priority,
+  body: t.body,
+  lastComment: t.lastComment,
+  recommendation: t.recommendation,
+  url: t.url,
 })
 
 // A GitHub ticket reframed as a customer lead for the Lead-inbox `lead` contract.
@@ -49,7 +79,11 @@ export const githubTriageRenders: RenderSpec[] = [
             deliver(origin, { kind: 'agent', agentId: target }, toPayload(ticket))
           }
           onTreatAsLead={(ticket: TriageTicket) =>
-            deliver(origin, { kind: 'contract', workflow: 'lead-inbox', input: 'lead' }, toLead(ticket))
+            deliver(
+              origin,
+              { kind: 'contract', workflow: 'lead-inbox', input: 'lead' },
+              toLead(ticket)
+            )
           }
         />
       )

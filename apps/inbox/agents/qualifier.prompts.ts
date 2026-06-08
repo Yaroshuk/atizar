@@ -20,8 +20,16 @@ function fromInbox(instructions: string, origin: string): string {
 }
 
 function fromHandedLead(
-  instructions: string, origin: string,
-  lead: { threadId: string; from: string; subject: string; summary: string; category: string; priority: string }
+  instructions: string,
+  origin: string,
+  lead: {
+    threadId: string
+    from: string
+    subject: string
+    summary: string
+    category: string
+    priority: string
+  }
 ): string {
   return [
     instructions,

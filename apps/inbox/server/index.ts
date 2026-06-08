@@ -12,7 +12,9 @@ for (const { descriptor } of workflowServers) {
   for (const { agent } of descriptor.agents) {
     for (const target of agent.handoffs ?? []) {
       if (!ids.has(target)) {
-        throw new Error(`Agent "${agent.id}" in "${descriptor.id}" hands off to unknown agent "${target}"`)
+        throw new Error(
+          `Agent "${agent.id}" in "${descriptor.id}" hands off to unknown agent "${target}"`
+        )
       }
     }
   }
@@ -27,14 +29,24 @@ for (const { descriptor, bindings } of workflowServers) {
   const byId = new Map(descriptor.agents.map((a) => [a.agent.id, a.agent]))
   for (const b of bindings(descriptor.id)) {
     const def = byId.get(b.agentId)
-    if (!def) throw new Error(`server binding for unknown agent "${b.agentId}" in "${descriptor.id}"`)
-    agents[instanceId(descriptor.id, b.agentId)] = buildAgent(def, b.prompts, providerRegistry, b.allowedTools)
+    if (!def)
+      throw new Error(`server binding for unknown agent "${b.agentId}" in "${descriptor.id}"`)
+    agents[instanceId(descriptor.id, b.agentId)] = buildAgent(
+      def,
+      b.prompts,
+      providerRegistry,
+      b.allowedTools
+    )
   }
 }
 
 const runtime = new CopilotRuntime({ agents, runner: new InMemoryAgentRunner() })
 
-const copilot = createCopilotEndpoint({ runtime, basePath: '/api/copilotkit', mode: 'single-route' })
+const copilot = createCopilotEndpoint({
+  runtime,
+  basePath: '/api/copilotkit',
+  mode: 'single-route',
+})
 const app = new Hono()
 app.route('/', copilot)
 serve({ fetch: app.fetch, port: 4000 })

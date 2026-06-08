@@ -20,7 +20,8 @@ export function resolveDelivery(
   const wf = workflows.find((w) => w.id === dest.workflow)
   if (!wf) return { ok: false, error: `unknown workflow "${dest.workflow}"` }
   const input = wf.inputs.find((i) => i.name === dest.input)
-  if (!input) return { ok: false, error: `workflow "${dest.workflow}" has no input "${dest.input}"` }
+  if (!input)
+    return { ok: false, error: `workflow "${dest.workflow}" has no input "${dest.input}"` }
   if (!input.schema.safeParse(payload).success) {
     return { ok: false, error: `payload does not match contract "${dest.workflow}.${dest.input}"` }
   }

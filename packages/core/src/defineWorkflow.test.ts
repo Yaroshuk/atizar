@@ -5,17 +5,33 @@ import { defineAgent } from './defineAgent.js'
 import { defineWorkflow, instanceId } from './defineWorkflow.js'
 
 const reader = defineAgent({
-  id: 'reader', name: 'Reader', provider: 'mock', instructions: 'x',
-  tools: ['t'], approvals: [], renders: {},
+  id: 'reader',
+  name: 'Reader',
+  provider: 'mock',
+  instructions: 'x',
+  tools: ['t'],
+  approvals: [],
+  renders: {},
 })
 const worker = defineAgent({
-  id: 'worker', name: 'Worker', provider: 'mock', instructions: 'x',
-  tools: ['t'], approvals: [], renders: {}, handoffs: [],
+  id: 'worker',
+  name: 'Worker',
+  provider: 'mock',
+  instructions: 'x',
+  tools: ['t'],
+  approvals: [],
+  renders: {},
+  handoffs: [],
 })
 
 const base = {
-  id: 'wf', label: 'WF', iconName: 'inbox',
-  agents: [{ agent: reader, role: 'input' as const }, { agent: worker, role: 'worker' as const }],
+  id: 'wf',
+  label: 'WF',
+  iconName: 'inbox',
+  agents: [
+    { agent: reader, role: 'input' as const },
+    { agent: worker, role: 'worker' as const },
+  ],
   entryAgentId: 'reader',
   inputs: [{ name: 'lead', schema: z.object({ x: z.string() }), agentId: 'reader' }],
 }
@@ -35,7 +51,10 @@ describe('defineWorkflow', () => {
   })
   it('rejects an input bound to a non-input agent', () => {
     expect(() =>
-      defineWorkflow({ ...base, inputs: [{ name: 'lead', schema: z.object({}), agentId: 'worker' }] })
+      defineWorkflow({
+        ...base,
+        inputs: [{ name: 'lead', schema: z.object({}), agentId: 'worker' }],
+      })
     ).toThrow(/input "lead"/i)
   })
   it('rejects duplicate published input names', () => {
@@ -44,16 +63,34 @@ describe('defineWorkflow', () => {
   })
   it('rejects a handoff that leaves the workflow', () => {
     const stray = defineAgent({
-      id: 'reader', name: 'R', provider: 'mock', instructions: 'x',
-      tools: ['t'], approvals: [], renders: {}, handoffs: ['nope'],
+      id: 'reader',
+      name: 'R',
+      provider: 'mock',
+      instructions: 'x',
+      tools: ['t'],
+      approvals: [],
+      renders: {},
+      handoffs: ['nope'],
     })
     expect(() =>
-      defineWorkflow({ ...base, agents: [{ agent: stray, role: 'input' as const }, { agent: worker, role: 'worker' as const }] })
+      defineWorkflow({
+        ...base,
+        agents: [
+          { agent: stray, role: 'input' as const },
+          { agent: worker, role: 'worker' as const },
+        ],
+      })
     ).toThrow(/hands off to "nope"/i)
   })
   it('rejects duplicate agent ids', () => {
     expect(() =>
-      defineWorkflow({ ...base, agents: [{ agent: reader, role: 'input' }, { agent: reader, role: 'input' }] })
+      defineWorkflow({
+        ...base,
+        agents: [
+          { agent: reader, role: 'input' },
+          { agent: reader, role: 'input' },
+        ],
+      })
     ).toThrow(/duplicate agent/i)
   })
 })

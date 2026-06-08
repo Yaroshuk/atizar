@@ -30,8 +30,13 @@ export const leadInboxRenders: RenderSpec[] = [
     toolName: 'renderVerdict',
     parameters: z.object({
       origin: z.string(),
-      threadId: z.string(), from: z.string(), subject: z.string(), summary: z.string(),
-      category: z.string(), priority: z.string(), reason: z.string(),
+      threadId: z.string(),
+      from: z.string(),
+      subject: z.string(),
+      summary: z.string(),
+      category: z.string(),
+      priority: z.string(),
+      reason: z.string(),
     }),
     render: ({ parameters }, deliver, registry) => {
       const { origin, threadId, from, subject, summary, category, priority, reason } = parameters
@@ -52,8 +57,11 @@ export const leadInboxRenders: RenderSpec[] = [
         <Verdict
           data={data}
           onDraftReply={() =>
-            deliver(origin, { kind: 'agent', agentId: 'reply' },
-              { threadId, from, subject, summary, category, priority })
+            deliver(
+              origin,
+              { kind: 'agent', agentId: 'reply' },
+              { threadId, from, subject, summary, category, priority }
+            )
           }
         />
       )
@@ -71,7 +79,9 @@ export const leadInboxHitl: HitlSpec[] = [
       return (
         <Approval
           data={{ threadId: args.threadId, body: args.body }}
-          onApprove={() => { if (status === 'executing' && respond) void respond('approved') }}
+          onApprove={() => {
+            if (status === 'executing' && respond) void respond('approved')
+          }}
         />
       )
     },
