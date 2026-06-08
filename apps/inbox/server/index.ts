@@ -31,12 +31,8 @@ for (const { descriptor, bindings } of workflowServers) {
     const def = byId.get(b.agentId)
     if (!def)
       throw new Error(`server binding for unknown agent "${b.agentId}" in "${descriptor.id}"`)
-    agents[instanceId(descriptor.id, b.agentId)] = buildAgent(
-      def,
-      b.prompts,
-      providerRegistry,
-      b.allowedTools
-    )
+    const key = instanceId(descriptor.id, b.agentId)
+    agents[key] = buildAgent(def, b.prompts, providerRegistry, b.allowedTools, key)
   }
 }
 

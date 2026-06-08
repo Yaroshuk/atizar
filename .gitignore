@@ -19,3 +19,6 @@ dist-types/
 # stray verification screenshots
 pipeline-*.png
 .playwright-mcp/
+
+# Dev record/replay cassettes — real captured email/ticket data, never commit
+apps/inbox/.cassettes/
