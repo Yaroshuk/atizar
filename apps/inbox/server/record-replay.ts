@@ -58,9 +58,9 @@ export interface Finding {
 
 const PATTERNS: ReadonlyArray<readonly [Finding['kind'], RegExp]> = [
   ['email', /[\w.+-]+@[\w-]+\.[\w.-]+/g],
-  // Phone: requires a +, parens, or spacing — and is guarded against ISO dates
-  // (e.g. 2024-01-15) so timestamps in cassette JSON don't read as phone numbers.
-  ['phone', /(?<![\d-])(?!\d{4}-\d{2}-\d{2})[(]?\+?\d[\d ()-]{7,}\d(?!\d)/g],
+  // Phone: requires a real separator (space, paren, or leading +) so pure
+  // digit-hyphen runs — UUID fragments, version numbers, ISO dates — don't match.
+  ['phone', /(?<![\d-])(?!\d{4}-\d{2}-\d{2})(?=[\d ()+-]*[ ()+])[(]?\+?\d[\d ()-]{7,}\d(?!\d)/g],
   // Secret: token-shaped (sk-… incl. sk-ant-/sk-proj- hyphens, ghp_…, AIza…, raw
   // JWTs) OR keyword-tagged (api_key= / Authorization: …). Keyword branch keeps
   // the :/= requirement so plain prose ("the secret to success") is NOT flagged.

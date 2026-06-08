@@ -85,6 +85,11 @@ describe('scanCassette', () => {
     const found = scanCassette('{"createdAt":"2024-01-15"}')
     expect(found.some((f) => f.kind === 'phone')).toBe(false)
   })
+
+  it('does NOT flag a UUID fragment as a phone number', () => {
+    const found = scanCassette('{"messageId":"1032c0b2-0029-446f-96e5-40eb90e4957c"}')
+    expect(found.some((f) => f.kind === 'phone')).toBe(false)
+  })
 })
 
 describe('CassetteStore', () => {
