@@ -81,6 +81,19 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads
   changing state via a `useRef` mirror — a state-dependent callback freezes its initial snapshot and
   silently no-ops. Invisible to typecheck + unit tests → **only the browser catches it**.
+- **Kill stale dev servers before browser-verifying.** A `yarn dev` from a previous session can keep
+  running and squat `:4000`/`:5173`; a fresh `yarn dev` then hits `EADDRINUSE` and crashes while the
+  OLD server keeps answering `curl` with **stale pre-branch code** (silently misleading). Before
+  driving the browser: `pkill -9 -f "apps/inbox/node_modules/.bin/(tsx|vite|concurrently)"`, free the
+  ports (`lsof -tiTCP:4000,:5173 | xargs kill -9`), then confirm the boot log shows
+  `server on http://localhost:4000` from THIS run (no `EADDRINUSE`).
+- **GitHub access is GraphQL-budgeted.** Projects v2 reads AND `gh search` go through the GraphQL API
+  (5000 points/hr, shared across all gh callers). A `gh project item-list` over the full board is
+  point-heavy; that's why `list_my_tickets` uses a single scoped `search` query instead. On
+  `API rate limit already exceeded`, diagnose with `gh api rate_limit --jq .resources.graphql`
+  (rate_limit is REST — free to poll) and wait for `.reset`. Granting `read:project`/`project` needs
+  `gh auth refresh -s read:project,project --hostname github.com` run in a **real terminal** (the
+  device-code flow needs a TTY; the `!`-prefix shell can't do it).
 
 - **Gmail MCP:** the _official_ Google Gmail MCP (`gmailmcp.googleapis.com`) is a **Workspace
   Developer Preview** — it 403s (`caller does not have permission`) for personal `@gmail.com`

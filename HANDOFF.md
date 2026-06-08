@@ -53,6 +53,18 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
   scoping (beyond the single assignee), or Projects-v2 status writes are explicitly **out of scope**
   unless the read-only constraint is revisited (it is a hard rule — see CLAUDE.md / memory).
 
+### Known issues / tech debt (GitHub triage — not blocking, user accepted)
+
+- **`list_my_tickets` chip shows "Running" forever** in the agent thread even after the run is Done.
+  It's a data tool with no registered render component, so `useRenderToolCall`'s default chip never
+  flips to done (Gmail's `get_latest_email` has the same look). Cosmetic. Fix = register a tiny
+  renderer for data tools, or hide unregistered tool chips.
+- **TRIAGE couriers every ticket through `render_triage`** (the model re-emits the array token by
+  token). Mitigated for now (status filter + cap 20 + trimmed body/comment + 180s timeout), but it's
+  a latent scaling limit — more/larger tickets re-introduce slow runs / timeouts. Robust fix: have
+  the client read the `list_my_tickets` tool RESULT from the message stream directly instead of the
+  model re-emitting it into the render tool.
+
 ## Other next-ups (suggested order)
 
 1. **Finish the split — `@platform/react` + `@platform/server` extraction (deferred):** the
