@@ -335,3 +335,58 @@ Known cosmetic (not blocking): per-instance `handoffNotes` accumulate, so a re-s
 shows its earlier "sent" note alongside the new "received" one (a side-log, not the thread).
 Spec: `docs/superpowers/specs/2026-06-08-workflow-separation-design.md`; plan:
 `docs/superpowers/plans/2026-06-08-workflow-separation.md`.
+
+## 9 · Dynamic agent instances (BUILT, `feat/agent-instances`, browser-verified)
+
+**Problem.** There was exactly one runtime copy of each agent per workflow (`wf__agent`), mounted idle
+for the session; `deliver` overwrote its `messages` and re-ran it. So handing a second item to a busy
+agent **overwrote the in-flight run** — no concurrency.
+
+**What shipped.** A busy agent now spawns additional concurrent copies, bounded by a per-agent cap,
+with overflow queued; the pipeline shows the live copies as nested instance cards.
+
+- **`maxInstances` on the passport** — `defineAgent` gains `maxInstances` (zod `.default(2)`; a cap of
+  1 = singleton, no separate flag). The two workflow input agents (`triage`, `qualifier`) are set to 1.
+  (zod input/output split: `AgentDefinitionInput` for callers, `AgentDefinition` for the parsed value.)
+- **Dynamic proxied instances — server unchanged.** The client creates an instance on demand via
+  `copilotkit.registerProxiedAgent({ agentId: localId, runtimeAgentId: wf__agent })` (localId =
+  `wf__agent#<seq>`), seeds the handoff message, `runAgent`s it, subscribes for status, and
+  `unregister`s on finalize. The server still registers ONE agent per `wf__agent`; stateless re-prime
+  makes concurrent runs on distinct threads safe. No `AgentsFactory`, no lane pool. Nothing exists at
+  startup — instance count tracks actual work, so a large agent catalog costs nothing idle.
+- **Cap + queue.** `spawn` starts an instance when live copies `< maxInstances`, else enqueues per
+  runtimeKey; a freed slot (on a torn-down instance) drains the next queued item. The cap holds even
+  against same-tick bursts because `useAgentInstances` keeps `instRef` as the **synchronous** source of
+  truth (a `commit` helper mutates the ref alongside `setInstances`) — reading the React `instances`
+  state instead would let several same-tick `spawn`s all pass the check before any commit.
+- **Lifecycle.** A `done` instance is torn down immediately, EXCEPT: a workflow **input** agent (kept as
+  the pipeline root) and a **parent with a live child** (kept, shown Working). An **errored** instance
+  is kept and keeps its slot (gated on the authoritative local `lifecycle`, not the lagging ref status).
+- **Pipeline = instance tree.** `pipelineModel.buildPipeline` (pure) builds repeated depth-2
+  `parent → [children grouped by agentId]` blocks: 1 instance → a single card; ≥2 of one agent → an
+  agent mini-header (`N active`) + the instances nested with L-connectors; a `queued: N` line under the
+  group; a dispatched instance that itself dispatches reappears as its own parent block (one agent can
+  show twice). Labels: `#<number> · <title>` (github) / sender (email), title truncates with ellipsis.
+- **Type card aggregate.** The right-grid `AgentCard` is the agent TYPE; `aggregate.ts` reduces its live
+  instances to `N active · M awaiting approval` (priority awaiting_approval > error > running > done).
+- **Decomposition.** Pure + unit-tested: `instancesCore` (cap), `statusFrom` (shared with
+  `useAgentStatus`), `aggregate`, `pipelineModel`. Integration: `useAgentInstances` (the manager),
+  `InboxView` (deliver→spawn, Start→spawn, aggregate), `PipelineColumn` (render), `AgentCard`.
+
+137 unit tests; `tsc --build` + lint + prettier all green. **Browser-verified E2E (real Magma board,
+read-only):** started TRIAGE (proxy `triage#1`, read the real 14-ticket board, rendered the TriageCard);
+routed **3 "Draft reply" tickets in one tick** → pipeline showed **REPLY DRAFT `2 active` + two
+L-connected instance cards (#5197, #5641) + `queued: 1`** (cap held); the queue **drained** (the 3rd
+started when a slot freed) and all torn down to the kept TRIAGE root; a single routed ticket renders as
+one card (no header); the type card showed the aggregate; **no page reload at any point**.
+
+Found-and-fixed during build/verify: (1) errored instances were torn down (stale-ref status read →
+gate on local `lifecycle`); (2) the pipeline `shown` set wrongly kept done descendants (dropped the
+buggy downward fixpoint, upward-only); (3) the cap leaked under same-tick deliveries (synchronous
+`instRef`). Known-benign: a transient `Agent <localId> not found` console warning on teardown (an
+unregister/pending-probe race). **Environment lesson** (now in CLAUDE.md): an "app reloads itself ~30s
+into a run" symptom was 5 stale dev stacks contending for `:5173` → Vite `vite:ws:disconnect →
+location.reload`, not a feature bug; the kill pattern pointed at the wrong (`apps/inbox`) `node_modules`
+path — binaries are hoisted to the workspace root.
+Spec: `docs/superpowers/specs/2026-06-08-agent-instances-design.md`; plan:
+`docs/superpowers/plans/2026-06-08-agent-instances.md`.

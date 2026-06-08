@@ -102,12 +102,20 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads
   changing state via a `useRef` mirror — a state-dependent callback freezes its initial snapshot and
   silently no-ops. Invisible to typecheck + unit tests → **only the browser catches it**.
-- **Kill stale dev servers before browser-verifying.** A `yarn dev` from a previous session can keep
-  running and squat `:4000`/`:5173`; a fresh `yarn dev` then hits `EADDRINUSE` and crashes while the
-  OLD server keeps answering `curl` with **stale pre-branch code** (silently misleading). Before
-  driving the browser: `pkill -9 -f "apps/inbox/node_modules/.bin/(tsx|vite|concurrently)"`, free the
-  ports (`lsof -tiTCP:4000,:5173 | xargs kill -9`), then confirm the boot log shows
-  `server on http://localhost:4000` from THIS run (no `EADDRINUSE`).
+- **Kill stale dev servers before browser-verifying — the binaries are in the ROOT `node_modules/.bin`,
+  not `apps/inbox/`.** yarn-classic hoists `tsx`/`vite`/`concurrently` to the workspace root, so the
+  correct kill is `pkill -9 -f "AiWorkflow/node_modules/.bin/(tsx|vite|concurrently)"` (the old
+  `apps/inbox/node_modules/.bin/...` pattern silently matches nothing and leaves stacks alive). ALWAYS
+  `ps aux | grep -E "AiWorkflow/node_modules/.bin/(tsx|vite|concurrently)"` first — multiple sessions
+  stack up (seen: 5 at once). **Why it matters:** several live Vite instances contend for `:5173`
+  (no `strictPort`, so extras grab `:5174+`) and starve the loaded tab's HMR WebSocket; on a CPU spike
+  (the ~30s `claude` subprocess + 3 stdio MCP servers per agent run) the WS drops and Vite fires its
+  `vite:ws:disconnect → waitForSuccessfulPing → location.reload()` path — a **full page reload that
+  resets ALL React state** (and is NOT logged as `[vite] page reload`, so grepping the dev log for that
+  marker finds nothing). This presents as "the app reloaded itself ~30s into a run" and is an
+  ENVIRONMENT artifact, not an app bug. Fix: kill every stale stack (root path), free the ports
+  (`lsof -tiTCP:4000,:5173,:5174 | xargs kill -9`), start ONE `yarn dev`, confirm a single
+  `server on http://localhost:4000` and one vite on `:5173` (no `EADDRINUSE`).
 - **GitHub access is GraphQL-budgeted.** Projects v2 reads AND `gh search` go through the GraphQL API
   (5000 points/hr, shared across all gh callers). A `gh project item-list` over the full board is
   point-heavy; that's why `list_my_tickets` uses a single scoped `search` query instead. On
@@ -158,6 +166,29 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   agent id; `deliver` runs the target in the BACKGROUND — no auto-open, no auto-switch (badge + an
   "Open in <wf>" button instead). Handoff-emitting render tools carry an `origin` param (injected by
   the per-instance prompt) so one shared render registration routes to the right copy.
+- **Agent instances are DYNAMIC client-side proxies — the server still has ONE agent per `wf__agent`.**
+  (As of `feat/agent-instances`, §9.) Instead of pre-mounting one fixed runtime per agent, the client
+  creates an instance on demand via `copilotkit.registerProxiedAgent({ agentId: localId, runtimeAgentId:
+wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, and `unregister`s on
+  finalize. The server is UNCHANGED (one agent per `wf__agent`; stateless re-prime makes concurrent runs
+  on different threads safe). It all lives in `client/src/useAgentInstances.ts` (cap/queue = pure
+  `instancesCore.ts`; status = pure `statusFrom.ts`; pipeline render-model = pure `pipelineModel.ts`).
+  Concurrency is bounded per-agent by `defineAgent.maxInstances` (default 2; `triage`+`qualifier` = 1 =
+  singleton — there is NO separate singleton flag). Overflow waits in a per-agent queue and auto-starts on
+  a freed slot. A `done` instance is torn down immediately EXCEPT input agents (kept as the pipeline root)
+  and parents with a live child (kept, shown Working). **The cap holds against SAME-TICK deliveries only
+  because `instRef` is the synchronous source of truth** — `useAgentInstances` mutates `instRef.current`
+  synchronously (a `commit` helper) alongside `setInstances`, so three `spawn`s in one tick see each other
+  (reading the `instances` state instead lets all three pass, since state isn't committed until render).
+  Invisible to typecheck/unit tests → **only the browser catches a cap leak** (route 3 at once → must read
+  2 active + `queued: 1`).
+- **Pipeline = instance tree, not agent list.** `pipelineModel.buildPipeline` emits repeated depth-2
+  `parent → [children grouped by agentId]` blocks: 1 instance of an agent → a single card; ≥2 → an agent
+  mini-header (`N active`) + the instances nested with L-connectors + a `queued: N` line; a dispatched
+  instance that itself dispatches reappears as its own parent block below (so one agent can show twice).
+  The "big card" (right grid) is the agent TYPE and shows the aggregate (`aggregate.ts`:
+  `N active · M awaiting approval`). On teardown a transient `Agent <localId> not found` console warning is
+  benign (an unregister/pending-probe race, same class as the startup warnings).
 - **Per-package `outDir`/`tsBuildInfoFile`:** under `tsc --build`, the base's relative `outDir`
   made two packages collide on `dist-types/index.d.ts` (TS5055). `@platform/providers` +
   `@platform/integrations` set a package-local `outDir`+`tsBuildInfoFile`; `@platform/core` relies
