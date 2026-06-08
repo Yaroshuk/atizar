@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Status, Lifecycle } from './status'
-import { hasPendingApproval, type Message } from '@platform/core'
+import { type Message } from '@platform/core'
+import { statusFrom } from './statusFrom'
 
 // The subset of AG-UI agent subscriber callbacks this hook listens to.
 type AgentSubscriber = {
@@ -44,7 +45,5 @@ export const useAgentStatus = (
     return () => unsubscribe()
   }, [agent])
 
-  if (lifecycle === 'error') return 'error'
-  if (hasPendingApproval(messages, approvalNames)) return 'awaiting_approval'
-  return lifecycle
+  return statusFrom(lifecycle, messages, approvalNames)
 }
