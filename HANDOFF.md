@@ -6,7 +6,7 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
-**On `feat/tool-result-surfacing` (BUILT, browser-verified):** the **tool-result surfacing +
+**On `master` (MERGED `8b67b83`, BUILT, browser-verified):** the **tool-result surfacing +
 consumer-thread polish** pass. Root cause unified three symptoms: MCP tool RESULTS never
 reached the client (`claude-stream` emitted only START/ARGS/END). Now the provider emits
 `TOOL_CALL_RESULT` for surfaced tools, which (a) flips a tool chip Running→Done (the default
