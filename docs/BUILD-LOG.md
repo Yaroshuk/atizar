@@ -270,3 +270,68 @@ only from the payload (it cited the "can't reproduce on Mars" last comment, made
 → verdict sales/hot → Draft reply handoff → reply draft → amber approval; pipeline lit qualifier
 Working → reply Approve). Follow-up deferred: a proper workflow-separation pass (the user flagged
 splitting flows comes later) and per-workflow desktop chrome.
+
+---
+
+## 8 · Workflow separation — self-contained modules, roles, cross-workflow contract (BUILT, `feat/workflow-separation`, browser-verified)
+
+A "workflow" was a filter over one shared everything (flat server agent map, one shared
+`InboxView`, one `META`, render tools registered globally). Now each workflow is a **self-contained
+module** and workflows are **isolated boxes** that talk only through a typed contract.
+
+What changed:
+
+- **`@platform/core` `defineWorkflow`** (`packages/core/src/defineWorkflow.ts`) — a pure, structure-
+  only validator (mirrors `defineAgent`) for a `WorkflowDescriptor` (`{id, label, iconName, agents:
+  {agent, role}[], entryAgentId, inputs}`). Adds `instanceId(workflowId, agentId)` (`wf__agent`) and
+  the `Destination` union (`{kind:'agent',agentId}` | `{kind:'contract',workflow,input}`).
+- **Agent roles `input | worker`** — a property of an agent's *placement*, not the def. `input` =
+  user-startable + the only cross-workflow delivery target; `worker` = reachable only via an
+  intra-workflow handoff. Replaces the old `handoffTargets`/`canStart` derivation.
+- **Module layout** — `apps/inbox/workflows/<id>/{descriptor.ts (core), server.ts (prompts +
+  allow-lists), client.tsx (render specs + META)}`, plus thin aggregators
+  (`workflows/index.ts`, `server/workflows.ts`, `client/src/workflows.ts`). Adding a workflow = a
+  folder + one line per aggregator; no shared file bodies edited. The old `inbox.agent.ts`/
+  `github.agent.ts` flat defs were deleted (moved into descriptors).
+- **Published-contract cross-workflow door (Variant 1)** — a workflow publishes named typed inputs
+  `{name, schema, agentId}`; the public face is `{name, schema}` (the bound agent is private). A
+  source addresses `{kind:'contract', workflow, input}` — never a foreign agent. `resolveDelivery`
+  (`client/src/deliver.ts`, pure + unit-tested) validates the payload against the contract schema
+  before routing to the private input agent.
+- **All agents mounted idle (Variant A)** — the shell mounts an invisible `AgentRuntime` for **every**
+  workflow × agent, keyed by instance id, for the whole session (`AgentRuntime` gets `def={{...def,
+  id: instanceId(...)}}` so each placement is an independent `useAgent`). The active-workflow state
+  only selects the view; `handles` is global and never cleared on switch (conversations persist).
+  This makes a cross-workflow target always-ready (no mount-then-run race) and is what makes the same
+  agent reusable as independent copies.
+- **One `deliver` seam** (`InboxView`) replaces `requestHandoff`: resolves the target, seeds
+  (`encodeHandoff`) + `runAgent` in the **background**. **No auto-open** of the target modal (the old
+  `setOpenId` is gone) and **no auto-switch** of the workflow. Cross-workflow delivery raises an
+  unread **badge** on the target's switcher tab + an **"Open in <workflow>"** button in the source
+  thread; the human navigates. `deliver` is a STABLE `useCallback` (`[copilotkit]`) reading the
+  active workflow via a `useRef` mirror — required because `useRenderTool` captures its render
+  closure once.
+- **Origin-routed reuse** — the two handoff-emitting render tools (`renderVerdict`, `render_triage`)
+  carry an `origin` (workflow id) param, injected by the per-instance prompt (same mechanism
+  `ticket.prompts` uses for `kind`). A single shared render registration reads `parameters.origin`
+  and routes the handoff to the correct copy, so handoff-emitting agents reuse cleanly. Render specs
+  are declared as data per module and registered **once per unique tool name** (`useWorkflowRenders`).
+- **Concrete cross-workflow demo** — the TRIAGE card's "Treat as lead → Lead inbox" maps a ticket to
+  the lead-inbox `lead` contract (`HandoffPayloadSchema`); the qualifier gained a `fromHandedLead`
+  prompt path that re-qualifies a handed lead instead of reading the inbox.
+
+122 unit tests; `tsc --build` + lint + prettier all green. **Browser-verified E2E (real board +
+real Gmail):** (1) Lead inbox: qualifier → verdict (spam/cold) → "Draft reply" **ran** REPLY but did
+**not** auto-open its modal; REPLY ran to *awaiting approval*. (2) GitHub triage read the **real**
+Magma board read-only (13 tickets bucketed by real Status) — only `list_my_tickets`/`get_ticket`
+exposed, model has no Bash, nothing mutated. (3) Cross-workflow: "Treat as lead" on #5784 ran
+`lead-inbox__qualifier` **in the background** (it took the handed-lead path, re-qualified printernet
+as other/warm), the **Lead inbox tab showed a badge "1"**, the view **stayed** on GitHub triage, and
+"Open in lead-inbox" switched + cleared the badge. (4) **State persisted**: REPLY stayed *awaiting
+approval* across the round-trip of workflow switches. (5) All six instance-ids mounted (visible in
+the per-agent `/threads` probes); no "Agent 'default' not found" throw; role-based START.
+
+Known cosmetic (not blocking): per-instance `handoffNotes` accumulate, so a re-seeded agent still
+shows its earlier "sent" note alongside the new "received" one (a side-log, not the thread).
+Spec: `docs/superpowers/specs/2026-06-08-workflow-separation-design.md`; plan:
+`docs/superpowers/plans/2026-06-08-workflow-separation.md`.
