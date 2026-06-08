@@ -15,3 +15,7 @@ dist-types/
 
 # brainstorm visual companion scratch
 .superpowers/
+
+# stray verification screenshots
+pipeline-*.png
+.playwright-mcp/
