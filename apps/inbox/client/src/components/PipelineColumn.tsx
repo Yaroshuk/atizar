@@ -1,23 +1,6 @@
 import type { PipelineBlock } from '../pipelineModel'
-import type { Status } from '../status'
+import { TINT, STATE_WORD } from '../statusDisplay'
 import { Icon } from './Icon'
-
-// Live status -> mini-card tint class. Idle never reaches here (filtered out by the
-// builder, which only shows active/input/kept instances).
-const TINT: Record<Status, string> = {
-  idle: '',
-  running: 'run',
-  done: 'run',
-  awaiting_approval: 'await',
-  error: 'err',
-}
-const STATE_WORD: Record<Status, string> = {
-  idle: '',
-  running: 'Working',
-  done: 'Done',
-  awaiting_approval: 'Approve',
-  error: 'Error',
-}
 
 type PipelineColumnProps = {
   blocks: PipelineBlock[]
@@ -60,7 +43,7 @@ export const PipelineColumn = ({ blocks, onOpen }: PipelineColumnProps) => (
 
             {block.groups.length > 0 && (
               <>
-                <div className='pl-arrow' />
+                <div className='connector-down'>↓</div>
                 <div className='pl-cont'>
                   {block.groups.map((g) => {
                     const nested = g.instances.length >= 2 || g.queued > 0

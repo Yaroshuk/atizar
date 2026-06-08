@@ -6,6 +6,20 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
+### 🐞 Known bugs — agent instances (NEXT, not yet fixed)
+
+- **One-time deliveries spawn duplicate instances.** Some handoffs are a one-shot action on a single
+  item — e.g. the email agent gets ONE email and the human clicks "Draft reply" 3×; today that spawns
+  3 reply instances for the same email. A one-time/idempotent delivery should dedupe (one instance per
+  source item) — clicking again should focus/no-op, not spawn a duplicate. (Dedupe was deferred in the
+  spec; promote it.) Needs a delivery identity (e.g. source item id / threadId on the payload).
+- **Second awaiting-approval instance's approve button is dead.** With two reply instances both in
+  `awaiting_approval`, approving one worked; on the OTHER the "Save draft" / approve button did nothing.
+  Likely the HITL `respond` callback is captured for only one instance (the active/last one) — the
+  generative-UI render/HITL registration is shared and may not route `respond` to the right proxy when
+  multiple instances await at once. Investigate `useWorkflowRenders`/`useHumanInTheLoop` + per-instance
+  routing (cf. the `origin`-param pattern) so each awaiting instance's approval resumes ITS own run.
+
 **On `feat/agent-instances` (BUILT, browser-verified, unmerged):** **dynamic agent instances** — a
 busy agent now spawns additional concurrent copies for new handed-off items instead of overwriting the
 in-flight run. Each instance is a client-side **proxied agent** (`copilotkit.registerProxiedAgent`,

@@ -8,6 +8,7 @@ import { aggregateAgent, aggregateLabel } from './aggregate'
 import { buildPipeline, type PInstance } from './pipelineModel'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal, type HandoffNote } from './components/AgentModal'
+import { InstancePickerModal } from './components/InstancePickerModal'
 import { PipelineColumn } from './components/PipelineColumn'
 import { WorkflowSwitcher } from './components/WorkflowSwitcher'
 import { Icon } from './components/Icon'
@@ -27,6 +28,7 @@ export const InboxView = () => {
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
   const [openId, setOpenId] = useState<string | null>(null) // a live instance localId
   const [openTypeId, setOpenTypeId] = useState<string | null>(null) // an agent id (no live instance)
+  const [openPickerId, setOpenPickerId] = useState<string | null>(null) // an agent id (≥2 instances)
   // Handoff notes keyed by the live instance localId (sent on the source, received on
   // the spawned target). A note is attached when the deliver fires; the source instance
   // exists (dispatchers are cap-1) and the target localId is the freshly spawned copy.
@@ -145,17 +147,17 @@ export const InboxView = () => {
       payload: null,
     })
 
-  // Open an agent: its first live instance if one exists, else a type view (intro + START)
-  // so an idle card is always clickable. Opening one view clears the other.
+  // Open an agent by count of its live instances: 0 → a type view (intro + START, so an
+  // idle card is always clickable); 1 → that instance's thread; ≥2 → an instance picker
+  // (cards, not a thread — the human picks which copy to open). Opening clears the others.
   const openAgent = (agentId: string) => {
-    const live = instances.find((x) => x.workflowId === workflow.id && x.agentId === agentId)
-    if (live) {
-      setOpenTypeId(null)
-      setOpenId(live.localId)
-    } else {
-      setOpenId(null)
-      setOpenTypeId(agentId)
-    }
+    const live = instances.filter((x) => x.workflowId === workflow.id && x.agentId === agentId)
+    setOpenId(null)
+    setOpenTypeId(null)
+    setOpenPickerId(null)
+    if (live.length === 0) setOpenTypeId(agentId)
+    else if (live.length === 1) setOpenId(live[0].localId)
+    else setOpenPickerId(agentId)
   }
 
   // Big-card aggregate: reduce an agent's live instance statuses to a single headline.
@@ -189,17 +191,23 @@ export const InboxView = () => {
   const openTypeAgent = openTypeId
     ? workflow.agents.find((a) => a.agent.id === openTypeId)?.agent
     : undefined
+  // The open PICKER view (an agent running ≥2 instances) + its live instances.
+  const pickerInstances = openPickerId
+    ? instances.filter((x) => x.workflowId === workflow.id && x.agentId === openPickerId)
+    : []
 
   const switchWorkflow = (id: string) => {
     setOpenId(null)
     setOpenTypeId(null)
+    setOpenPickerId(null)
     setUnread((u) => ({ ...u, [id]: 0 }))
     setActiveWorkflowId(id)
   }
 
-  // Jump to a live instance by localId (used by a handoff note's "Open" button).
+  // Jump to a live instance by localId (handoff note's "Open" button, or a picker card).
   const openInstanceById = (localId: string) => {
     setOpenTypeId(null)
+    setOpenPickerId(null)
     setOpenId(localId)
   }
 
@@ -213,13 +221,7 @@ export const InboxView = () => {
       />
 
       <div className='workspace-body'>
-        <PipelineColumn
-          blocks={blocks}
-          onOpen={(localId) => {
-            setOpenTypeId(null)
-            setOpenId(localId)
-          }}
-        />
+        <PipelineColumn blocks={blocks} onOpen={openInstanceById} />
         <div className='main'>
           <div className='comp-head'>
             <span className='ch-label'>
@@ -306,6 +308,23 @@ export const InboxView = () => {
               if (id) setOpenId(id) // transition the modal onto the now-running instance
             }}
             onClose={() => setOpenTypeId(null)}
+          />
+        )}
+
+        {/* Picker: an agent running ≥2 instances opens to a card per instance (not a
+            thread); clicking a card opens that specific copy. */}
+        {openPickerId && pickerInstances.length >= 2 && (
+          <InstancePickerModal
+            title={pickerInstances[0].name}
+            iconName={pickerInstances[0].iconName}
+            instances={pickerInstances.map((x) => ({
+              localId: x.localId,
+              label: x.label,
+              name: x.name,
+              status: x.status,
+            }))}
+            onOpenInstance={openInstanceById}
+            onClose={() => setOpenPickerId(null)}
           />
         )}
       </div>
