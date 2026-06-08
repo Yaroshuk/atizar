@@ -157,7 +157,7 @@ export function withRecordReplay(
 ): Provider {
   return {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
-      const messages = (input?.messages ?? []) as Message[]
+      const messages = (input.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames)
       const store = new CassetteStore(opts.dir, opts.key)
 
@@ -174,6 +174,7 @@ export function withRecordReplay(
         captured.push(event)
         yield event
       }
+      // Write only on normal completion — a provider throw unwinds past here, leaving the cassette clean.
       await store.writeStep(step, captured)
     },
   }
