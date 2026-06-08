@@ -20,7 +20,7 @@ full chronological build history see `docs/BUILD-LOG.md`.
   multiple instances await at once. Investigate `useWorkflowRenders`/`useHumanInTheLoop` + per-instance
   routing (cf. the `origin`-param pattern) so each awaiting instance's approval resumes ITS own run.
 
-**On `feat/agent-instances` (BUILT, browser-verified, unmerged):** **dynamic agent instances** — a
+**On `master` (MERGED `5d13f3f`, BUILT, browser-verified):** **dynamic agent instances** — a
 busy agent now spawns additional concurrent copies for new handed-off items instead of overwriting the
 in-flight run. Each instance is a client-side **proxied agent** (`copilotkit.registerProxiedAgent`,
 localId `wf__agent#<seq>`) created on demand, run, and `unregister`'d on finalize; the server is
@@ -39,8 +39,16 @@ renders as one card, input agent kept, done workers torn down — **no page relo
 `docs/superpowers/plans/2026-06-08-agent-instances.md`; detail → `docs/BUILD-LOG.md` §9.
 **Lesson logged (CLAUDE.md):** an "app reloads itself ~30s into a run" symptom was NOT a feature bug —
 it was 5 stale dev stacks contending for `:5173` and tripping Vite's `vite:ws:disconnect → location.reload`
-(the kill pattern in CLAUDE.md pointed at the wrong `node_modules` path; now fixed). **Next:** merge to
-`master`; optional follow-ups below.
+(the kill pattern in CLAUDE.md pointed at the wrong `node_modules` path; now fixed).
+**Post-merge polish also landed & browser-verified:** idle agent cards open a type view (intro + START);
+a handoff note carries an "Open <agent>" jump button; `awaiting_approval` instances are KEPT on finalize
+(claude-cli HITL kills the process at the approval tool call — they must stay, not vanish); opening an
+agent with ≥2 live instances shows an **instance picker** (cards, pick a copy) instead of one thread; the
+pipeline parent→children connector is the prior centered `↓` with a bordered container over the children.
+**Next for the following agent:** the two 🐞 at the top (one-time-delivery dedupe; second
+awaiting-approval instance's approve button is dead) are the priority — both real and reproducible. Then
+the optional follow-ups below. Pre-existing cosmetic: the model sometimes narrates "Let me load the tool
+schemas first" into the thread (deferred-polish list).
 
 **On `master` (MERGED `8b67b83`, BUILT, browser-verified):** the **tool-result surfacing +
 consumer-thread polish** pass. Root cause unified three symptoms: MCP tool RESULTS never
