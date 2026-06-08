@@ -6,6 +6,7 @@ type Route = 'feature' | 'bugfix' | 'reply-draft'
 type TriageCardProps = {
   tickets: TriageTicket[]
   onRoute: (target: Route, ticket: TriageTicket) => void
+  onTreatAsLead?: (t: TriageTicket) => void
 }
 
 const RECO_TO_ROUTE: Record<string, Route> = {
@@ -22,7 +23,7 @@ const ROUTE_LABEL: Record<Route, string> = {
   'reply-draft': 'Draft reply',
 }
 
-export const TriageCard = ({ tickets, onRoute }: TriageCardProps) => {
+export const TriageCard = ({ tickets, onRoute, onTreatAsLead }: TriageCardProps) => {
   const groups = groupByStatus(tickets)
   return (
     <div className='lead-card'>
@@ -56,6 +57,11 @@ export const TriageCard = ({ tickets, onRoute }: TriageCardProps) => {
                   <button className='btn btn-primary' onClick={() => onRoute(suggested, ticket)}>
                     {ROUTE_LABEL[suggested]}
                   </button>
+                  {onTreatAsLead && (
+                    <button className='btn btn-primary' onClick={() => onTreatAsLead(ticket)}>
+                      Treat as lead → Lead inbox
+                    </button>
+                  )}
                 </div>
               </div>
             )

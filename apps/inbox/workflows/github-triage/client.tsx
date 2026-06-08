@@ -23,6 +23,17 @@ const toPayload = (t: TriageTicket): TicketHandoffPayload => ({
   body: t.body, lastComment: t.lastComment, recommendation: t.recommendation, url: t.url,
 })
 
+// A GitHub ticket reframed as a customer lead for the Lead-inbox `lead` contract.
+// Shape MUST satisfy HandoffPayloadSchema { threadId, from, subject, summary, category, priority }.
+const toLead = (t: TriageTicket) => ({
+  threadId: t.url,
+  from: t.lastComment?.author ?? 'github',
+  subject: t.title,
+  summary: t.recommendation,
+  category: 'support',
+  priority: t.priority,
+})
+
 export const githubTriageRenders: RenderSpec[] = [
   {
     toolName: 'render_triage',
@@ -36,6 +47,9 @@ export const githubTriageRenders: RenderSpec[] = [
           tickets={tickets}
           onRoute={(target: string, ticket: TriageTicket) =>
             deliver(origin, { kind: 'agent', agentId: target }, toPayload(ticket))
+          }
+          onTreatAsLead={(ticket: TriageTicket) =>
+            deliver(origin, { kind: 'contract', workflow: 'lead-inbox', input: 'lead' }, toLead(ticket))
           }
         />
       )
