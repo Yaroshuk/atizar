@@ -66,36 +66,53 @@ Role subsumes today's `canStart` / `handoffTargets` derivation in `InboxView`.
 Mapping the current app: `qualifier` = input, `reply` = worker; `triage` = input,
 `feature`/`bugfix`/`reply-draft` = workers.
 
-### 2. The cross-workflow door
+### 2. The cross-workflow door — published contracts (Variant 1)
 
-An input agent **may** additionally declare `accepts: ZodSchema` — the parcel shape it will receive
-from *other* workflows.
+A workflow **publishes a list of named, typed inputs** — its *contract*. Each input is
+`{ name, schema, agentId }` where `agentId` is the **private** binding to the input agent that
+receives it. The contract's public face is only `{ name, schema }`: other workflows see "workflow B
+accepts a parcel of shape X under the name `lead`" and **never see which agent handles it**.
 
-- Input agent **without** `accepts` → user-startable, but no other workflow may deliver to it.
-- Input agent **with** `accepts` → also a valid cross-workflow delivery target; an incoming parcel
-  is validated against `accepts` before it is allowed through ("проверка формы").
+- A source addresses a destination by **contract** — `{ workflow, input }` — never by the target's
+  agent id. The source may know that workflow B exists and publishes input `lead` of shape X (it
+  sees the contract); it may not reach into B's agents.
+- An incoming parcel is validated against the named input's `schema` before it is allowed through
+  ("проверка формы"). A mismatched shape or an unknown input name is rejected.
+- The bound input agent is the box's receptionist: it receives the parcel and routes internally
+  using the existing intra-workflow handoff seam (`handoff.ts`). Outside callers never see the box's
+  internals.
 
-The input agent is the box's receptionist: it receives the parcel and routes internally using the
-existing intra-workflow handoff seam (`handoff.ts`). Outside callers never see the box's internals.
+An input agent that is **not** bound to any published contract is still user-startable (Start
+button) but cannot receive cross-workflow deliveries.
+
+(Deferred: Variant 2 — fully type-matched discovery where the source emits a typed parcel and the
+shell offers every workflow whose contract matches, without the source naming any workflow. Variant
+1 is what we build now.)
 
 ### 3. Delivery: runs immediately, never navigates
 
-One unified shell-level seam replaces the current `requestHandoff`:
+One unified shell-level seam replaces the current `requestHandoff`. It takes a **destination** and a
+payload, plus the `origin` workflow the click came from (see §5 for how `origin` is known):
 
-```
-deliver(target: { workflow?: string; agentId: string }, payload: unknown)
+```ts
+type Destination =
+  | { kind: 'agent'; agentId: string }                       // intra-workflow worker
+  | { kind: 'contract'; workflow: string; input: string }    // another workflow's published input
+
+deliver(origin: string, dest: Destination, payload: unknown)
 ```
 
-- **Intra-workflow** (`workflow` omitted): resolve the target instance handle within the active
-  workflow, seed its messages (`encodeHandoff`), `runAgent`. **Change from today:** do *not*
-  `setOpenId(targetId)` — no auto-open. The "delivered to X" note already renders in the source
-  thread; the user opens the target agent by clicking its card.
-- **Cross-workflow** (`workflow` given): the target must be a `role:'input'` agent of that workflow
-  with an `accepts` schema that the payload satisfies; otherwise the call is rejected (structural
-  error surfaced to the workflow author, not a runtime crash — see validation). On success: seed +
-  `runAgent` the target input agent **in the background**, do **not** switch the active workflow,
-  and raise (a) a badge on the target workflow's switcher tab and (b) a "Open in <workflow>" button
-  in the source's generative UI / thread. The human clicks to switch and open.
+- **Intra-workflow** (`kind: 'agent'`): resolve `instanceId(origin, agentId)`, seed its messages
+  (`encodeHandoff`), `runAgent`. **Change from today:** do *not* `setOpenId` — no auto-open. The
+  "delivered to X" note already renders in the source thread; the user opens the target by clicking
+  its card.
+- **Cross-workflow** (`kind: 'contract'`): look up `workflow`'s published input by `input` name;
+  validate `payload` against its `schema`; reject (structural error to the author, not a runtime
+  crash — see §7) if the input is unknown or the shape mismatches. On success: resolve to
+  `instanceId(workflow, <private bound agentId>)`, seed + `runAgent` it **in the background**, do
+  **not** switch the active workflow, and raise (a) a badge on the target workflow's switcher tab
+  and (b) an "Open in <workflow>" button in the source's generative UI / thread. The human clicks to
+  switch and open.
 
 Because all input agents are always mounted (§4), the target handle always exists at delivery time
 — there is no mount-then-run race (the reason "waking" a worker was rejected).
@@ -131,16 +148,24 @@ instanceId(workflowId, agentId)  ->  `${workflowId}__${agentId}`
   instances of the same agent run independently. The server's flat map is replaced by an iteration
   over the workflow registry: for each workflow, for each agent placement, register
   `instanceId → buildAgent(def, prompts, registry, allowedTools)`.
-- Intra-workflow handoff targets resolve to `instanceId(thisWorkflow, def.handoffs[i])`.
-- Cross-workflow delivery targets `instanceId(targetWorkflow, targetInputAgentId)`.
+- Intra-workflow handoff targets resolve to `instanceId(origin, def.handoffs[i])`.
+- Cross-workflow delivery targets `instanceId(targetWorkflow, <private bound agentId>)`.
 
-**Known limitation (documented, in scope to flag — not to fully solve this pass):** render tools
-register by **global tool name** with a single captured closure. An agent whose render tool *emits
-a handoff* (e.g. `render_triage`'s route button) cannot yet be reused across workflows, because the
-one registered closure can't know which instance emitted the click. Reuse of agents that do **not**
-emit handoffs from their render tool (pure readers/workers) works. Full reuse of handoff-emitting
-agents needs the instance id threaded through the tool result — deferred. The existing two
-workflows have disjoint agents, so this pass is not blocked by it.
+**Render tools must know which copy emitted the click (done properly, not deferred).** A render
+callback receives only `{ name, toolCallId, parameters, status, result }` — **not** the emitting
+agent id (confirmed in `docs/copilotkit-notes.md`). And a render tool registers **once per global
+tool name** (registering the same name twice would collide), so a single shared closure draws the
+cards of *every* copy of a reused agent. To let that closure route a handoff to the **correct**
+copy, the emitting workflow id travels **in the tool parameters** as an `origin` field:
+
+- The per-instance prompt injects the origin — the same mechanism `ticket.prompts.ts` already uses
+  to inject `renderTool`/`kind`. The agent reliably echoes a constant we hand it ("when you call
+  `render_triage`, set `origin` to `"github-triage"`"). This does not depend on any CopilotKit
+  internal exposing the agent id.
+- Render specs are declared as **data** by each workflow module; the client shell collects them and
+  registers each **unique** tool name **once**, with a closure that reads `parameters.origin` and
+  calls `deliver(origin, dest, payload)`. Reused agents share that one registration; `origin`
+  disambiguates the copy. This makes reuse of handoff-emitting agents work fully — no deferral.
 
 ### 6. Module structure
 
@@ -148,11 +173,15 @@ A workflow becomes a folder `apps/inbox/workflows/<id>/` with three files, one p
 (core/server/client cannot share one import graph — server is Node, client is React):
 
 - **`descriptor.ts`** (imports `@platform/core` only — pure data): `id`, `label`, `iconName`, agent
-  placements `{ agent, role, accepts? }[]`, `entryAgentId`. Validated by `defineWorkflow` (§7).
+  placements `{ agent, role }[]`, `entryAgentId`, and the published `inputs` contract
+  `{ name, schema, agentId }[]`. Validated by `defineWorkflow` (§7).
 - **`server.ts`** (Node): per-agent `prompts` factory + `allowedTools` (the `mcp__…` allow-lists,
-  moved out of `server/index.ts`).
-- **`client.tsx`** (React): render-tool registrations (today's `useXActions`), `META` chrome, and
-  an **optional** `view` component override (default: the shared two-panel view).
+  moved out of `server/index.ts`). The prompts factory injects each agent's `origin` (its
+  workflow id) for handoff-emitting render tools (§5).
+- **`client.tsx`** (React): render specs as **data** (`{ toolName, parameters, component, kind }`
+  where `kind` is `'render' | 'handoff' | 'approval'`), `META` chrome, and an **optional** `view`
+  component override (default: the shared two-panel view). The shell registers each unique
+  `toolName` once (§5).
 
 Three thin aggregators collect them: `workflows/index.ts` (descriptors, core),
 `server/workflows.ts`, `client/src/workflows.ts`. **Adding a workflow = add the folder + one line in
@@ -165,13 +194,14 @@ Mirrors `defineAgent`'s structure-only philosophy (pure, zod, no React/Node):
 
 - `entryAgentId` is a `role:'input'` agent in this workflow.
 - Every agent's `handoffs` resolve to agents **within the same workflow** (cross-workflow links go
-  through declared inputs only, never `handoffs`).
-- `accepts` only appears on `role:'input'` agents.
+  through published contracts only, never `handoffs`).
+- Every published input's `agentId` is a `role:'input'` agent in this workflow.
+- Published input `name`s are unique within the workflow.
 - No duplicate agent ids within a workflow.
 
-Cross-workflow delivery legality (target is an input with a matching `accepts`) is enforced by the
-shell's `deliver` against the registry — a structural guard, since only a human can trigger delivery
-(the model has no tool for it).
+Cross-workflow delivery legality (the destination contract exists and the payload matches its
+`schema`) is enforced by the shell's `deliver` against the registry — a structural guard, since only
+a human can trigger delivery (the model has no tool for it).
 
 ## Data shapes (sketch)
 
@@ -181,7 +211,14 @@ type AgentRole = 'input' | 'worker'
 type WorkflowAgent = {
   agent: AgentDefinition
   role: AgentRole
-  accepts?: z.ZodTypeAny      // input-only; presence = cross-workflow deliverable
+}
+
+// A published contract entry: public face is { name, schema }; agentId is the
+// private binding to the input agent that receives this parcel.
+type WorkflowInput = {
+  name: string
+  schema: z.ZodTypeAny
+  agentId: string             // must be a role:'input' agent in this workflow
 }
 
 type WorkflowDescriptor = {
@@ -190,7 +227,12 @@ type WorkflowDescriptor = {
   iconName: IconName
   agents: WorkflowAgent[]
   entryAgentId: string        // must be a role:'input' agent
+  inputs: WorkflowInput[]     // published contract (may be empty)
 }
+
+type Destination =
+  | { kind: 'agent'; agentId: string }
+  | { kind: 'contract'; workflow: string; input: string }
 ```
 
 ## Behavior changes summary (user-visible)
@@ -199,14 +241,16 @@ type WorkflowDescriptor = {
 |---------------------------------|----------------------------------------|-------|
 | Agent A hands to agent B (same box) | seeds + runs B, **auto-opens** B's modal | seeds + runs B; **no auto-open**; user clicks B's card |
 | Switch workflow                 | unmounts old agents, state lost        | pure view swap; state persists |
-| Cross-workflow delivery         | not possible                           | runs target input agent in background; badge + button; **no auto-switch** |
-| Reuse one agent in two workflows| not possible                           | independent copies (instance ids) — except handoff-emitting render tools (deferred) |
+| Cross-workflow delivery         | not possible                           | addressed by contract `{workflow, input}`; runs target input agent in background; badge + button; **no auto-switch** |
+| Reuse one agent in two workflows| not possible                           | independent copies (instance ids); handoff-emitting cards routed by `origin` param — works fully |
 
 ## Testing
 
 - **Unit:** `defineWorkflow` validation (each rule above, happy + each failure); `instanceId`;
-  `deliver` target resolution (intra, cross-allowed, cross-rejected on bad shape / non-input
-  target). Keep the existing 103 tests green; migrate `handoff` tests as needed.
+  `deliver` resolution — intra (`kind:'agent'` → `instanceId(origin, agentId)`), cross-allowed
+  (`kind:'contract'` → resolves the private bound agent), cross-rejected (unknown input name /
+  payload fails the contract `schema`); `origin`-based routing picks the correct copy when an agent
+  is placed in two workflows. Keep the existing 103 tests green; migrate `handoff` tests as needed.
 - **Browser E2E (mandatory — per project rule, always run the full pipeline):**
   1. Lead inbox: start qualifier → it hands to reply → confirm reply **does not** auto-open; open
      it manually; approve a draft (Gmail flow intact, never sends).
@@ -221,12 +265,12 @@ type WorkflowDescriptor = {
 
 ## Scope & deferred
 
-- **In scope:** roles, the cross-workflow door + `deliver`, all-mounted runtime, instance
-  namespacing, module structure, `defineWorkflow`, the two behavior changes (no auto-open, no
-  auto-switch + badge/button), migrate the two existing workflows, browser E2E.
-- **Deferred:** URL routing per workflow; per-workflow CopilotKit contexts; full reuse of
-  handoff-emitting agents (render-tool instance awareness); a third demo workflow that exercises
-  reuse live. Reuse-as-copies is *architecturally supported and unit-tested* this pass; a live
-  reuse demo is optional.
+- **In scope:** roles, the published-contract cross-workflow door + `deliver`, all-mounted runtime,
+  instance namespacing, `origin`-routed handoff cards (full reuse of handoff-emitting agents),
+  module structure, `defineWorkflow`, the two behavior changes (no auto-open, no auto-switch +
+  badge/button), migrate the two existing workflows, browser E2E.
+- **Deferred:** URL routing per workflow; per-workflow CopilotKit contexts; Variant 2 type-matched
+  contract discovery; a third demo workflow that exercises reuse live. Reuse-as-copies is fully
+  built and unit-tested this pass; a live reuse demo is optional.
 - **Hard constraint unchanged:** GitHub stays strictly read-only; nothing here adds a GitHub write
   path.
