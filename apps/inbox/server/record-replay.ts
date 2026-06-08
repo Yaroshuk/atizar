@@ -1,3 +1,5 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { BaseEvent } from '@ag-ui/client'
 
 // A cassette file is JSONL: one recorded AG-UI event per line, tagged with its
@@ -77,4 +79,42 @@ export function scanCassette(text: string): Finding[] {
     }
   })
   return out
+}
+
+async function readFileOrNull(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch {
+    return null // ENOENT (or unreadable) → treat as "no recording yet"
+  }
+}
+
+// One JSONL file per agent key, holding every step. readStep returns null when
+// the step has no recorded events (→ caller records it). writeStep replaces just
+// that step's lines, leaving other steps intact.
+export class CassetteStore {
+  constructor(
+    private readonly dir: string,
+    private readonly key: string
+  ) {}
+
+  private file(): string {
+    return join(this.dir, `${this.key}.jsonl`)
+  }
+
+  async readStep(step: number): Promise<BaseEvent[] | null> {
+    const text = await readFileOrNull(this.file())
+    if (text === null) return null
+    const events = eventsForStep(text, step)
+    return events.length > 0 ? events : null
+  }
+
+  async writeStep(step: number, events: BaseEvent[]): Promise<void> {
+    const existing = (await readFileOrNull(this.file())) ?? ''
+    const kept = dropStep(existing, step)
+    const added = events.map((e) => encodeLine(step, e)).join('\n')
+    const body = [kept, added].filter((s) => s.length > 0).join('\n')
+    await mkdir(this.dir, { recursive: true })
+    await writeFile(this.file(), body + '\n', 'utf8')
+  }
 }

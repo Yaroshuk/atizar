@@ -1,6 +1,16 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent } from '@ag-ui/client'
-import { encodeLine, parseLine, eventsForStep, dropStep, scanCassette } from './record-replay.js'
+import {
+  encodeLine,
+  parseLine,
+  eventsForStep,
+  dropStep,
+  scanCassette,
+  CassetteStore,
+} from './record-replay.js'
 
 const ev = (delta: string): BaseEvent =>
   ({ type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant', messageId: 'm', delta }) as BaseEvent
@@ -71,5 +81,38 @@ describe('scanCassette', () => {
   it('does NOT flag an ISO date as a phone number', () => {
     const found = scanCassette('{"createdAt":"2024-01-15"}')
     expect(found.some((f) => f.kind === 'phone')).toBe(false)
+  })
+})
+
+describe('CassetteStore', () => {
+  it('readStep returns null when the file does not exist', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const store = new CassetteStore(dir, 'wf__agent')
+    expect(await store.readStep(0)).toBeNull()
+  })
+
+  it("writeStep then readStep round-trips that step's events", async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const store = new CassetteStore(dir, 'wf__agent')
+    await store.writeStep(0, [ev('a'), ev('b')])
+    expect(await store.readStep(0)).toEqual([ev('a'), ev('b')])
+    expect(await store.readStep(1)).toBeNull()
+  })
+
+  it('writeStep preserves other steps in the same file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const store = new CassetteStore(dir, 'wf__agent')
+    await store.writeStep(0, [ev('a')])
+    await store.writeStep(1, [ev('b')])
+    expect(await store.readStep(0)).toEqual([ev('a')])
+    expect(await store.readStep(1)).toEqual([ev('b')])
+  })
+
+  it('writeStep replaces (overwrites) an existing step', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const store = new CassetteStore(dir, 'wf__agent')
+    await store.writeStep(0, [ev('old')])
+    await store.writeStep(0, [ev('new')])
+    expect(await store.readStep(0)).toEqual([ev('new')])
   })
 })
