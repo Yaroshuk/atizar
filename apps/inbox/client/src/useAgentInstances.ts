@@ -35,19 +35,32 @@ export const useAgentInstances = () => {
   const [instances, setInstances] = useState<Live[]>([])
   const [queued, setQueued] = useState<Record<string, Pending[]>>({})
 
-  // Mirror current state for the stable callbacks.
+  // instRef is the SYNCHRONOUS source of truth for the instance list: every list change
+  // mutates it via `commit` alongside setInstances, so a same-tick second spawn sees spawns
+  // from earlier in the same tick (React commits state only between ticks). queueRef still
+  // mirrors state on render — its callbacks don't need same-tick reads.
   const instRef = useRef(instances)
-  instRef.current = instances
   const queueRef = useRef(queued)
   queueRef.current = queued
 
-  const update = useCallback((localId: string, patch: Partial<Live>) => {
-    setInstances((prev) => prev.map((x) => (x.localId === localId ? { ...x, ...patch } : x)))
+  const commit = useCallback((next: Live[]) => {
+    instRef.current = next
+    setInstances(next)
   }, [])
 
-  const remove = useCallback((localId: string) => {
-    setInstances((prev) => prev.filter((x) => x.localId !== localId))
-  }, [])
+  const update = useCallback(
+    (localId: string, patch: Partial<Live>) => {
+      commit(instRef.current.map((x) => (x.localId === localId ? { ...x, ...patch } : x)))
+    },
+    [commit]
+  )
+
+  const remove = useCallback(
+    (localId: string) => {
+      commit(instRef.current.filter((x) => x.localId !== localId))
+    },
+    [commit]
+  )
 
   // Forward-declared so onFinalized can call drain.
   const startRef = useRef<(args: SpawnArgs) => string>(() => '')
@@ -125,11 +138,13 @@ export const useAgentInstances = () => {
         },
       })
       live.subId = subId
-      setInstances((prev) => [...prev, live])
+      // Append synchronously BEFORE runAgent returns control, so a same-tick second spawn
+      // counts this instance against the cap.
+      commit([...instRef.current, live])
       void copilotkit.runAgent({ agent })
       return localId
     },
-    [copilotkit, update, onFinalized]
+    [copilotkit, update, onFinalized, commit]
   )
   startRef.current = start
 
