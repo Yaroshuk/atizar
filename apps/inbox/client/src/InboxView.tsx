@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useCopilotKit, useRenderToolCall } from '@copilotkit/react-core/v2'
-import { useInboxActions } from './actions'
-import { useGithubActions } from './githubActions'
+import { instanceId, encodeHandoff, type Destination, type Message } from '@platform/core'
+import { useWorkflowRenders } from './useWorkflowRenders'
+import { resolveDelivery } from './deliver'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal, type HandoffNote } from './components/AgentModal'
 import { AgentRuntime, type AgentHandle } from './components/AgentRuntime'
@@ -11,27 +12,16 @@ import { Icon } from './components/Icon'
 import type { PipelineNode } from './pipeline'
 import type { Status } from './status'
 import { workflows, META } from './workflows'
-import { encodeHandoff, type Message } from '@platform/core'
 
 export const InboxView = () => {
   const { copilotkit } = useCopilotKit()
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
-  const [openId, setOpenId] = useState<string | null>(null)
-  const [handles, setHandles] = useState<Record<string, AgentHandle>>({})
-  // Per-agent handoff lines (sent/received) shown atop each agent's modal thread.
+  const [openId, setOpenId] = useState<string | null>(null) // instance id
+  const [handles, setHandles] = useState<Record<string, AgentHandle>>({}) // keyed by instance id
   const [handoffNotes, setHandoffNotes] = useState<Record<string, HandoffNote[]>>({})
+  const [unread, setUnread] = useState<Record<string, number>>({}) // workflow id -> badge count
 
   const workflow = workflows.find((w) => w.id === activeWorkflowId) ?? workflows[0]
-
-  // Mirror the active workflow so the (stable) handoff callback can resolve agent
-  // names without depending on `workflow` (which would break its stable identity).
-  const workflowRef = useRef(workflow)
-  workflowRef.current = workflow
-
-  // Agents that are some other agent's handoff target are launched BY that agent —
-  // they get no START button. Computed over the active workflow only.
-  const handoffTargets = new Set(workflow.agents.flatMap((a) => a.handoffs ?? []))
-  const canStart = (id: string) => !handoffTargets.has(id)
 
   const onAgentChange = useCallback((id: string, handle: AgentHandle) => {
     setHandles((prev) => {
@@ -41,100 +31,107 @@ export const InboxView = () => {
     })
   }, [])
 
-  // Mirror the latest handles into a ref so the (stable) handoff callback always reads
-  // fresh agents. requestHandoff MUST be stable: useRenderTool captures its render
-  // closure once (its effect deps stringify a function to "[null]", so it never
-  // re-runs), so a handles-dependent requestHandoff would freeze the initial empty map
-  // and every handoff would silently no-op.
   const handlesRef = useRef(handles)
   handlesRef.current = handles
+  // Mirror the active workflow so the STABLE deliver callback can read it without a
+  // dep. CRITICAL: useRenderTool captures its render closure (and thus deliver) ONCE
+  // — a deliver with activeWorkflowId in deps would freeze the initial value.
+  const activeRef = useRef(activeWorkflowId)
+  activeRef.current = activeWorkflowId
 
-  // The handoff seam (human trigger). Seed the target run with the payload, launch it,
-  // open its modal. Works for both payload shapes — encode is schema-agnostic.
-  const requestHandoff = useCallback(
-    (targetId: string, payload: unknown) => {
-      const target = handlesRef.current[targetId]?.agent
+  // The one delivery seam. MUST be stable: useRenderTool captures it once. Resolves the
+  // target, seeds + runs it in the BACKGROUND. Never opens a modal; never switches view.
+  const deliver = useCallback(
+    (origin: string, dest: Destination, payload: unknown) => {
+      const r = resolveDelivery(workflows, origin, dest, payload)
+      if (!r.ok) {
+        // A rejected delivery (bad contract/payload) is a dev-time signal, not a user
+        // error — surface it to the console rather than silently dropping the parcel.
+        // eslint-disable-next-line no-console
+        console.warn('delivery rejected:', r.error)
+        return
+      }
+      const target = handlesRef.current[r.instanceId]?.agent
       if (!target) return
-      const seed = encodeHandoff(payload) as Message
-      target.messages.splice(0, target.messages.length, seed)
+      target.messages.splice(0, target.messages.length, encodeHandoff(payload) as Message)
       void copilotkit.runAgent({ agent: target })
-      setOpenId(targetId)
 
-      // Record the handoff on both sides so each thread shows what moved where.
-      const wf = workflowRef.current
-      const source = wf.agents.find((a) => (a.handoffs ?? []).includes(targetId))
-      const targetName = wf.agents.find((a) => a.id === targetId)?.name ?? targetId
       const p = payload as { number?: number; title?: string; subject?: string }
       const label =
         typeof p.number === 'number'
           ? `#${p.number} ${p.title ?? ''}`.trim()
           : (p.subject ?? 'item')
-      setHandoffNotes((prev) => {
-        const next = { ...prev }
-        if (source) {
-          next[source.id] = [
-            ...(prev[source.id] ?? []),
-            { dir: 'sent', otherName: targetName, label },
-          ]
-        }
-        next[targetId] = [
-          ...(prev[targetId] ?? []),
-          { dir: 'received', otherName: source?.name ?? 'an agent', label },
-        ]
-        return next
-      })
+      const sourceInstance = instanceId(origin, sourceAgentOf(origin, dest))
+      setHandoffNotes((prev) => ({
+        ...prev,
+        [sourceInstance]: [
+          ...(prev[sourceInstance] ?? []),
+          { dir: 'sent', otherName: r.instanceId, label, targetWorkflow: r.targetWorkflow },
+        ],
+        [r.instanceId]: [
+          ...(prev[r.instanceId] ?? []),
+          { dir: 'received', otherName: origin, label },
+        ],
+      }))
+      if (r.targetWorkflow && r.targetWorkflow !== activeRef.current) {
+        setUnread((u) => ({ ...u, [r.targetWorkflow!]: (u[r.targetWorkflow!] ?? 0) + 1 }))
+      }
     },
     [copilotkit]
   )
 
-  // Both workflows' render tools register unconditionally (globally-unique tool names,
-  // stable hook order). requestHandoff is stable and accepts either payload shape, so
-  // it is passed directly (no inline wrapper, which would defeat the stable identity).
-  useInboxActions(requestHandoff)
-  useGithubActions(requestHandoff)
-
+  useWorkflowRenders(deliver)
   const renderToolCall = useRenderToolCall()
 
-  const statusOf = (id: string): Status => handles[id]?.status ?? 'idle'
+  const iid = (agentId: string) => instanceId(workflow.id, agentId)
+  const statusOf = (instId: string): Status => handles[instId]?.status ?? 'idle'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const agentOf = (id: string): any => handles[id]?.agent
+  const agentOf = (instId: string): any => handles[instId]?.agent
+  const canStart = (agentId: string) =>
+    workflow.agents.find((a) => a.agent.id === agentId)?.role === 'input'
 
-  const pipelineNodes: PipelineNode[] = workflow.agents.map((a) => ({
-    id: a.id,
-    name: a.name,
-    subtitle: META[a.id].subtitle,
-    iconName: META[a.id].iconName,
-    status: statusOf(a.id),
-    handoffsTo: a.handoffs ?? [],
+  const pipelineNodes: PipelineNode[] = workflow.agents.map(({ agent }) => ({
+    id: agent.id,
+    name: agent.name,
+    subtitle: META[agent.id].subtitle,
+    iconName: META[agent.id].iconName,
+    status: statusOf(iid(agent.id)),
+    handoffsTo: agent.handoffs ?? [],
   }))
 
-  const openAgentDef = openId ? workflow.agents.find((a) => a.id === openId) : undefined
+  const openAgent = openId ? workflow.agents.find((a) => iid(a.agent.id) === openId) : undefined
+
+  // Every workflow × agent mounted idle for the whole session (keyed by instance id),
+  // so a cross-workflow delivery target always exists — no mount-then-run race.
+  const allRuntimes = useMemo(
+    () =>
+      workflows.flatMap((wf) =>
+        wf.agents.map(({ agent }) => ({ id: instanceId(wf.id, agent.id), def: agent }))
+      ),
+    []
+  )
+
+  const switchWorkflow = (id: string) => {
+    setOpenId(null)
+    setUnread((u) => ({ ...u, [id]: 0 }))
+    setActiveWorkflowId(id)
+  }
 
   return (
     <>
-      {/* Hidden hook owners — one per agent in the active workflow. Keyed by id so a
-          workflow switch unmounts the old set and mounts the new (hooks reset cleanly). */}
-      {workflow.agents.map((a) => (
-        <AgentRuntime key={`${workflow.id}:${a.id}`} def={a} onChange={onAgentChange} />
+      {allRuntimes.map(({ id, def }) => (
+        <AgentRuntime key={id} def={{ ...def, id }} onChange={onAgentChange} />
       ))}
 
       <WorkflowSwitcher
         workflows={workflows}
         activeId={activeWorkflowId}
-        onSelect={(id) => {
-          setOpenId(null)
-          // Drop the previous workflow's handles so a future workflow that reuses an
-          // agent id can't be served a stale handle; the new workflow's AgentRuntimes
-          // re-publish theirs on mount.
-          setHandles({})
-          setHandoffNotes({})
-          setActiveWorkflowId(id)
-        }}
+        unread={unread}
+        onSelect={switchWorkflow}
       />
 
       <div className='workspace-body'>
-        <PipelineColumn nodes={pipelineNodes} onOpen={setOpenId} />
-
+        <PipelineColumn nodes={pipelineNodes} onOpen={(agentId) => setOpenId(iid(agentId))} />
         <div className='main'>
           <div className='comp-head'>
             <span className='ch-label'>
@@ -157,21 +154,20 @@ export const InboxView = () => {
               </span>
             </span>
           </div>
-
           <div className='main-scroll'>
             <div className='agent-grid'>
-              {workflow.agents.map((a) => {
-                const agent = agentOf(a.id)
+              {workflow.agents.map(({ agent }) => {
+                const a = agentOf(iid(agent.id))
                 return (
                   <AgentCard
-                    key={a.id}
-                    name={a.name}
-                    subtitle={META[a.id].subtitle}
-                    iconName={META[a.id].iconName}
-                    status={statusOf(a.id)}
-                    canStart={canStart(a.id)}
-                    onStart={() => agent && void copilotkit.runAgent({ agent })}
-                    onOpen={() => setOpenId(a.id)}
+                    key={agent.id}
+                    name={agent.name}
+                    subtitle={META[agent.id].subtitle}
+                    iconName={META[agent.id].iconName}
+                    status={statusOf(iid(agent.id))}
+                    canStart={canStart(agent.id)}
+                    onStart={() => a && void copilotkit.runAgent({ agent: a })}
+                    onOpen={() => setOpenId(iid(agent.id))}
                   />
                 )
               })}
@@ -179,20 +175,21 @@ export const InboxView = () => {
           </div>
         </div>
 
-        {openAgentDef && agentOf(openAgentDef.id) && (
+        {openAgent && agentOf(iid(openAgent.agent.id)) && (
           <AgentModal
-            agent={agentOf(openAgentDef.id)}
-            title={openAgentDef.name}
-            iconName={META[openAgentDef.id].iconName}
-            status={statusOf(openAgentDef.id)}
+            agent={agentOf(iid(openAgent.agent.id))}
+            title={openAgent.agent.name}
+            iconName={META[openAgent.agent.id].iconName}
+            status={statusOf(iid(openAgent.agent.id))}
             renderToolCall={renderToolCall}
-            loading={statusOf(openAgentDef.id) === 'running'}
-            canStart={canStart(openAgentDef.id)}
-            intro={META[openAgentDef.id].intro}
-            notes={handoffNotes[openAgentDef.id] ?? []}
+            loading={statusOf(iid(openAgent.agent.id)) === 'running'}
+            canStart={canStart(openAgent.agent.id)}
+            intro={META[openAgent.agent.id].intro}
+            notes={handoffNotes[iid(openAgent.agent.id)] ?? []}
+            onOpenWorkflow={switchWorkflow}
             onStart={() => {
-              const agent = agentOf(openAgentDef.id)
-              if (agent) void copilotkit.runAgent({ agent })
+              const a = agentOf(iid(openAgent.agent.id))
+              if (a) void copilotkit.runAgent({ agent: a })
             }}
             onClose={() => setOpenId(null)}
           />
@@ -200,4 +197,18 @@ export const InboxView = () => {
       </div>
     </>
   )
+}
+
+// The source agent for a destination: intra handoff → the agent in the origin workflow
+// whose handoffs include the target; contract → the origin's entry agent (the card that
+// emitted the delivery lives there).
+function sourceAgentOf(origin: string, dest: Destination): string {
+  const wf = workflows.find((w) => w.id === origin)!
+  if (dest.kind === 'agent') {
+    return (
+      wf.agents.find((a) => (a.agent.handoffs ?? []).includes(dest.agentId))?.agent.id ??
+      wf.entryAgentId
+    )
+  }
+  return wf.entryAgentId
 }

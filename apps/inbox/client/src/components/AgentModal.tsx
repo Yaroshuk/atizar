@@ -16,7 +16,12 @@ import { Icon, type IconName } from './Icon'
 // `respond` callback (sourced from the executing tool-call state, not toolMessage).
 // A handoff line shown at the top of an agent's thread so the flow is legible:
 // the sender notes what it handed off, the receiver notes what it received.
-export type HandoffNote = { dir: 'sent' | 'received'; otherName: string; label: string }
+export type HandoffNote = {
+  dir: 'sent' | 'received'
+  otherName: string
+  label: string
+  targetWorkflow?: string // present on a cross-workflow 'sent' note
+}
 
 type AgentModalProps = {
   agent: { messages: Message[] }
@@ -34,6 +39,8 @@ type AgentModalProps = {
   intro: string
   // Handoff lines (sent and/or received) to show above the thread.
   notes: HandoffNote[]
+  // Switch to the target workflow when a cross-workflow 'sent' note is clicked.
+  onOpenWorkflow?: (id: string) => void
   onStart: () => void
   onClose: () => void
 }
@@ -48,6 +55,7 @@ export const AgentModal = ({
   canStart,
   intro,
   notes,
+  onOpenWorkflow,
   onStart,
   onClose,
 }: AgentModalProps) => {
@@ -131,6 +139,14 @@ export const AgentModal = ({
           {sent.map((note, i) => (
             <div className='thread-note sent' key={`snt-${i}`}>
               → Handed <strong>{note.label}</strong> to {note.otherName}
+              {note.targetWorkflow && (
+                <button
+                  className='note-link'
+                  onClick={() => onOpenWorkflow?.(note.targetWorkflow!)}
+                >
+                  Open in {note.targetWorkflow}
+                </button>
+              )}
             </div>
           ))}
           {loading && (
