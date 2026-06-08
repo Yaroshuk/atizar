@@ -64,7 +64,8 @@ const PATTERNS: ReadonlyArray<readonly [Finding['kind'], RegExp]> = [
   // Secret: token-shaped (sk-… incl. sk-ant-/sk-proj- hyphens, ghp_…, AIza…, raw
   // JWTs) OR keyword-tagged (api_key= / Authorization: …). Keyword branch keeps
   // the :/= requirement so plain prose ("the secret to success") is NOT flagged.
-  // Snippet is length-capped so a huge token doesn't produce a 2000-char finding.
+  // Every finding's snippet is capped at 120 chars at the push site so a long
+  // token/JWT doesn't bloat the report.
   [
     'secret',
     /\b(?:sk-[\w-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|AIza[A-Za-z0-9_-]{16,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b|(?:bearer|authorization|token|api[_-]?key|secret|password)\s*[:=]\s*\S{1,120}/gi,
@@ -76,7 +77,7 @@ export function scanCassette(text: string): Finding[] {
   text.split('\n').forEach((line, i) => {
     for (const [kind, re] of PATTERNS) {
       for (const match of line.matchAll(re)) {
-        out.push({ line: i + 1, kind, snippet: match[0] })
+        out.push({ line: i + 1, kind, snippet: match[0].slice(0, 120) })
       }
     }
   })
