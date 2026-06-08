@@ -37,6 +37,15 @@ const toolArgs = (index: number, partial: string) =>
   })
 const blockStop = (index: number) =>
   JSON.stringify({ type: 'stream_event', event: { type: 'content_block_stop', index } })
+const messageStart = () =>
+  JSON.stringify({ type: 'stream_event', event: { type: 'message_start' } })
+// A `claude` tool_result line: the CLI runs the (MCP) tool and feeds the result back
+// as a top-level `user` message carrying a tool_result block keyed by tool_use_id.
+const toolResult = (toolUseId: string, content: unknown) =>
+  JSON.stringify({
+    type: 'user',
+    message: { content: [{ type: 'tool_result', tool_use_id: toolUseId, content }] },
+  })
 
 describe('mapClaudeStream', () => {
   it('maps text deltas to TEXT_MESSAGE_CHUNK', async () => {
@@ -205,6 +214,83 @@ describe('mapClaudeStream', () => {
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant' })
     expect(out[0].delta).toMatch(/Not logged in/)
+  })
+
+  it('gives contiguous text deltas ONE shared messageId (so the UI renders one bubble, not one per delta)', async () => {
+    const out = await collect([textDelta('Draf'), textDelta('ted a reply')], ['confirmSend'])
+    const chunks = out.filter((e) => e.type === EventType.TEXT_MESSAGE_CHUNK)
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0].messageId).toBeDefined()
+    expect(chunks[1].messageId).toBe(chunks[0].messageId)
+  })
+
+  it('starts a NEW text messageId after a tool call (separate paragraph = separate bubble)', async () => {
+    const out = await collect(
+      [
+        textDelta('before'),
+        toolStart(0, 'tc1', 'mcp__inbox__renderLead'),
+        blockStop(0),
+        textDelta('after'),
+      ],
+      ['confirmSend']
+    )
+    const chunks = out.filter((e) => e.type === EventType.TEXT_MESSAGE_CHUNK)
+    expect(chunks).toHaveLength(2)
+    expect(chunks[1].messageId).not.toBe(chunks[0].messageId)
+  })
+
+  it('resets the text messageId on message_start', async () => {
+    const out = await collect(
+      [messageStart(), textDelta('a'), messageStart(), textDelta('b')],
+      ['confirmSend']
+    )
+    const chunks = out.filter((e) => e.type === EventType.TEXT_MESSAGE_CHUNK)
+    expect(chunks).toHaveLength(2)
+    expect(chunks[1].messageId).not.toBe(chunks[0].messageId)
+  })
+
+  it('surfaces a tool RESULT (for a surfaced tool) as TOOL_CALL_RESULT paired by toolCallId', async () => {
+    const out = await collect(
+      [
+        toolStart(0, 'tc_list', 'mcp__github__list_my_tickets'),
+        blockStop(0),
+        toolResult('tc_list', JSON.stringify({ tickets: [{ number: 42 }] })),
+      ],
+      ['confirmSend']
+    )
+    const result = out.find((e) => e.type === EventType.TOOL_CALL_RESULT)
+    expect(result).toBeDefined()
+    expect(result).toMatchObject({ toolCallId: 'tc_list', role: 'tool' })
+    expect(JSON.parse(result.content)).toMatchObject({ tickets: [{ number: 42 }] })
+  })
+
+  it('normalizes an array tool_result content (text blocks) to a string', async () => {
+    const out = await collect(
+      [
+        toolStart(0, 'tc_list', 'mcp__github__list_my_tickets'),
+        blockStop(0),
+        toolResult('tc_list', [{ type: 'text', text: '{"tickets":[]}' }]),
+      ],
+      ['confirmSend']
+    )
+    const result = out.find((e) => e.type === EventType.TOOL_CALL_RESULT)
+    expect(result.content).toBe('{"tickets":[]}')
+  })
+
+  it('ignores a tool_result for a tool that was never surfaced (e.g. internal ToolSearch)', async () => {
+    const out: any[] = []
+    const lines = [
+      toolStart(0, 'tc_search', 'ToolSearch'),
+      blockStop(0),
+      toolResult('tc_search', 'internal noise'),
+    ]
+    for await (const ev of mapClaudeStream(fromLines(lines), {
+      approvalNames: ['confirmSend'],
+      surfaceTools: ['renderLead'],
+    })) {
+      out.push(ev)
+    }
+    expect(out.some((e) => e.type === EventType.TOOL_CALL_RESULT)).toBe(false)
   })
 
   it('emits args from content_block_start.input when no input_json_delta arrives', async () => {

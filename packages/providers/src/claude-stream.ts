@@ -18,6 +18,21 @@ function textChunk(text: string): BaseEvent {
   } as BaseEvent
 }
 
+// Normalizes a `claude` tool_result `content` (string | array of {text} blocks |
+// arbitrary) to a plain string the client can store on a ToolMessage.
+function normalizeResultContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    const text = content
+      .map((b) =>
+        b && typeof b === 'object' && 'text' in b ? String((b as { text: unknown }).text) : ''
+      )
+      .join('')
+    return text || JSON.stringify(content)
+  }
+  return JSON.stringify(content ?? '')
+}
+
 type ToolBlock = { id: string; name: string; sawArgs: boolean; startInput: unknown }
 
 // Parses the `claude --output-format stream-json` NDJSON stream into AG-UI events.
@@ -41,6 +56,25 @@ export async function* mapClaudeStream(
   // skip the complete top-level message's text to avoid double-emitting.
   let streamedText = false
 
+  // All text deltas of ONE contiguous text run MUST share a single messageId, or
+  // AG-UI closes the message and opens a new one on each differing id (TEXT_MESSAGE_CHUNK
+  // semantics) — rendering one bubble per delta ("Draf"/"ted a reply"). Allocate lazily
+  // on first delta; `endTextRun()` clears it at a boundary (tool call, message_start,
+  // end of a complete message) so the next run is a fresh, separate bubble.
+  let textMsgId: string | null = null
+  function textRunChunk(text: string): BaseEvent {
+    if (!textMsgId) textMsgId = crypto.randomUUID()
+    return {
+      type: EventType.TEXT_MESSAGE_CHUNK,
+      role: 'assistant',
+      messageId: textMsgId,
+      delta: text,
+    } as BaseEvent
+  }
+  const endTextRun = () => {
+    textMsgId = null
+  }
+
   // Only surface tool calls that are part of the agent's contract (the names the
   // client can render). Internal/built-in tools the model may use to reach them
   // (e.g. ToolSearch) are machinery — never show them to the consumer. When
@@ -58,6 +92,7 @@ export async function* mapClaudeStream(
   ): Generator<BaseEvent> {
     const name = stripMcpPrefix(rawName)
     emittedToolIds.add(id)
+    endTextRun() // a tool call ends the preceding text run
     yield {
       type: EventType.TOOL_CALL_START,
       toolCallId: id,
@@ -113,7 +148,7 @@ export async function* mapClaudeStream(
           input?: unknown
         }
         if (b.type === 'text' && b.text && !streamedText && !synthetic) {
-          yield textChunk(b.text)
+          yield textRunChunk(b.text)
         }
         if (
           b.type === 'tool_use' &&
@@ -130,6 +165,28 @@ export async function* mapClaudeStream(
         }
       }
       streamedText = false
+      endTextRun()
+      continue
+    }
+
+    // Tool RESULT line: `claude` ran a tool and fed the result back as a top-level
+    // `user` message with tool_result blocks. Surface the result (only for tools WE
+    // surfaced — internal tool results like ToolSearch stay hidden) as a ToolMessage
+    // so the client can (a) flip the tool chip from Running→Done and (b) read the
+    // data directly instead of the model re-emitting it into a render tool.
+    if (obj.type === 'user' && Array.isArray(obj.message?.content)) {
+      for (const block of obj.message!.content) {
+        const b = block as { type?: string; tool_use_id?: string; content?: unknown }
+        if (b.type === 'tool_result' && b.tool_use_id && emittedToolIds.has(b.tool_use_id)) {
+          yield {
+            type: EventType.TOOL_CALL_RESULT,
+            messageId: crypto.randomUUID(),
+            toolCallId: b.tool_use_id,
+            content: normalizeResultContent(b.content),
+            role: 'tool',
+          } as BaseEvent
+        }
+      }
       continue
     }
 
@@ -144,6 +201,7 @@ export async function* mapClaudeStream(
 
     if (ev.type === 'message_start') {
       streamedText = false
+      endTextRun()
       continue
     }
 
@@ -155,6 +213,7 @@ export async function* mapClaudeStream(
       const id = ev.content_block.id ?? crypto.randomUUID()
       blocks.set(index, { id, name, sawArgs: false, startInput: ev.content_block.input })
       emittedToolIds.add(id)
+      endTextRun() // a tool call ends the preceding text run
       yield {
         type: EventType.TOOL_CALL_START,
         toolCallId: id,
@@ -167,7 +226,7 @@ export async function* mapClaudeStream(
     if (ev.type === 'content_block_delta') {
       if (ev.delta?.type === 'text_delta' && ev.delta.text) {
         streamedText = true
-        yield textChunk(ev.delta.text)
+        yield textRunChunk(ev.delta.text)
         continue
       }
       if (ev.delta?.type === 'input_json_delta' && typeof ev.delta.partial_json === 'string') {

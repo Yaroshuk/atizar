@@ -11,7 +11,15 @@ import { WorkflowSwitcher } from './components/WorkflowSwitcher'
 import { Icon } from './components/Icon'
 import type { PipelineNode } from './pipeline'
 import type { Status } from './status'
-import { workflows, META } from './workflows'
+import { workflows, META, renderSpecs, hitlSpecs } from './workflows'
+
+// Tool names that render as generative-UI cards — everything the client registered a
+// renderer for. Anything else (list_my_tickets, get_latest_email, …) is plumbing and
+// is hidden from the consumer thread unless dev mode is on.
+const renderableToolNames: ReadonlySet<string> = new Set([
+  ...renderSpecs.map((s) => s.toolName),
+  ...hitlSpecs.map((s) => s.toolName),
+])
 
 export const InboxView = () => {
   const { copilotkit } = useCopilotKit()
@@ -182,6 +190,7 @@ export const InboxView = () => {
             iconName={META[openAgent.agent.id].iconName}
             status={statusOf(iid(openAgent.agent.id))}
             renderToolCall={renderToolCall}
+            renderableToolNames={renderableToolNames}
             loading={statusOf(iid(openAgent.agent.id)) === 'running'}
             canStart={canStart(openAgent.agent.id)}
             intro={META[openAgent.agent.id].intro}

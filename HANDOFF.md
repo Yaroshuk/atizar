@@ -6,6 +6,26 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
+**On `feat/tool-result-surfacing` (BUILT, browser-verified):** the **tool-result surfacing +
+consumer-thread polish** pass. Root cause unified three symptoms: MCP tool RESULTS never
+reached the client (`claude-stream` emitted only START/ARGS/END). Now the provider emits
+`TOOL_CALL_RESULT` for surfaced tools, which (a) flips a tool chip Running→Done (the default
+chip waits on a `toolMessage` that never arrived → stuck "Running") and (b) hands the data to
+the client directly. On top: **dev mode** (`?dev=1`, persisted) — the consumer thread shows
+ONLY generative-UI cards; internal data-fetch chips (`list_my_tickets`, `get_latest_email`)
+are hidden unless dev mode is on (`AgentModal` filters by the registered render/HITL tool
+names). **TRIAGE no longer couriers tickets through the model**: `render_triage` shrank to
+`{origin, recommendations:[{number,route}]}` (tiny + fast); the TriageCard reads ticket DATA
+from the surfaced `list_my_tickets` result via a `ThreadResultsContext`, merging the model's
+route. Plus visual fixes: triage rows stack (title wraps, action buttons wrap, no overflow);
+`ReplyDraftCard` uses the proper head/badge/kicker (label no longer overlaps the title); and
+contiguous text deltas now share ONE `messageId` (AG-UI `TEXT_MESSAGE_CHUNK` opened a new
+message per differing id → "Draf"/"ted a reply" split into two bubbles). 127 unit tests +
+typecheck/lint/prettier green. **Browser-verified E2E** (real Magma board, real reply draft):
+normal mode = clean cards (no `list_my_tickets` chip, no stuck Running); dev mode = the chip
+shows and reads **Done**; triage card + reply card lay out correctly; the narration is one bubble.
+**Next:** commit this, then pick from "Other next-ups" / "PLANNED NEXT" below.
+
 **On `master` (MERGED `3a92241`, BUILT, browser-verified):** the **workflow-
 separation** pass. Each workflow is now a **self-contained module** (`apps/inbox/workflows/<id>/`
 descriptor+server+client) and workflows are **isolated boxes** that talk only through a typed
@@ -66,22 +86,22 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
   contract discovery (source emits a typed parcel, system offers compatible workflows — no naming);
   a live demo reusing one agent across two workflows; clearing per-instance `handoffNotes` when an
   agent is re-seeded (cosmetic — a re-seeded agent still shows its prior "sent" note); show the
-  workflow *label* instead of the raw id in the "Open in" button / handoff notes.
+  workflow _label_ instead of the raw id in the "Open in" button / handoff notes.
 - The GitHub data path is **real and read-only by construction**. A real-time refresh, broader
   scoping (beyond the single assignee), or Projects-v2 status writes are explicitly **out of scope**
   unless the read-only constraint is revisited (it is a hard rule — see CLAUDE.md / memory).
 
-### Known issues / tech debt (GitHub triage — not blocking, user accepted)
+### Known issues / tech debt (GitHub triage)
 
-- **`list_my_tickets` chip shows "Running" forever** in the agent thread even after the run is Done.
-  It's a data tool with no registered render component, so `useRenderToolCall`'s default chip never
-  flips to done (Gmail's `get_latest_email` has the same look). Cosmetic. Fix = register a tiny
-  renderer for data tools, or hide unregistered tool chips.
-- **TRIAGE couriers every ticket through `render_triage`** (the model re-emits the array token by
-  token). Mitigated for now (status filter + cap 20 + trimmed body/comment + 180s timeout), but it's
-  a latent scaling limit — more/larger tickets re-introduce slow runs / timeouts. Robust fix: have
-  the client read the `list_my_tickets` tool RESULT from the message stream directly instead of the
-  model re-emitting it into the render tool.
+- ✅ **FIXED (this session):** **`list_my_tickets` chip shows "Running" forever.** Root cause: the
+  provider never surfaced tool RESULTS, so the default chip's `toolMessage` never arrived. Now
+  `claude-stream` emits `TOOL_CALL_RESULT` → chip flips to Done. In normal mode the chip is hidden
+  entirely (only cards show); dev mode (`?dev=1`) shows it, now correctly Done.
+- ✅ **FIXED (this session):** **TRIAGE couriered every ticket through `render_triage`.** The robust
+  fix landed: the client reads the `list_my_tickets` RESULT (now surfaced) via `ThreadResultsContext`,
+  and `render_triage` carries only `{origin, recommendations}`. The model no longer re-emits ticket
+  text → no latency/timeout scaling wall. The `MAX_TICKETS`/trim knobs now only bound the streamed
+  result payload, not model latency.
 
 ## Other next-ups (suggested order)
 
