@@ -360,8 +360,10 @@ with overflow queued; the pipeline shows the live copies as nested instance card
   truth (a `commit` helper mutates the ref alongside `setInstances`) — reading the React `instances`
   state instead would let several same-tick `spawn`s all pass the check before any commit.
 - **Lifecycle.** A `done` instance is torn down immediately, EXCEPT: a workflow **input** agent (kept as
-  the pipeline root) and a **parent with a live child** (kept, shown Working). An **errored** instance
-  is kept and keeps its slot (gated on the authoritative local `lifecycle`, not the lagging ref status).
+  the pipeline root), a **parent with a live child** (kept, shown Working), and a run that finalized
+  **awaiting approval** or **errored** — kept, keeping its slot. The teardown gate is the SETTLED status
+  (`statusFrom` over the messages), not the lagging ref: with claude-cli, HITL kills the process at the
+  approval tool call so the run finalizes, and the reply copy must stay visible as `awaiting_approval`.
 - **Pipeline = instance tree.** `pipelineModel.buildPipeline` (pure) builds repeated depth-2
   `parent → [children grouped by agentId]` blocks: 1 instance → a single card; ≥2 of one agent → an
   agent mini-header (`N active`) + the instances nested with L-connectors; a `queued: N` line under the
@@ -380,10 +382,17 @@ L-connected instance cards (#5197, #5641) + `queued: 1`** (cap held); the queue 
 started when a slot freed) and all torn down to the kept TRIAGE root; a single routed ticket renders as
 one card (no header); the type card showed the aggregate; **no page reload at any point**.
 
+Also browser-verified the **lead-inbox approval flow** (real Gmail): qualifier qualified an AliExpress
+lead (spam/cold), "Draft reply" handed off to REPLY, and REPLY **stayed in the pipeline as `Approve`**
+(awaiting_approval) with its ApprovalDialog — not torn down; an **idle agent card opens a type view**
+(intro + START); the qualifier's handoff note carries an **"Open REPLY AGENT"** jump button.
+
 Found-and-fixed during build/verify: (1) errored instances were torn down (stale-ref status read →
 gate on local `lifecycle`); (2) the pipeline `shown` set wrongly kept done descendants (dropped the
 buggy downward fixpoint, upward-only); (3) the cap leaked under same-tick deliveries (synchronous
-`instRef`). Known-benign: a transient `Agent <localId> not found` console warning on teardown (an
+`instRef`); (4) three regressions the rewrite introduced vs the old fixed-mount model, all caught in the
+lead-inbox E2E — `awaiting_approval` instances torn down on finalize (now kept via settled-status gate);
+idle cards dead (now open a type view); no intra-workflow handoff jump (now an "Open <agent>" note button). Known-benign: a transient `Agent <localId> not found` console warning on teardown (an
 unregister/pending-probe race); a queued item gets no "received" handoff note until it actually
 starts (the drain path re-enters `start`, not `deliver`) — the "sent" note on the source is unaffected.
 The folded-away `AgentRuntime.tsx`/`useAgentStatus.ts` (their status logic now lives in `statusFrom.ts`,

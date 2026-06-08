@@ -175,8 +175,11 @@ wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, 
   `instancesCore.ts`; status = pure `statusFrom.ts`; pipeline render-model = pure `pipelineModel.ts`).
   Concurrency is bounded per-agent by `defineAgent.maxInstances` (default 2; `triage`+`qualifier` = 1 =
   singleton — there is NO separate singleton flag). Overflow waits in a per-agent queue and auto-starts on
-  a freed slot. A `done` instance is torn down immediately EXCEPT input agents (kept as the pipeline root)
-  and parents with a live child (kept, shown Working). **The cap holds against SAME-TICK deliveries only
+  a freed slot. A `done` instance is torn down immediately EXCEPT input agents (kept as the pipeline root),
+  parents with a live child (kept, shown Working), AND a run that finalized **awaiting approval** — with
+  claude-cli, HITL kills the process at the approval tool call, so the run finalizes; `onFinalized` must
+  KEEP an instance whose settled status (`statusFrom` over its messages) is `awaiting_approval` or `error`
+  (gate on the derived status, NOT the lagging ref) or the reply copy vanishes instead of showing Approve. **The cap holds against SAME-TICK deliveries only
   because `instRef` is the synchronous source of truth** — `useAgentInstances` mutates `instRef.current`
   synchronously (a `commit` helper) alongside `setInstances`, so three `spawn`s in one tick see each other
   (reading the `instances` state instead lets all three pass, since state isn't committed until render).
