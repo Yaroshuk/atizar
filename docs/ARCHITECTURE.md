@@ -5,15 +5,25 @@
 > Most of this document is 🎯 — only the vertical slice under `apps/inbox/` is ✅.
 > This captures decisions made in conversation so they aren't lost between sessions.
 
+> **Pipeline build spec (LOCKED 2026-06-09) → `docs/pipeline-updated-3.md`.** Server-authoritative
+> runtime, locked decisions (server-executed effects, Stop, Mastra+Postgres in beta, Trace-rendered
+> thread), beta scope and build order. **Read it before any pipeline work.**
+
+> **Pipeline entity model → `docs/pipeline-model.md`.** How work lives and moves through
+> stages: Workflow / Agent / WorkItem / Case, the lifecycle, gates, `source` vs `payload`,
+> workflow boundaries, and "who knows what". Read it to understand the durable-work model
+> (and why the P1/P2/P3 pipeline gaps dissolve under it).
+
 ## 1. What this is & positioning
 
 An **open-source framework for AI engineers who ship agentic automations to
 clients**: code for the engineer, a polished UI for the client.
 
-The differentiator no one else hits cleanly: **two modes in one open-source product**
-- **Developer mode** — the integrator configures agents, pipelines, integrations, skills (code).
-- **Consumer mode** — the client's manager/staff use a clean UI (cards, buttons), get work
-  done, but never see or touch code.
+The differentiator no one else hits cleanly: **two views in one open-source product**
+- **Developer view** — the integrator configures agents, pipelines, integrations, skills (code).
+- **Consumer view** — the client's manager/staff use a clean UI (cards, buttons), get work
+  done, and may edit a few declared leaf text fields (prompt/name/description), but never see or
+  touch code.
 
 This fills the gap between "library of building blocks" (CopilotKit) and "closed SaaS"
 (Lindy). n8n shows a technical node editor to everyone; Dify gives one builder UI;
@@ -34,25 +44,29 @@ funnel, not the moat — so do not over-invest in framework elegance early.
 action). Narrow in form, broad in reach (every company has it). Not a cage — the default
 example and skill focus, while the framework stays extensible.
 
-## 2. The three modes (the architectural spine)
+## 2. The two views (the architectural spine)
 
-Everything is driven by **config-as-data** (a Zod object). The three modes are three
-ways of touching the same config (plus code for the deepest):
+Everything is driven by **config-as-data** (a Zod object). There are **two views** onto the same
+config + code:
 
 ```
             ONE source of truth: config (Zod) + code in folders
                                  ▲
-   MODE 3: Consumer        MODE 2: Visual + chat        MODE 1: Developer
-   read-only, just works   edits CONFIG visually/chat   edits CONFIG and CODE
-   (manager)               (in-between, power user)     (engineer)
+        CONSUMER view                          DEVELOPER view
+   operates the UI (cards, buttons),      edits CODE + config directly,
+   edits a few leaf text fields           full power
+   (prompt/name/description) — manager    (engineer)
 ```
 
-- **Mode 1 (Developer):** edits code + config directly. Full power. ✅ (this is how we work now)
-- **Mode 3 (Consumer):** read-only, just operates the UI (cards, buttons). 🎯 (the slice is a first cut of this surface)
-- **Mode 2 (Visual + chat):** edits via forms + chat, no code editor. Its power == the
-  surface of the config schema ("the more you put in config, the more mode 2 can do
-  without code"). 💤 **Far future** — explicitly deferred; the riskiest/most expensive part
-  (it embeds a mini-Claude-Code). Do NOT build until clients ask.
+- **Developer view:** edits code + config directly. Full power. ✅ (this is how we work now)
+- **Consumer view:** operates the UI (cards, buttons), and may edit a few declared **leaf text
+  fields** (prompt / name / description) stored as per-account overrides. Never sees or touches
+  code. 🎯 (the slice is a first cut of this surface)
+
+> A visual / chat config **builder** (a third "edit the pipeline by mouse/chat" mode) was considered
+> and **dropped**: it's the riskiest, most expensive part (a mini-Claude-Code), and the
+> config-schema ceiling it implies is the classic low-code trap. What survives is the modest slice
+> above — field-level overrides in the consumer view, not arbitrary UI authoring.
 
 ## 3. Config-as-data behind a source adapter 🎯
 
@@ -60,21 +74,22 @@ The runtime receives ONE validated config object; it doesn't know the source:
 
 ```
 config source adapter:
-  ├── FileAdapter  → config from repo/code   → MODE 1 (engineer, git, typesafe)   ✅ first
-  ├── DbAdapter    → config from Postgres     → MODE 2 (visual/chat edits → DB)    💤
-  └── (all read)   → active config            → MODE 3 (consumer just renders)
+  ├── FileAdapter   → config from repo/code   → DEVELOPER view (git, typesafe)        ✅ first
+  └── OverrideStore → per-account leaf-text overrides (DB) → CONSUMER view edits        🎯
+      active config = file base ⊕ overrides
 ```
 
 **Storage split (decided):**
 - **Structure** (which agents, screens, components) → in **files** (git, engineer). Rarely changes.
-- **Manager-editable text** (prompts, tone, messages) → in **DB** (overrides).
+- **Manager-editable text** (prompts, tone, messages) → in **DB** as per-account overrides.
 - **Secrets** (API keys) → **env only**, referenced by name; never in git, never plaintext DB.
 
 `editableBy` on a field is what decides file-vs-DB — storage is a *consequence* of who edits.
 
-**base⊕overrides layering** 💤 — final config = base (FileAdapter, git, engineer)
-⊕ overrides (DbAdapter, visual, client). Keep overrides limited to leaf text fields so the
-merge stays trivial. **Deferred** — it's a solution to a problem we don't have until mode 2 exists.
+**base⊕overrides layering** 🎯 — final config = base (files, git, engineer) ⊕ per-account overrides
+(DB, consumer). Overrides are limited to declared **leaf text fields** (prompt / name / description)
+so the merge stays trivial. This is the modest config-as-data slice that backs consumer-view editing
+— not arbitrary UI authoring.
 
 ## 4. The `defineAgent` contract ✅ (core built; `fields` deferred)
 
@@ -188,7 +203,7 @@ skill seed): `docs/dev-record-replay.md`. Build narrative: `docs/BUILD-LOG.md` �
 Skills ride **inside packages**, versioned with `npm update` (no drift, no DB):
 `node_modules/@platform/*/skills/*/SKILL.md` + project `./skills/*`. Discovery by
 convention (glob), not a list. `CLAUDE.md` is a thin pointer, not a duplicate of the
-knowledge. Skills are also what make mode-2 chat-editing reliable (the chat agent reads
+knowledge. Skills also guide the AI when a developer asks it to extend the framework (it reads
 them instead of hallucinating). (We already do a lightweight version: `.claude/skills/rules/`.)
 
 ## 8. Stack & why each layer
@@ -222,13 +237,14 @@ trust/self-host/audit, last-mile UX, client relationships & context.
   stay 💤. `@platform/*` is a placeholder scope (rename before publish).
 - ✅ **One real integration (Gmail MCP)** — `@platform/integrations/gmail-basic` (read latest /
   create draft, draft-only).
-- 💤 **Then, roughly in order:** real agent (Mastra, beside `claude-cli`) → `@platform/react` +
+- 💤 **Then, roughly in order:** server-authoritative pipeline state + persistence
+  (see `docs/pipeline-updated-3.md` — Mastra + Postgres are IN the first beta) → `@platform/react` +
   `@platform/server` extraction → auth/RBAC/audit → DB + config file/DB split → deploy (Docker,
-  self-host) → (much later) mode-2 visual/chat editor, base⊕overrides. `fields` stay 💤.
+  self-host). Consumer-view field overrides (`editableBy` leaf text) + base⊕overrides land with the DB.
 
 ## 10. Three ways to run (design intent) 🎯
 
-Same files, three modes: local no-docker (`npm run dev`, sqlite, auth off — fast dev);
+Same files, three ways: local no-docker (`npm run dev`, sqlite, auth off — fast dev);
 local docker (`docker compose up`, Postgres, hot-reload — prod parity); server
 (`docker compose up -d`, Postgres, `AUTH_ENABLED=true`, client API key, self-host —
 execution only). Edit code locally → `git push` → CI/CD deploys to client server.

@@ -6,6 +6,33 @@ full chronological build history see `docs/BUILD-LOG.md`.
 
 ## ⏭️ Where we are now
 
+### 🔒 ARCHITECTURE LOCKED (2026-06-09) → `docs/pipeline-updated-3.md`
+
+The build spec for the first public beta, superseding `pipeline-updated.md`/`-2.md` and
+absorbing the 50-agent audit (Notion: "Анализ архитектуры v3"). Locked decisions:
+**server-executed effects** (model proposes + opens gates; the SERVER executes approved
+actions through the action ledger, key = `workItemId+gateId`); **Stop/cancel per agent
+instance AND per workflow**; **Mastra + Postgres ship IN the first beta** (claude-cli =
+dev-only provider — also satisfies "no terminal-spawn in prod" verbatim); **machine dispatch
+allowed / machine action never** (origin reserves `inbound`; no trigger code in beta);
+**approval expiry = stale badge, never auto-resolve**; **thread = Trace render + per-WorkItem
+SSE tail** (drop `@copilotkit/*` transport; KEEP AG-UI vocabulary + render registry + cards;
+assistant-ui = named fallback renderer).
+
+**Build order (beta):**
+1. Provider contract v2 (`resume?` capability + `GATE_OPENED` signal) + conformance suite — BEFORE any PipelineService code.
+2. Week-0 spike: RunObserver + browser attach to a running WorkItem (trace snapshot + SSE tail).
+3. Server spine on Postgres: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE.
+4. Server-executed effects + cancel edges + startup sweep + finished guards (+ Gate fields: formRev, assignee, comment, both artifact versions).
+5. Mastra provider (production path) beside claude-cli (dev); re-key record/replay cassettes to the server gate count.
+6. Re-point board/thread UI to server state; delete `@copilotkit/*` deps.
+7. Packaging: zero-cred demo (synthetic cassettes + scanCassette CI gate), README, LICENSE, `@platform/*` rename, golden-set eval, bearer token.
+
+(The "NEXT — docs/pipeline-plan.md" P1/P2/P3 items below are absorbed by the
+server-authoritative model in updated-3.)
+
+---
+
 **On `feat/dev-record-replay` (BUILT, browser E2E pending merge):** **dev record/replay** — a
 `Provider → Provider` decorator (`withRecordReplay`) toggled by `DEV_RECORD_REPLAY` that records
 each real provider run to disk once and replays it instantly on every subsequent run. Recordings

@@ -10,7 +10,7 @@ are right now and what to build next, see **`HANDOFF.md`** (living session state
 **Where everything lives:**
 
 - `HANDOFF.md` — current status + the next thing to build (changes every session).
-- `docs/ARCHITECTURE.md` — the full vision & architecture (three modes, config-as-data,
+- `docs/ARCHITECTURE.md` — the full vision & architecture (dev & consumer views, config-as-data,
   `defineAgent`, providers, generative UI, roadmap), each item marked BUILT / DESIGN INTENT /
   DEFERRED. **Read this first for the big picture.**
 - `docs/BUILD-LOG.md` — chronological per-feature narratives of everything BUILT.
@@ -248,6 +248,17 @@ wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, 
 
 ## Decisions
 
+- **Pipeline architecture v3 LOCKED (2026-06-09) → `docs/pipeline-updated-3.md`** (the build spec;
+  supersedes pipeline-model/updated/updated-2). Headlines: server-authoritative state in
+  **Postgres** (the beta backend, dev included); **server-executed effects** (model proposes +
+  opens gates, the SERVER executes approved actions via the action ledger, key =
+  `workItemId+gateId`); **Stop/cancel per agent instance and per workflow**; **Mastra ships in the
+  first beta as the production provider — claude-cli is dev-only** (satisfies the
+  no-terminal-spawn-in-prod rule); machine dispatch allowed/visible/gated — machine action never;
+  approval expiry never auto-resolves (stale badge); thread UI = Trace render + per-WorkItem SSE
+  tail — `@copilotkit/*` transport is dropped, AG-UI stays as the event vocabulary (assistant-ui =
+  named fallback renderer). Provider contract v2 (optional `resume?` + `GATE_OPENED` signal) lands
+  in `@platform/core` BEFORE any PipelineService code.
 - Server = Hono (Web-Standards / fetch; mounts CopilotKit endpoint without adapters). Swappable behind a thin layer.
 - Slice verified by manual click-through; TDD + review loop starts with the reusable core layer.
 - Config split (later): structure in files, manager-editable text fields in DB; secrets in env only.
