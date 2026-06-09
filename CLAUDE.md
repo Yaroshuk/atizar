@@ -116,6 +116,34 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   ENVIRONMENT artifact, not an app bug. Fix: kill every stale stack (root path), free the ports
   (`lsof -tiTCP:4000,:5173,:5174 | xargs kill -9`), start ONE `yarn dev`, confirm a single
   `server on http://localhost:4000` and one vite on `:5173` (no `EADDRINUSE`).
+  **Gotcha within the gotcha:** `tsx watch server/index.ts` spawns a CHILD `node` running the
+  server whose command line is NOT `…/node_modules/.bin/tsx`, so the `pkill` pattern above MISSES
+  it — the child keeps `:4000` and the next `yarn dev` logs `EADDRINUSE` while a stale REPLAY server
+  silently keeps answering `/info` 200 (so you think you restarted but didn't — e.g. a record-mode
+  restart still replays). Always also `lsof -tiTCP:4000 | xargs kill -9` and confirm `:4000` is free
+  before restarting; `grep -c EADDRINUSE` the dev log after boot.
+  **Now mitigated:** a **`predev`** script (`apps/inbox/package.json`) frees `:4000`/`:5173` LISTEN
+  sockets before every `yarn dev`, so a fresh server always binds in the intended `DEV_RECORD_REPLAY`
+  mode. This was the root cause of a "cassettes don't work" report — a stale non-replay server on
+  `:4000` was intercepting every request. (macOS/Linux only — `predev` uses `lsof`.)
+- **Concurrent HITL approvals need PER-INSTANCE tool registration.** `useHumanInTheLoop` holds ONE
+  `resolvePromiseRef` per registration; a single global registration shared across instances means a
+  second concurrent run overwrites the first's resolver → the first awaiting instance's approve button
+  goes dead. Fix (BUILT): register HITL tools per live instance under `agentId = localId` (one
+  `InstanceTools` mounted per instance) and wrap the open instance's thread in
+  `<CopilotChatConfigurationProvider agentId={localId}>` (see `LiveInstanceModal`, which creates its
+  `useRenderToolCall` INSIDE the provider). CopilotKit keys tools+renders by `${agentId}:${name}` and
+  core looks up the handler via `getTool({ toolName, agentId: agent.agentId })` where a proxied agent's
+  `agentId` IS the localId — so both the handler and the render resolve to the right copy. Pure render
+  tools stay GLOBAL (no `respond`, so no shared-ref problem); only HITL is per-instance. **Only the
+  browser catches this** (unit tests + typecheck pass with the broken global registration).
+- **Replaying the SAME cassette in two instances reuses its `toolCallId` → masks multi-instance HITL.**
+  CopilotKit's `executingToolCallIds` is a GLOBAL set keyed by `toolCallId`; `useRenderToolCall` only
+  hands `respond` (status `executing`) when the id is in that set. Two instances replaying one cassette
+  share the recorded `toolu_…` id, so after the first approves (id removed) the second renders
+  `inProgress`/no-respond — a **replay artifact, NOT a product bug** (real `claude` runs mint a unique
+  id per run). To browser-verify concurrent HITL, force REAL runs (`DEV_RECORD_REPLAY=record`) so each
+  instance gets a distinct id; replay (`=1`) will show a false "second button dead".
 - **GitHub access is GraphQL-budgeted.** Projects v2 reads AND `gh search` go through the GraphQL API
   (5000 points/hr, shared across all gh callers). A `gh project item-list` over the full board is
   point-heavy; that's why `list_my_tickets` uses a single scoped `search` query instead. On

@@ -1,13 +1,19 @@
 import { useCallback, useRef, useState } from 'react'
-import { useCopilotKit, useRenderToolCall } from '@copilotkit/react-core/v2'
+import {
+  useCopilotKit,
+  useRenderToolCall,
+  CopilotChatConfigurationProvider,
+} from '@copilotkit/react-core/v2'
 import { instanceId, type AgentDefinition, type Destination } from '@platform/core'
 import { useWorkflowRenders } from './useWorkflowRenders'
-import { resolveDelivery } from './deliver'
+import { resolveDelivery, deliveryKey } from './deliver'
 import { useAgentInstances } from './useAgentInstances'
+import { InstanceTools } from './InstanceTools'
 import { aggregateAgent, aggregateLabel } from './aggregate'
 import { buildPipeline, type PInstance } from './pipelineModel'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal, type HandoffNote } from './components/AgentModal'
+import { LiveInstanceModal } from './components/LiveInstanceModal'
 import { InstancePickerModal } from './components/InstancePickerModal'
 import { PipelineColumn } from './components/PipelineColumn'
 import { WorkflowSwitcher } from './components/WorkflowSwitcher'
@@ -82,7 +88,7 @@ export const InboxView = () => {
         (x) => x.workflowId === origin && x.agentId === sourceAgentId
       )
 
-      const localId = spawn({
+      const { localId, deduped } = spawn({
         runtimeKey: r.instanceId,
         agentId,
         workflowId: targetWf.id,
@@ -93,7 +99,12 @@ export const InboxView = () => {
         maxInstances: def.maxInstances,
         parentLocalId: parent?.localId,
         payload,
+        deliveryKey: deliveryKey(payload),
       })
+
+      // A deduped delivery (the same source item, already in flight) is a no-op: an
+      // existing copy covers it, so don't add a duplicate handoff note or badge.
+      if (deduped) return
 
       // Handoff notes: a 'sent' note on the source instance, a 'received' note on the
       // spawned target (only if it spawned now — a queued item has no localId yet).
@@ -145,7 +156,7 @@ export const InboxView = () => {
       maxInstances: agentDef.maxInstances,
       isInput: true,
       payload: null,
-    })
+    }).localId
 
   // Open an agent by count of its live instances: 0 → a type view (intro + START, so an
   // idle card is always clickable); 1 → that instance's thread; ≥2 → an instance picker
@@ -213,6 +224,14 @@ export const InboxView = () => {
 
   return (
     <>
+      {/* Per-instance HITL tool registrations — one per live instance, keyed by
+          localId, so each instance gets its own `respond` (see InstanceTools). Mounted
+          for ALL instances (any workflow) since a background run can pause for approval
+          while its modal is closed. */}
+      {instances.map((inst) => (
+        <InstanceTools key={inst.localId} agentId={inst.localId} />
+      ))}
+
       <WorkflowSwitcher
         workflows={workflows}
         activeId={activeWorkflowId}
@@ -267,25 +286,26 @@ export const InboxView = () => {
         </div>
 
         {openInstance && openAgentObj && (
-          <AgentModal
-            agent={openAgentObj}
-            title={openInstance.name}
-            iconName={openInstance.iconName}
-            status={openInstance.status}
-            renderToolCall={renderToolCall}
-            renderableToolNames={renderableToolNames}
-            loading={openInstance.status === 'running'}
-            canStart={openInstance.isInput}
-            intro={META[openInstance.agentId].intro}
-            notes={handoffNotes[openInstance.localId] ?? []}
-            onOpenWorkflow={switchWorkflow}
-            onOpenInstance={openInstanceById}
-            onStart={() => {
-              const def = workflow.agents.find((a) => a.agent.id === openInstance.agentId)?.agent
-              if (def) startInput(def)
-            }}
-            onClose={() => setOpenId(null)}
-          />
+          <CopilotChatConfigurationProvider agentId={openInstance.localId}>
+            <LiveInstanceModal
+              agent={openAgentObj}
+              title={openInstance.name}
+              iconName={openInstance.iconName}
+              status={openInstance.status}
+              renderableToolNames={renderableToolNames}
+              loading={openInstance.status === 'running'}
+              canStart={openInstance.isInput}
+              intro={META[openInstance.agentId].intro}
+              notes={handoffNotes[openInstance.localId] ?? []}
+              onOpenWorkflow={switchWorkflow}
+              onOpenInstance={openInstanceById}
+              onStart={() => {
+                const def = workflow.agents.find((a) => a.agent.id === openInstance.agentId)?.agent
+                if (def) startInput(def)
+              }}
+              onClose={() => setOpenId(null)}
+            />
+          </CopilotChatConfigurationProvider>
         )}
 
         {/* Type view: an idle agent (no live instance) is still clickable — shows its
