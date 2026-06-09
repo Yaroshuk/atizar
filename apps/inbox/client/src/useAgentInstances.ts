@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useCopilotKit } from '@copilotkit/react-core/v2'
 import { encodeHandoff, type Message } from '@platform/core'
 import { statusFrom } from './statusFrom'
-import { canSpawn, type Routable } from './instancesCore'
+import { canSpawn, liveDuplicate, type Routable } from './instancesCore'
 import type { PInstance } from './pipelineModel'
 import type { Status } from './status'
 
@@ -19,10 +19,19 @@ export type SpawnArgs = {
   isInput?: boolean
   // seed: handoff payload (workers) or null (an input agent reads the inbox itself)
   payload: unknown | null
+  // Identity of the source item this delivery acts on. When set, a repeated delivery
+  // for the same (runtimeKey, deliveryKey) is deduped instead of spawning a duplicate.
+  deliveryKey?: string
 }
+
+// Outcome of a spawn: `localId` is the new (or existing, when deduped) instance's id,
+// or undefined when the item was queued. `deduped` is true when an existing live or
+// queued copy already covers this delivery, so no new instance was created.
+export type SpawnResult = { localId?: string; deduped: boolean }
 
 type Live = PInstance & {
   workflowId: string
+  deliveryKey?: string
   unregister: () => void
   subId?: { unsubscribe: () => void }
 }
@@ -125,6 +134,7 @@ export const useAgentInstances = () => {
         status: 'running',
         parentLocalId: args.parentLocalId,
         isInput: !!args.isInput,
+        deliveryKey: args.deliveryKey,
         unregister,
       }
       let lifecycle: 'running' | 'done' | 'error' = 'running'
@@ -162,20 +172,30 @@ export const useAgentInstances = () => {
   )
   startRef.current = start
 
-  // Public: spawn or enqueue based on the cap. Returns the new instance's localId when
-  // it started immediately, or undefined when the item was queued (no instance yet).
+  // Public: dedupe, then spawn or enqueue based on the cap. A delivery carrying a
+  // deliveryKey is deduped against live instances AND the queue for the same target, so
+  // a repeated one-time delivery (e.g. clicking "Draft reply" again on the same email)
+  // returns the existing copy instead of spawning a duplicate.
   const spawn = useCallback(
-    (args: SpawnArgs): string | undefined => {
+    (args: SpawnArgs): SpawnResult => {
+      if (args.deliveryKey) {
+        const existing = liveDuplicate(instRef.current, args.runtimeKey, args.deliveryKey)
+        if (existing) return { localId: existing, deduped: true }
+        const q = queueRef.current[args.runtimeKey] ?? []
+        if (q.some((p) => p.args.deliveryKey === args.deliveryKey))
+          return { localId: undefined, deduped: true }
+      }
       const routables: Routable[] = instRef.current.map((x) => ({
         runtimeKey: x.runtimeKey,
         status: x.status,
       }))
-      if (canSpawn(routables, args.runtimeKey, args.maxInstances)) return start(args)
+      if (canSpawn(routables, args.runtimeKey, args.maxInstances))
+        return { localId: start(args), deduped: false }
       setQueued((prev) => ({
         ...prev,
         [args.runtimeKey]: [...(prev[args.runtimeKey] ?? []), { args }],
       }))
-      return undefined
+      return { localId: undefined, deduped: false }
     },
     [start]
   )

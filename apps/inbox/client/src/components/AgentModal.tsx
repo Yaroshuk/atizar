@@ -26,7 +26,7 @@ export type HandoffNote = {
   targetLocalId?: string // the spawned target instance (intra-workflow jump), if it started
 }
 
-type AgentModalProps = {
+export type AgentModalProps = {
   agent: { messages: Message[] }
   title: string
   iconName: IconName
