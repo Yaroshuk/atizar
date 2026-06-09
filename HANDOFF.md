@@ -21,19 +21,50 @@ spec → `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`; plan �
 `docs/superpowers/plans/2026-06-08-dev-record-replay.md`; build narrative →
 `docs/BUILD-LOG.md` §10.
 
-### 🐞 Known bugs — agent instances (NEXT, not yet fixed)
+### ✅ FIXED & browser-verified — the two agent-instance bugs (this session)
 
-- **One-time deliveries spawn duplicate instances.** Some handoffs are a one-shot action on a single
-  item — e.g. the email agent gets ONE email and the human clicks "Draft reply" 3×; today that spawns
-  3 reply instances for the same email. A one-time/idempotent delivery should dedupe (one instance per
-  source item) — clicking again should focus/no-op, not spawn a duplicate. (Dedupe was deferred in the
-  spec; promote it.) Needs a delivery identity (e.g. source item id / threadId on the payload).
-- **Second awaiting-approval instance's approve button is dead.** With two reply instances both in
-  `awaiting_approval`, approving one worked; on the OTHER the "Save draft" / approve button did nothing.
-  Likely the HITL `respond` callback is captured for only one instance (the active/last one) — the
-  generative-UI render/HITL registration is shared and may not route `respond` to the right proxy when
-  multiple instances await at once. Investigate `useWorkflowRenders`/`useHumanInTheLoop` + per-instance
-  routing (cf. the `origin`-param pattern) so each awaiting instance's approval resumes ITS own run.
+Both bugs from the prior handoff are fixed, on `master` working tree (uncommitted), with
+**166 unit tests + typecheck + lint green** and a full browser E2E pass. Commit when ready.
+
+- **✅ One-time deliveries spawned duplicate instances.** Clicking "Draft reply" 3× on ONE email spawned
+  3 reply instances. Fix: a delivery now carries a `deliveryKey` derived from the source item
+  (`deliveryKey(payload)` in `deliver.ts` — `thread:<id>` / `number:<n>` / `email:<from>|<subject>`),
+  and `spawn` dedupes against live instances AND the queue (`liveDuplicate` in `instancesCore.ts`); a
+  repeated delivery is a no-op (returns `{deduped:true}`, no duplicate note/badge). **Browser-verified:**
+  3× Draft reply → exactly **1** reply instance (`1 active · 1 awaiting approval`).
+- **✅ Second awaiting-approval instance's approve button was dead.** Root cause (source-verified in
+  `@copilotkit`): one global `useHumanInTheLoop` holds ONE `resolvePromiseRef`; a second concurrent run
+  overwrote the first's resolver. Fix: register HITL tools PER live instance under `agentId = localId`
+  (`InstanceTools`, mounted one-per-instance) + wrap the open thread in
+  `<CopilotChatConfigurationProvider agentId={localId}>` (`LiveInstanceModal` creates `useRenderToolCall`
+  inside it). Render tools stay global; only HITL is per-instance. **Browser-verified with REAL runs**
+  (`DEV_RECORD_REPLAY=record`, two distinct leads): both instances showed `status=executing respond=true`
+  and **both** "Save draft" buttons fired `respond` → both resumed → both saved drafts → both torn down.
+  Note: in `=replay` mode two instances share the cassette's `toolCallId`, which masks this as a false
+  "second button dead" — a replay artifact (see CLAUDE.md); verify concurrent HITL with `=record`.
+
+### ✅ FIXED — "cassettes don't work" was a stale-server collision
+`DEV_RECORD_REPLAY` cassettes are correct; replay was being silently bypassed because a **stale dev
+server held `:4000`**, so a freshly-started replay server hit `EADDRINUSE` (its `tsx watch` child
+isn't matched by the `.bin/tsx` pkill pattern) and Vite kept proxying to the OLD server — which was
+launched WITHOUT the env var → real `claude` every time. Fix: a **`predev`** script
+(`apps/inbox/package.json`) frees `:4000`/`:5173` LISTEN sockets before every `yarn dev`, so the
+fresh server always binds in the intended mode. **Verified:** a stale listener is killed and the new
+server binds with 0 `EADDRINUSE`; a clean replay run completes in ~2s with the cassette mtime
+unchanged (true replay, no real `claude`).
+
+### 🧭 NEXT — `docs/pipeline-plan.md` (three more gaps, design-first)
+Three issues surfaced this session are captured (with current model + options + open questions) in
+the new **`docs/pipeline-plan.md`** — think the pipelines through there, then spin specifics into a
+dated spec. Summary:
+- **P1 (highest impact):** result-only worker instances (TRIAGE → FEATURE/BUG-FIX/REPLY-DRAFT)
+  finalize `done` and are **torn down**, so their result card vanishes and the user can't act. The
+  lifecycle has no "completed-with-a-result-to-show" state. Recommended fix anchor: a uniform RESULT
+  lifecycle (`running → awaiting_approval | result | error → kept until dismissed`).
+- **P2:** the green intro bubble shows even when idle — split `intro` (active) from `description`
+  (idle type view); gate the running-intro on lifecycle.
+- **P3:** a one-time action button (VerdictCard "Draft reply") stays active after use; dedup makes a
+  re-click a no-op but the UI doesn't reflect it — reflect delivery state (by `deliveryKey`) on the card.
 
 **On `master` (MERGED `5d13f3f`, BUILT, browser-verified):** **dynamic agent instances** — a
 busy agent now spawns additional concurrent copies for new handed-off items instead of overwriting the
