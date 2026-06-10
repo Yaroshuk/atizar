@@ -43,6 +43,9 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
   const { db, store, pool, bus } = deps
 
   const publishStatus = (id: string, status: string): void => {
+    // Per-WorkItem topic carries status alongside trace events (the thread SSE tail);
+    // the board topic carries it for the coarse board SSE.
+    bus.publish(`workitem:${id}`, { kind: 'status', status })
     bus.publish('board', { kind: 'status', id, status })
   }
 

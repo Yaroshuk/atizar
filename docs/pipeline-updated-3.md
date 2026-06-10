@@ -7,7 +7,7 @@
 > updated-2 is **validated and unchanged**; this revision locks the open decisions and folds in
 > the confirmed audit corrections.
 
-## 0. Locked decisions (2026-06-09)
+## 0. Locked decisions (2026-06-09; #7 added 2026-06-10)
 
 1. **Server-executed effects.** The model proposes artifacts and opens gates; the **server**
    executes approved side-effecting actions. Belief #1 becomes code, not prompt text.
@@ -23,6 +23,13 @@
    event vocabulary, the render registry, cards/design, AgentModal's folding logic (ported to
    fold Trace events). Named fallback renderer: assistant-ui (ExternalStoreRuntime + AG-UI
    adapter).
+7. **The beta IS the framework packages + a thin demo app.** The deliverable is the monorepo of
+   libraries — `@platform/core|providers|integrations` plus `@platform/server` (pipeline engine)
+   and `@platform/react` (board/thread UI) extracted as the LAST build step — and a small demo
+   app with the basic workflows that consumes ONLY the public packages (the living proof of
+   belief #3: userland never imports internals). NOT a clone-template app with incidental
+   libraries. Extraction still happens once, at the end (after the API stops churning in steps
+   3–6), with strict import discipline before that so the move is mechanical.
 
 ## 1. Changes vs updated-2
 

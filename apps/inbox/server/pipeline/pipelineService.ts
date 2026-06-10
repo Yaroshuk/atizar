@@ -108,6 +108,16 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     stats(agentId: string): { active: number; queued: number } {
       return { active: pool.activeCount(agentId), queued: pool.queuedCount(agentId) }
     },
+
+    knows(agentId: string): boolean {
+      return deps.resolveAgent(agentId) !== undefined
+    },
+
+    // Re-feed a queued WorkItem to the pool (the startup sweep's recovery path).
+    reenqueue(item: { id: string; agentId: string }): void {
+      const cap = deps.resolveAgent(item.agentId)?.maxInstances ?? 1
+      pool.enqueue(item.id, item.agentId, cap)
+    },
   }
 }
 

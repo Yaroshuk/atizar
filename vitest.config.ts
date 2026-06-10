@@ -12,6 +12,15 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./apps/inbox/client/src/test/setup.ts'],
+    // Pipeline tests hit a SEPARATE Postgres database from the dev server, so leftover test
+    // rows never reach the dev server's startup sweep (which would re-enqueue them and spawn
+    // real provider runs). globalSetup creates + migrates it once.
+    env: {
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ??
+        'postgres://aiworkflow:aiworkflow@localhost:5432/aiworkflow_test',
+    },
+    globalSetup: ['./apps/inbox/server/pipeline/db/test-global-setup.ts'],
     include: ['apps/inbox/**/*.test.{ts,tsx,mjs}', 'packages/*/src/**/*.test.{ts,tsx}'],
     css: true,
     server: {

@@ -1,0 +1,139 @@
+import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
+import type { BaseEvent } from '@ag-ui/client'
+import type { PipelineService } from './pipelineService.js'
+
+// HTTP surface over the PipelineService. Read shapes (trace snapshot + SSE tail) are ported
+// verbatim from the step-2 spike (apps/inbox/server/dev-runs.ts) so the existing `?spike=1`
+// client keeps working against the Postgres spine. The dev start/resolve routes are dev-only
+// (the production trigger lands at step 6; the gate-keyed resolve with the ledger at step 4).
+
+const TERMINAL = new Set(['finished', 'error', 'closed'])
+
+// Messages on the `workitem:<id>` topic are either a trace event or a status change.
+type WorkItemMsg = { seq: number; event: BaseEvent } | { kind: 'status'; status: string }
+const isStatusMsg = (m: WorkItemMsg): m is { kind: 'status'; status: string } => 'kind' in m
+
+export function createPipelineRoutes(service: PipelineService): Hono {
+  const app = new Hono()
+
+  // START a run (dev throwaway — step 6 starts via the production trigger). The agent key is
+  // `wf__agent`; the workflow id is its prefix.
+  app.post('/api/dev/runs', async (c) => {
+    const { agent } = await c.req.json<{ agent: string }>()
+    if (!service.knows(agent)) return c.json({ error: `unknown agent: ${agent}` }, 404)
+    const [workflowId] = agent.split('__')
+    const { id } = await service.dispatch({
+      workflowId: workflowId ?? agent,
+      agentId: agent,
+      origin: 'human',
+      payload: {},
+    })
+    return c.json({ id })
+  })
+
+  // JSON history snapshot from `?from=seq`.
+  app.get('/api/workitems/:id/trace', async (c) => {
+    const from = Number(c.req.query('from') ?? 0)
+    const snap = await service.getTrace(c.req.param('id'), from)
+    if (!snap) return c.json({ error: 'not found' }, 404)
+    return c.json(snap)
+  })
+
+  // SSE tail. Subscribe BEFORE flushing the backlog so no event slips through the gap; the
+  // client dedupes/orders by `seq` (the SSE `id`). Close only AFTER the terminal status
+  // write flushes — stream writes are FIFO, so awaiting it also flushes prior events (the
+  // step-2 lesson: closing synchronously strands the UI on `running`).
+  app.get('/api/workitems/:id/stream', async (c) => {
+    const id = c.req.param('id')
+    const head = await service.getTrace(id, 0)
+    if (!head) return c.json({ error: 'not found' }, 404)
+
+    const lastId = c.req.header('Last-Event-ID')
+    const from =
+      lastId !== undefined && lastId !== '' ? Number(lastId) + 1 : Number(c.req.query('from') ?? 0)
+
+    return streamSSE(c, async (stream) => {
+      await new Promise<void>((resolve) => {
+        let closed = false
+        let unsub = () => {}
+        const cleanup = () => {
+          if (closed) return
+          closed = true
+          unsub()
+          resolve()
+        }
+
+        const onMsg = (raw: unknown) => {
+          const msg = raw as WorkItemMsg
+          if (isStatusMsg(msg)) {
+            const written = stream.writeSSE({ event: 'status', data: msg.status }).catch(() => {})
+            if (TERMINAL.has(msg.status)) void written.then(cleanup)
+            return
+          }
+          if (msg.seq < from) return
+          void stream
+            .writeSSE({ id: String(msg.seq), data: JSON.stringify(msg.event) })
+            .catch(() => {})
+        }
+
+        unsub = service.subscribeWorkItem(id, onMsg)
+        stream.onAbort(cleanup)
+
+        // Backlog (after subscribing — dupes are fine, the client orders by seq).
+        void (async () => {
+          const snap = await service.getTrace(id, from)
+          if (!snap) return cleanup()
+          for (const e of snap.events) {
+            void stream
+              .writeSSE({ id: String(e.seq), data: JSON.stringify(e.event) })
+              .catch(() => {})
+          }
+          const initial = stream.writeSSE({ event: 'status', data: snap.status }).catch(() => {})
+          // Already finished at attach → close only after the status write flushes.
+          if (snap.done) void initial.then(cleanup)
+        })()
+      })
+    })
+  })
+
+  // RESOLVE a gate (dev throwaway — step 4 = gate-keyed /api/gates/:id/resolve with formRev,
+  // ledger, and server-executed effect). Here it resolves the gate and resumes.
+  app.post('/api/dev/workitems/:id/resolve', async (c) => {
+    const id = c.req.param('id')
+    const body = await c.req.json<{
+      decision: 'approved' | 'rejected'
+      form?: Record<string, unknown>
+      comment?: string
+    }>()
+    const result = await service.resolveGate(id, {
+      gateId: id, // dev: one open gate per item; step 4 keys by the real gate id
+      decision: body.decision,
+      form: body.form,
+      comment: body.comment,
+    })
+    return result.ok ? c.json({ ok: true }) : c.json({ error: result.error }, 409)
+  })
+
+  // BOARD snapshot.
+  app.get('/api/board', async (c) => {
+    return c.json(await service.getBoard())
+  })
+
+  // BOARD SSE — coarse status changes only (resume via snapshot refetch).
+  app.get('/api/board/stream', (c) => {
+    return streamSSE(c, async (stream) => {
+      await new Promise<void>((resolve) => {
+        const unsub = service.subscribeBoard((msg) => {
+          void stream.writeSSE({ event: 'board', data: JSON.stringify(msg) }).catch(() => {})
+        })
+        stream.onAbort(() => {
+          unsub()
+          resolve()
+        })
+      })
+    })
+  })
+
+  return app
+}

@@ -12,8 +12,9 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 0
 fi
 
-if docker compose -f "$ROOT/docker-compose.yml" up -d postgres >/dev/null 2>&1; then
-  echo "[predev] postgres container up (:${POSTGRES_PORT:-5432})"
+# --wait blocks until the healthcheck passes, so a migrate step connects to a ready DB.
+if docker compose -f "$ROOT/docker-compose.yml" up -d --wait postgres >/dev/null 2>&1; then
+  echo "[predev] postgres container up + healthy (:${POSTGRES_PORT:-5432})"
 else
   echo "[predev] WARN: could not start postgres container — is Docker Desktop running?"
 fi

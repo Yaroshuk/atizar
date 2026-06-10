@@ -1,0 +1,34 @@
+import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { migrate } from 'drizzle-orm/postgres-js/migrator'
+
+// Vitest globalSetup (runs once, before any worker). Creates the dedicated TEST database and
+// applies migrations so pipeline tests run against a schema identical to dev — but isolated,
+// so test rows never reach the dev server's startup sweep. If Postgres is unreachable the
+// pipeline tests skip themselves (describe.skipIf), so a failure here is swallowed.
+const ADMIN_URL =
+  process.env.DATABASE_URL ?? 'postgres://aiworkflow:aiworkflow@localhost:5432/aiworkflow'
+const TEST_URL =
+  process.env.TEST_DATABASE_URL ?? 'postgres://aiworkflow:aiworkflow@localhost:5432/aiworkflow_test'
+const TEST_DB = 'aiworkflow_test'
+
+export default async function setup(): Promise<void> {
+  try {
+    const admin = postgres(ADMIN_URL)
+    try {
+      const exists = await admin`SELECT 1 FROM pg_database WHERE datname = ${TEST_DB}`
+      if (exists.length === 0) await admin.unsafe(`CREATE DATABASE ${TEST_DB}`)
+    } finally {
+      await admin.end({ timeout: 5 })
+    }
+
+    const sql = postgres(TEST_URL)
+    try {
+      await migrate(drizzle(sql), { migrationsFolder: 'apps/inbox/server/pipeline/db/migrations' })
+    } finally {
+      await sql.end({ timeout: 5 })
+    }
+  } catch (err) {
+    console.warn('[test-global-setup] Postgres unreachable — pipeline tests will skip:', err)
+  }
+}

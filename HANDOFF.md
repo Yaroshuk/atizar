@@ -93,6 +93,11 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
 - **Code layout:** pipeline code lives in `apps/inbox/server/pipeline/` (PipelineService,
   StateStore, RunObserver, WorkerPool, transition, dispatch). Do NOT create `@platform/server` —
   package extraction is explicitly deferred until the boundary settles (ARCHITECTURE §9).
+  **Extraction discipline so the later move is mechanical:** CONTRACTS/types/pure helpers go into
+  `@platform/core` immediately (the steps-1/2 pattern: `gate.ts`, `conformance.ts`, `fold.ts`);
+  implementation stays in the app, and `server/pipeline/` may import ONLY `@platform/*` + its own
+  folder — never the rest of `apps/inbox` (no reaching into workflows/, client/, mcp/). Post-beta,
+  `pipeline/` → `@platform/server` and the board/thread UI → `@platform/react` become folder moves.
 - **Step 3 micro-decisions:** Drizzle over `pg` (node-postgres) — don't bikeshed the driver;
   WorkItem id = `crypto.randomUUID()` ("deterministic at dispatch" in the spec means minted at an
   engine-controlled moment, NOT derived from model output — dedup uses `source`, never the id);
