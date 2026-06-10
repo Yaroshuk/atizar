@@ -95,7 +95,15 @@ describe('foldEventsToMessages', () => {
       tcArgs('call_1', '{"ok":true}'),
       tcEnd('call_1'),
     ]
-    expect(foldEventsToMessages(events.slice(0, 2))).toHaveLength(1)
-    expect(foldEventsToMessages(events)).toHaveLength(2)
+    const prefix = foldEventsToMessages(events.slice(0, 2))
+    const full = foldEventsToMessages(events)
+    expect(prefix).toHaveLength(1)
+    expect(full).toHaveLength(2)
+    // The common prefix must fold identically — not just the same count.
+    expect(full[0]).toEqual(prefix[0])
+  })
+
+  it('silently ignores TOOL_CALL_ARGS with no preceding START', () => {
+    expect(foldEventsToMessages([tcArgs('ghost_id', '{"x":1}')])).toEqual([])
   })
 })
