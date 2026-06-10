@@ -138,9 +138,16 @@ mid-migration.
 
 ### 1.7 Storage: Postgres-first
 
-- **Postgres is THE beta backend** — including dev (`docker compose up`); one concurrency
-  model instead of three. (A zero-docker demo path, if kept, uses the same SQL via embedded
-  PG or is mock-only — SQLite is not a correctness tier anymore.)
+- **Postgres is THE beta backend** — in dev too; one concurrency model instead of three.
+  **Dev topology (do not get this wrong): Docker runs ONLY Postgres** (`docker compose up -d
+  postgres`, or a host install via `brew install postgresql` — the server doesn't care). The
+  **app itself stays on the host** (`yarn dev` exactly as today) because the `claude-cli`
+  provider spawns the local `claude` binary authenticated via the macOS keychain — a
+  containerized server process cannot reach either, so the dev server is NEVER put in Docker.
+  A full app-in-Docker compose tier only becomes possible with a containerizable provider
+  (Mastra / claude-api) and is the prod-parity story, not the dev loop. (A zero-docker demo
+  path, if kept, uses the same SQL via embedded PG or is mock-only — SQLite is not a
+  correctness tier anymore.)
 - §3.6 rewritten for PG: `SELECT … FOR UPDATE` on the parent inside `transition()`;
   canonical lock order = **ascending WorkItem id** (matches the leaf→root auto-finish walk);
   alternative SERIALIZABLE + retry on `40001`. CI runs the race tests (concurrent

@@ -22,7 +22,7 @@ assistant-ui = named fallback renderer).
 **Build order (beta):**
 1. Provider contract v2 (`resume?` capability + `GATE_OPENED` signal) + conformance suite — BEFORE any PipelineService code.
 2. Week-0 spike: RunObserver + browser attach to a running WorkItem (trace snapshot + SSE tail).
-3. Server spine on Postgres: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE.
+3. Server spine on Postgres: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE. **Dev topology: Docker runs ONLY Postgres; the app stays on the host (`yarn dev`) — claude-cli needs the local binary + macOS-keychain auth, so the dev server is never containerized.**
 4. Server-executed effects + cancel edges + startup sweep + finished guards (+ Gate fields: formRev, assignee, comment, both artifact versions).
 5. Mastra provider (production path) beside claude-cli (dev); re-key record/replay cassettes to the server gate count.
 6. Re-point board/thread UI to server state; delete `@copilotkit/*` deps.
