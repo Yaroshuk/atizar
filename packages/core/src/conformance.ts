@@ -4,6 +4,10 @@ import type { Provider, ResumeHandle, GateResolution } from './providers.js'
 
 // The fixture a provider supplies so the generic checks can drive it. `turn1Input` must be a
 // fresh run that reaches the agent's approval tool; `approved`/`rejected` are the resume calls.
+// Note: `approved.handle`/`rejected.handle` are pre-built fixtures — their `runId`/`input` stand
+// in for what a real turn-1 run would have produced (the checks don't thread turn-1's output
+// into resume). A provider that ignores the handle on resume (e.g. claude-cli re-primes from the
+// resolution) needs only a well-formed handle here, not one correlated to a live run.
 export interface ConformanceScenario {
   approvalNames: readonly string[]
   surfaceTools: readonly string[]
@@ -47,11 +51,17 @@ export const providerConformanceChecks: ConformanceCheck[] = [
       const events = await collect(makeProvider().run(s.turn1Input))
       const gates = gatesOf(events)
       assert(gates.length === 1, `expected 1 GATE_OPENED, got ${gates.length}`)
-      assert(s.approvalNames.includes(gates[0].toolName), `gate toolName "${gates[0].toolName}" is not an approval`)
+      assert(
+        s.approvalNames.includes(gates[0].toolName),
+        `gate toolName "${gates[0].toolName}" is not an approval`
+      )
       const startIds = events
         .filter((e) => e.type === EventType.TOOL_CALL_START)
         .map((e) => (e as unknown as { toolCallId: string }).toolCallId)
-      assert(startIds.includes(gates[0].toolCallId), 'gate toolCallId has no matching TOOL_CALL_START')
+      assert(
+        startIds.includes(gates[0].toolCallId),
+        'gate toolCallId has no matching TOOL_CALL_START'
+      )
     },
   },
   {
@@ -71,6 +81,10 @@ export const providerConformanceChecks: ConformanceCheck[] = [
       assert(typeof p.resume === 'function', 'provider does not implement resume()')
       const events = await collect(p.resume!(s.rejected.handle, s.rejected.resolution))
       assert(gatesOf(events).length === 0, 'resume(rejected) re-opened a gate')
+      // Rejection must still terminate with at least a closing event (a note/RUN_FINISHED) —
+      // a silent empty stream is indistinguishable from "resume did nothing". Symmetric with
+      // the approved check; both real providers emit a closing chunk on reject.
+      assert(events.length > 0, 'resume(rejected) produced no events')
     },
   },
   {
@@ -80,7 +94,8 @@ export const providerConformanceChecks: ConformanceCheck[] = [
       const names = events
         .filter((e) => e.type === EventType.TOOL_CALL_START)
         .map((e) => (e as unknown as { toolCallName: string }).toolCallName)
-      for (const n of names) assert(s.surfaceTools.includes(n), `surfaced an undeclared tool: "${n}"`)
+      for (const n of names)
+        assert(s.surfaceTools.includes(n), `surfaced an undeclared tool: "${n}"`)
     },
   },
 ]
