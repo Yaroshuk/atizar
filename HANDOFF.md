@@ -78,6 +78,19 @@ endpoint SHAPES must survive). Step 1 (Provider contract v2) is ✅ BUILT & brow
 and keeps working as the dev surface until step 6). Do NOT invest further in that client layer;
 new work targets the server-authoritative spine.
 
+> **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
+> the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
+> this branch — deviates from the usual "one step = one branch"; if you prefer, branch step 2 off
+> this branch, not off `master`, since `master` lacks the v2 contract). Step 1 commits run
+> `e4e80ac`…`d98d981`; `master` (`1374833`) has only the spec/plan/docker docs, NOT the contract
+> code. Fast-iteration aid: a **live E2E this session recorded fresh cassettes** for
+> `lead-inbox__qualifier` + `lead-inbox__reply` under `apps/inbox/.cassettes/` (gitignored, REAL
+> Gmail data — never commit/share without `scanCassette`), so `DEV_RECORD_REPLAY=1 yarn dev`
+> replays the full qualify→handoff→reply→approve→draft flow in ~seconds without burning real
+> `claude` runs. The `lead-inbox__reply` cassette already contains a `GATE_OPENED` event — handy
+> when wiring the step-2 RunObserver to react to it. `docker compose up -d postgres` is wired into
+> `predev`; the DB is up but step 1 doesn't touch it (step 3 does).
+
 (The "NEXT — docs/pipeline-plan.md" P1/P2/P3 items below are absorbed by the
 server-authoritative model in updated-3 — keep for reference, do not build standalone.)
 
