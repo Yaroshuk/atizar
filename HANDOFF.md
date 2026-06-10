@@ -79,11 +79,13 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - **As-built — deviations from the plan's pseudo-code (all sound, verified):** (a) `resolveGate` does NOT itself `transition(resume)` — `observer.resume` owns that edge (avoids a double-transition); (b) the **reject** path does `transition(reject)` and does NOT call `observer.resume` (resume from `finished` would be illegal; the claude-cli rejected-branch is now reachable only via the legacy `run()` path — UI shows the `rejected` marker, no model narration); (c) no `setResolution` store method (the transition writes the marker).
    - **Browser/runtime E2E (all 6 PASS, `DEV_RECORD_REPLAY=1` + the trimmed `lead-inbox__reply` cassette):** (1) **edited approve → real Gmail draft** — edited the gate body, approved; DB: gate `resolved` with the edited `form.body`, `action_ledger` one row `{ok:true, draftId}`, work item `finished`; **fetched the real draft by id from Gmail → body contained the edited marker `7Q3Z`** (the load-bearing guarantee); thread showed the new resume narration "The Gmail draft was saved successfully." (no `create_draft`). (2) **reject** → `finished`/`rejected`, zero ledger rows. (3) **Stop mid-running** → caught at `running`; stream killed mid-flight (8/18 trace events), `finished`/`cancelled`, status not flipped back (terminal-tolerant). (4) **Stop at awaiting_approval** → `finished`/`cancelled`, gate `GET` → 404. (5) **restart durability** → killed+restarted the server mid-`awaiting_approval`; both gates SURVIVED (startup sweep leaves `awaiting_approval` durable), gate still fetchable. (6) **stale formRev → 409**, item not consumed (stays `awaiting_approval`). The `saveDraft` chip stays "running" (expected — HITL-kill means the approval tool never gets a `TOOL_CALL_RESULT`). Effect runs OUTSIDE record/replay → approve hits real Gmail (draft-only; the one test draft was deleted).
    - **Deferred to post-beta (decided, NOT built):** gate `capabilities` (editability derives from `kind`); runtime default-deny at the execution seam (only the boot-time classification kernel was taken — it is physically meaningful at the Mastra/server seam, step 5+); budget edge. **For the step-5 agent:** the `expires_at`/`assignee` Gate columns + stale badge are seams present in the schema but UI is post-beta; `reply.prompts.ts` is now propose-don't-execute; the conformance suite from step 1 is the Mastra definition-of-done.
-5. **Mastra provider** (production path) beside claude-cli (dev); re-key record/replay.
-   - New `packages/providers/src/mastra-provider.ts`; needs `ANTHROPIC_API_KEY` (ask the user NOW, not before). Mastra emits AG-UI natively — `run()` is mostly passthrough; GATE_OPENED derives from the workflow suspend status (not a tool call); `resume()` = native `resume(runId, resumeData)`, NO kill-and-re-prime.
-   - Keep a `workItemId ↔ runId` mapping in StateStore; do NOT store Mastra's step state (belief #2 boundary, spec §1.4).
-   - Run the step-1 conformance suite against it — that's the two-unlike-providers proof.
-   - record/replay: cassette step key changes from `resolvedApprovalCount(input)` (message scan) to the store's resolved-gate count; wipe `.cassettes/` once (gitignored fixtures).
+5. **Mastra provider** (production path) beside claude-cli (dev). — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 276 unit tests (incl. the Mastra conformance suite — the two-unlike-providers proof) + typecheck/lint/format green; live Mastra E2E (approve→real Gmail draft / reject / cancel) verified server-side AND in the browser (`?spike=1` replay). Spec → `docs/superpowers/specs/2026-06-10-mastra-provider-design.md`; plan → `docs/superpowers/plans/2026-06-10-mastra-provider.md`. Commits `26cee2c`…`845597b`.
+   - **As-built — injected `MastraRunner` seam (fork 1):** `@platform/providers` gained `mastra-types.ts` (`MastraRunner`/`MastraRun`/`MastraRunResult`/`MastraChunk`), `mastra-stream.ts` (chunk→AG-UI mapper, mirrors `claude-stream`), `mastra-provider.ts` (`createMastraProvider` — pure, NO `@mastra/*` import). The real Mastra Agent + 2-step workflow + Postgres storage lives in `apps/inbox/server/mastra/{tools,runner}.ts`. Conformance runs on a fake runner (no API key); the live key is only for E2E.
+   - **As-built — gate via propose tool (fork 2):** one generic workflow `agentStep → gateStep`. `saveDraft`/`renderLead`/`renderVerdict` are no-op capture tools (`execute: (inputData)=>inputData`); `get_latest_email` is a native read tool calling the **extracted** `@platform/integrations/gmail-basic/get-latest-email` (mirrors `createDraft`; the MCP `index.mjs` now delegates to it too). agentStep captures the LAST approval tool-call; gateStep `suspend()`s with it. The provider synthesizes `GATE_OPENED` from the observed approval call (refinement vs spec — robust to Mastra's suspend-payload shape).
+   - **As-built — native resume (fork 3 / fork 4):** `resume()` = `createRun({ runId }) + resumeStream({ resumeData })` against the parked suspended snapshot (NO kill-and-re-prime). One **shared** `PostgresStore` (bounded pool `max 8`) across all agents — a per-agent store exhausted PG connections at boot. `ProviderConfig` gained `instructions` + `agentId` (threaded from `buildProvider`); `providers.ts` adds the `mastra` factory + `PROVIDER=mastra` alias (default stays `claude-cli`) + `ANTHROPIC_API_KEY` fail-fast + `MASTRA_MODEL` (default `claude-sonnet-4-6`); DB url reuses `client.ts` `databaseUrl`.
+   - **THE bug the live E2E caught (cautions paid off):** the provider's `finally{run.abort()}` fired on a clean SUSPEND too, cancelling the parked Mastra run → resume failed _"This workflow run was not suspended"_. Fix: track `settled`; abort ONLY on interrupt (Stop/`iterator.return`), never on a clean suspend/finish (+2 unit tests). caution (a) cancel-mid-run, caution (b) last-wins/no-draft, caution (c) Mastra tables out of our drizzle set + `reset.ts`/test-globalSetup init — all built and verified.
+   - **Deviations from the plan (sound):** record/replay re-key was **DEFERRED** — the message-scan step key already yields the correct 0/1 steps in the server-spine single-gate model (`input.messages` carries no resolved-approval transcript; re-keying would couple the dev decorator to StateStore + risk regressing claude-cli for zero behavioural gain). Cassettes were wiped. `/api/dev/runs` gained an optional `payload` (drives the gate on a fresh real run — throwaway, dies at step 6). **Pre-existing latent issue noted (NOT step-5):** `WorkerPool.resumeAcquire` calls `opts.run` → a benign `IllegalTransition: cannot "start" from "running"` is logged on every resume (the real resume runs via `observer.resume`'s own `consume`); harmless but worth cleaning at step 6.
+   - **DX note:** the server does NOT auto-load `.env.local`; `PROVIDER=mastra` needs `ANTHROPIC_API_KEY` in the process env (`set -a; . ./.env.local; set +a` before `yarn dev`, or add `--env-file`). Worth wiring `.env.local` loading at step 6/7.
 6. **Re-point board/thread UI** to server state; delete `@copilotkit/*` deps.
    - Board reads `GET /api/board` `{items, gates, lastEventId}` + per-account SSE (coarse status events only, resume via `Last-Event-ID`); thread = step-2 trace endpoints. Keep `renderRegistry`, all cards, Smedja styles, `?dev=1`.
    - Approve/reject/cancel/edit = plain HTTP. DELETE (not port): `useAgentInstances`, `instancesCore` client copy, `statusFrom`, proxied agents, `useHumanInTheLoop`, `<CopilotKit>` tree.
@@ -252,23 +254,23 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
   switch git branches in subagents.
 
-**Starting point for the next session = beta build order step 5** (Mastra provider — the production
-path beside claude-cli/dev). **ASK THE USER FOR `ANTHROPIC_API_KEY` AT THE START of step 5** (the
-only step-gated question). New `packages/providers/src/mastra-provider.ts`: Mastra emits AG-UI
-natively (`run()` mostly passthrough); `GATE_OPENED` derives from the workflow SUSPEND status (not a
-tool call); `resume()` = native `resume(runId, resumeData)` (NO kill-and-re-prime). Keep a
-`workItemId ↔ runId` map in StateStore; do NOT mirror Mastra's step state (belief #2). By step 5
-effects are server-side, so the Mastra agent needs only read + propose/render tools — wire
-`gmail-basic` read fns as native Mastra tools, no MCP. **Definition of done = the step-1 conformance
-suite (`runProviderConformance`) passes against Mastra** (the two-unlike-providers proof). Re-key
-record/replay: cassette step changes from `resolvedApprovalCount(input)` to the store's resolved-gate
-count; wipe `.cassettes/` once. Default provider stays `claude-cli` locally (env switch, e.g.
-`PROVIDER=mastra`). Steps 1–4 are ✅ BUILT & browser-verified on `feat/provider-contract-v2` (NOT
-merged — same branch strategy). Step 4 gives you: server-executed effects (the `ServerBinding.effects`
-seam + `action_ledger`), gate-keyed resolve with formRev/ledger, Stop (cancel/reject edges +
-RunObserver `cancel`), and the boot-time classification check. Do NOT invest further in the
-`@copilotkit/*` client layer — it stays the dev surface until step 6; drive lead-inbox through the
-`?spike=1` page (now with edit/reject/Stop) + the Postgres trace/SSE endpoints + `/api/gates/:id/resolve`.
+**Starting point for the next session = beta build order step 6** (re-point the board/thread UI to
+server state; delete `@copilotkit/*`). Steps 1–5 are ✅ BUILT & browser-verified on
+`feat/provider-contract-v2` (NOT merged — same branch strategy). Step 6: the board reads
+`GET /api/board` + per-account SSE; the thread reuses the step-2 trace/SSE endpoints +
+`foldEventsToMessages` (already built — the `?spike=1` page proves it); approve/reject/cancel/edit =
+plain HTTP (`/api/gates/:id/resolve`, `/api/workitems/:id/cancel`). DELETE (don't port):
+`useAgentInstances`, `instancesCore` client copy, `statusFrom`, proxied agents, `useHumanInTheLoop`,
+the `<CopilotKit>` tree. Keep `renderRegistry`, all cards, Smedja styles, `?dev=1`. **What step 5
+hands you:** a working production provider behind `PROVIDER=mastra` (default stays `claude-cli`) —
+both pass the step-1 conformance suite. Two cheap cleanups to fold into step 6: (1) `WorkerPool.resumeAcquire`
+re-invokes `opts.run` → a benign `IllegalTransition: cannot "start" from "running"` logged on every
+resume (the real resume runs via `observer.resume`'s `consume`) — make `resumeAcquire` reserve the
+slot WITHOUT calling run; (2) wire `.env.local` loading into the dev server so `PROVIDER=mastra` "just
+works". Also delete the throwaway `?spike=1` page + `/api/dev/runs` (incl. its optional `payload`).
+**Provider knobs:** `PROVIDER=mastra`, `MASTRA_MODEL` (default `claude-sonnet-4-6`), `ANTHROPIC_API_KEY`
+(in the process env — see DX note above). The Mastra adapter is `apps/inbox/server/mastra/{tools,runner}.ts`;
+the pure provider is `@platform/providers/mastra-*`.
 
 > **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
 > the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
