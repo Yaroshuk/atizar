@@ -1,7 +1,10 @@
 import { z } from 'zod'
-import type { RenderSpec, AgentMeta, DeliverFn, Registry } from '../../client/src/renderSpecs'
+import type { RenderSpec, AgentMeta, DeliverFn } from '@platform/react'
+import { useThreadResult } from '@platform/react'
 import type { TriageTicket } from '../../client/src/buckets'
-import { useThreadResult } from '../../client/src/threadResults'
+import { TriageCard } from '../../client/src/components/TriageCard'
+import { TicketResultCard } from '../../client/src/components/TicketResultCard'
+import { ReplyDraftCard } from '../../client/src/components/ReplyDraftCard'
 import type { TicketHandoffPayload } from '@platform/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
 
@@ -65,12 +68,10 @@ const TriageCardConnected = ({
   origin,
   recommendations,
   deliver,
-  registry,
 }: {
   origin: string
   recommendations: Recommendation[]
   deliver: DeliverFn
-  registry: Registry
 }) => {
   const result = useThreadResult<{ tickets?: Omit<TriageTicket, 'recommendation'>[] }>(
     'list_my_tickets'
@@ -80,9 +81,8 @@ const TriageCardConnected = ({
     ...t,
     recommendation: routeByNumber.get(t.number) ?? (t.needsReply ? 'reply' : 'feature'),
   }))
-  const Triage = registry['TriageCard']
   return (
-    <Triage
+    <TriageCard
       tickets={tickets}
       onRoute={(target: string, ticket: TriageTicket) =>
         deliver(origin, { kind: 'agent', agentId: target }, toPayload(ticket))
@@ -98,37 +98,30 @@ export const githubTriageRenders: RenderSpec[] = [
   {
     toolName: 'render_triage',
     parameters: z.object({ origin: z.string(), recommendations: z.array(recommendationSchema) }),
-    render: ({ parameters }, deliver, registry) => {
+    render: ({ parameters }, deliver) => {
       const { origin, recommendations } = parameters
       if (origin === undefined || recommendations === undefined) return <></>
       return (
-        <TriageCardConnected
-          origin={origin}
-          recommendations={recommendations}
-          deliver={deliver}
-          registry={registry}
-        />
+        <TriageCardConnected origin={origin} recommendations={recommendations} deliver={deliver} />
       )
     },
   },
   {
     toolName: 'render_ticket_result',
     parameters: z.object({ title: z.string(), kind: z.string(), analysis: z.string() }),
-    render: ({ parameters }, _deliver, registry) => {
+    render: ({ parameters }) => {
       const { title, kind, analysis } = parameters
       if (title === undefined || kind === undefined || analysis === undefined) return <></>
-      const Result = registry['TicketResultCard']
-      return <Result data={{ title, kind, analysis }} />
+      return <TicketResultCard data={{ title, kind, analysis }} />
     },
   },
   {
     toolName: 'render_reply_draft',
     parameters: z.object({ title: z.string(), draft: z.string() }),
-    render: ({ parameters }, _deliver, registry) => {
+    render: ({ parameters }) => {
       const { title, draft } = parameters
       if (title === undefined || draft === undefined) return <></>
-      const Reply = registry['ReplyDraftCard']
-      return <Reply data={{ title, draft }} />
+      return <ReplyDraftCard data={{ title, draft }} />
     },
   },
 ]

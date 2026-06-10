@@ -28,6 +28,7 @@
     "@platform/core": "*",
     "@platform/integrations": "*",
     "@platform/providers": "*",
+    "@platform/react": "*",
     "@platform/server": "*",
     "googleapis": "^173.0.0",
     "hono": "^4.12.23",

@@ -3,8 +3,7 @@ import type { Destination } from '@platform/core'
 import { useWorkItemThread } from '../hooks/useWorkItemThread'
 import { useGate } from '../hooks/useGate'
 import { buildRenderToolCall } from '../buildRenderToolCall'
-import { renderRegistry } from '../renderRegistry'
-import { hitlSpecs } from '../workflows'
+import { useWorkflowsConfig } from '../workflowsContext'
 import { mapStatus } from '../status'
 import { AgentModal, type HandoffNote } from './AgentModal'
 import type { IconName } from './Icon'
@@ -30,6 +29,7 @@ export type ThreadModalProps = {
 }
 
 export const ThreadModal = (p: ThreadModalProps) => {
+  const { renders, hitl } = useWorkflowsConfig()
   const { messages, status } = useWorkItemThread(p.id)
   const display = mapStatus(status)
   const awaiting = display === 'awaiting_approval'
@@ -38,8 +38,9 @@ export const ThreadModal = (p: ThreadModalProps) => {
   // The handoff seam: a card's deliver call carries the open work item as the parent.
   const { deliver, id } = p
   const renderToolCall = useMemo(
-    () => buildRenderToolCall((origin, dest, payload) => deliver(origin, dest, payload, id)),
-    [deliver, id]
+    () =>
+      buildRenderToolCall(renders, (origin, dest, payload) => deliver(origin, dest, payload, id)),
+    [renders, deliver, id]
   )
 
   // Render the workflow's approval card from the authoritative gate (only while awaiting).
@@ -47,12 +48,9 @@ export const ThreadModal = (p: ThreadModalProps) => {
     awaiting &&
     gate &&
     (() => {
-      const spec = hitlSpecs.find((s) => s.toolName === gate.toolName)
+      const spec = hitl.find((s) => s.toolName === gate.toolName)
       if (!spec) return null
-      return spec.render(
-        { form: gate.form, formRev: gate.formRev, status, approve, reject },
-        renderRegistry
-      )
+      return spec.render({ form: gate.form, formRev: gate.formRev, status, approve, reject })
     })()
 
   return (

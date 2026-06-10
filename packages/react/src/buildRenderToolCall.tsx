@@ -1,16 +1,15 @@
 import type { ReactNode } from 'react'
 import type { ToolCall, ToolMessage } from '@platform/core'
-import { renderRegistry } from './renderRegistry'
-import { renderSpecs } from './workflows'
-import type { DeliverFn } from './renderSpecs'
+import type { DeliverFn, RenderSpec } from './renderSpecs'
 
 // Local replacement for CopilotKit's useRenderToolCall: given a folded assistant tool call,
 // parse its args and dispatch to the matching pure render spec (the generative-UI card).
 // `deliver` is the handoff seam (POST /api/deliver). A tool with no registered render spec
 // (a data-fetch tool like list_my_tickets) returns null — AgentModal already filters those
-// out by `renderableToolNames` unless dev mode is on.
+// out by `renderableToolNames` unless dev mode is on. Specs are injected (from the
+// WorkflowsConfig context), not statically imported — the package holds no userland cards.
 export const buildRenderToolCall =
-  (deliver: DeliverFn) =>
+  (renderSpecs: RenderSpec[], deliver: DeliverFn) =>
   ({ toolCall }: { toolCall: ToolCall; toolMessage?: ToolMessage }): ReactNode => {
     const name = toolCall.function?.name
     const spec = renderSpecs.find((s) => s.toolName === name)
@@ -21,5 +20,5 @@ export const buildRenderToolCall =
     } catch {
       return null // partial/streaming args — skip until the call completes
     }
-    return spec.render({ parameters }, deliver, renderRegistry)
+    return spec.render({ parameters }, deliver)
   }

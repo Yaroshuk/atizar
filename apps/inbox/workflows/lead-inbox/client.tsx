@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import type { RenderSpec, HitlSpec, AgentMeta } from '../../client/src/renderSpecs'
+import type { RenderSpec, HitlSpec, AgentMeta } from '@platform/react'
+import { LeadCard } from '../../client/src/components/LeadCard'
+import { VerdictCard } from '../../client/src/components/VerdictCard'
+import { ApprovalDialog } from '../../client/src/components/ApprovalDialog'
 import { qualifierAgent, replyAgent } from './descriptor'
 
 export const leadInboxMeta: Record<string, AgentMeta> = {
@@ -19,11 +22,10 @@ export const leadInboxRenders: RenderSpec[] = [
   {
     toolName: 'renderLead',
     parameters: z.object({ from: z.string(), subject: z.string(), summary: z.string() }),
-    render: ({ parameters }, _deliver, registry) => {
+    render: ({ parameters }) => {
       const { from, subject, summary } = parameters
       if (from === undefined || subject === undefined || summary === undefined) return <></>
-      const Lead = registry['LeadCard']
-      return <Lead lead={{ from, subject, summary }} />
+      return <LeadCard lead={{ from, subject, summary }} />
     },
   },
   {
@@ -38,7 +40,7 @@ export const leadInboxRenders: RenderSpec[] = [
       priority: z.string(),
       reason: z.string(),
     }),
-    render: ({ parameters }, deliver, registry) => {
+    render: ({ parameters }, deliver) => {
       const { origin, threadId, from, subject, summary, category, priority, reason } = parameters
       if (
         origin === undefined ||
@@ -52,9 +54,8 @@ export const leadInboxRenders: RenderSpec[] = [
       )
         return <></>
       const data = { threadId, from, subject, summary, category, priority, reason }
-      const Verdict = registry['VerdictCard']
       return (
-        <Verdict
+        <VerdictCard
           data={data}
           onDraftReply={() =>
             deliver(
@@ -73,12 +74,11 @@ export const leadInboxHitl: HitlSpec[] = [
   {
     toolName: 'saveDraft',
     parameters: z.object({ threadId: z.string(), body: z.string() }),
-    render: ({ form, approve, reject }, registry) => {
-      const Approval = registry['ApprovalDialog']
+    render: ({ form, approve, reject }) => {
       const threadId = typeof form.threadId === 'string' ? form.threadId : ''
       const body = typeof form.body === 'string' ? form.body : ''
       return (
-        <Approval
+        <ApprovalDialog
           data={{ threadId, body }}
           onApprove={(editedBody: string) => approve({ ...form, body: editedBody })}
           onReject={() => reject('no thanks')}

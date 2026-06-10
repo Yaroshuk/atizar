@@ -13,14 +13,7 @@ import { PipelineColumn } from './components/PipelineColumn'
 import { WorkflowSwitcher } from './components/WorkflowSwitcher'
 import { Icon } from './components/Icon'
 import type { WorkItem } from './serverTypes'
-import { workflows, META, renderSpecs, hitlSpecs } from './workflows'
-
-// Tool names that render as generative-UI cards. Anything else (list_my_tickets,
-// get_latest_email, …) is plumbing, hidden from the consumer thread unless dev mode is on.
-const renderableToolNames: ReadonlySet<string> = new Set([
-  ...renderSpecs.map((s) => s.toolName),
-  ...hitlSpecs.map((s) => s.toolName),
-])
+import { WorkflowsProvider, type WorkflowsConfig } from './workflowsContext'
 
 // A cross-workflow child = a work item whose parent lives in a DIFFERENT workflow (a
 // delivery via a published contract). Powers the per-workflow "new arrivals" badge.
@@ -30,9 +23,17 @@ const isCrossWorkflowChild = (w: WorkItem, parentOf: (id: string) => WorkItem | 
   return parent !== undefined && parent.workflowId !== w.workflowId
 }
 
-export const InboxView = () => {
+export const WorkflowBoard = ({ config }: { config: WorkflowsConfig }) => {
+  const { workflows, meta: META, renders: renderSpecs, hitl: hitlSpecs } = config
   const board = useBoard()
   const { start, deliver, cancel } = useDispatch()
+
+  // Tool names that render as generative-UI cards. Anything else (list_my_tickets,
+  // get_latest_email, …) is plumbing, hidden from the consumer thread unless dev mode is on.
+  const renderableToolNames: ReadonlySet<string> = new Set([
+    ...renderSpecs.map((s) => s.toolName),
+    ...hitlSpecs.map((s) => s.toolName),
+  ])
 
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
   // The URL carries the open work item id so a reload re-attaches to the same thread.
@@ -149,7 +150,7 @@ export const InboxView = () => {
   const pickerInstances = openPickerId ? liveOf(openPickerId) : []
 
   return (
-    <>
+    <WorkflowsProvider config={config}>
       <WorkflowSwitcher
         workflows={workflows}
         activeId={activeWorkflowId}
@@ -262,6 +263,6 @@ export const InboxView = () => {
           />
         )}
       </div>
-    </>
+    </WorkflowsProvider>
   )
 }

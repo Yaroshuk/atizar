@@ -1,4 +1,4 @@
-import { Icon } from './Icon'
+import { Icon } from '@platform/react'
 
 type ReplyDraftCardProps = { data: { title: string; draft: string } }
 

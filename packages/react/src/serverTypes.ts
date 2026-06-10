@@ -1,5 +1,5 @@
 // Client-facing shapes of the server-authoritative state. These mirror the fields the UI
-// consumes from `apps/inbox/server/pipeline/db/schema.ts` — kept as a hand-written copy so
+// consumes from `@platform/server`'s db schema — kept as a hand-written copy so
 // the client never imports server/Node code (and stays bundler-clean).
 
 export type ServerStatus =

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ToolCall } from '@platform/core'
-import { buildRenderToolCall } from './buildRenderToolCall'
+import { buildRenderToolCall } from '@platform/react'
+import { leadInboxRenders } from '../../workflows/lead-inbox/client'
 
 // renderLead is a pure display card (no handoff) — buildRenderToolCall parses the folded
 // tool call and renders the LeadCard.
@@ -20,7 +21,9 @@ const toolCall = {
 
 describe('renderLead generative-UI mapping', () => {
   it('renders the LeadCard from a folded renderLead tool call', () => {
-    const { container } = render(<div>{buildRenderToolCall(() => {})({ toolCall })}</div>)
+    const { container } = render(
+      <div>{buildRenderToolCall(leadInboxRenders, () => {})({ toolCall })}</div>
+    )
     expect(screen.getByText('Order: 10 units')).toBeInTheDocument()
     expect(screen.getByText(/ivan@acme\.ru/)).toBeInTheDocument()
     expect(container.querySelector('.lead-env')).toBeInTheDocument()
