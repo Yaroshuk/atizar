@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { createDraft } from './create-draft.mjs'
 
-function fakeGmail(overrides = {}) {
+function fakeGmail() {
   const calls = { drafts: [] }
   const gmail = {
     users: {
@@ -30,13 +30,16 @@ function fakeGmail(overrides = {}) {
       },
     },
   }
-  return { gmail: { ...gmail, ...overrides }, calls }
+  return { gmail, calls }
 }
 
 describe('createDraft', () => {
   it('creates a draft and returns the draftId', async () => {
     const { gmail, calls } = fakeGmail()
-    const res = await createDraft({ threadId: 't1', body: 'Hello there' }, { getGmail: async () => gmail })
+    const res = await createDraft(
+      { threadId: 't1', body: 'Hello there' },
+      { getGmail: async () => gmail }
+    )
     expect(res).toEqual({ ok: true, draftId: 'draft-123' })
     expect(calls.drafts).toHaveLength(1)
     expect((calls.drafts[0] as any).message.threadId).toBe('t1')

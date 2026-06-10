@@ -60,6 +60,21 @@ export function parseLatestMessage(message) {
 }
 
 // ---------------------------------------------------------------------------
+// errText
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract a human-readable error message from an unknown thrown value.
+ * Pure helper — no I/O, no Node deps.
+ *
+ * @param {unknown} err
+ * @returns {string}
+ */
+export function errText(err) {
+  return err?.response?.data?.error?.message ?? err?.message ?? String(err)
+}
+
+// ---------------------------------------------------------------------------
 // buildReplyRaw
 // ---------------------------------------------------------------------------
 

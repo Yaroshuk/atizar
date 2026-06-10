@@ -37,7 +37,3 @@ export async function getGmail() {
   _gmail = google.gmail({ version: 'v1', auth })
   return _gmail
 }
-
-export function errText(err) {
-  return err?.response?.data?.error?.message ?? err?.message ?? String(err)
-}

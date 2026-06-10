@@ -1,5 +1,5 @@
-import { buildReplyRaw } from './format.mjs'
-import { getGmail as defaultGetGmail, errText } from './gmail-client.mjs'
+import { buildReplyRaw, errText } from './format.mjs'
+import { getGmail as defaultGetGmail } from './gmail-client.mjs'
 
 // Pure, importable effect: create a Gmail DRAFT reply for a thread. NEVER sends.
 // `getGmail` is injectable so the server imports this directly (no MCP child) and tests

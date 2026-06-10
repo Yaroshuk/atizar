@@ -7,8 +7,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
-import { parseLatestMessage } from './format.mjs'
-import { getGmail, errText } from './gmail-client.mjs'
+import { parseLatestMessage, errText } from './format.mjs'
+import { getGmail } from './gmail-client.mjs'
 import { createDraft } from './create-draft.mjs'
 
 // ---------------------------------------------------------------------------
