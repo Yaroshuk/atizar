@@ -166,7 +166,11 @@ export function makeStateStore(db: Db) {
         .onConflictDoNothing()
         .returning()
       if (inserted.length > 0) return { alreadyClaimed: false, result: null }
-      const [row] = await db.select().from(actionLedger).where(eq(actionLedger.key, input.key)).limit(1)
+      const [row] = await db
+        .select()
+        .from(actionLedger)
+        .where(eq(actionLedger.key, input.key))
+        .limit(1)
       return { alreadyClaimed: true, result: row?.result ?? null }
     },
 

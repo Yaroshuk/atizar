@@ -19,13 +19,19 @@ export function assertAgentClassification(
   const declared = new Set(def.effects)
   const bound = new Set(Object.keys(binding.effects ?? {}))
   for (const name of declared) {
-    if (!bound.has(name)) throw new Error(`agent "${def.id}": effect "${name}" declared but not bound`)
+    if (!bound.has(name))
+      throw new Error(`agent "${def.id}": effect "${name}" declared but not bound`)
   }
   for (const name of bound) {
-    if (!declared.has(name)) throw new Error(`agent "${def.id}": effect "${name}" bound but not declared`)
+    if (!declared.has(name))
+      throw new Error(`agent "${def.id}": effect "${name}" bound but not declared`)
   }
 
-  const classified = new Set<string>([...def.readonly, ...def.approvals, ...Object.keys(def.renders)])
+  const classified = new Set<string>([
+    ...def.readonly,
+    ...def.approvals,
+    ...Object.keys(def.renders),
+  ])
   for (const tool of binding.allowedTools) {
     const bare = bareName(tool)
     if (!classified.has(bare)) {

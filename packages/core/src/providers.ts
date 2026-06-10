@@ -41,7 +41,10 @@ export interface PromptStrategy {
   buildFirst(input: RunAgentInput): string
   // `args` is the approved/edited artifact; `executedResult` is the server's effect result
   // (present at step 4+). Returns null when no usable resume → the provider errors.
-  buildResume?(args: Record<string, unknown>, executedResult?: Record<string, unknown>): string | null
+  buildResume?(
+    args: Record<string, unknown>,
+    executedResult?: Record<string, unknown>
+  ): string | null
 }
 
 // Everything a provider needs to run ONE agent, derived from its passport.

@@ -128,7 +128,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       } else {
         const runtime = deps.resolveAgent(wi.agentId)
         const effect = runtime?.effects?.[gate.toolName]
-        if (!effect) return { ok: false, status: 500, error: `no effect bound for "${gate.toolName}"` }
+        if (!effect)
+          return { ok: false, status: 500, error: `no effect bound for "${gate.toolName}"` }
         // Stamp the approved form on the gate row (audit). observer.resume() will find no open
         // gate (already resolved) and skip its own resolveGateRow call — clean handoff.
         await store.resolveGateRow(gate.id, { form })

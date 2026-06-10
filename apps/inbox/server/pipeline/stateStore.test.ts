@@ -80,7 +80,12 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
 
   it('claimLedger is idempotent — second claim reports alreadyClaimed with the prior result', async () => {
     const store = makeStateStore(db)
-    const wi = await store.insertWorkItem({ workflowId: 'wf', agentId: 'wf__a', origin: 'human', payload: {} })
+    const wi = await store.insertWorkItem({
+      workflowId: 'wf',
+      agentId: 'wf__a',
+      origin: 'human',
+      payload: {},
+    })
     const gateId = randomUUID()
     const key = `${wi.id}:${gateId}`
     const first = await store.claimLedger({ key, workItemId: wi.id, gateId })
@@ -93,7 +98,12 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
 
   it('getGate returns a gate by id', async () => {
     const store = makeStateStore(db)
-    const wi = await store.insertWorkItem({ workflowId: 'wf', agentId: 'wf__a', origin: 'human', payload: {} })
+    const wi = await store.insertWorkItem({
+      workflowId: 'wf',
+      agentId: 'wf__a',
+      origin: 'human',
+      payload: {},
+    })
     const gate = await store.insertGate({
       workItemId: wi.id,
       toolName: 'saveDraft',

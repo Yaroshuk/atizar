@@ -108,7 +108,11 @@ export const TraceSpike = () => {
     await fetch(`/api/gates/${openGate.id}/resolve`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ decision: 'rejected', formRev: openGate.formRev, comment: 'no thanks' }),
+      body: JSON.stringify({
+        decision: 'rejected',
+        formRev: openGate.formRev,
+        comment: 'no thanks',
+      }),
     })
   }
 

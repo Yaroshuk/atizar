@@ -128,7 +128,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const effect = vi.fn(async () => ({ draftId: 'd1' }))
     const svc = makeService({ effects: { saveDraft: effect } })
     const { gateId } = await seedGate(svc)
-    const res = await svc.resolveGate(gateId, { gateId, decision: 'approved', formRev: 999, form: { threadId: 't', body: 'b' } })
+    const res = await svc.resolveGate(gateId, {
+      gateId,
+      decision: 'approved',
+      formRev: 999,
+      form: { threadId: 't', body: 'b' },
+    })
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.status).toBe(409)
     expect(effect).not.toHaveBeenCalled()
@@ -138,8 +143,18 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const effect = vi.fn(async () => ({ draftId: 'd1' }))
     const svc = makeService({ effects: { saveDraft: effect } })
     const { gateId } = await seedGate(svc)
-    const a = await svc.resolveGate(gateId, { gateId, decision: 'approved', formRev: 0, form: { threadId: 't', body: 'edited' } })
-    const b = await svc.resolveGate(gateId, { gateId, decision: 'approved', formRev: 0, form: { threadId: 't', body: 'edited' } })
+    const a = await svc.resolveGate(gateId, {
+      gateId,
+      decision: 'approved',
+      formRev: 0,
+      form: { threadId: 't', body: 'edited' },
+    })
+    const b = await svc.resolveGate(gateId, {
+      gateId,
+      decision: 'approved',
+      formRev: 0,
+      form: { threadId: 't', body: 'edited' },
+    })
     expect(a.ok).toBe(true)
     expect(b.ok).toBe(true)
     expect(effect).toHaveBeenCalledTimes(1)
@@ -151,7 +166,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const effect = vi.fn(async () => ({}))
     const svc = makeService({ effects: { saveDraft: effect } })
     const { gateId, workItemId } = await seedGate(svc)
-    const res = await svc.resolveGate(gateId, { gateId, decision: 'rejected', formRev: 0, comment: 'no' })
+    const res = await svc.resolveGate(gateId, {
+      gateId,
+      decision: 'rejected',
+      formRev: 0,
+      comment: 'no',
+    })
     expect(res.ok).toBe(true)
     expect(effect).not.toHaveBeenCalled()
     await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'finished')

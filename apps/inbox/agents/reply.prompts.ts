@@ -55,7 +55,10 @@ export function createReplyPrompts(instructions: string): PromptStrategy {
       const h = decodeHandoff(input, HandoffPayloadSchema)
       return h ? handoffFirst(instructions, h) : noLeadFirst(instructions)
     },
-    buildResume(_args: Record<string, unknown>, executedResult?: Record<string, unknown>): string | null {
+    buildResume(
+      _args: Record<string, unknown>,
+      executedResult?: Record<string, unknown>
+    ): string | null {
       const draftId = typeof executedResult?.draftId === 'string' ? executedResult.draftId : 'saved'
       return resume(instructions, draftId)
     },
