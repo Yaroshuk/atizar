@@ -93,7 +93,9 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
-      return dispatchChokepoint(db, pool, { ...req, maxInstances })
+      const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
+      publishBoard() // a newly-queued item should appear on the board even before its run starts
+      return result
     },
 
     // A human-gated handoff from a rendered card: resolve the Destination server-side
@@ -120,6 +122,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         parentId: req.parentId,
         maxInstances,
       })
+      publishBoard() // surface the new child (and any parent reopen) on the board immediately
       return { ok: true, ...result }
     },
 

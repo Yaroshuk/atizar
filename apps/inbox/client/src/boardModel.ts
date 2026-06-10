@@ -6,7 +6,8 @@ import type { IconName } from './components/Icon'
 // Map the server-authoritative board (WorkItem[]) onto the pure client pipeline model.
 // The cap/queue is server-side now (WorkerPool); the board is the single source of truth.
 
-const stripWf = (agentId: string, workflowId: string): string => agentId.slice(workflowId.length + 2)
+const stripWf = (agentId: string, workflowId: string): string =>
+  agentId.slice(workflowId.length + 2)
 const isQueued = (w: WorkItem): boolean => w.status === 'queued'
 
 // An item is shown in the pipeline once it is past `queued` AND still relevant: active

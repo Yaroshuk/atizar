@@ -58,7 +58,12 @@ describe('resolveDelivery', () => {
     expect(r.ok).toBe(false)
   })
   it('rejects a payload that fails the contract schema', () => {
-    const r = resolveDelivery(wfs, 'a', { kind: 'contract', workflow: 'b', input: 'lead' }, { x: 123 })
+    const r = resolveDelivery(
+      wfs,
+      'a',
+      { kind: 'contract', workflow: 'b', input: 'lead' },
+      { x: 123 }
+    )
     expect(r.ok).toBe(false)
   })
 })

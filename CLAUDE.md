@@ -17,6 +17,9 @@ are right now and what to build next, see **`HANDOFF.md`** (living session state
 - `docs/copilotkit-notes.md` — confirmed CopilotKit v2 + AG-UI API reference.
 - `.claude/skills/rules/copilotkit-v2.md` — quick-recall CopilotKit gotchas.
 - `docs/CONVENTIONS.md` — code-style rules Prettier/ESLint can't enforce.
+- `docs/AGENTIC.md` — the agentic-first infrastructure track (docs/skills/delivery for agents
+  building and consuming the framework): decisions + roadmap with statuses. Living handoff,
+  maintained like `HANDOFF.md`.
 - `docs/superpowers/specs|plans/` — per-feature specs & plans.
 
 ## Agent-First Project — Continuous Learning
@@ -76,6 +79,10 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   the adapter is the only GitHub path. This is a hard user rule. The board/owner/assignee are env
   knobs (`GH_PROJECT=8`, `GH_OWNER=matteappen`, `GH_ASSIGNEE=Yaroshuk` — defaults in
   `github-tools.mjs`, overridable via the shell env `claude-spawn.ts` passes through).
+  **Scope (clarified 2026-06-10): the protected object is the REAL Magma production board this
+  demo reads — not GitHub as such.** A writable GitHub integration is legitimate future framework
+  work (writes go through approval gates + server-executed effects, dev-tested on a sandbox repo);
+  do NOT generalize this rule into repo-wide "no `gh` mutations" guards/hooks.
 - **MCP tool RESULTS are surfaced into the stream (`TOOL_CALL_RESULT`).** The `claude` CLI runs MCP
   tools internally and feeds results back as a top-level `{type:'user', message:{content:[{type:
 'tool_result', tool_use_id, content}]}}` line. `claude-stream.ts` now emits an AG-UI
@@ -102,38 +109,12 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads
   changing state via a `useRef` mirror — a state-dependent callback freezes its initial snapshot and
   silently no-ops. Invisible to typecheck + unit tests → **only the browser catches it**.
-- **Kill stale dev servers before browser-verifying — the binaries are in the ROOT `node_modules/.bin`,
-  not `apps/inbox/`.** yarn-classic hoists `tsx`/`vite`/`concurrently` to the workspace root, so the
-  correct kill is `pkill -9 -f "AiWorkflow/node_modules/.bin/(tsx|vite|concurrently)"` (the old
-  `apps/inbox/node_modules/.bin/...` pattern silently matches nothing and leaves stacks alive). ALWAYS
-  `ps aux | grep -E "AiWorkflow/node_modules/.bin/(tsx|vite|concurrently)"` first — multiple sessions
-  stack up (seen: 5 at once). **Why it matters:** several live Vite instances contend for `:5173`
-  (no `strictPort`, so extras grab `:5174+`) and starve the loaded tab's HMR WebSocket; on a CPU spike
-  (the ~30s `claude` subprocess + 3 stdio MCP servers per agent run) the WS drops and Vite fires its
-  `vite:ws:disconnect → waitForSuccessfulPing → location.reload()` path — a **full page reload that
-  resets ALL React state** (and is NOT logged as `[vite] page reload`, so grepping the dev log for that
-  marker finds nothing). This presents as "the app reloaded itself ~30s into a run" and is an
-  ENVIRONMENT artifact, not an app bug. Fix: kill every stale stack (root path), free the ports
-  (`lsof -tiTCP:4000,:5173,:5174 | xargs kill -9`), start ONE `yarn dev`, confirm a single
-  `server on http://localhost:4000` and one vite on `:5173` (no `EADDRINUSE`).
-  **Gotcha within the gotcha:** `tsx watch server/index.ts` spawns a CHILD `node` running the
-  server whose command line is NOT `…/node_modules/.bin/tsx`, so the `pkill` pattern above MISSES
-  it — the child keeps `:4000` and the next `yarn dev` logs `EADDRINUSE` while a stale REPLAY server
-  silently keeps answering `/info` 200 (so you think you restarted but didn't — e.g. a record-mode
-  restart still replays). Always also `lsof -tiTCP:4000 | xargs kill -9` and confirm `:4000` is free
-  before restarting; `grep -c EADDRINUSE` the dev log after boot.
-  **Now mitigated:** a **`predev`** script (`apps/inbox/package.json`) frees `:4000`/`:5173` LISTEN
-  sockets before every `yarn dev`, so a fresh server always binds in the intended `DEV_RECORD_REPLAY`
-  mode. This was the root cause of a "cassettes don't work" report — a stale non-replay server on
-  `:4000` was intercepting every request. (macOS/Linux only — `predev` uses `lsof`.)
-- **Playwright-MCP holds a Chrome PROFILE LOCK across sessions.** A prior browser-verify leaves a
-  `mcp-chrome-<id>` Chrome process (and a `SingletonLock`) under
-  `~/Library/Caches/ms-playwright-mcp/`; the next session's `browser_navigate`/`browser_close` then
-  fails with **"Browser is already in use … use --isolated"**. `browser_close` ALSO fails (it needs
-  the same lock), so you can't recover through the MCP. Fix from a shell:
-  `pkill -9 -f "ms-playwright-mcp/mcp-chrome"` then
-  `rm -f ~/Library/Caches/ms-playwright-mcp/mcp-chrome-*/Singleton*`, then re-`browser_navigate`.
-  (Seen 2026-06-10 during the step-2 spike browser E2E.)
+- **Dev-server hygiene + Playwright-MCP recovery → skill `browser-verify`.** Killing stale dev
+  stacks (root `node_modules/.bin` pattern + the `tsx watch` child that keeps `:4000`), freeing
+  `:4000`/`:5173`, the `predev` mitigation, the `EADDRINUSE` / "app reloads itself ~30s in"
+  (Vite ws-disconnect) diagnosis, and the Playwright-MCP profile-lock recovery ("Browser is
+  already in use") are now owned by the **`browser-verify`** skill (`references/dev-servers.md`,
+  `references/playwright-recovery.md`). Invoke it before any browser-verify.
 - **Concurrent HITL approvals need PER-INSTANCE tool registration.** `useHumanInTheLoop` holds ONE
   `resolvePromiseRef` per registration; a single global registration shared across instances means a
   second concurrent run overwrites the first's resolver → the first awaiting instance's approve button

@@ -14,10 +14,21 @@ export const useGate = (workItemId: string | null, awaiting: boolean) => {
     setGate(res.ok ? ((await res.json()) as Gate) : null)
   }, [workItemId])
 
+  // Fetch the gate when the run reaches approval. The setState lives after an `await` (not a
+  // synchronous in-effect set); the consumer guards rendering on `awaiting`, and a fresh work
+  // item remounts this hook (gate starts null).
   useEffect(() => {
-    if (awaiting) void refetch()
-    else setGate(null)
-  }, [awaiting, refetch])
+    if (!awaiting || !workItemId) return
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(`/api/workitems/${workItemId}/gate`)
+      if (cancelled) return
+      setGate(res.ok ? ((await res.json()) as Gate) : null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [awaiting, workItemId])
 
   const resolve = useCallback(
     async (

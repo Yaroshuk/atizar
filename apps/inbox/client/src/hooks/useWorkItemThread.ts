@@ -19,10 +19,11 @@ export const useWorkItemThread = (id: string | null) => {
       return next
     })
 
+  // Note: this hook assumes a fresh mount per work item id (the consumer keys the thread
+  // component by id), so there is no synchronous in-effect reset of accumulated events.
   useEffect(() => {
     if (!id) return
     let cancelled = false
-    setBySeq(new Map())
     void (async () => {
       const snap = (await (await fetch(`/api/workitems/${id}/trace?from=0`)).json()) as {
         status: ServerStatus

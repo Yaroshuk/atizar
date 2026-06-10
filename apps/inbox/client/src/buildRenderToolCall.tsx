@@ -15,7 +15,7 @@ export const buildRenderToolCall =
     const name = toolCall.function?.name
     const spec = renderSpecs.find((s) => s.toolName === name)
     if (!spec) return null
-    let parameters: unknown = {}
+    let parameters: unknown
     try {
       parameters = JSON.parse(toolCall.function?.arguments || '{}')
     } catch {

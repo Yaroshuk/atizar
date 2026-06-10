@@ -1,237 +1,155 @@
-import { useCallback, useRef, useState } from 'react'
-import {
-  useCopilotKit,
-  useRenderToolCall,
-  CopilotChatConfigurationProvider,
-} from '@copilotkit/react-core/v2'
-import { instanceId, type AgentDefinition, type Destination } from '@platform/core'
-import { useWorkflowRenders } from './useWorkflowRenders'
-import { resolveDelivery, deliveryKey } from './deliver'
-import { useAgentInstances } from './useAgentInstances'
-import { InstanceTools } from './InstanceTools'
+import { useEffect, useRef, useState } from 'react'
+import { instanceId, type AgentDefinition } from '@platform/core'
+import { useBoard } from './hooks/useBoard'
+import { useDispatch } from './hooks/useDispatch'
+import { toPInstances, queuedByAgent, statusesOf } from './boardModel'
 import { aggregateAgent, aggregateLabel } from './aggregate'
-import { buildPipeline, type PInstance } from './pipelineModel'
+import { buildPipeline } from './pipelineModel'
 import { AgentCard } from './components/AgentCard'
 import { AgentModal, type HandoffNote } from './components/AgentModal'
-import { LiveInstanceModal } from './components/LiveInstanceModal'
+import { ThreadModal } from './components/ThreadModal'
 import { InstancePickerModal } from './components/InstancePickerModal'
 import { PipelineColumn } from './components/PipelineColumn'
 import { WorkflowSwitcher } from './components/WorkflowSwitcher'
 import { Icon } from './components/Icon'
-import type { Status } from './status'
+import type { WorkItem } from './serverTypes'
 import { workflows, META, renderSpecs, hitlSpecs } from './workflows'
 
-// Tool names that render as generative-UI cards — everything the client registered a
-// renderer for. Anything else (list_my_tickets, get_latest_email, …) is plumbing and
-// is hidden from the consumer thread unless dev mode is on.
+// Tool names that render as generative-UI cards. Anything else (list_my_tickets,
+// get_latest_email, …) is plumbing, hidden from the consumer thread unless dev mode is on.
 const renderableToolNames: ReadonlySet<string> = new Set([
   ...renderSpecs.map((s) => s.toolName),
   ...hitlSpecs.map((s) => s.toolName),
 ])
 
+// A cross-workflow child = a work item whose parent lives in a DIFFERENT workflow (a
+// delivery via a published contract). Powers the per-workflow "new arrivals" badge.
+const isCrossWorkflowChild = (w: WorkItem, parentOf: (id: string) => WorkItem | undefined) => {
+  if (!w.parentId) return false
+  const parent = parentOf(w.parentId)
+  return parent !== undefined && parent.workflowId !== w.workflowId
+}
+
 export const InboxView = () => {
-  const { copilotkit } = useCopilotKit()
+  const board = useBoard()
+  const { start, deliver } = useDispatch()
+
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
-  const [openId, setOpenId] = useState<string | null>(null) // a live instance localId
-  const [openTypeId, setOpenTypeId] = useState<string | null>(null) // an agent id (no live instance)
-  const [openPickerId, setOpenPickerId] = useState<string | null>(null) // an agent id (≥2 instances)
-  // Handoff notes keyed by the live instance localId (sent on the source, received on
-  // the spawned target). A note is attached when the deliver fires; the source instance
-  // exists (dispatchers are cap-1) and the target localId is the freshly spawned copy.
-  const [handoffNotes, setHandoffNotes] = useState<Record<string, HandoffNote[]>>({})
-  const [unread, setUnread] = useState<Record<string, number>>({}) // workflow id -> badge count
+  // The URL carries the open work item id so a reload re-attaches to the same thread.
+  const [openId, setOpenId] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get('open')
+  )
+  const [openTypeId, setOpenTypeId] = useState<string | null>(null) // an agent id (no live item)
+  const [openPickerId, setOpenPickerId] = useState<string | null>(null) // an agent id (≥2 items)
+  // Ids of cross-workflow children already seen (badge clears on switching to that workflow).
+  const seenRef = useRef<Set<string>>(new Set())
 
-  const { instances, spawn, queuedByAgent } = useAgentInstances()
-
+  const itemById = (id: string): WorkItem | undefined => board.items.find((w) => w.id === id)
   const workflow = workflows.find((w) => w.id === activeWorkflowId) ?? workflows[0]
 
-  // Mirror live instances so the STABLE deliver callback can read them without a dep.
-  // CRITICAL: useRenderTool captures its render closure (and thus deliver) ONCE — a
-  // deliver listing instances in deps would freeze the initial (empty) snapshot.
-  const instancesRef = useRef(instances)
-  instancesRef.current = instances
-  // Mirror the active workflow likewise (same capture-once reason).
-  const activeRef = useRef(activeWorkflowId)
-  activeRef.current = activeWorkflowId
+  // Persist the open id into the URL (so a reload re-attaches; survives the SSE re-subscribe).
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (openId) url.searchParams.set('open', openId)
+    else url.searchParams.delete('open')
+    window.history.replaceState(null, '', url)
+  }, [openId])
 
-  // The one delivery seam. MUST be stable: useRenderTool captures it once. Resolves the
-  // target, spawns a fresh instance (or queues it) in the BACKGROUND. Never opens a
-  // modal; never switches view.
-  const deliver = useCallback(
-    (origin: string, dest: Destination, payload: unknown) => {
-      const r = resolveDelivery(workflows, origin, dest, payload)
-      if (!r.ok) {
-        // A rejected delivery (bad contract/payload) is a dev-time signal, not a user
-        // error — surface it to the console rather than silently dropping the parcel.
-        // eslint-disable-next-line no-console
-        console.warn('delivery rejected:', r.error)
-        return
-      }
-      // The target instance id is `wf__agent`; split off the workflow to find the def.
-      const targetWf =
-        workflows.find((w) => instanceId(w.id, w.entryAgentId) === r.instanceId) ??
-        workflows.find((w) => w.agents.some((a) => instanceId(w.id, a.agent.id) === r.instanceId))
-      if (!targetWf) return
-      const agentId = r.instanceId.slice(targetWf.id.length + 2) // strip "wf__"
-      const def = targetWf.agents.find((a) => a.agent.id === agentId)?.agent
-      if (!def) return
+  // Per-workflow chrome lookups (by stripped agent id).
+  const defOf = (wfId: string, agentId: string): AgentDefinition | undefined =>
+    workflows.find((w) => w.id === wfId)?.agents.find((a) => a.agent.id === agentId)?.agent
+  const roleOf = (agentId: string) => workflow.agents.find((a) => a.agent.id === agentId)?.role
+  const nameOf = (agentId: string) => defOf(workflow.id, agentId)?.name ?? agentId
+  const metaIcon = (agentId: string) => META[agentId]?.iconName ?? 'inbox'
+  const labelOf = (w: WorkItem): string => {
+    const p = w.payload as { number?: number; title?: string; subject?: string; from?: string }
+    if (typeof p.number === 'number') return `#${p.number}${p.title ? ` · ${p.title}` : ''}`
+    return p.from ?? p.subject ?? ''
+  }
 
-      const p = payload as { number?: number; title?: string; subject?: string; from?: string }
-      const label =
-        typeof p.number === 'number'
-          ? `#${p.number}${p.title ? ` · ${p.title}` : ''}`
-          : (p.from ?? p.subject ?? 'item')
+  // Board → pipeline (server-authoritative; cap/queue live server-side now).
+  const pInstances = toPInstances(board.items, workflow.id, roleOf, metaIcon, nameOf, labelOf)
+  const blocks = buildPipeline(pInstances, queuedByAgent(board.items, workflow.id))
 
-      // Parent = the live instance of the source agent (cap-1 dispatchers ⇒ unique).
-      const sourceAgentId = sourceAgentOf(origin, dest)
-      const parent = instancesRef.current.find(
-        (x) => x.workflowId === origin && x.agentId === sourceAgentId
-      )
+  const canStart = (agentId: string) => roleOf(agentId) === 'input'
+  const liveOf = (agentId: string) => pInstances.filter((p) => p.agentId === agentId)
+  const aggOf = (agentId: string) => aggregateAgent(statusesOf(board.items, workflow.id, agentId))
 
-      const { localId, deduped } = spawn({
-        runtimeKey: r.instanceId,
-        agentId,
-        workflowId: targetWf.id,
-        name: def.name,
-        iconName: META[agentId].iconName,
-        label,
-        approvals: def.approvals,
-        maxInstances: def.maxInstances,
-        parentLocalId: parent?.localId,
-        payload,
-        deliveryKey: deliveryKey(payload),
-      })
+  // Cross-workflow unread badges (count fresh cross-workflow children per non-active workflow).
+  const unread: Record<string, number> = {}
+  for (const w of board.items) {
+    if (w.workflowId === activeWorkflowId) continue
+    if (isCrossWorkflowChild(w, itemById) && !seenRef.current.has(w.id)) {
+      unread[w.workflowId] = (unread[w.workflowId] ?? 0) + 1
+    }
+  }
 
-      // A deduped delivery (the same source item, already in flight) is a no-op: an
-      // existing copy covers it, so don't add a duplicate handoff note or badge.
-      if (deduped) return
+  // Launch an input agent: dispatch a fresh run (it reads the inbox itself), open its thread.
+  const startInput = (agentDef: AgentDefinition): void => {
+    void start(instanceId(workflow.id, agentDef.id)).then((id) => {
+      setOpenTypeId(null)
+      setOpenId(id)
+    })
+  }
 
-      // Handoff notes: a 'sent' note on the source instance, a 'received' note on the
-      // spawned target (only if it spawned now — a queued item has no localId yet).
-      setHandoffNotes((prev) => {
-        const next = { ...prev }
-        if (parent) {
-          next[parent.localId] = [
-            ...(next[parent.localId] ?? []),
-            {
-              dir: 'sent',
-              otherName: def.name,
-              label,
-              targetWorkflow: r.targetWorkflow,
-              targetLocalId: localId, // present when the target spawned now (not queued)
-            },
-          ]
-        }
-        if (localId) {
-          next[localId] = [...(next[localId] ?? []), { dir: 'received', otherName: origin, label }]
-        }
-        return next
-      })
-
-      if (r.targetWorkflow && r.targetWorkflow !== activeRef.current) {
-        setUnread((u) => ({ ...u, [r.targetWorkflow!]: (u[r.targetWorkflow!] ?? 0) + 1 }))
-      }
-    },
-    [spawn]
-  )
-
-  useWorkflowRenders(deliver)
-  const renderToolCall = useRenderToolCall()
-
-  const iid = (agentId: string) => instanceId(workflow.id, agentId)
-  const canStart = (agentId: string) =>
-    workflow.agents.find((a) => a.agent.id === agentId)?.role === 'input'
-
-  // Launch an input agent: spawn a fresh input instance (it reads the inbox itself).
-  // Returns the new instance's localId so a caller can re-open the modal on it.
-  const startInput = (agentDef: AgentDefinition): string | undefined =>
-    spawn({
-      runtimeKey: iid(agentDef.id),
-      agentId: agentDef.id,
-      workflowId: workflow.id,
-      name: agentDef.name,
-      iconName: META[agentDef.id].iconName,
-      label: '',
-      approvals: agentDef.approvals,
-      maxInstances: agentDef.maxInstances,
-      isInput: true,
-      payload: null,
-    }).localId
-
-  // Open an agent by count of its live instances: 0 → a type view (intro + START, so an
-  // idle card is always clickable); 1 → that instance's thread; ≥2 → an instance picker
-  // (cards, not a thread — the human picks which copy to open). Opening clears the others.
-  const openAgent = (agentId: string) => {
-    const live = instances.filter((x) => x.workflowId === workflow.id && x.agentId === agentId)
-    setOpenId(null)
+  // Open an agent by count of its visible items: 0 → type view (intro + START); 1 → its
+  // thread; ≥2 → an instance picker (the human picks a copy).
+  const openAgent = (agentId: string): void => {
+    const live = liveOf(agentId)
     setOpenTypeId(null)
     setOpenPickerId(null)
+    setOpenId(null)
     if (live.length === 0) setOpenTypeId(agentId)
     else if (live.length === 1) setOpenId(live[0].localId)
     else setOpenPickerId(agentId)
   }
 
-  // Big-card aggregate: reduce an agent's live instance statuses to a single headline.
-  const statusesOf = (agentId: string): Status[] =>
-    instances
-      .filter((x) => x.workflowId === workflow.id && x.agentId === agentId)
-      .map((x) => x.status)
-  const aggOf = (agentId: string) => aggregateAgent(statusesOf(agentId))
-
-  // The pipeline reads from the live instances of the active workflow.
-  const pInstances: PInstance[] = instances
-    .filter((x) => x.workflowId === workflow.id)
-    .map((x) => ({
-      localId: x.localId,
-      runtimeKey: x.runtimeKey,
-      agentId: x.agentId,
-      name: x.name,
-      iconName: x.iconName,
-      label: x.label,
-      status: x.status,
-      parentLocalId: x.parentLocalId,
-      isInput: x.isInput,
-    }))
-  const blocks = buildPipeline(pInstances, queuedByAgent(workflow.id))
-
-  // The open instance (modal keys off a live localId, not an agent id).
-  const openInstance = openId ? instances.find((x) => x.localId === openId) : undefined
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const openAgentObj: any = openInstance ? copilotkit.getAgent(openInstance.localId) : undefined
-  // The open TYPE view (an idle agent with no live instance).
-  const openTypeAgent = openTypeId
-    ? workflow.agents.find((a) => a.agent.id === openTypeId)?.agent
-    : undefined
-  // The open PICKER view (an agent running ≥2 instances) + its live instances.
-  const pickerInstances = openPickerId
-    ? instances.filter((x) => x.workflowId === workflow.id && x.agentId === openPickerId)
-    : []
-
-  const switchWorkflow = (id: string) => {
+  const switchWorkflow = (id: string): void => {
+    // Mark this workflow's current cross-workflow children as seen (clears its badge).
+    for (const w of board.items) {
+      if (w.workflowId === id && isCrossWorkflowChild(w, itemById)) seenRef.current.add(w.id)
+    }
     setOpenId(null)
     setOpenTypeId(null)
     setOpenPickerId(null)
-    setUnread((u) => ({ ...u, [id]: 0 }))
     setActiveWorkflowId(id)
   }
 
-  // Jump to a live instance by localId (handoff note's "Open" button, or a picker card).
-  const openInstanceById = (localId: string) => {
-    setOpenTypeId(null)
-    setOpenPickerId(null)
-    setOpenId(localId)
+  // Handoff notes for the open item, DERIVED from board topology (no client deliver state):
+  // a 'received' note from the item's parent, a 'sent' note per child.
+  const notesFor = (id: string): HandoffNote[] => {
+    const item = itemById(id)
+    if (!item) return []
+    const notes: HandoffNote[] = []
+    if (item.parentId) {
+      const parent = itemById(item.parentId)
+      if (parent)
+        notes.push({
+          dir: 'received',
+          otherName: nameOf(parent.agentId.slice(parent.workflowId.length + 2)),
+          label: labelOf(item),
+        })
+    }
+    for (const child of board.items.filter((w) => w.parentId === id)) {
+      const childAgent = child.agentId.slice(child.workflowId.length + 2)
+      notes.push({
+        dir: 'sent',
+        otherName: nameOf(childAgent),
+        label: labelOf(child),
+        targetWorkflow: child.workflowId !== workflow.id ? child.workflowId : undefined,
+        targetLocalId: child.workflowId === workflow.id ? child.id : undefined,
+      })
+    }
+    return notes
   }
+
+  // Resolve what the open id points at (it may have left the board after finishing).
+  const openItem = openId ? itemById(openId) : undefined
+  const openTypeAgent = openTypeId ? defOf(workflow.id, openTypeId) : undefined
+  const pickerInstances = openPickerId ? liveOf(openPickerId) : []
 
   return (
     <>
-      {/* Per-instance HITL tool registrations — one per live instance, keyed by
-          localId, so each instance gets its own `respond` (see InstanceTools). Mounted
-          for ALL instances (any workflow) since a background run can pause for approval
-          while its modal is closed. */}
-      {instances.map((inst) => (
-        <InstanceTools key={inst.localId} agentId={inst.localId} />
-      ))}
-
       <WorkflowSwitcher
         workflows={workflows}
         activeId={activeWorkflowId}
@@ -240,7 +158,7 @@ export const InboxView = () => {
       />
 
       <div className='workspace-body'>
-        <PipelineColumn blocks={blocks} onOpen={openInstanceById} />
+        <PipelineColumn blocks={blocks} onOpen={setOpenId} />
         <div className='main'>
           <div className='comp-head'>
             <span className='ch-label'>
@@ -285,54 +203,46 @@ export const InboxView = () => {
           </div>
         </div>
 
-        {openInstance && openAgentObj && (
-          <CopilotChatConfigurationProvider agentId={openInstance.localId}>
-            <LiveInstanceModal
-              agent={openAgentObj}
-              title={openInstance.name}
-              iconName={openInstance.iconName}
-              status={openInstance.status}
-              renderableToolNames={renderableToolNames}
-              loading={openInstance.status === 'running'}
-              canStart={openInstance.isInput}
-              intro={META[openInstance.agentId].intro}
-              notes={handoffNotes[openInstance.localId] ?? []}
-              onOpenWorkflow={switchWorkflow}
-              onOpenInstance={openInstanceById}
-              onStart={() => {
-                const def = workflow.agents.find((a) => a.agent.id === openInstance.agentId)?.agent
-                if (def) startInput(def)
-              }}
-              onClose={() => setOpenId(null)}
-            />
-          </CopilotChatConfigurationProvider>
+        {openItem && (
+          <ThreadModal
+            key={openItem.id}
+            id={openItem.id}
+            title={nameOf(openItem.agentId.slice(openItem.workflowId.length + 2))}
+            iconName={metaIcon(openItem.agentId.slice(openItem.workflowId.length + 2))}
+            intro={META[openItem.agentId.slice(openItem.workflowId.length + 2)]?.intro ?? ''}
+            canStart={canStart(openItem.agentId.slice(openItem.workflowId.length + 2))}
+            renderableToolNames={renderableToolNames}
+            notes={notesFor(openItem.id)}
+            deliver={deliver}
+            onOpenWorkflow={switchWorkflow}
+            onOpenInstance={setOpenId}
+            onStart={() => {
+              const def = defOf(workflow.id, openItem.agentId.slice(openItem.workflowId.length + 2))
+              if (def) startInput(def)
+            }}
+            onClose={() => setOpenId(null)}
+          />
         )}
 
-        {/* Type view: an idle agent (no live instance) is still clickable — shows its
-            intro + START (input) so the card always opens something. */}
-        {!openInstance && openTypeAgent && (
+        {/* Type view: an idle agent (no live item) — its intro + START. */}
+        {!openItem && openTypeAgent && (
           <AgentModal
             agent={{ messages: [] }}
             title={openTypeAgent.name}
             iconName={META[openTypeAgent.id].iconName}
             status='idle'
-            renderToolCall={renderToolCall}
+            renderToolCall={() => null}
             renderableToolNames={renderableToolNames}
             loading={false}
             canStart={canStart(openTypeAgent.id)}
             intro={META[openTypeAgent.id].intro}
             notes={[]}
-            onStart={() => {
-              const id = startInput(openTypeAgent)
-              setOpenTypeId(null)
-              if (id) setOpenId(id) // transition the modal onto the now-running instance
-            }}
+            onStart={() => startInput(openTypeAgent)}
             onClose={() => setOpenTypeId(null)}
           />
         )}
 
-        {/* Picker: an agent running ≥2 instances opens to a card per instance (not a
-            thread); clicking a card opens that specific copy. */}
+        {/* Picker: an agent running ≥2 instances → a card per instance. */}
         {openPickerId && pickerInstances.length >= 2 && (
           <InstancePickerModal
             title={pickerInstances[0].name}
@@ -343,26 +253,14 @@ export const InboxView = () => {
               name: x.name,
               status: x.status,
             }))}
-            onOpenInstance={openInstanceById}
+            onOpenInstance={(localId) => {
+              setOpenPickerId(null)
+              setOpenId(localId)
+            }}
             onClose={() => setOpenPickerId(null)}
           />
         )}
       </div>
     </>
   )
-}
-
-// The source agent for a destination: intra handoff → the agent in the origin workflow
-// whose handoffs include the target; contract → the origin's entry agent (the card that
-// emitted the delivery lives there).
-function sourceAgentOf(origin: string, dest: Destination): string {
-  const wf = workflows.find((w) => w.id === origin)
-  if (!wf) return origin
-  if (dest.kind === 'agent') {
-    return (
-      wf.agents.find((a) => (a.agent.handoffs ?? []).includes(dest.agentId))?.agent.id ??
-      wf.entryAgentId
-    )
-  }
-  return wf.entryAgentId
 }
