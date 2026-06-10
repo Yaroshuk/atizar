@@ -72,12 +72,13 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - ONE `dispatch()` chokepoint mints the WorkItem id, checks one-time dedup (ledger/approved children only) + depth cap, enqueues. WorkerPool ports the pure logic from `apps/inbox/client/src/instancesCore.ts` (cap + queue, already unit-tested) — port, don't redesign.
    - RunObserver (from the spike, now real): consume `provider.run()`, append trace rows, GATE_OPENED → insert Gate + `transition(awaiting_approval)` + kill via provider; registered render tool → fill `card`; stream end → finalize status.
    - Race tests run against REAL Postgres (the compose container) in CI: concurrent finish-vs-finish and finish-vs-dispatch.
-4. **Server-executed effects + Stop** (+ sweep, guards, Gate fields).
-   - `defineAgent` gains `effects: string[]` (zod: **`effects ⊆ approvals`** — corrected from the older `∩ = ∅`; see the "Approval→effect binding" ANSWERED block below) + `readonly: string[]` (for the boot classification). The integration MCP tool (`mcp__gmail__create_draft`, today leaking in at `apps/inbox/workflows/lead-inbox/server.ts`) leaves the allow-list; the model only proposes the artifact in the approval-tool args. Full design → `docs/superpowers/specs/2026-06-10-server-executed-effects-stop-design.md`.
-   - `POST /api/gates/:id/resolve` body carries `{ formRev, decision, form }`: tx① check formRev (mismatch → 409) + mark resolved + INSERT `action_ledger` claim (key = `workItemId+gateId`); execute the integration call directly (`@platform/integrations/gmail-basic` createDraft — plain function call, no MCP child needed); tx② record the result; then `provider.resume()` primed with "the action was executed with <artifact>" (narrative only).
-   - Cancel: `POST /api/workitems/:id/cancel` → `transition(cancelled)` + kill the executor handle + cascade to active children (ascending id); workflow-level cancel = same loop over the workflow's active items. Reuses the existing HITL kill path.
-   - Startup sweep (before `listen`): `running` w/o live executor → `error('executor lost')`; `queued` → re-enqueue by `createdAt`.
-   - Gate columns: `form_rev int`, `proposed_artifact jsonb` (keep BOTH versions), `comment text`, `assignee text null`, `expires_at timestamptz null` (no default, badge-only). Rewrite `reply.prompts.ts`: propose-don't-execute.
+4. **Server-executed effects + Stop** — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 248 unit tests (incl. real-PG: ledger one-execution, formRev 409, cancel/reject edges, failing-effect→error) + typecheck/lint/format green; all 6 browser/runtime E2E flows verified (below). Spec → `docs/superpowers/specs/2026-06-10-server-executed-effects-stop-design.md`; plan → `docs/superpowers/plans/2026-06-10-server-executed-effects-stop.md`. Commits `43611b6`…`c7b8b5c` (+ fixes `…`).
+   - **As-built — contract:** `@platform/core` `defineAgent` gained `effects: string[]` (zod **`effects ⊆ approvals`**) + `readonly: string[]`; `GateResolution.executedResult?` + `PromptStrategy.buildResume(args, executedResult?)`. `ServerBinding.effects: { [approvalTool]: (form, ctx) => Promise<result> }` (functions in the server layer, names in core — the `renders` pattern); `EffectFn` type in `server-binding.ts`. **Boot checks** (`apps/inbox/server/agent-checks.ts`, wired in `index.ts`): (1) effect bindings ⇔ `def.effects` both ways; (2) every allow-listed tool's bare name ∈ `readonly ∪ approvals ∪ keys(renders)` — unclassified ⇒ server refuses to start. The model's allow-list lost `mcp__gmail__create_draft`; `qualifier` declares `readonly: ['get_latest_email']`; `triage` got `readonly: ['list_my_tickets','get_ticket']`.
+   - **As-built — effect execution:** `createDraft` was EXTRACTED from the Gmail MCP into a pure exported `@platform/integrations/gmail-basic/create-draft` (injectable `getGmail`; MCP wrapper + server both call it; `errText` moved to `format.mjs`). `POST /api/gates/:id/resolve` `{formRev, decision, form?, comment?}` → `PipelineService.resolveGate(gateId, …)`: formRev mismatch → **409**; `claimLedger` (INSERT ON CONFLICT DO NOTHING, key `workItemId:gateId`) licenses exactly ONE execution; the SERVER calls `effects[gate.toolName](editedForm, ctx)` → real `createDraft`; `setLedgerResult`; then `observer.resume` primed via the propose-don't-execute reply prompt (reads `executedResult.draftId`). **A failing effect (`{error}`) fails the work item (`transition(fail)`, HTTP 502) — never a false "saved".** A re-resolve after the gate closed is idempotent (returns the prior ledger result, no second execution).
+   - **As-built — Stop:** `transition.ts` gained `cancel` (from queued/running/awaiting_approval/awaiting_input) + `reject` (from awaiting_approval) edges, each writing the `resolution` marker; the active-children deferral guard stays scoped to `finish`. RunObserver drives an explicit `AsyncIterator` registered in `Map<id, iterator>`; `cancel(id)` calls `iterator.return()` → the claude-cli generator's `finally` kills the subprocess; `consume`'s post-loop is **terminal-tolerant** (a concurrent cancel that already finalized the item is not overridden). `PipelineService.cancel`/`cancelWorkflow` cascade parent-first then ascending-id; `cancelItem` early-returns on already-terminal items and does NOT release the pool slot (queued never held one; running's slot is released by its own consume loop; awaiting_approval's was released at the gate) — fixes a double-release that could over-admit queued work. `WorkerPool.dequeue` removes a queued id on cancel. Routes: `/api/workitems/:id/cancel`, `/api/workflows/:id/cancel`, `GET /api/workitems/:id/gate`; the dev `/api/dev/workitems/:id/resolve` is GONE (the dev START `/api/dev/runs` stays for the spike until step 6).
+   - **As-built — deviations from the plan's pseudo-code (all sound, verified):** (a) `resolveGate` does NOT itself `transition(resume)` — `observer.resume` owns that edge (avoids a double-transition); (b) the **reject** path does `transition(reject)` and does NOT call `observer.resume` (resume from `finished` would be illegal; the claude-cli rejected-branch is now reachable only via the legacy `run()` path — UI shows the `rejected` marker, no model narration); (c) no `setResolution` store method (the transition writes the marker).
+   - **Browser/runtime E2E (all 6 PASS, `DEV_RECORD_REPLAY=1` + the trimmed `lead-inbox__reply` cassette):** (1) **edited approve → real Gmail draft** — edited the gate body, approved; DB: gate `resolved` with the edited `form.body`, `action_ledger` one row `{ok:true, draftId}`, work item `finished`; **fetched the real draft by id from Gmail → body contained the edited marker `7Q3Z`** (the load-bearing guarantee); thread showed the new resume narration "The Gmail draft was saved successfully." (no `create_draft`). (2) **reject** → `finished`/`rejected`, zero ledger rows. (3) **Stop mid-running** → caught at `running`; stream killed mid-flight (8/18 trace events), `finished`/`cancelled`, status not flipped back (terminal-tolerant). (4) **Stop at awaiting_approval** → `finished`/`cancelled`, gate `GET` → 404. (5) **restart durability** → killed+restarted the server mid-`awaiting_approval`; both gates SURVIVED (startup sweep leaves `awaiting_approval` durable), gate still fetchable. (6) **stale formRev → 409**, item not consumed (stays `awaiting_approval`). The `saveDraft` chip stays "running" (expected — HITL-kill means the approval tool never gets a `TOOL_CALL_RESULT`). Effect runs OUTSIDE record/replay → approve hits real Gmail (draft-only; the one test draft was deleted).
+   - **Deferred to post-beta (decided, NOT built):** gate `capabilities` (editability derives from `kind`); runtime default-deny at the execution seam (only the boot-time classification kernel was taken — it is physically meaningful at the Mastra/server seam, step 5+); budget edge. **For the step-5 agent:** the `expires_at`/`assignee` Gate columns + stale badge are seams present in the schema but UI is post-beta; `reply.prompts.ts` is now propose-don't-execute; the conformance suite from step 1 is the Mastra definition-of-done.
 5. **Mastra provider** (production path) beside claude-cli (dev); re-key record/replay.
    - New `packages/providers/src/mastra-provider.ts`; needs `ANTHROPIC_API_KEY` (ask the user NOW, not before). Mastra emits AG-UI natively — `run()` is mostly passthrough; GATE_OPENED derives from the workflow suspend status (not a tool call); `resume()` = native `resume(runId, resumeData)`, NO kill-and-re-prime.
    - Keep a `workItemId ↔ runId` mapping in StateStore; do NOT store Mastra's step state (belief #2 boundary, spec §1.4).
@@ -114,34 +115,34 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   the theme. Litmus test: renders from the generic model (Workflow/Agent/WorkItem/Gate/status)
   → package; knows the vertical's payload (lead, ticket, draft) → userland card.
   **`@platform/react` beta component inventory (decided 2026-06-10):**
-  *Board surface:* WorkflowBoard (desktop grid), WorkflowSwitcher (tabs + delivery badges),
+  _Board surface:_ WorkflowBoard (desktop grid), WorkflowSwitcher (tabs + delivery badges),
   PipelineColumn + InstanceTree (L-connectors, `queued: N`), AgentCard (type card: name, START,
   aggregate), StartButton/dialog (THE human-initiated dispatch gesture), InstancePicker, idle
   AgentDescription view (the P2 fix), DoneDrawer (finished/closed list with reopen — records
   leave the board but never vanish).
-  *Thread surface:* ThreadView (foldEventsToMessages + live tail + autoscroll), GateForm
+  _Thread surface:_ ThreadView (foldEventsToMessages + live tail + autoscroll), GateForm
   (editable artifact, approve/reject, formRev-409 → re-render flow), GateHistory (resolved
   gates as ✓ steps), SourcePanel (renders the WorkItem's source content NEXT to the proposed
   artifact — the prompt-injection mitigation; generic "what the agent worked from" frame),
   StopButton (workitem + workflow variants), RejectedState (comment + explicit re-run),
   ErrorState (retry/drop actions), CostBadge (cost/latencyMs/tokens fields), StatusBadge +
   StaleBadge, "Open in <workflow>" jump link.
-  *Dev/observability:* TraceLog — raw AG-UI event inspector behind `?dev=1` (seq, event type
+  _Dev/observability:_ TraceLog — raw AG-UI event inspector behind `?dev=1` (seq, event type
   filter, tool args/results; the beta's run-inspector and the only observability surface),
   DevModeToggle, ToolChip (raw tool-call chip in dev mode).
-  *Card construction kit (cards themselves are userland, the KIT is the package):* CardShell —
+  _Card construction kit (cards themselves are userland, the KIT is the package):_ CardShell —
   the generic card frame (head/title/kicker/badge/body/actions zone; today implicit in Smedja
   CSS that each card hand-assembles — extract it ONCE so userland cards inherit the look),
   primitives kit (Card, Field, Badge, Button, List), `registerCard` registry, and the in-card
   building blocks (GateForm, SourcePanel, CostBadge, StatusBadge). An approval card is literally
   CardShell + SourcePanel + GateForm; a userland card = CardShell + primitives + ~30 lines of
   vertical-specific fields.
-  *Infra:* ConnectionStatus (SSE state + "reconnecting → snapshot refetch" indicator — cheap
+  _Infra:_ ConnectionStatus (SSE state + "reconnecting → snapshot refetch" indicator — cheap
   and trust-critical).
-  *Hooks:* useBoard, useWorkItemThread, useGate, useCancel, useStart, useThreadResult (how a
+  _Hooks:_ useBoard, useWorkItemThread, useGate, useCancel, useStart, useThreadResult (how a
   card reads a data-tool's result from the thread — today's ThreadResultsContext, ported),
   useDevMode, useConnectionState.
-  *Deliberately NOT in the beta package:* approvals-queue inbox view, notifications/email
+  _Deliberately NOT in the beta package:_ approvals-queue inbox view, notifications/email
   approve links, batch approve, analytics — post-beta (market table-stakes list).
   **Styling (decided 2026-06-10): plain CSS + design tokens as CSS custom properties.** The
   package exports `tokens.css` (all `--atz-*` variables: colors, surface, radius, font,
@@ -231,19 +232,23 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
   switch git branches in subagents.
 
-**Starting point for the next session = beta build order step 4** (Server-executed effects + Stop:
-the gate-keyed `POST /api/gates/:id/resolve` with formRev 409 + `action_ledger` claim + the SERVER
-executing the approved artifact via `@platform/integrations/gmail-basic` createDraft DIRECTLY +
-`resume` primed with "executed with <artifact>"; cancel edges + startup-sweep cancel + the full
-all-inbound-edges finished guard in `transition.ts`; `defineAgent.effects` with the effect tool
-REMOVED from the model allow-list; `reply.prompts.ts` rewritten propose-don't-execute; Gate
-fields formRev/assignee/comment/both-artifact-versions). Steps 1–3 are ✅ BUILT & browser-verified
-on `feat/provider-contract-v2`. Step 3 gives you the spine to build ON: `transition()` with the
-guard mechanism, the `dispatch()` chokepoint, the StateStore, the `action_ledger` table + `form_rev`
-column (seams already present), and the RunObserver/PipelineService. The current dev resolve
-(`/api/dev/workitems/:id/resolve`) is the throwaway step-4 replaces. Do NOT invest further in the
+**Starting point for the next session = beta build order step 5** (Mastra provider — the production
+path beside claude-cli/dev). **ASK THE USER FOR `ANTHROPIC_API_KEY` AT THE START of step 5** (the
+only step-gated question). New `packages/providers/src/mastra-provider.ts`: Mastra emits AG-UI
+natively (`run()` mostly passthrough); `GATE_OPENED` derives from the workflow SUSPEND status (not a
+tool call); `resume()` = native `resume(runId, resumeData)` (NO kill-and-re-prime). Keep a
+`workItemId ↔ runId` map in StateStore; do NOT mirror Mastra's step state (belief #2). By step 5
+effects are server-side, so the Mastra agent needs only read + propose/render tools — wire
+`gmail-basic` read fns as native Mastra tools, no MCP. **Definition of done = the step-1 conformance
+suite (`runProviderConformance`) passes against Mastra** (the two-unlike-providers proof). Re-key
+record/replay: cassette step changes from `resolvedApprovalCount(input)` to the store's resolved-gate
+count; wipe `.cassettes/` once. Default provider stays `claude-cli` locally (env switch, e.g.
+`PROVIDER=mastra`). Steps 1–4 are ✅ BUILT & browser-verified on `feat/provider-contract-v2` (NOT
+merged — same branch strategy). Step 4 gives you: server-executed effects (the `ServerBinding.effects`
+seam + `action_ledger`), gate-keyed resolve with formRev/ledger, Stop (cancel/reject edges +
+RunObserver `cancel`), and the boot-time classification check. Do NOT invest further in the
 `@copilotkit/*` client layer — it stays the dev surface until step 6; drive lead-inbox through the
-`?spike=1` page + the Postgres trace/SSE endpoints.
+`?spike=1` page (now with edit/reject/Stop) + the Postgres trace/SSE endpoints + `/api/gates/:id/resolve`.
 
 > **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
 > the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
