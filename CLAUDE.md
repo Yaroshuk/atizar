@@ -126,6 +126,14 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   sockets before every `yarn dev`, so a fresh server always binds in the intended `DEV_RECORD_REPLAY`
   mode. This was the root cause of a "cassettes don't work" report — a stale non-replay server on
   `:4000` was intercepting every request. (macOS/Linux only — `predev` uses `lsof`.)
+- **Playwright-MCP holds a Chrome PROFILE LOCK across sessions.** A prior browser-verify leaves a
+  `mcp-chrome-<id>` Chrome process (and a `SingletonLock`) under
+  `~/Library/Caches/ms-playwright-mcp/`; the next session's `browser_navigate`/`browser_close` then
+  fails with **"Browser is already in use … use --isolated"**. `browser_close` ALSO fails (it needs
+  the same lock), so you can't recover through the MCP. Fix from a shell:
+  `pkill -9 -f "ms-playwright-mcp/mcp-chrome"` then
+  `rm -f ~/Library/Caches/ms-playwright-mcp/mcp-chrome-*/Singleton*`, then re-`browser_navigate`.
+  (Seen 2026-06-10 during the step-2 spike browser E2E.)
 - **Concurrent HITL approvals need PER-INSTANCE tool registration.** `useHumanInTheLoop` holds ONE
   `resolvePromiseRef` per registration; a single global registration shared across instances means a
   second concurrent run overwrites the first's resolver → the first awaiting instance's approve button

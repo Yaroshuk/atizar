@@ -170,6 +170,22 @@ spike's dev page + trace/SSE endpoints.
 > when wiring the step-2 RunObserver to react to it. `docker compose up -d postgres` is wired into
 > `predev`; the DB is up but step 1 doesn't touch it (step 3 does).
 
+> **CONTINUATION NOTE (2026-06-10, after step 2) — for the step-3 agent.** Steps 1 & 2 stay on
+> `feat/provider-contract-v2` (NOT merged — same branch strategy). Step 2 commits run
+> `f6b9a16`…`344e1e0`; final review = READY TO MERGE, no Critical/Important findings.
+> **How to drive the spike surface (your step-3 verification harness):** `DEV_RECORD_REPLAY=1 yarn dev`,
+> open `http://localhost:5173/?spike=1`, click **Start reply run** → it POSTs `/api/dev/runs`,
+> writes the WorkItem id into the URL (`?spike=1&id=…`), renders the folded thread from the
+> trace/SSE endpoints, and shows an Approve button at the gate. Reload re-attaches; Approve resumes.
+> This is the dev surface the spec's anticipated-decisions block means by "the new spine drives
+> lead-inbox through the spike's dev surface" — port the in-memory store in `dev-runs.ts` onto
+> Postgres-backed Trace; keep the endpoint shapes + `seq` cursor + `foldEventsToMessages` as-is.
+> **Preserve when porting:** the SSE handler closes only AFTER the terminal `done`/`error` status
+> write flushes (else the UI strands on `running` — see the step-2 lesson above); replicate that in
+> the real RunObserver's SSE. **Browser-verify gotcha hit this session (now in CLAUDE.md):** a stale
+> Playwright-MCP Chrome holds the profile lock → `browser_navigate` errors "Browser is already in
+> use"; kill `mcp-chrome-*` procs + remove the `SingletonLock` before driving the browser.
+
 (The "NEXT — docs/pipeline-plan.md" P1/P2/P3 items below are absorbed by the
 server-authoritative model in updated-3 — keep for reference, do not build standalone.)
 
