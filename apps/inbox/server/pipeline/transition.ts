@@ -49,11 +49,7 @@ async function hasActiveChild(tx: Tx, id: string): Promise<boolean> {
 // recurse to the root. The "no active children" check IS the finished entry guard, here
 // in one place (design §4).
 async function autoFinishParent(tx: Tx, parentId: string): Promise<void> {
-  const [parent] = await tx
-    .select()
-    .from(workItems)
-    .where(eq(workItems.id, parentId))
-    .for('update')
+  const [parent] = await tx.select().from(workItems).where(eq(workItems.id, parentId)).for('update')
   if (!parent || parent.status !== 'running') return
   if (await hasActiveChild(tx, parentId)) return
 

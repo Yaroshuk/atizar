@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, gte } from 'drizzle-orm'
+import { and, asc, count, eq, gte } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db } from './db/client.js'
 import {
@@ -77,6 +77,15 @@ export function makeStateStore(db: Db) {
         .from(trace)
         .where(and(eq(trace.workItemId, workItemId), gte(trace.seq, from)))
         .orderBy(asc(trace.seq))
+    },
+
+    // Total trace rows for a WorkItem = the next seq (rows are contiguous 0..n-1).
+    async countTrace(workItemId: string): Promise<number> {
+      const [row] = await db
+        .select({ c: count() })
+        .from(trace)
+        .where(eq(trace.workItemId, workItemId))
+      return row?.c ?? 0
     },
 
     // The board snapshot: all work items (newest first) + every OPEN gate.

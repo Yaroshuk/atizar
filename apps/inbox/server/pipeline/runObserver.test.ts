@@ -66,7 +66,11 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
       store,
       pool,
       bus: { publish: vi.fn(), subscribe: () => () => {} },
-      resolveAgent: () => ({ provider: fakeProvider(), renderToolNames: ['renderLead'] }),
+      resolveAgent: () => ({
+        provider: fakeProvider(),
+        renderToolNames: ['renderLead'],
+        maxInstances: 2,
+      }),
     })
 
     await observer.run(id)

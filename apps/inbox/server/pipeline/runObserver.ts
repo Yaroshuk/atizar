@@ -16,6 +16,8 @@ import type { WorkItem } from './db/schema.js'
 export interface AgentRuntime {
   provider: Provider
   renderToolNames: string[]
+  // The agent passport's maxInstances — the per-agent concurrency cap (defineAgent default 2).
+  maxInstances: number
 }
 
 export interface RunObserverDeps {
