@@ -44,6 +44,10 @@ export type AgentModalProps = {
   canStart: boolean
   // A hardcoded one-line "what I'm doing" shown once the agent has started.
   intro: string
+  // The gate-sourced approval card, rendered below the thread when awaiting_approval. The
+  // GATE (its form + formRev) is authoritative, not the folded stream args — so this is fed
+  // from useGate, not from a tool call in `agent.messages`.
+  gateSlot?: ReactNode
   // Handoff lines (sent and/or received) to show above the thread.
   notes: HandoffNote[]
   // Switch to the target workflow when a cross-workflow 'sent' note is clicked.
@@ -64,6 +68,7 @@ export const AgentModal = ({
   loading,
   canStart,
   intro,
+  gateSlot,
   notes,
   onOpenWorkflow,
   onOpenInstance,
@@ -192,6 +197,7 @@ export const AgentModal = ({
                 )}
               </div>
             ))}
+            {gateSlot && <div className='thread-item'>{gateSlot}</div>}
             {loading && (
               <div className='thread-item bubble-row'>
                 <span className='agent-glyph'>
