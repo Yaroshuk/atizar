@@ -1,0 +1,142 @@
+import { randomUUID } from 'node:crypto'
+import { and, asc, eq, gte } from 'drizzle-orm'
+import type { BaseEvent } from '@ag-ui/client'
+import type { Db } from './db/client.js'
+import {
+  gates,
+  trace,
+  workItems,
+  type Gate,
+  type OriginKind,
+  type TraceRow,
+  type WorkItem,
+} from './db/schema.js'
+
+export interface InsertWorkItemInput {
+  id?: string
+  workflowId: string
+  agentId: string
+  origin: OriginKind
+  payload: Record<string, unknown>
+  parentId?: string | null
+  source?: string | null
+}
+
+export interface InsertGateInput {
+  workItemId: string
+  toolName: string
+  toolCallId: string
+  proposedArtifact: Record<string, unknown>
+}
+
+export interface ResolveGateInput {
+  resolvedBy?: string
+  comment?: string
+  form?: Record<string, unknown>
+}
+
+// Typed CRUD over the pipeline tables. The ONLY status writes go through transition()
+// (this module just sets the INITIAL `queued` on insert — creation, not a transition).
+// Takes the drizzle handle so a caller can pass a live transaction if needed.
+export function makeStateStore(db: Db) {
+  return {
+    async insertWorkItem(input: InsertWorkItemInput): Promise<WorkItem> {
+      const [row] = await db
+        .insert(workItems)
+        .values({
+          id: input.id ?? randomUUID(),
+          workflowId: input.workflowId,
+          agentId: input.agentId,
+          origin: input.origin,
+          payload: input.payload,
+          parentId: input.parentId ?? null,
+          source: input.source ?? null,
+          status: 'queued',
+        })
+        .returning()
+      return row
+    },
+
+    async getWorkItem(id: string): Promise<WorkItem | undefined> {
+      const [row] = await db.select().from(workItems).where(eq(workItems.id, id)).limit(1)
+      return row
+    },
+
+    async appendTrace(
+      workItemId: string,
+      seq: number,
+      event: BaseEvent,
+      surfaced = true
+    ): Promise<void> {
+      await db.insert(trace).values({ workItemId, seq, event, surfaced })
+    },
+
+    async getTrace(workItemId: string, from: number): Promise<TraceRow[]> {
+      return db
+        .select()
+        .from(trace)
+        .where(and(eq(trace.workItemId, workItemId), gte(trace.seq, from)))
+        .orderBy(asc(trace.seq))
+    },
+
+    // The board snapshot: all work items (newest first) + every OPEN gate.
+    async getBoardSnapshot(): Promise<{ items: WorkItem[]; gates: Gate[] }> {
+      const items = await db.select().from(workItems).orderBy(asc(workItems.createdAt))
+      const openGates = await db.select().from(gates).where(eq(gates.status, 'open'))
+      return { items, gates: openGates }
+    },
+
+    async insertGate(input: InsertGateInput): Promise<Gate> {
+      const [row] = await db
+        .insert(gates)
+        .values({
+          id: randomUUID(),
+          workItemId: input.workItemId,
+          kind: 'approval',
+          status: 'open',
+          form: input.proposedArtifact,
+          proposedArtifact: input.proposedArtifact,
+          toolName: input.toolName,
+          toolCallId: input.toolCallId,
+        })
+        .returning()
+      return row
+    },
+
+    async getOpenGate(workItemId: string): Promise<Gate | undefined> {
+      const [row] = await db
+        .select()
+        .from(gates)
+        .where(and(eq(gates.workItemId, workItemId), eq(gates.status, 'open')))
+        .limit(1)
+      return row
+    },
+
+    async resolveGateRow(gateId: string, input: ResolveGateInput): Promise<void> {
+      await db
+        .update(gates)
+        .set({
+          status: 'resolved',
+          resolvedAt: new Date(),
+          resolvedBy: input.resolvedBy ?? null,
+          comment: input.comment ?? null,
+          ...(input.form ? { form: input.form } : {}),
+        })
+        .where(eq(gates.id, gateId))
+    },
+
+    async setCard(id: string, card: Record<string, unknown>): Promise<void> {
+      await db.update(workItems).set({ card, updatedAt: new Date() }).where(eq(workItems.id, id))
+    },
+
+    async setRunId(id: string, runId: string): Promise<void> {
+      await db.update(workItems).set({ runId, updatedAt: new Date() }).where(eq(workItems.id, id))
+    },
+
+    async setError(id: string, error: string): Promise<void> {
+      await db.update(workItems).set({ error, updatedAt: new Date() }).where(eq(workItems.id, id))
+    },
+  }
+}
+
+export type StateStore = ReturnType<typeof makeStateStore>
