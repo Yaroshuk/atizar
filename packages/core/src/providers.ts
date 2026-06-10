@@ -27,6 +27,10 @@ export interface GateResolution {
   decision: 'approved' | 'rejected'
   form?: Record<string, unknown>
   comment?: string
+  // Filled at step 4 once the SERVER has executed the approved effect: the integration
+  // result (e.g. { draftId }). The resume prompt narrates "the action was executed with
+  // this result"; the model never re-performs the effect.
+  executedResult?: Record<string, unknown>
 }
 
 // A per-agent prompt strategy: how this agent turns a run into CLI prompts.
@@ -35,7 +39,9 @@ export interface GateResolution {
 // Lives at the seam so claude-cli stays generic; a Mastra provider would ignore it.
 export interface PromptStrategy {
   buildFirst(input: RunAgentInput): string
-  buildResume?(args: Record<string, unknown>): string | null
+  // `args` is the approved/edited artifact; `executedResult` is the server's effect result
+  // (present at step 4+). Returns null when no usable resume → the provider errors.
+  buildResume?(args: Record<string, unknown>, executedResult?: Record<string, unknown>): string | null
 }
 
 // Everything a provider needs to run ONE agent, derived from its passport.
