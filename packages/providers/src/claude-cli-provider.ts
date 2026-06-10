@@ -2,8 +2,10 @@ import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import {
   approvalResolved,
   lastApprovalArgs,
+  type GateResolution,
   type Provider,
   type PromptStrategy,
+  type ResumeHandle,
   type Message,
 } from '@platform/core'
 import { mapClaudeStream } from './claude-stream.js'
@@ -29,6 +31,15 @@ function errorChunk(message: string): BaseEvent {
   } as BaseEvent
 }
 
+function textChunk(message: string): BaseEvent {
+  return {
+    type: EventType.TEXT_MESSAGE_CHUNK,
+    role: 'assistant',
+    messageId: crypto.randomUUID(),
+    delta: message,
+  } as BaseEvent
+}
+
 // Generic over the agent: prompts come from an injected PromptStrategy, so the same
 // provider serves the reply agent, the qualifier, and any future claude-cli agent.
 export function createClaudeCliProvider(opts: {
@@ -42,39 +53,66 @@ export function createClaudeCliProvider(opts: {
   spawn: ClaudeSpawn
 }): Provider {
   const { approvalNames, surfaceTools, allowedTools, prompts, spawn } = opts
+
+  // Spawn the CLI for a prompt and map its NDJSON to AG-UI events. `detectApprovals` is the
+  // approval-name set the stream watches for the GATE_OPENED suspend point — passed [] on a
+  // resume run (a resumed run must not re-open the same gate).
+  async function* primeAndStream(
+    prompt: string,
+    detectApprovals: readonly string[]
+  ): AsyncGenerator<BaseEvent> {
+    let child: { lines: AsyncIterable<string>; kill: () => void }
+    try {
+      child = spawn(prompt, allowedTools)
+    } catch (err) {
+      yield errorChunk(err instanceof Error ? err.message : String(err))
+      return
+    }
+    try {
+      yield* mapClaudeStream(child.lines, { approvalNames: detectApprovals, surfaceTools })
+    } catch (err) {
+      yield errorChunk(err instanceof Error ? err.message : String(err))
+    } finally {
+      child.kill()
+    }
+  }
+
+  // Build the resume prompt from the approved/edited artifact (resolution.form), falling back
+  // to the last approval args in the transcript. Returns null when no usable draft exists.
+  function resumePromptFrom(handle: ResumeHandle, resolution: GateResolution): string | null {
+    const messages = (handle.input?.messages ?? []) as Message[]
+    const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
+    return prompts.buildResume?.(args) ?? null
+  }
+
   return {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input?.messages ?? []) as Message[]
       const resuming = approvalResolved(messages, approvalNames)
-      let child: { lines: AsyncIterable<string>; kill: () => void } | undefined
-      try {
-        let prompt: string
-        if (resuming) {
-          const args = lastApprovalArgs(messages, approvalNames) ?? {}
-          const resumePrompt = prompts.buildResume?.(args) ?? null
-          if (!resumePrompt) {
-            yield errorChunk('Resume failed: no saved draft found in the thread')
-            return
-          }
-          prompt = resumePrompt
-        } else {
-          prompt = prompts.buildFirst(input)
+      if (resuming) {
+        const args = lastApprovalArgs(messages, approvalNames) ?? {}
+        const resumePrompt = prompts.buildResume?.(args) ?? null
+        if (!resumePrompt) {
+          yield errorChunk('Resume failed: no saved draft found in the thread')
+          return
         }
-        child = spawn(prompt, allowedTools)
-      } catch (err) {
-        yield errorChunk(err instanceof Error ? err.message : String(err))
+        yield* primeAndStream(resumePrompt, [])
         return
       }
-      try {
-        yield* mapClaudeStream(child.lines, {
-          approvalNames: resuming ? [] : approvalNames,
-          surfaceTools,
-        })
-      } catch (err) {
-        yield errorChunk(err instanceof Error ? err.message : String(err))
-      } finally {
-        child.kill()
+      yield* primeAndStream(prompts.buildFirst(input), approvalNames)
+    },
+
+    async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
+      if (resolution.decision === 'rejected') {
+        yield textChunk('The human rejected the proposed action; no changes were made.')
+        return
       }
+      const resumePrompt = resumePromptFrom(handle, resolution)
+      if (!resumePrompt) {
+        yield errorChunk('Resume failed: no saved draft found in the thread')
+        return
+      }
+      yield* primeAndStream(resumePrompt, [])
     },
   }
 }

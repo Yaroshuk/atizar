@@ -4,6 +4,10 @@ import {
   decodeHandoff,
   HandoffPayloadSchema,
   readGateOpened,
+  providerConformanceChecks,
+  type ConformanceScenario,
+  type ResumeHandle,
+  type GateResolution,
   type PromptStrategy,
 } from '@platform/core'
 import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider.js'
@@ -276,4 +280,128 @@ describe('createClaudeCliProvider', () => {
     await drain(provider.run(runInput([])))
     expect(seen!.allowedTools).toEqual(['mcp__inbox__renderLead', 'mcp__gmail__create_draft'])
   })
+})
+
+describe('createClaudeCliProvider — resume()', () => {
+  const baseOpts = {
+    approvalNames: ['saveDraft'] as const,
+    surfaceTools: ['renderLead', 'saveDraft'] as const,
+    allowedTools: [
+      'mcp__inbox__renderLead',
+      'mcp__inbox__saveDraft',
+      'mcp__gmail__create_draft',
+    ] as const,
+  }
+
+  it('resume(approved) re-primes from resolution.form and streams done text', async () => {
+    let seenPrompt = ''
+    const spawn = (prompt: string) => {
+      seenPrompt = prompt
+      async function* lines() {
+        yield textDelta('Draft saved to Gmail.')
+      }
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      ...baseOpts,
+      prompts: createReplyPrompts('x'),
+      spawn,
+    })
+    const handle: ResumeHandle = { runId: 'r1', input: runInput([]) }
+    const resolution: GateResolution = {
+      gateId: 'g1',
+      decision: 'approved',
+      form: { threadId: 't_42', body: 'Hi Ivan' },
+    }
+    const out = await drain(provider.resume!(handle, resolution))
+    expect(seenPrompt).toContain('t_42')
+    expect(seenPrompt).toContain('Hi Ivan')
+    expect(seenPrompt).toContain('APPROVED')
+    expect(out[0]).toMatchObject({ delta: 'Draft saved to Gmail.' })
+  })
+
+  it('resume(rejected) yields a no-effect note and does NOT spawn', async () => {
+    let spawned = false
+    const spawn = () => {
+      spawned = true
+      async function* lines() {}
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      ...baseOpts,
+      prompts: createReplyPrompts('x'),
+      spawn,
+    })
+    const handle: ResumeHandle = { runId: 'r1', input: runInput([]) }
+    const out = await drain(provider.resume!(handle, { gateId: 'g1', decision: 'rejected' }))
+    expect(spawned).toBe(false)
+    expect(
+      out.some((e) => e.type === EventType.TEXT_MESSAGE_CHUNK && /reject/i.test(e.delta ?? ''))
+    ).toBe(true)
+  })
+
+  it('resume(approved) errors (no spawn) when no usable draft args exist', async () => {
+    let spawned = false
+    const spawn = () => {
+      spawned = true
+      async function* lines() {}
+      return { lines: lines(), kill: () => {} }
+    }
+    const provider = createClaudeCliProvider({
+      ...baseOpts,
+      prompts: createReplyPrompts('x'),
+      spawn,
+    })
+    const handle: ResumeHandle = { runId: 'r1', input: runInput([]) }
+    const out = await drain(
+      provider.resume!(handle, { gateId: 'g1', decision: 'approved', form: {} })
+    )
+    expect(spawned).toBe(false)
+    expect(out.some((e) => /Resume failed/.test(e.delta ?? ''))).toBe(true)
+  })
+})
+
+describe('createClaudeCliProvider conformance', () => {
+  const scenario: ConformanceScenario = {
+    approvalNames: ['saveDraft'],
+    surfaceTools: ['renderLead', 'saveDraft'],
+    turn1Input: runInput([]),
+    approved: {
+      handle: { runId: 'r1', input: runInput([]) },
+      resolution: {
+        gateId: 'g1',
+        decision: 'approved',
+        form: { threadId: 't_42', body: 'Hi Ivan' },
+      },
+    },
+    rejected: {
+      handle: { runId: 'r1', input: runInput([]) },
+      resolution: { gateId: 'g1', decision: 'rejected' },
+    },
+  }
+  const makeProvider = () =>
+    createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['renderLead', 'saveDraft'],
+      allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
+      prompts: createReplyPrompts('do it'),
+      spawn: fakeSpawn([
+        { when: (p) => /APPROVED/.test(p), lines: [textDelta('Draft saved to Gmail.')] },
+        {
+          when: () => true,
+          lines: [
+            textDelta('Checking inbox… found a lead.'),
+            toolStart(0, 'tc_lead', 'mcp__inbox__renderLead'),
+            toolArgs(0, '{"id":42}'),
+            stop(0),
+            toolStart(1, 'tc_ok', 'mcp__inbox__saveDraft'),
+            toolArgs(1, '{"threadId":"t_42","body":"Hi"}'),
+            stop(1),
+          ],
+        },
+      ]).spawn,
+    })
+  for (const check of providerConformanceChecks) {
+    it(check.name, () => check.run(makeProvider, scenario))
+  }
 })
