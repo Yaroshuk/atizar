@@ -1,279 +1,201 @@
-# AiWorkflow — Architecture & Vision
+# AiWorkflow — Architecture
 
-> **Status legend:** ✅ BUILT (exists in the repo) · 🎯 DESIGN INTENT (agreed in
-> discussion, not yet built) · 💤 DEFERRED (intentionally not now).
-> Most of this document is 🎯 — only the vertical slice under `apps/inbox/` is ✅.
-> This captures decisions made in conversation so they aren't lost between sessions.
+The timeless architecture: what the framework **is** and how its pieces fit. This describes the
+design, not its build status.
 
-> **Pipeline build spec (LOCKED 2026-06-09) → `docs/pipeline-updated-3.md`.** Server-authoritative
-> runtime, locked decisions (server-executed effects, Stop, Mastra+Postgres in beta, Trace-rendered
-> thread), beta scope and build order. **Read it before any pipeline work.**
+- **Why** the design is shaped this way → [`PHILOSOPHY.md`](PHILOSOPHY.md).
+- **Current build status + what's next** → [`HANDOFF.md`](../HANDOFF.md) (living).
+- **What was built, chronologically** → [`docs/BUILD-LOG.md`](BUILD-LOG.md).
+- **The pipeline build spec** (server-authoritative runtime, beta scope/order) →
+  [`docs/pipeline-updated-3.md`](pipeline-updated-3.md). A clean, self-contained pipeline reference
+  replaces it once the beta lands.
+- **The agentic-first track** (docs / skills / hooks / delivery) → [`docs/AGENTIC.md`](AGENTIC.md).
 
-> **Pipeline entity model → `docs/pipeline-model.md`.** How work lives and moves through
-> stages: Workflow / Agent / WorkItem / Case, the lifecycle, gates, `source` vs `payload`,
-> workflow boundaries, and "who knows what". Read it to understand the durable-work model
-> (and why the P1/P2/P3 pipeline gaps dissolve under it).
+## 0. Invariants (LOCKED — do not change silently)
 
-## 1. What this is & positioning
+The load-bearing decisions that define what this framework **is**. They derive from
+[`PHILOSOPHY.md`](PHILOSOPHY.md) (the three beliefs) and the locked pipeline decisions. This list
+is the **canonical, protected statement**; the build spec (`pipeline-updated-3.md`) carries the
+implementation detail and may change as steps land, but it must not contradict an invariant here.
 
-An **open-source framework for AI engineers who ship agentic automations to
-clients**: code for the engineer, a polished UI for the client.
+**Changing any invariant below is dangerous and delicate** — it changes the framework's identity.
+It requires an **explicit warning to the developer that it is dangerous, and their direct
+confirmation**. Never edit silently. (Backstops: the `guard-foundation-edits` hook; the
+`check-foundation` skill stage run by any task.)
 
-The differentiator no one else hits cleanly: **two views in one open-source product**
-- **Developer view** — the integrator configures agents, pipelines, integrations, skills (code).
-- **Consumer view** — the client's manager/staff use a clean UI (cards, buttons), get work
-  done, and may edit a few declared leaf text fields (prompt/name/description), but never see or
-  touch code.
+_Philosophy-derived:_
 
-This fills the gap between "library of building blocks" (CopilotKit) and "closed SaaS"
-(Lindy). n8n shows a technical node editor to everyone; Dify gives one builder UI;
-CopilotKit is blocks not a product; Lindy is closed and codeless.
+- **I1 — Human-in-the-loop by design.** The human starts, steers, and approves; approval gates are
+  a first-class entity in the agent contract; no fully autonomous mode; no irreversible meaningful
+  action without confirmation; everything is audited.
+- **I2 — Machine dispatch allowed, a machine action never.** A machine may create a visible,
+  gated work item; it may never fire a consequential action. The **server** executes the approved
+  action — the model only proposes.
+- **I3 — Thin layer, not an engine.** One minimal contract `AgentRuntime: run(input) →
+  AsyncIterable<AGUIEvent>` (+ optional `resume` + `GATE_OPENED`). AG-UI is the only outward
+  language. The core knows no concrete engine (no engine import in `@platform/core`). We do not
+  duplicate engine features (memory / RAG / tool-execution live in the provider layer).
+- **I4 — Swappability proven, not declared.** ≥2 unlike providers out of the box (Mastra +
+  claude-cli); the provider conformance suite is the proof the contract didn't leak.
+- **I5 — Framework / userland boundary is physical.** Userland imports only the public SDK
+  (`@platform/core`: `defineAgent` / `defineTool` / `defineProvider`), never internals. No
+  fork-and-hack; the core is a versioned dependency.
+- **I6 — Skills / knowledge ride inside packages,** versioned with the code they describe
+  (discovery from `node_modules`), never in a DB.
+- **I7 — Config-as-data.** One Zod object behind an adapter (file → DB → master). The consumer view
+  edits only declared leaf fields (prompt / name / description), never code.
 
-**Primary audience = the AI integrator**, a growing profession. We build the tool for
-that profession; integrators find their own tools → solves distribution.
+_Architecture-locked (pipeline):_
 
-**Business model (like Next.js):** the framework is free; money comes from the service
-layer — configuring pipelines, verticals, integrations, trust/self-host. The durable
-asset in ~2 years is **not the code** (models will rewrite it) but clients, data, baked-in
-integrations, trust, and relationships. The framework is a credibility/distribution
-funnel, not the moat — so do not over-invest in framework elegance early.
+- **I8 — Server-authoritative state in Postgres.** One `transition()` owns every status change
+  (guards + the finished-entry guard, in one place); one `dispatch()` chokepoint mints work items.
+- **I9 — Server-executed effects.** The model proposes and opens gates; the SERVER executes the
+  approved action through the action ledger (key = `workItemId+gateId`), exactly once.
+- **I10 — Stop / cancel per agent instance AND per workflow.**
+- **I11 — Provider tiers.** Mastra = the production path; claude-cli = dev-only (no terminal-spawn
+  in production).
+- **I12 — Work item vs instance.** The durable, visible work item is the unit; the ephemeral
+  instance only executes. A result is kept until the human closes it.
+- **I13 — Approval expiry = a stale badge, never an auto-resolve.**
+- **I14 — Thread = Trace render + per-WorkItem SSE tail;** AG-UI is the event vocabulary.
+- **I15 — Boot-time tool classification.** Every allow-listed tool is declared
+  `readonly | approvals | renders | effects`; an unclassified tool → the framework refuses to
+  boot. Effects are bound server-side (names in core, functions in the `ServerBinding`);
+  `effects ⊆ approvals`.
 
-**North star:** from `git clone` to a dashboard ready to show a client — **in an hour.**
+## 1. The two views (the spine)
 
-**Default vertical:** inbound flows (email/lead/message → qualify → human approval →
-action). Narrow in form, broad in reach (every company has it). Not a cage — the default
-example and skill focus, while the framework stays extensible.
+Everything is driven by **config-as-data**: one validated config object (Zod). There are two views
+onto the same config + code:
 
-## 2. The two views (the architectural spine)
-
-Everything is driven by **config-as-data** (a Zod object). There are **two views** onto the same
-config + code:
-
-```
-            ONE source of truth: config (Zod) + code in folders
-                                 ▲
-        CONSUMER view                          DEVELOPER view
-   operates the UI (cards, buttons),      edits CODE + config directly,
-   edits a few leaf text fields           full power
-   (prompt/name/description) — manager    (engineer)
-```
-
-- **Developer view:** edits code + config directly. Full power. ✅ (this is how we work now)
-- **Consumer view:** operates the UI (cards, buttons), and may edit a few declared **leaf text
+- **Developer view** — edits code + config directly. Full power.
+- **Consumer view** — operates the UI (cards, buttons) and may edit a few declared **leaf text
   fields** (prompt / name / description) stored as per-account overrides. Never sees or touches
-  code. 🎯 (the slice is a first cut of this surface)
+  code.
 
-> A visual / chat config **builder** (a third "edit the pipeline by mouse/chat" mode) was considered
-> and **dropped**: it's the riskiest, most expensive part (a mini-Claude-Code), and the
-> config-schema ceiling it implies is the classic low-code trap. What survives is the modest slice
-> above — field-level overrides in the consumer view, not arbitrary UI authoring.
+A visual / chat config **builder** (a third "edit the pipeline by mouse/chat" mode) was considered
+and **dropped**: it is the riskiest, most expensive part (a mini-Claude-Code), and the
+config-schema ceiling it implies is the classic low-code trap. What survives is the modest slice
+above — field-level overrides in the consumer view, not arbitrary UI authoring.
 
-## 3. Config-as-data behind a source adapter 🎯
+## 2. Config-as-data behind a source adapter
 
-The runtime receives ONE validated config object; it doesn't know the source:
+The runtime receives ONE validated config object; it does not know the source.
 
-```
-config source adapter:
-  ├── FileAdapter   → config from repo/code   → DEVELOPER view (git, typesafe)        ✅ first
-  └── OverrideStore → per-account leaf-text overrides (DB) → CONSUMER view edits        🎯
-      active config = file base ⊕ overrides
-```
-
-**Storage split (decided):**
 - **Structure** (which agents, screens, components) → in **files** (git, engineer). Rarely changes.
-- **Manager-editable text** (prompts, tone, messages) → in **DB** as per-account overrides.
+- **Manager-editable text** (prompts, tone, messages) → in the **DB** as per-account overrides.
 - **Secrets** (API keys) → **env only**, referenced by name; never in git, never plaintext DB.
 
-`editableBy` on a field is what decides file-vs-DB — storage is a *consequence* of who edits.
+`editableBy` on a field decides file-vs-DB — storage is a consequence of who edits. The final
+config is `base (files) ⊕ per-account overrides (DB)`; overrides are limited to declared leaf text
+fields so the merge stays trivial. This backs consumer-view editing — not arbitrary UI authoring.
 
-**base⊕overrides layering** 🎯 — final config = base (files, git, engineer) ⊕ per-account overrides
-(DB, consumer). Overrides are limited to declared **leaf text fields** (prompt / name / description)
-so the merge stays trivial. This is the modest config-as-data slice that backs consumer-view editing
-— not arbitrary UI authoring.
+## 3. The `defineAgent` contract
 
-## 4. The `defineAgent` contract ✅ (core built; `fields` deferred)
-
-A single object describes an agent; the UI, pauses, and rendering all *derive* from it.
-Built in `@platform/core` (`packages/core/src/defineAgent.ts`, Zod-validated) + the concrete
-instance in `apps/inbox/agents/inbox.agent.ts`:
+A single object describes an agent; the UI, the pauses, and the rendering all *derive* from it.
+It lives in `@platform/core` (Zod-validated):
 
 ```ts
 defineAgent({
-  id, name,
-  provider: "mock",                  // ref into the provider registry (§5)
-  instructions,                       // base prompt (declared; not yet consumed — mock provider scripts its own output)
-  tools: ["renderLead", "confirmSend"],
-  approvals: ["confirmSend"],         // actions that pause for human-in-the-loop
-  renders: { renderLead: "LeadCard", confirmSend: "ApprovalDialog" }, // tool name → component name
+  id: 'reply',
+  name: 'Reply',
+  role: 'worker',                  // 'input' = user-startable + cross-workflow target; 'worker' = handoff-only
+  provider: 'claude-cli',          // a name in the provider registry (§4)
+  instructions,                    // base prompt
+  readonly: ['get_latest_email'],  // pure data tools, no side effects
+  tools: ['get_latest_email', 'saveDraft'],
+  approvals: ['saveDraft'],        // tools that open a gate (pause for the human)
+  effects: ['saveDraft'],          // approved actions the SERVER executes (effects ⊆ approvals)
+  renders: { saveDraft: 'ApprovalDialog' }, // tool name → component name
 })
 ```
 
-- `renders` is keyed **by tool name** (refinement of the original `key → component` idea):
-  keying by tool name lets it drive client tool registration directly. The values are
-  component *names*; a client-side registry (`renderRegistry.tsx`) maps names → React
-  components, keeping the shared passport free of React imports.
-- `defineAgent` validates STRUCTURE only — `approvals ⊆ tools`, `renders` keys ⊆ `tools`.
-  The "provider exists" check is enforced at wiring time by `registry.resolve(def.provider)`,
-  not in the passport (a passport doesn't know the registry).
-- 💤 `fields` (configurable fields + `editableBy` + auto-form + storage split) — **deferred**:
-  nothing consumes it until the form/DB land. `type` ∈ string | text | secret | number |
-  boolean | enum; `secret` sourced from env by name. Rejoins the contract with the form/DB.
+- **`renders` is keyed by tool name**; the values are component *names*. A client-side registry
+  maps names → React components, keeping the shared contract free of React imports.
+- **`defineAgent` validates STRUCTURE only** — `approvals ⊆ tools`, `effects ⊆ approvals`,
+  `renders` keys ⊆ `tools`. "Provider exists" is enforced at wiring time by the registry, not in
+  the contract. Every tool must be classified `readonly | approvals | renders | effects`, or the
+  framework refuses to boot (I15).
+- **Effect functions live server-side** in the workflow's `ServerBinding` (names here, functions
+  there) — the model never sees an effect tool; on approval the server runs it (I9).
+- `fields` (configurable fields + `editableBy` + auto-form + the storage split) is **not yet
+  built** — it rejoins the contract with the form/DB.
 
-## 5. Provider registry ✅ (interface + registry + mock + `claude-cli` built)
+## 4. Provider registry & the `AgentRuntime` contract
 
-Models are not hardcoded in the agent. A separate registry defines providers; agents
-reference one by name. The `Provider` interface + `defineProviders` live in `@platform/core`
-(`packages/core/src/providers.ts`); the concrete providers — `mock-provider` (fake) and the
-real `claude-cli` provider — live in `@platform/providers` (`packages/providers/src/`). The
-runtime registry that wires them lives **server-side** (`apps/inbox/server/providers.ts`):
+Models are not hardcoded in the agent. A separate registry defines providers; agents reference one
+by name. The `Provider` interface lives in `@platform/core`; concrete providers live in
+`@platform/providers`; the runtime registry that wires them lives **server-side** (the real
+providers need Node, and `core` is client-imported — so `spawn` is injected to keep the provider
+package Node-free).
 
-```ts
-defineProviders({
-  mock:         createMockInboxProvider(...),          // ✅ scripted AG-UI stream
-  'claude-cli': createClaudeCliProvider({ spawn, ... }), // ✅ real `claude` subprocess
-  // 'claude-api': anthropic SDK …                      // 💤 deferred (needs API key)
-})
-```
+The interface is `run(input) → AsyncIterable<AGUIEvent>`, plus optional `resume(handle,
+resolution)` and a `GATE_OPENED` signal at an approval point. Every provider translates its own
+output into AG-UI (I3). The tiers (I11):
 
-`claude-cli` (✅, branch `feat/claude-cli-provider`): spawns the real `claude` binary
-(`-p --output-format stream-json`, tools via a stdio MCP server), maps the NDJSON stream to
-AG-UI events (`core/claude-stream.ts`), and pauses HITL by **detecting the `confirmSend`
-tool call and killing the process**; resume is a stateless re-prime. The registry moved to
-`server/` because the real provider needs Node and `core/` is client-imported; `spawn` is
-injected so `core/claude-cli-provider.ts` stays Node-free.
+- **`claude-cli`** — dev-only. Spawns the real `claude` binary (stream-json, tools via a stdio MCP
+  server), maps the stream to AG-UI events, and pauses HITL by **detecting the approval tool call
+  and killing the process**; resume is a stateless re-prime.
+- **Mastra** — the production path. Emits AG-UI natively; a gate is a workflow suspend; resume is
+  native.
+- **`mock`** — a scripted AG-UI stream for tests.
 
-The `Provider` interface is `run(input: RunAgentInput) → AsyncIterable<BaseEvent>`. CLI vs API
-are different execution models normalized behind it; the runtime is swappable behind the
-registry. **Decided:** wire `claude-cli` first (no API key; subscription login). `claude-api`
-and a real agentic loop (Mastra) remain 💤.
+A provider conformance suite (`runProviderConformance`) is the definition-of-done that proves the
+contract didn't leak across two unlike providers (I4).
 
-## 5a. Dev record/replay layer ✅ (BUILT, `feat/dev-record-replay`)
+## 5. Generative UI & the consumer surface
 
-A development-speed tool that wraps the real provider in a `Provider → Provider` decorator
-(`withRecordReplay`) toggled by the `DEV_RECORD_REPLAY` env var. When set, every agent's
-provider is wrapped at build time (`apps/inbox/server/build-agent.ts`); when unset the
-production path is byte-identical.
+**Rendering:** the agent emits tool calls that map to React components via the `renders` registry.
+Two polarities, with a deliberate default:
 
-**Cassette identity:** keyed by `wf__agent` (the runtime instance id — same agent in two
-workflows = two files; dynamic client instances `wf__agent#N` collapse to the one server key)
-PLUS **step** = `resolvedApprovalCount(input)` from `@platform/core` — the number of human
-approvals already resolved in the run input. HITL splits one logical run into multiple provider
-requests; step 0 = first run, step 1 = after the first approval, etc.
+- **Named components** (LeadCard, ApprovalDialog, …) for the polished, branded, predictable cases
+  — this is the default, and the constraint is a feature (you do not want a model inventing
+  arbitrary UI for a client).
+- A **primitives kit** (Card, Field, Badge, Button, List) as an escape hatch the agent can compose
+  for the long tail — flexible, but still in your style.
 
-**Storage:** one JSONL file per `wf__agent` under `apps/inbox/.cassettes/`, each line
-`{step, event}` (an AG-UI event). `CassetteStore` handles per-step read/write with atomic
-writes (temp + rename) and never clobbers on an empty capture or a non-ENOENT read error.
-`apps/inbox/.cassettes/` is in `.gitignore` — recordings hold real captured data.
+**Consumer UX:** a desktop of **agent cards** (name, START, a status indicator). Click opens a
+**thread**: the agent streams text + rich result cards and pauses at approvals. The closed card and
+the open thread are two renderings of the same run. **Human-in-the-loop** is the core product
+moment — the agent pauses at an approval, the human edits/approves, the server executes, audited.
 
-**Mode toggle:** `DEV_RECORD_REPLAY=1` (or `=replay`) → auto (replay a recorded step, else
-call the real provider and record); `=record` → force-overwrite always; unset → no wrapper.
+**Packaging:** `@platform/react` ships the chrome (board, switcher, pipeline tree, thread,
+GateForm, Stop, TraceLog, ConnectionStatus) + the card construction kit (CardShell, primitives,
+`registerCard`, `useThreadResult`); the hooks are the headless layer; **workflow-specific cards
+stay in userland** (demo-app exemplars). Styling is plain CSS over `--atz-*` design tokens
+(`tokens.css` + `styles.css`; no Tailwind, no CSS-in-JS), with consumer branding driven by
+`editableBy` config-as-data.
 
-**Share-safety:** `scanCassette(text): Finding[]` (pure, exported from
-`apps/inbox/server/record-replay.ts`) performs a regex/keyword pass flagging emails, phones,
-and token/secret-shaped strings with `{line, kind, snippet}`. It backs the mandatory agent
-scan rule in `CLAUDE.md`. Names and addresses are not reliably regex-detectable — the human
-is the final reviewer.
+## 6. Skills & knowledge
 
-Spec: `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`. Developer guide (the
-skill seed): `docs/dev-record-replay.md`. Build narrative: `docs/BUILD-LOG.md` §10.
+Skills ride **inside packages**, versioned with the code they describe (I6) — discovered from
+`node_modules` by convention, never from a DB. They also guide the AI when a developer asks it to
+extend the framework (it reads them instead of guessing). `CLAUDE.md` is a thin pointer, not a
+duplicate of the knowledge. The full track — layers, authoring conventions, delivery — lives in
+[`docs/AGENTIC.md`](AGENTIC.md); skill-authoring rules in
+[`.claude/skills/CONVENTIONS.md`](../.claude/skills/CONVENTIONS.md).
 
-## 6. Generative UI & the consumer UX 🎯 (slice is a first cut ✅)
-
-**Rendering:** the agent emits tool calls that map to React components via a registry
-(`renders` keys). Two polarities, and the chosen balance:
-- Named components (LeadCard, ApprovalDialog…) for the polished, branded, predictable
-  cases — **this is the default, and the constraint is a feature** (you don't want a model
-  inventing arbitrary UI for a client).
-- A **primitives kit** (Card, Field, Badge, Button, List) as an escape hatch the agent can
-  compose for the long tail — flexibility, but still in your style. (primitives kit = 🎯)
-
-**Consumer desktop UX (the vision):**
-- A desktop of **agent cards**. A closed card shows: name, START button, a status indicator
-  (idle / working / awaiting approval / done). ✅ built in the slice.
-- Click → **modal** opens into a thread: the agent streams text + rich result components
-  (e.g. an order card with a gmail icon, subject, and an action button), and pauses at
-  approvals. ✅ built (text + LeadCard + ApprovalDialog).
-- "One run, two views": closed card and open modal are two renderings of the same run
-  (status + thread). ✅.
-- **Human-in-the-loop** is the core product moment: the agent pauses at an `approval`,
-  the manager clicks, the action proceeds, audit-logged (audit = 💤). ✅ (pause/resume built).
-
-**Beta packaging of this surface (LOCKED 2026-06-10)** → `@platform/react` ships the chrome
-(board, switcher, pipeline tree, thread, GateForm, Stop, TraceLog, ConnectionStatus) + the card
-construction kit (CardShell, primitives, `registerCard`, `useThreadResult`); hooks are the
-headless layer; workflow-specific cards stay USERLAND (demo app exemplars). Styling = plain CSS
-over `--atz-*` design tokens (`tokens.css` + `styles.css`; no Tailwind/CSS-in-JS), three-layer
-customization, consumer branding via `editableBy` config-as-data. Detail →
-`docs/pipeline-updated-3.md` §1.10 + HANDOFF inventory.
-
-## 7. Skills storage 🎯 (future)
-
-Skills ride **inside packages**, versioned with `npm update` (no drift, no DB):
-`node_modules/@platform/*/skills/*/SKILL.md` + project `./skills/*`. Discovery by
-convention (glob), not a list. `CLAUDE.md` is a thin pointer, not a duplicate of the
-knowledge. Skills also guide the AI when a developer asks it to extend the framework (it reads
-them instead of hallucinating). (We already do a lightweight version: `.claude/skills/rules/`.)
-
-## 8. Stack & why each layer
+## 7. Stack
 
 | Layer | Choice | Role | Swappable? |
 |---|---|---|---|
-| Agent runtime ("brain") | Mastra 🎯 (mocked now) | agents, tools, memory, orchestration | yes, behind an `AgentRuntime` facade |
-| BFF server ("door") | Hono ✅ | serves UI, auth, OAuth callback, proxy to runtime | yes (Express/Fastify) — but Hono fits CopilotKit's fetch handlers natively |
-| Consumer UI ("face") | CopilotKit + AG-UI ✅ | streaming, generative UI, human-in-the-loop | used as a dependency, not competed with |
-| Client | Vite + React (SPA) ✅ | thin server only proxies; data lives in runtime → SPA is cleaner than Next |
-| Auth | Better Auth + RBAC 🎯, NullAuth now 🎯 | login, roles; design the interface now, run as admin-stub | — |
-| DB | Drizzle + Postgres/SQLite 💤 | behind an abstraction; `DATABASE_URL` switch | — |
-| Config | Zod ✅ | config-as-data; both front and back read it | — |
-| Glue protocols | MCP (agent↔tools) 🎯, AG-UI (agent↔UI) ✅ | — | — |
+| Agent runtime ("brain") | Mastra (prod) / claude-cli (dev) | agents, tools, memory, orchestration | yes, behind the `AgentRuntime` contract |
+| Server ("door") | Hono | serves the UI, auth, OAuth callback, API | yes (fetch / Web-Standards) |
+| State | Postgres (Drizzle) | server-authoritative work-item/gate/trace state | behind a StateStore |
+| Consumer UI ("face") | React (Vite SPA) + AG-UI vocabulary | streaming, generative UI, human-in-the-loop | — |
+| Config | Zod | config-as-data; front and back read it | — |
+| Glue | MCP (agent ↔ tools), AG-UI (agent ↔ UI) | — | — |
 
-Principle: rent/swap the "smart" parts (model, agent loop, UI plumbing — they ride the
-rising tide); invest your soul in what the model won't take: real integrations,
-trust/self-host/audit, last-mile UX, client relationships & context.
+Principle: **rent and swap the "smart" parts** (the model, the agent loop, the UI plumbing — they
+ride the rising tide, behind facades); **invest engineering in what the tide won't carry**: real
+integrations, trust / self-host / audit, and last-mile UX.
 
-## 9. Roadmap
+## 8. Packaging strategy
 
-- ✅ **Vertical slice on mocks** — done, browser-verified, merged. (`apps/inbox/`)
-- ✅ **Reusable core extracted** — typed message layer (deduped the toolCallId↔toolMessage logic,
-  replaced `any`), `Provider` interface + registry + one fake provider, and the `defineAgent`
-  contract — all threaded through server & client (TDD + two-stage review; browser-verified).
-- ✅ **`@platform/*` package split (core + providers + integrations)** — extracted into a
-  yarn-classic workspace: `@platform/core` (isomorphic contract), `@platform/providers`
-  (isomorphic; injected spawn), `@platform/integrations` (node-only batteries; subpath exports +
-  optional peers). Consumed by `apps/inbox` as raw TS source (no build step; `tsc --build`).
-  Browser-verified e2e on real Gmail; 79 unit tests green. `@platform/react` + `@platform/server`
-  stay 💤. `@platform/*` is a placeholder scope (rename before publish).
-- ✅ **One real integration (Gmail MCP)** — `@platform/integrations/gmail-basic` (read latest /
-  create draft, draft-only).
-- 💤 **Then, roughly in order:** server-authoritative pipeline state + persistence
-  (see `docs/pipeline-updated-3.md` — Mastra + Postgres are IN the first beta) → `@platform/react` +
-  `@platform/server` extraction → auth/RBAC/audit → DB + config file/DB split → deploy (Docker,
-  self-host). Consumer-view field overrides (`editableBy` leaf text) + base⊕overrides land with the DB.
-
-## 10. Three ways to run (design intent) 🎯
-
-Same files, three ways: local no-docker (`npm run dev`, sqlite, auth off — fast dev);
-local docker (`docker compose up`, Postgres, hot-reload — prod parity); server
-(`docker compose up -d`, Postgres, `AUTH_ENABLED=true`, client API key, self-host —
-execution only). Edit code locally → `git push` → CI/CD deploys to client server.
-
-## 11. How this maps to what exists today
-
-Built: a **yarn-classic workspace** — `apps/inbox/` (Hono + CopilotKit v2 runtime, the consumer
-card→modal→approval loop on real CopilotKit + AG-UI) consuming three extracted packages:
-`@platform/core` (message layer, provider contract, `defineAgent`, handoff — §4/§5 BUILT),
-`@platform/providers` (`claude-cli` real provider + mock + stream parser), and
-`@platform/integrations` (`gmail-basic`, node-only). Packages are consumed as raw TS source (no
-build step). The agent runs on the **real `claude-cli`** provider end-to-end on a real Gmail
-account. `@platform/react` + `@platform/server` (extracting the client/server layers out of
-`apps/inbox/`) are deferred; `@platform/*` is a placeholder scope to rename before publish.
-
-**Packaging strategy (decision):** ONE batteries package per axis (one `@platform/integrations`,
-one `@platform/providers`) with **subpath entrypoints + optional peer dependencies**, rather than
-a package per integration/provider — validated against LangChain community / n8n / Vercel AI SDK.
-Promote an integration or provider to its own package only when its **dependencies diverge**
-(weight or conflict) or its **release cadence diverges** — NOT for tidiness. The contract
-(`@platform/core`) is what enables third-party extension.
-
-`fields`, config file/DB split (§3), skills storage (§7), §10, and parts of §6/§8 remain design
-intent to be built incrementally. See the spec/plan in `docs/superpowers/`.
+**One batteries package per axis** (one `@platform/integrations`, one `@platform/providers`) with
+**subpath entrypoints + optional peer dependencies**, rather than a package per integration or
+provider. Promote an integration or provider to its own package only when its **dependencies
+diverge** (weight or conflict) or its **release cadence diverges** — not for tidiness. The contract
+package (`@platform/core`) is what enables third-party extension. `@platform/*` is a placeholder
+scope; the framework is named **atizar**, so the locked rename target is **`@atizar/*`** — flip the
+code (package names + imports) and the docs together in one pass before any npm publish.

@@ -86,6 +86,14 @@ review itself mid-task (which would fire early, or double the parent's prompt).
    in English, regardless of the language used in chat. This is the project-wide rule (`CLAUDE.md`
    Conventions): docs are authored once, for any agent or contributor, in English.
 
+7. **Foundation check (Task skills only).** Every **Task** skill includes a stage that runs the
+   `check-foundation` procedure before reporting done — verifying the change does not violate or
+   erode the philosophy (`../../docs/PHILOSOPHY.md`) or an architecture invariant
+   (`../../docs/ARCHITECTURE.md` section 0, I1–I15). A detected conflict is a **STOP**: warn the
+   developer explicitly and get their **direct confirmation** before proceeding; never change the
+   foundation silently. Procedures do not run this themselves — the calling Task does (mechanical
+   backstop: the `guard-foundation-edits` hook).
+
 ## Part 3 — Reference patterns (proven shapes, not required)
 
 Borrow and adapt; document significant deviations in your `SKILL.md` so future maintainers

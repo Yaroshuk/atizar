@@ -122,6 +122,25 @@ stops being a phrase and becomes a build list.
   real PII — always), never current-project context (today's demo data source happens to be a
   production board). If a legitimate future feature would have to violate the rule, it fails
   the criterion — scope the rule to the actual protected object instead.
+- ✅ **Foundation protection (docs + skill + hook + convention)** — BUILT & tested (2026-06-10).
+  The framework's identity is now a protected, three-layer concern:
+  - **Docs (the map):** `docs/PHILOSOPHY.md` authored fresh (the three beliefs, conscious "no"s —
+    framework-only, no business/personal material, no dated patches) and `docs/ARCHITECTURE.md`
+    section 0 = the canonical invariants **I1–I15** (philosophy-derived + pipeline-locked). These
+    are the canonical protected statement; `pipeline-updated-3.md` stays the editable build spec.
+  - **Skill (the procedure):** `check-foundation` — a **Procedure** (genre 2a) that reads
+    PHILOSOPHY + the invariants and checks a change against them; a violation/tension is a STOP →
+    WARN + the developer's direct confirmation. Registered in the skills README.
+  - **Convention:** `CONVENTIONS.md` Part 2.7 — every **Task** skill runs `check-foundation`
+    before reporting done.
+  - **Hook (the backstop):** `guard-foundation-edits.sh` (PreToolUse on Edit/Write/Bash) prompts
+    `permissionDecision:"ask"` (verified schema — exit 0 + JSON; "ask" lets the human confirm,
+    not a hard block) on any edit to `PHILOSOPHY.md` / `ARCHITECTURE.md`. Tested 10/10 (4 ask, 6
+    defer; reads and other files defer). Anchor rule added to `CLAUDE.md`.
+  - **Deferred:** the clean self-contained `docs/pipeline.md` (replacing the badly-named
+    `pipeline-updated-3.md` + its cross-references) is written **after** the beta lands (~step 7),
+    and **added to the hook's protected set then** — the hook protects the FINAL docs, not the
+    temporary build spec.
 
 ### Phase 1 — dev skills (L1), priority by recurrence
 
@@ -139,25 +158,33 @@ pointer once the skill owns the procedure — CLAUDE.md stays the map, skills ow
    masks it via shared toolCallId), `?dev=1`/`?spike=1` surfaces, the flow checklist + "only the
    browser catches it" catalog. Registered in `.claude/skills/README.md`. The two CLAUDE.md gotcha
    blocks (dev-server hygiene + Playwright lock) were **shrunk to a one-line pointer** at the skill
-   (CLAUDE.md stays the map). Cassette blocks left for `cassette-care` (#4).
-2. ❌ **`add-workflow`** — scaffold `apps/inbox/workflows/<id>/{descriptor,server,client}` +
-   the 3 aggregator lines + tool classification (`readonly`/`approvals`/`renders` — boot check
-   fails otherwise) + per-agent allow-list + register cards + browser-verify. Mechanical,
-   recurs with every new vertical, perfectly skill-shaped — and "add a workflow" is THE core
-   action of the framework in client projects, so this L1 skill is the dress rehearsal for
-   the flagship L2 twin.
-3. ❌ **`add-render-card`** — render-spec registration (card surfaces only if registered),
-   `ThreadResultsContext` for data tools, HITL per-instance registration gotcha, the
-   "render closures captured once" trap, browser-verify requirement.
-4. ❌ **`cassette-care`** — refresh/re-key cassettes after prompt changes, the share-safety
-   `scanCassette` flow (already a CLAUDE.md hard rule — the skill makes it a procedure),
-   step-keying semantics, "stale server makes cassettes look broken" diagnosis.
-5. ❌ **`add-provider`** — write AFTER beta step 5 (Mastra) lands: the conformance suite
-   (`runProviderConformance`) is the definition-of-done, Mastra+claude-cli are the two worked
-   examples. This skill is the L2 `add-provider` twin's first draft.
-6. ❌ **`add-integration`** — write AFTER beta step 7 (extraction): teaches the
-   `@platform/integrations` contract + ServerBinding effects seam; `gmail-basic` is the worked
-   example. Also the template for the flagship L2 skill.
+   (CLAUDE.md stays the map). Cassette knowledge → `rules/cassettes.md` (genre-1 rule, #2).
+2. ✅ **`rules/cassettes.md`** — BUILT (2026-06-10), a **genre-1 Rule, not a skill** (decided after
+   user pushback). Cassette care splits into recall-facts (modes, "replay masks a prompt change,"
+   true-replay check, the multi-instance `toolCallId` masking) + a 3-step share-safety procedure
+   (`scanCassette` → report `file:line` → wait). Neither is a multi-stage gated flow: the
+   recall-facts are reference, and share-safety is already mechanically triggered + enforced by the
+   `guard-cassette-share` hook (a skill would just duplicate the hook's trigger). So it lives as a
+   rule in `.claude/skills/rules/`, pointing to `docs/dev-record-replay.md` for depth. Registered
+   in the skills README.
+
+**L1 dev skills are complete for now.** The recurring dev-side procedures are captured
+(`browser-verify` + `cassettes` + the foundation/conventions infra). We add another L1 skill ONLY
+when a dev task actually recurs and bites (A4) — not by marching a list.
+
+The following were considered for L1 but are **CONSUMER skills (L2 → Phase 2)** — they teach the
+public SDK, not framework internals, so a userland developer runs them on top of the framework:
+
+- ❌ **`add-workflow`** — scaffold a workflow + tool classification + register cards. "Add a
+  workflow" is THE core consumer action; it belongs in `@platform/core`/`@platform/server` (L2).
+- ❌ **`add-render-card`** — render-spec registration, `ThreadResultsContext` for data tools,
+  browser-verify. A consumer surfaces a custom card on top of the framework → L2.
+
+Post-beta first drafts of their L2 twins (gated on beta progress, NOT now):
+
+- ❌ **`add-provider`** — after beta step 5 (Mastra); the conformance suite is the definition-of-done.
+- ❌ **`add-integration`** — after beta step 7 (extraction); the `@platform/integrations` contract +
+  the `ServerBinding` effects seam, with `gmail-basic` as the worked example. The flagship L2 skill.
 
 ### Phase 2 — consumer skills (L2), after beta step 7
 
@@ -167,6 +194,8 @@ shipped inside its package:
 - ❌ `add-integration` (in `@platform/integrations`) — the flagship; proves "Claude writes your
   integration in a minute, guided by the skill".
 - ❌ `add-workflow` / `add-agent` (in `@platform/core` or `@platform/server` post-extraction).
+- ❌ `add-render-card` (in `@platform/react` post-extraction) — register a custom card on the
+  render registry; `ThreadResultsContext`/`useThreadResult` for data tools.
 - ❌ `add-provider` (in `@platform/providers`) — conformance suite as the contract.
 - ❌ Consumer-project `AGENTS.md` template — what a client repo's context file should say about
   the framework (possibly emitted by a future `init`, but a copy-paste template ships first).

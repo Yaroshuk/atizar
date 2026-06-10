@@ -85,6 +85,15 @@ scope — rename before any npm publish**. `@platform/react` + `@platform/server
 > `claude-stream` → `foldEventsToMessages`), the cards-only consumer thread + `?dev=1`, and the
 > stale-dev-server / Playwright-lock ops notes.
 
+- **The foundation is PROTECTED — never change it silently.** `docs/PHILOSOPHY.md` (the three
+  beliefs + conscious "no"s) and `docs/ARCHITECTURE.md` section 0 (invariants I1–I15) define what
+  the framework IS. A change that violates or erodes a belief/invariant requires an **explicit
+  warning that it's dangerous + the developer's direct confirmation** before proceeding. Run the
+  `check-foundation` skill when a change touches actions, providers, `@platform/core`, the
+  framework/userland boundary, or those docs. Backstop: the `guard-foundation-edits` hook prompts
+  ("ask") on any edit to those two docs. (The temporary build spec `pipeline-updated-3.md` is NOT
+  protected — it changes as the beta is built; the clean `docs/pipeline.md` joins the protected set
+  when written, ~step 7.)
 - **GitHub is STRICTLY READ-ONLY.** The GitHub triage workflow reads the real Magma Board
   (`matteappen` Projects v2 #8) + issues via `gh`. NEVER post/comment/edit/close/label/move or
   mutate anything on GitHub — not in the `github-tools.mjs` adapter (it exposes only `gh project

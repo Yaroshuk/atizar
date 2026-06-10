@@ -27,12 +27,14 @@ stage). See [`CONVENTIONS.md`](CONVENTIONS.md) Part 1. The build order for the r
 | Skill            | When to use                                                                                                                                                                                                                                                                              | SKILL.md                                           |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `browser-verify` | About to claim a change is done/working/ready-to-merge; running a browser E2E or verifying an HITL approval flow; starting `yarn dev`; or a dev server / port / `EADDRINUSE` / self-reloading page / Playwright-MCP browser misbehaves. Invoked as a step by Task skills, or standalone. | [browser-verify/SKILL.md](browser-verify/SKILL.md) |
+| `check-foundation` | Before a change lands, or as a stage in any development / bug-fixing / feature Task; or standalone when unsure whether a change touches the philosophy or base architecture. WARNs and requires explicit developer confirmation on a foundation conflict. | [check-foundation/SKILL.md](check-foundation/SKILL.md) |
 
 ## Rules (genre 1 — topical reference)
 
 | Rule                                               | Covers                                       |
 | -------------------------------------------------- | -------------------------------------------- |
 | [`rules/copilotkit-v2.md`](rules/copilotkit-v2.md) | CopilotKit v2 + AG-UI gotchas (quick recall) |
+| [`rules/cassettes.md`](rules/cassettes.md) | `DEV_RECORD_REPLAY` cassettes: recall-facts + the share-safety procedure |
 
 ## Tasks without a skill (handle directly)
 
