@@ -1,9 +1,8 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { CopilotRuntime, createCopilotEndpoint, InMemoryAgentRunner } from '@copilotkit/runtime/v2'
 import { instanceId } from '@platform/core'
 import { providerRegistry } from './providers.js'
-import { buildAgent, buildProvider } from './build-agent.js'
+import { buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
 import { db } from './pipeline/db/client.js'
 import { runMigrations } from './pipeline/db/migrate.js'
@@ -29,11 +28,9 @@ for (const { descriptor } of workflowServers) {
 
 // Register EVERY workflow × agent under its instance id. The same agent placed in
 // two workflows becomes two independently routable runtime agents (stateless re-prime,
-// no server session — so they never share state).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const agents: Record<string, any> = {}
-// The server-authoritative spine consumes the SAME wrapped providers as the CopilotKit
-// agents (one code path), plus each agent's render-tool names + concurrency cap.
+// no server session — so they never share state). The server-authoritative spine
+// (RunObserver) consumes these wrapped providers; each runtime also carries the agent's
+// render-tool names + concurrency cap + server-executed effects.
 const runtimes: Record<string, AgentRuntime> = {}
 for (const { descriptor, bindings } of workflowServers) {
   const byId = new Map(descriptor.agents.map((a) => [a.agent.id, a.agent]))
@@ -44,7 +41,6 @@ for (const { descriptor, bindings } of workflowServers) {
     assertAgentClassification(def, { allowedTools: b.allowedTools, effects: b.effects })
     const key = instanceId(descriptor.id, b.agentId)
     const provider = buildProvider(def, b.prompts, providerRegistry, b.allowedTools, key)
-    agents[key] = buildAgent(def, b.prompts, providerRegistry, b.allowedTools, key)
     runtimes[key] = {
       provider,
       renderToolNames: Object.keys(def.renders),
@@ -60,17 +56,9 @@ const pipeline = makePipelineService({
   descriptors: workflowServers.map((w) => w.descriptor),
 })
 
-const runtime = new CopilotRuntime({ agents, runner: new InMemoryAgentRunner() })
-
-const copilot = createCopilotEndpoint({
-  runtime,
-  basePath: '/api/copilotkit',
-  mode: 'single-route',
-})
+// Server-authoritative pipeline spine — the ONLY transport (CopilotKit dropped at step 6):
+// board + per-WorkItem trace/SSE + dispatch/deliver/resolve/cancel, all on Postgres.
 const app = new Hono()
-app.route('/', copilot)
-// Server-authoritative pipeline spine (step 3): board + per-WorkItem trace/SSE on Postgres.
-// The CopilotKit transport above stays the live dev surface until step 6.
 app.route('/', createPipelineRoutes(pipeline))
 
 // Boot: apply migrations (so a fresh clone + `yarn dev` just works) and reconcile any rows
