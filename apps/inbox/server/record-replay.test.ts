@@ -298,4 +298,20 @@ describe('withRecordReplay resume()', () => {
     })
     expect(wrapped.resume).toBeUndefined()
   })
+
+  it('mode "record" → overwrites even when a resume recording exists', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeResumeProvider([], [ev('fresh')])
+    await new CassetteStore(dir, 'wf__a').writeStep(1, [ev('stale')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'record',
+    })
+    const out = await collect(wrapped.resume!(resumeHandle, approvedResolution))
+    expect(out).toEqual([ev('fresh')])
+    expect(fake.resumes()).toBe(1)
+    expect(await new CassetteStore(dir, 'wf__a').readStep(1)).toEqual([ev('fresh')])
+  })
 })
