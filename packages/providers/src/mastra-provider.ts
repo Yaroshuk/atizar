@@ -74,9 +74,11 @@ export function createMastraProvider(opts: {
       yield* drive(runner.start(runId, inputData), true)
     },
 
-    async *resume(_handle: ResumeHandle, _resolution: GateResolution): AsyncIterable<BaseEvent> {
-      // Implemented in Task 4.
-      yield errorChunk('resume not implemented')
+    async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
+      // The server already executed the effect; resolution carries decision + executedResult.
+      // gateStep (server-side) reads these from resumeData (approved → confirm sentence;
+      // rejected → bail). A resumed run must NOT re-open the gate → emitGateOnSuspend=false.
+      yield* drive(runner.resume(handle.runId, resolution), false)
     },
   }
 }

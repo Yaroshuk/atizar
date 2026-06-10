@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import { readGateOpened } from '@platform/core'
+import type { ResumeHandle } from '@platform/core'
 import { createMastraProvider } from './mastra-provider.js'
 import type { MastraChunk, MastraRunner, MastraRun, MastraRunResult } from './mastra-types.js'
 
@@ -138,5 +139,65 @@ describe('createMastraProvider run()', () => {
       delta: string
     }
     expect(text.delta).toContain('boom')
+  })
+})
+
+describe('createMastraProvider resume()', () => {
+  const handle = { runId: 'r1', input } as ResumeHandle
+
+  it('approved completes, re-opens no gate, emits events', async () => {
+    const runner: MastraRunner = {
+      start: () => fakeRun([], { status: 'completed' }),
+      resume: () =>
+        fakeRun([{ type: 'text-delta', payload: { text: 'The Gmail draft was saved.' } }], {
+          status: 'completed',
+        }),
+    }
+    const p = createMastraProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['saveDraft'],
+      runner,
+    })
+    const events = await collect(
+      p.resume!(handle, {
+        gateId: 'g1',
+        decision: 'approved',
+        form: DRAFT,
+        executedResult: { draftId: 'd1' },
+      })
+    )
+    expect(events.map(readGateOpened).filter(Boolean)).toHaveLength(0)
+    expect(events.length).toBeGreaterThan(0)
+  })
+
+  it('rejected terminates with no tool call', async () => {
+    const runner: MastraRunner = {
+      start: () => fakeRun([], { status: 'completed' }),
+      resume: () =>
+        fakeRun([{ type: 'text-delta', payload: { text: 'Rejected; nothing was saved.' } }], {
+          status: 'completed',
+        }),
+    }
+    const p = createMastraProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['saveDraft'],
+      runner,
+    })
+    const events = await collect(p.resume!(handle, { gateId: 'g1', decision: 'rejected' }))
+    expect(events.filter((e) => e.type === EventType.TOOL_CALL_START)).toHaveLength(0)
+    expect(events.map(readGateOpened).filter(Boolean)).toHaveLength(0)
+    expect(events.length).toBeGreaterThan(0)
+  })
+
+  it('passes the resolution to runner.resume keyed by handle.runId', async () => {
+    const resume = vi.fn(() =>
+      fakeRun([{ type: 'text-delta', payload: { text: 'ok' } }], { status: 'completed' as const })
+    )
+    const runner: MastraRunner = { start: () => fakeRun([], { status: 'completed' }), resume }
+    const p = createMastraProvider({ approvalNames: ['saveDraft'], surfaceTools: [], runner })
+    await collect(
+      p.resume!(handle, { gateId: 'g1', decision: 'approved', executedResult: { draftId: 'd1' } })
+    )
+    expect(resume).toHaveBeenCalledWith('r1', expect.objectContaining({ decision: 'approved' }))
   })
 })
