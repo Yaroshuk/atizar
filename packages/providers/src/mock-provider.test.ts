@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
+import { providerConformanceChecks, type ConformanceScenario } from '@platform/core'
 import { createMockInboxProvider } from './mock-provider.js'
 
 async function collect(stream: AsyncIterable<BaseEvent>): Promise<BaseEvent[]> {
@@ -12,6 +13,36 @@ async function collect(stream: AsyncIterable<BaseEvent>): Promise<BaseEvent[]> {
 function input(messages: unknown[]): RunAgentInput {
   return { messages } as unknown as RunAgentInput
 }
+
+const resolvedMessages = [
+  {
+    role: 'assistant',
+    toolCalls: [
+      { id: 'tc_ok', type: 'function', function: { name: 'saveDraft', arguments: '{"threadId":"t","body":"b"}' } },
+    ],
+  },
+  { role: 'tool', toolCallId: 'tc_ok', content: 'approved' },
+]
+
+const scenario: ConformanceScenario = {
+  approvalNames: ['saveDraft'],
+  surfaceTools: ['renderLead', 'saveDraft'],
+  turn1Input: { messages: [] } as unknown as RunAgentInput,
+  approved: {
+    handle: { runId: 'r1', input: { messages: resolvedMessages } as unknown as RunAgentInput },
+    resolution: { gateId: 'g1', decision: 'approved', form: { threadId: 't', body: 'b' } },
+  },
+  rejected: {
+    handle: { runId: 'r1', input: { messages: resolvedMessages } as unknown as RunAgentInput },
+    resolution: { gateId: 'g1', decision: 'rejected' },
+  },
+}
+
+describe('mock-provider conformance', () => {
+  for (const check of providerConformanceChecks) {
+    it(check.name, () => check.run(() => createMockInboxProvider(['saveDraft']), scenario))
+  }
+})
 
 describe('mockInboxProvider', () => {
   const provider = createMockInboxProvider(['saveDraft'])
