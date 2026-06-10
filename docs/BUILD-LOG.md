@@ -533,3 +533,55 @@ E2E on `?spike=1` over the Postgres spine: attach mid-run → folded thread + ga
 **and the new guarantee — a server restart mid-`awaiting_approval` then reload shows the gate STILL
 there** (the in-memory spike lost this). Final DB: 20 stitched trace rows (run+resume), status
 `finished`, gate `resolved`.
+
+## 12 · Server-driven UI — drop `@copilotkit/*` (BUILT, `feat/provider-contract-v2`, browser-verified)
+
+Beta build-order step 6. The consumer UI flips from **client-authoritative** (CopilotKit proxied
+agents owned the instances, cap/queue, status derivation, and cross-agent handoff) to
+**server-authoritative**: the React client only READS board/thread state over HTTP+SSE and ACTS via
+plain HTTP. All `@copilotkit/*` packages and the `<CopilotKit>` tree are gone; `@ag-ui/client` stays
+(the event vocabulary). Spec → `docs/superpowers/specs/2026-06-10-server-driven-ui-step6-design.md`;
+plan → `docs/superpowers/plans/2026-06-10-server-driven-ui-step6.md`.
+
+**Scope discovery.** Server-side **handoff did not exist** — steps 3–5 only drove single agents via
+`/api/dev/runs`. But handoff is **human-gated** (a rendered card's button carries a hardcoded
+`Destination`; the model never emits one), so it became a small `POST /api/deliver` endpoint plus
+lifting the pure `resolveDelivery`/`deliveryKey` into `@platform/core` (`delivery.ts`). The server
+resolves the destination and dispatches a CHILD work item (`parentId` = the card's work item);
+dedup-by-`source` and the depth cap are the chokepoint's existing job.
+
+**Server.** `POST /api/deliver` (resolve + dispatch child, origin `agent`); `/api/dev/runs` promoted
+to `POST /api/dispatch` (human START); `PipelineService.deliver` (+ a `descriptors` dep); `dispatch`
+/`deliver` now `publishBoard()` so a freshly-queued item appears immediately. The CopilotKit endpoint
+(`createCopilotEndpoint`/`CopilotRuntime`) and `buildAgent` are deleted — the pipeline routes are the
+only transport; the RunObserver consumes the same `buildProvider`-wrapped providers.
+
+**Client.** Four data hooks — `useBoard` (snapshot + board-SSE refetch), `useWorkItemThread` (trace
+snapshot + SSE tail → `foldEventsToMessages`), `useGate` (open gate + formRev approve/reject),
+`useDispatch` (start/deliver/cancel). `boardModel.ts` maps server `WorkItem[]` onto the EXISTING pure
+`pipelineModel`/`aggregate` (the cap/queue is server-side now); `status.mapStatus` reduces the server
+status union to the display `Status`; `serverTypes.ts` is the client mirror of the schema fields.
+`buildRenderToolCall` replaces CopilotKit's `useRenderToolCall` (parse the folded tool-call args →
+the matching render spec). Approval is **gate-driven**: `HitlSpec.render` ctx became
+`{form, formRev, status, approve, reject}` and `ApprovalDialog` is an editable textarea (the edited
+body is what the server-executed `createDraft` writes); `ThreadModal` owns the per-item hooks, keyed
+by id so a reload remounts fresh, and renders the gate card from `useGate`. Handoff notes are DERIVED
+from board `parentId` topology (no client deliver state). The open work item id rides in `?open=<id>`
+for reload re-attach. A per-workitem **Stop** button was added to the thread (found missing during
+E2E; "Stop per agent" is a locked decision).
+
+**Deleted:** `useAgentInstances`, `instancesCore` (client copy), `statusFrom`, `InstanceTools`,
+`useWorkflowRenders`, `LiveInstanceModal`, `spike/TraceSpike`, the `?spike=1` mount, the `<CopilotKit>`
+tree, `/api/dev/runs`, both `@copilotkit/*` deps. **Kept:** `renderRegistry` + all cards,
+`RenderSpec`/`HitlSpec` (HITL ctx changed), `pipelineModel`/`aggregate`/`buckets`/`devMode`/`status`/
+`threadResults`, the chrome components, Smedja `styles.css`, `?dev=1`.
+
+**Verified.** 277 unit tests + typecheck/lint/format/build green. Browser E2E (`DEV_RECORD_REPLAY=1`):
+single run; handoff (deliver → reply child nested under the qualifier, parent reopened, derived notes
++ "Open" jump); **approve with an edited artifact → the edited `EDITED-MARKER-7Q3Z` body was present
+in the real Gmail draft fetched by id** (ledger one row, item `finished`, parent auto-finished);
+reject (`rejected`, zero ledger); cancel via the UI Stop button (`cancelled`, gate 404); reload
+re-attach (`?open=<id>` rebuilds thread + gate); board-SSE live coherence; post-deps-removal boot +
+single-run smoke. The 3-at-once cap (integration-tested with a blocking provider; gate releases slots
+under fast replay) and the live cross-workflow triage flow (needs a github-triage cassette) are step-7
+eval follow-ups.

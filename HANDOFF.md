@@ -86,10 +86,12 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - **THE bug the live E2E caught (cautions paid off):** the provider's `finally{run.abort()}` fired on a clean SUSPEND too, cancelling the parked Mastra run → resume failed _"This workflow run was not suspended"_. Fix: track `settled`; abort ONLY on interrupt (Stop/`iterator.return`), never on a clean suspend/finish (+2 unit tests). caution (a) cancel-mid-run, caution (b) last-wins/no-draft, caution (c) Mastra tables out of our drizzle set + `reset.ts`/test-globalSetup init — all built and verified.
    - **Deviations from the plan (sound):** record/replay re-key was **DEFERRED** — the message-scan step key already yields the correct 0/1 steps in the server-spine single-gate model (`input.messages` carries no resolved-approval transcript; re-keying would couple the dev decorator to StateStore + risk regressing claude-cli for zero behavioural gain). Cassettes were wiped. `/api/dev/runs` gained an optional `payload` (drives the gate on a fresh real run — throwaway, dies at step 6). **Pre-existing latent issue noted (NOT step-5):** `WorkerPool.resumeAcquire` calls `opts.run` → a benign `IllegalTransition: cannot "start" from "running"` is logged on every resume (the real resume runs via `observer.resume`'s own `consume`); harmless but worth cleaning at step 6.
    - **DX note:** the server does NOT auto-load `.env.local`; `PROVIDER=mastra` needs `ANTHROPIC_API_KEY` in the process env (`set -a; . ./.env.local; set +a` before `yarn dev`, or add `--env-file`). Worth wiring `.env.local` loading at step 6/7.
-6. **Re-point board/thread UI** to server state; delete `@copilotkit/*` deps.
-   - Board reads `GET /api/board` `{items, gates, lastEventId}` + per-account SSE (coarse status events only, resume via `Last-Event-ID`); thread = step-2 trace endpoints. Keep `renderRegistry`, all cards, Smedja styles, `?dev=1`.
-   - Approve/reject/cancel/edit = plain HTTP. DELETE (not port): `useAgentInstances`, `instancesCore` client copy, `statusFrom`, proxied agents, `useHumanInTheLoop`, `<CopilotKit>` tree.
-   - Browser E2E checklist before merge (memory rule — EVERY flow): single run; 3-at-once (cap 2 + `queued: 1`); approve WITH an edited artifact (verify the edited text is what lands in Gmail); reject + re-run; cancel mid-run; reload mid-run; second tab coherence.
+6. **Re-point board/thread UI** to server state; delete `@copilotkit/*` deps. — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 277 unit tests + typecheck/lint/format/build green; the UI is fully server-driven and `@copilotkit/*` is gone from the import graph AND `package.json` (`@ag-ui/client` stays — the event vocabulary). Spec → `docs/superpowers/specs/2026-06-10-server-driven-ui-step6-design.md`; plan → `docs/superpowers/plans/2026-06-10-server-driven-ui-step6.md`.
+   - **Scope discovery (the step-6 line glossed it):** server-side **handoff did not exist** — steps 3–5 only ever drove single agents via `/api/dev/runs`. But handoff is **human-gated** (a card button with a hardcoded `Destination`, NOT model-autonomous), so it became one `POST /api/deliver` endpoint + lifting the pure `resolveDelivery`/`deliveryKey` into `@platform/core` (`packages/core/src/delivery.ts`). The server resolves the destination and dispatches a CHILD work item (`parentId` = the card's work item); dedup-by-`source` is the chokepoint's existing job.
+   - **As-built — server:** `POST /api/deliver` ({origin, dest, payload, parentId} → resolve + dispatch child, origin `agent`); `/api/dev/runs` promoted to `POST /api/dispatch` (human START); `PipelineService.deliver` (+ `descriptors` dep); `dispatch`/`deliver` now `publishBoard()` so a freshly-queued item shows immediately. The CopilotKit endpoint (`createCopilotEndpoint`) + `buildAgent` are DELETED — pipeline routes are the only transport.
+   - **As-built — client:** four data hooks (`hooks/useBoard` snapshot+SSE-refetch, `hooks/useWorkItemThread` trace+SSE-tail+`foldEventsToMessages`, `hooks/useGate` gate+formRev approve/reject, `hooks/useDispatch` start/deliver/cancel); `boardModel.ts` maps server `WorkItem[]` → the EXISTING pure `pipelineModel`/`aggregate` (cap/queue now server-side); `status.mapStatus` (server union → display `Status`); `serverTypes.ts` (client mirror of the schema fields). `buildRenderToolCall` replaces CopilotKit `useRenderToolCall` (parse tool args → render spec). Approval is **gate-driven**: `HitlSpec.render` ctx changed to `{form, formRev, status, approve, reject}`; `ApprovalDialog` is now an editable textarea (the edited body is the load-bearing "edited text → Gmail" path); `ThreadModal` owns the per-item hooks (keyed by id so a reload remounts fresh) + renders the gate card from `useGate`. Handoff notes are DERIVED from board `parentId` topology (no client deliver state). The open work item id rides in `?open=<id>` so a reload re-attaches. A per-workitem **Stop** button was added to the thread (found missing during E2E — "Stop per agent" is a locked decision).
+   - **DELETED:** `useAgentInstances`, `instancesCore` (client copy), `statusFrom`, `InstanceTools`, `useWorkflowRenders`, `LiveInstanceModal`, `spike/TraceSpike`, the `?spike=1` mount, the `<CopilotKit>` tree, `/api/dev/runs`, both `@copilotkit/*` deps. KEPT: `renderRegistry` + all cards, `RenderSpec`/`HitlSpec` (HITL ctx changed), `pipelineModel`/`aggregate`/`buckets`/`devMode`/`status`/`threadResults`, `WorkflowSwitcher`/`PipelineColumn`/`AgentCard`/`InstancePickerModal`, Smedja `styles.css`, `?dev=1`.
+   - **Browser E2E (replay, `DEV_RECORD_REPLAY=1`):** ✅ **single run** (START → qualifier runs → Done); ✅ **handoff** (`/api/deliver` → reply child nested under the qualifier with the ↓ connector, parent reopened to Working, derived "→ Handed / ← Received" notes + "Open" jump); ✅ **approve WITH an edited artifact** — edited the gate body to insert `EDITED-MARKER-7Q3Z`, approved, **fetched the real Gmail draft by id → the edited body was present** (ledger one row `{ok,draftId}`, item `finished`, parent auto-finished); ✅ **reject** (`finished`/`rejected`, zero ledger rows); ✅ **cancel via the UI Stop button** (`finished`/`cancelled`, gate 404); ✅ **reload re-attach** (fresh navigation to `?open=<id>` rebuilds the full thread + gate from the trace/gate endpoints); ✅ **board SSE live coherence** (handoff/status updates appeared live without reload); ✅ **post-deps-removal smoke** (booted clean, single run works, no `@copilotkit` in node_modules). **NOT browser-driven this session (honest):** 3-at-once cap (covered by the `pipelineService` blocking-provider integration test — under fast replay the gate releases slots, so "2 active + queued 1" isn't reliably observable); cross-workflow "Treat as lead" (the contract resolution + schema validation are covered by the `pipelineService.deliver` integration test; a live triage run has no cassette and would hit the real GitHub board). Both are follow-ups for step 7's golden-set/eval pass.
 7. **Extraction + packaging (the beta IS the framework — locked decision #7, 2026-06-10)**: FIRST extract `apps/inbox/server/pipeline/` → `@platform/server` and the board/thread UI → `@platform/react` (mechanical folder moves if the import discipline below held), then slim the demo app down to workflows/config that consume ONLY the public packages — the living proof of belief #3 (userland never imports internals). The beta deliverable = the monorepo of libraries + this thin demo app, NOT a clone-template app. Then: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`). npm publish at launch vs monorepo-first is a launch-time call — the package BOUNDARY is the deliverable, the registry is logistics.
 
 **Anticipated decisions, steps 3–7 (ANSWERED 2026-06-10 — decide-and-go, do not re-ask the user):**
@@ -254,23 +256,29 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
   switch git branches in subagents.
 
-**Starting point for the next session = beta build order step 6** (re-point the board/thread UI to
-server state; delete `@copilotkit/*`). Steps 1–5 are ✅ BUILT & browser-verified on
-`feat/provider-contract-v2` (NOT merged — same branch strategy). Step 6: the board reads
-`GET /api/board` + per-account SSE; the thread reuses the step-2 trace/SSE endpoints +
-`foldEventsToMessages` (already built — the `?spike=1` page proves it); approve/reject/cancel/edit =
-plain HTTP (`/api/gates/:id/resolve`, `/api/workitems/:id/cancel`). DELETE (don't port):
-`useAgentInstances`, `instancesCore` client copy, `statusFrom`, proxied agents, `useHumanInTheLoop`,
-the `<CopilotKit>` tree. Keep `renderRegistry`, all cards, Smedja styles, `?dev=1`. **What step 5
-hands you:** a working production provider behind `PROVIDER=mastra` (default stays `claude-cli`) —
-both pass the step-1 conformance suite. Two cheap cleanups to fold into step 6: (1) `WorkerPool.resumeAcquire`
-re-invokes `opts.run` → a benign `IllegalTransition: cannot "start" from "running"` logged on every
-resume (the real resume runs via `observer.resume`'s `consume`) — make `resumeAcquire` reserve the
-slot WITHOUT calling run; (2) wire `.env.local` loading into the dev server so `PROVIDER=mastra` "just
-works". Also delete the throwaway `?spike=1` page + `/api/dev/runs` (incl. its optional `payload`).
-**Provider knobs:** `PROVIDER=mastra`, `MASTRA_MODEL` (default `claude-sonnet-4-6`), `ANTHROPIC_API_KEY`
-(in the process env — see DX note above). The Mastra adapter is `apps/inbox/server/mastra/{tools,runner}.ts`;
-the pure provider is `@platform/providers/mastra-*`.
+**Starting point for the next session = beta build order step 7** (extraction + packaging — the
+beta IS the framework, locked decision #7). Steps 1–6 are ✅ BUILT & browser-verified on
+`feat/provider-contract-v2` (NOT merged — same branch strategy). Step 7: FIRST extract
+`apps/inbox/server/pipeline/` → `@platform/server` and the board/thread UI → `@platform/react`
+(mechanical folder moves — the import discipline held: `server/pipeline/` imports only `@platform/*`
+
+- its own folder; the new client hooks/components import only `@platform/*` + each other). The
+  `@platform/react` boundary + beta component inventory + styling decisions are in the anticipated-
+  decisions block above. Then: zero-cred demo (`DEMO=1` → PGlite + mock provider + SYNTHETIC cassettes,
+  scanCassette CI gate), README 10-minute script, **LICENSE (ask the user — recommend MIT)**,
+  `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on mutation routes.
+  **Two step-6 follow-ups for the step-7 eval pass** (NOT browser-driven this session): (1) the
+  3-at-once server cap (`pipelineService` cap test passes with a blocking provider; under fast replay
+  the gate releases slots so it's not browser-observable — drive it with a slow/blocking eval fixture);
+  (2) the cross-workflow "Treat as lead → Lead inbox" full browser flow (resolution + schema validation
+  are integration-tested; needs a github-triage cassette — record one, since a live triage run reads the
+  real GitHub board). **Carried-over cheap cleanups (still open from step 5, deferred past step 6):**
+  (a) `WorkerPool.resumeAcquire` re-invokes `opts.run` → a benign `IllegalTransition: cannot "start"
+from "running"` logged on every resume — make `resumeAcquire` reserve the slot WITHOUT calling run;
+  (b) wire `.env.local` loading into the dev server so `PROVIDER=mastra` "just works".
+  **Provider knobs:** `PROVIDER=mastra`, `MASTRA_MODEL` (default `claude-sonnet-4-6`), `ANTHROPIC_API_KEY`
+  (in the process env). The Mastra adapter is `apps/inbox/server/mastra/{tools,runner}.ts`; the pure
+  provider is `@platform/providers/mastra-*`.
 
 > **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
 > the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
