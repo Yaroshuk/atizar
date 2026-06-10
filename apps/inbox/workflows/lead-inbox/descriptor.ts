@@ -8,6 +8,7 @@ export const replyAgent = defineAgent({
     'Read the latest email in the inbox, draft a reply, and ask the human before saving it as a draft.',
   tools: ['renderLead', 'saveDraft'],
   approvals: ['saveDraft'],
+  effects: ['saveDraft'],
   renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
 })
 
@@ -17,8 +18,9 @@ export const qualifierAgent = defineAgent({
   provider: 'claude-cli',
   instructions:
     'Read the latest email in the inbox and qualify the lead: category, priority, and a one-line reason.',
-  tools: ['renderVerdict'],
+  tools: ['renderVerdict', 'get_latest_email'],
   approvals: [],
+  readonly: ['get_latest_email'],
   renders: { renderVerdict: 'VerdictCard' },
   handoffs: ['reply'],
   maxInstances: 1,

@@ -2,6 +2,7 @@ import type { ServerBinding } from '../server-binding.js'
 import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
+import { createDraft } from '@platform/integrations/gmail-basic/create-draft'
 
 export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
@@ -12,6 +13,12 @@ export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
     agentId: replyAgent.id,
     prompts: createReplyPrompts(replyAgent.instructions),
-    allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft', 'mcp__gmail__create_draft'],
+    // create_draft is GONE from the model's allow-list — it is now a server effect.
+    allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft'],
+    effects: {
+      // The approved/edited form { threadId, body } IS the createDraft args, byte-verbatim.
+      saveDraft: (form) =>
+        createDraft({ threadId: String(form.threadId ?? ''), body: String(form.body ?? '') }),
+    },
   },
 ]

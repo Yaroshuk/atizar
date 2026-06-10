@@ -5,9 +5,10 @@ export const triageAgent = defineAgent({
   name: 'TRIAGE',
   provider: 'claude-cli',
   instructions:
-    'Read the user’s open tickets on the project board and recommend how to route each.',
+    "Read the user's open tickets on the project board and recommend how to route each.",
   tools: ['list_my_tickets', 'get_ticket', 'render_triage'],
   approvals: [],
+  readonly: ['list_my_tickets', 'get_ticket'],
   renders: { render_triage: 'TriageCard' },
   handoffs: ['feature', 'bugfix', 'reply-draft'],
   maxInstances: 1,

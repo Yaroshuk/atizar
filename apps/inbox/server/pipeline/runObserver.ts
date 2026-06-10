@@ -7,6 +7,7 @@ import type { WorkerPool } from './workerPool.js'
 import type { EventBus } from './eventBus.js'
 import { transition } from './transition.js'
 import type { WorkItem } from './db/schema.js'
+import type { EffectFn } from '../../workflows/server-binding.js'
 
 // The server-side consumer of a provider run — runs for EVERY dispatch, browser or not
 // (spec §1.5). Appends Trace, reacts to GATE_OPENED (insert Gate + transition + suspend),
@@ -18,6 +19,8 @@ export interface AgentRuntime {
   renderToolNames: string[]
   // The agent passport's maxInstances — the per-agent concurrency cap (defineAgent default 2).
   maxInstances: number
+  // Server-executed effects, keyed by approval tool name (step 4). Empty for read-only agents.
+  effects: Record<string, EffectFn>
 }
 
 export interface RunObserverDeps {

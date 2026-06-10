@@ -63,6 +63,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       provider: gateProvider(),
       renderToolNames: [],
       maxInstances: 2,
+      effects: {},
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime })
 
@@ -86,6 +87,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       provider: blockingProvider(),
       renderToolNames: [],
       maxInstances: 2,
+      effects: {},
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime })
 

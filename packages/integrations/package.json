@@ -6,7 +6,10 @@
   "exports": {
     "./gmail-basic": "./src/gmail-basic/index.mjs",
     "./gmail-basic/format": "./src/gmail-basic/format.mjs",
-    "./gmail-basic/create-draft": "./src/gmail-basic/create-draft.mjs"
+    "./gmail-basic/create-draft": {
+      "types": "./src/gmail-basic/create-draft.d.ts",
+      "default": "./src/gmail-basic/create-draft.mjs"
+    }
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

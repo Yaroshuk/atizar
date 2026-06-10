@@ -11,6 +11,7 @@ import { startupSweep } from './pipeline/sweep.js'
 import { makePipelineService } from './pipeline/pipelineService.js'
 import { createPipelineRoutes } from './pipeline/routes.js'
 import type { AgentRuntime } from './pipeline/runObserver.js'
+import { assertAgentClassification } from './agent-checks.js'
 
 // Wiring-time check: a passport must not hand off to an agent absent from its own workflow.
 for (const { descriptor } of workflowServers) {
@@ -40,6 +41,7 @@ for (const { descriptor, bindings } of workflowServers) {
     const def = byId.get(b.agentId)
     if (!def)
       throw new Error(`server binding for unknown agent "${b.agentId}" in "${descriptor.id}"`)
+    assertAgentClassification(def, { allowedTools: b.allowedTools, effects: b.effects })
     const key = instanceId(descriptor.id, b.agentId)
     const provider = buildProvider(def, b.prompts, providerRegistry, b.allowedTools, key)
     agents[key] = buildAgent(def, b.prompts, providerRegistry, b.allowedTools, key)
@@ -47,6 +49,7 @@ for (const { descriptor, bindings } of workflowServers) {
       provider,
       renderToolNames: Object.keys(def.renders),
       maxInstances: def.maxInstances,
+      effects: b.effects ?? {},
     }
   }
 }

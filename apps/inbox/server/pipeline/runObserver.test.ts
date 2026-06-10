@@ -70,6 +70,7 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
         provider: fakeProvider(),
         renderToolNames: ['renderLead'],
         maxInstances: 2,
+        effects: {},
       }),
     })
 
