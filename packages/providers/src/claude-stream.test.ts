@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { EventType } from '@ag-ui/client'
+import { readGateOpened } from '@platform/core'
 import { mapClaudeStream } from './claude-stream.js'
 
 async function* fromLines(lines: string[]) {
@@ -91,7 +92,9 @@ describe('mapClaudeStream', () => {
       ['confirmSend']
     )
     expect(out.some((e) => e.delta === 'THIS MUST NOT APPEAR')).toBe(false)
-    expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
+    expect(out.some((e) => e.type === EventType.TOOL_CALL_END && e.toolCallId === 'tc_ok')).toBe(
+      true
+    )
   })
 
   it('skips malformed lines and blanks', async () => {
@@ -174,7 +177,9 @@ describe('mapClaudeStream', () => {
       ],
       ['confirmSend']
     )
-    expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
+    expect(out.some((e) => e.type === EventType.TOOL_CALL_END && e.toolCallId === 'tc_ok')).toBe(
+      true
+    )
     expect(out.some((e) => e.delta === 'NOPE')).toBe(false)
   })
 
@@ -314,5 +319,110 @@ describe('mapClaudeStream', () => {
       EventType.TOOL_CALL_END,
     ])
     expect(out[1]).toMatchObject({ toolCallId: 'tc1', delta: '{"id":42}' })
+  })
+})
+
+describe('mapClaudeStream — GATE_OPENED', () => {
+  async function drain(it: AsyncIterable<any>) {
+    const out: any[] = []
+    for await (const e of it) out.push(e)
+    return out
+  }
+
+  it('emits GATE_OPENED after the approval tool on the STREAMING path', async () => {
+    async function* lines() {
+      yield JSON.stringify({
+        type: 'stream_event',
+        event: {
+          type: 'content_block_start',
+          index: 0,
+          content_block: {
+            type: 'tool_use',
+            id: 'tc_ok',
+            name: 'mcp__inbox__saveDraft',
+            input: {},
+          },
+        },
+      })
+      yield JSON.stringify({
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'input_json_delta', partial_json: '{"threadId":"t_1",' },
+        },
+      })
+      yield JSON.stringify({
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'input_json_delta', partial_json: '"body":"Hi"}' },
+        },
+      })
+      yield JSON.stringify({
+        type: 'stream_event',
+        event: { type: 'content_block_stop', index: 0 },
+      })
+    }
+    const out = await drain(
+      mapClaudeStream(lines(), { approvalNames: ['saveDraft'], surfaceTools: ['saveDraft'] })
+    )
+    const gate = out.map(readGateOpened).find(Boolean)
+    expect(gate).toEqual({
+      gateKind: 'approval',
+      toolName: 'saveDraft',
+      toolCallId: 'tc_ok',
+      proposedArtifact: { threadId: 't_1', body: 'Hi' },
+    })
+    // gate is the LAST event (suspend point) — nothing after it
+    expect(readGateOpened(out.at(-1))).not.toBeNull()
+  })
+
+  it('emits GATE_OPENED after the approval tool on the COMPLETE-MESSAGE path', async () => {
+    async function* lines() {
+      yield JSON.stringify({
+        type: 'assistant',
+        message: {
+          model: 'claude',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tc_c',
+              name: 'mcp__inbox__saveDraft',
+              input: { threadId: 't_2', body: 'Yo' },
+            },
+          ],
+        },
+      })
+    }
+    const out = await drain(
+      mapClaudeStream(lines(), { approvalNames: ['saveDraft'], surfaceTools: ['saveDraft'] })
+    )
+    const gate = out.map(readGateOpened).find(Boolean)
+    expect(gate).toEqual({
+      gateKind: 'approval',
+      toolName: 'saveDraft',
+      toolCallId: 'tc_c',
+      proposedArtifact: { threadId: 't_2', body: 'Yo' },
+    })
+  })
+
+  it('emits NO GATE_OPENED for a non-approval tool', async () => {
+    async function* lines() {
+      yield JSON.stringify({
+        type: 'assistant',
+        message: {
+          model: 'claude',
+          content: [
+            { type: 'tool_use', id: 'tc_r', name: 'mcp__inbox__renderLead', input: { id: 1 } },
+          ],
+        },
+      })
+    }
+    const out = await drain(
+      mapClaudeStream(lines(), { approvalNames: ['saveDraft'], surfaceTools: ['renderLead'] })
+    )
+    expect(out.map(readGateOpened).find(Boolean)).toBeUndefined()
   })
 })

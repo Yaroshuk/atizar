@@ -1,4 +1,5 @@
 import { EventType, type BaseEvent } from '@ag-ui/client'
+import { gateOpened, type GateOpenedValue } from '@platform/core'
 
 // Claude Code MCP tools surface as `mcp__<server>__<tool>`; the client registered
 // the bare names (`renderLead`, `saveDraft`), so strip the prefix.
@@ -33,7 +34,13 @@ function normalizeResultContent(content: unknown): string {
   return JSON.stringify(content ?? '')
 }
 
-type ToolBlock = { id: string; name: string; sawArgs: boolean; startInput: unknown }
+type ToolBlock = {
+  id: string
+  name: string
+  sawArgs: boolean
+  startInput: unknown
+  argsBuf: string
+}
 
 // Parses the `claude --output-format stream-json` NDJSON stream into AG-UI events.
 //
@@ -109,6 +116,32 @@ export async function* mapClaudeStream(
     return opts.approvalNames.includes(stripMcpPrefix(rawName))
   }
 
+  function parseArtifact(raw: unknown): Record<string, unknown> {
+    if (typeof raw === 'string') {
+      try {
+        const v = JSON.parse(raw)
+        return v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
+      } catch {
+        return {}
+      }
+    }
+    if (raw && typeof raw === 'object') return raw as Record<string, unknown>
+    return {}
+  }
+  function gateFor(
+    toolName: string,
+    toolCallId: string,
+    artifact: Record<string, unknown>
+  ): BaseEvent {
+    const value: GateOpenedValue = {
+      gateKind: 'approval',
+      toolName,
+      toolCallId,
+      proposedArtifact: artifact,
+    }
+    return gateOpened(value)
+  }
+
   for await (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed) continue
@@ -161,7 +194,10 @@ export async function* mapClaudeStream(
               ? JSON.stringify(b.input)
               : undefined
           yield* emitToolCall(b.id, b.name ?? '', argsJson)
-          if (isApproval(b.name ?? '')) return
+          if (isApproval(b.name ?? '')) {
+            yield gateFor(stripMcpPrefix(b.name ?? ''), b.id, parseArtifact(b.input))
+            return
+          }
         }
       }
       streamedText = false
@@ -211,7 +247,13 @@ export async function* mapClaudeStream(
       // later args/stop lines find no block and are harmlessly ignored.
       if (!shouldSurface(name)) continue
       const id = ev.content_block.id ?? crypto.randomUUID()
-      blocks.set(index, { id, name, sawArgs: false, startInput: ev.content_block.input })
+      blocks.set(index, {
+        id,
+        name,
+        sawArgs: false,
+        startInput: ev.content_block.input,
+        argsBuf: '',
+      })
       emittedToolIds.add(id)
       endTextRun() // a tool call ends the preceding text run
       yield {
@@ -233,6 +275,7 @@ export async function* mapClaudeStream(
         const block = blocks.get(index)
         if (block) {
           block.sawArgs = true
+          block.argsBuf += ev.delta.partial_json
           yield {
             type: EventType.TOOL_CALL_ARGS,
             toolCallId: block.id,
@@ -260,8 +303,13 @@ export async function* mapClaudeStream(
         } as BaseEvent
       }
       yield { type: EventType.TOOL_CALL_END, toolCallId: block.id } as BaseEvent
+      const stoppedBlock = block
       blocks.delete(index)
-      if (opts.approvalNames.includes(block.name)) return
+      if (opts.approvalNames.includes(stoppedBlock.name)) {
+        const artifact = parseArtifact(stoppedBlock.argsBuf || stoppedBlock.startInput)
+        yield gateFor(stoppedBlock.name, stoppedBlock.id, artifact)
+        return
+      }
       continue
     }
   }
