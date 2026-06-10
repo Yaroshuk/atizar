@@ -65,11 +65,25 @@ scope — rename before any npm publish**. `@platform/react` + `@platform/server
 
 - Client: Vite + React + TypeScript
 - Server: Hono (thin BFF)
-- Agent UI: CopilotKit + AG-UI (`@copilotkit/runtime` v2, `@copilotkit/react-core`) —
-  confirmed API reference in `docs/copilotkit-notes.md`.
-- Real now: `claude-cli` provider, Gmail MCP. Mocked/deferred: Mastra, DB, auth.
+- Agent UI: **server-driven** (AG-UI event vocabulary kept; `@copilotkit/*` REMOVED at step 6).
+  The client reads board/thread state over HTTP+SSE and acts via plain HTTP — data hooks
+  `useBoard`/`useWorkItemThread`/`useGate`/`useDispatch`; approval is **gate-driven** (`GET
+.../gate` + `POST /api/gates/:id/resolve`), not a client-held HITL `respond`. (Historical
+  CopilotKit API ref: `docs/copilotkit-notes.md`.)
+- Real now: `claude-cli` (dev) + **Mastra** (`PROVIDER=mastra`, prod) providers, Gmail MCP,
+  **Postgres** (Docker) for server-authoritative state. Deferred: auth (bearer token at step 7).
 
 ## Don't-rediscover gotchas
+
+> **⚠️ STEP-6 SUPERSEDED (2026-06-10):** the CopilotKit transport, proxied agents, and
+> client-held HITL are **DELETED**. Gotchas below that mention `<CopilotKit>`/`agent={...}`,
+> `useHumanInTheLoop`, `useRenderTool`/`useRenderToolCall`, `useAgentStatus`,
+> `registerProxiedAgent`, `useAgentInstances`/`statusFrom`, or "Agent 'default' not found" are
+> **HISTORICAL** — that code no longer exists. They're kept because they explain WHY the design
+> is shaped as it is. The live UI is server-driven (see Stack); the still-true client gotchas are
+> the MCP-tool-result surfacing, the one-`messageId`-per-contiguous-text rule (now in
+> `claude-stream` → `foldEventsToMessages`), the cards-only consumer thread + `?dev=1`, and the
+> stale-dev-server / Playwright-lock ops notes.
 
 - **GitHub is STRICTLY READ-ONLY.** The GitHub triage workflow reads the real Magma Board
   (`matteappen` Projects v2 #8) + issues via `gh`. NEVER post/comment/edit/close/label/move or
