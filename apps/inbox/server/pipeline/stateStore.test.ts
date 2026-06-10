@@ -77,4 +77,29 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
     await store.resolveGateRow(gate.id, { resolvedBy: 'tester' })
     expect(await store.getOpenGate(id)).toBeUndefined()
   })
+
+  it('claimLedger is idempotent — second claim reports alreadyClaimed with the prior result', async () => {
+    const store = makeStateStore(db)
+    const wi = await store.insertWorkItem({ workflowId: 'wf', agentId: 'wf__a', origin: 'human', payload: {} })
+    const gateId = randomUUID()
+    const key = `${wi.id}:${gateId}`
+    const first = await store.claimLedger({ key, workItemId: wi.id, gateId })
+    expect(first.alreadyClaimed).toBe(false)
+    await store.setLedgerResult(key, { draftId: 'd1' })
+    const second = await store.claimLedger({ key, workItemId: wi.id, gateId })
+    expect(second.alreadyClaimed).toBe(true)
+    expect(second.result).toEqual({ draftId: 'd1' })
+  })
+
+  it('getGate returns a gate by id', async () => {
+    const store = makeStateStore(db)
+    const wi = await store.insertWorkItem({ workflowId: 'wf', agentId: 'wf__a', origin: 'human', payload: {} })
+    const gate = await store.insertGate({
+      workItemId: wi.id,
+      toolName: 'saveDraft',
+      toolCallId: 'tc1',
+      proposedArtifact: { threadId: 't', body: 'b' },
+    })
+    expect((await store.getGate(gate.id))?.id).toBe(gate.id)
+  })
 })

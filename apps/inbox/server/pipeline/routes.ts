@@ -107,12 +107,14 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       comment?: string
     }>()
     const result = await service.resolveGate(id, {
-      gateId: id, // dev: one open gate per item; step 4 keys by the real gate id
+      gateId: id, // dev stub: one open gate per item; Task 8 keys by real gate id
       decision: body.decision,
       form: body.form,
       comment: body.comment,
+      formRev: 0, // dev stub: no formRev check; Task 8 reads from request body
     })
-    return result.ok ? c.json({ ok: true }) : c.json({ error: result.error }, 409)
+    if (!result.ok) return c.json({ error: result.error }, 409)
+    return c.json({ ok: true })
   })
 
   // BOARD snapshot.

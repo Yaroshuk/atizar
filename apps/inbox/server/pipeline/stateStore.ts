@@ -3,6 +3,7 @@ import { and, asc, count, eq, gte } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db } from './db/client.js'
 import {
+  actionLedger,
   gates,
   trace,
   workItems,
@@ -11,6 +12,8 @@ import {
   type TraceRow,
   type WorkItem,
 } from './db/schema.js'
+
+const ACTIVE_STATUSES: WorkItem['status'][] = ['queued', 'running', 'awaiting_approval', 'awaiting_input']
 
 export interface InsertWorkItemInput {
   id?: string
@@ -144,6 +147,42 @@ export function makeStateStore(db: Db) {
 
     async setError(id: string, error: string): Promise<void> {
       await db.update(workItems).set({ error, updatedAt: new Date() }).where(eq(workItems.id, id))
+    },
+
+    async getGate(gateId: string): Promise<Gate | undefined> {
+      const [row] = await db.select().from(gates).where(eq(gates.id, gateId)).limit(1)
+      return row
+    },
+
+    // One-time effect claim. INSERT … ON CONFLICT DO NOTHING; if the row already existed,
+    // report alreadyClaimed with whatever result was recorded (null until setLedgerResult).
+    async claimLedger(input: {
+      key: string
+      workItemId: string
+      gateId: string
+    }): Promise<{ alreadyClaimed: boolean; result: Record<string, unknown> | null }> {
+      const inserted = await db
+        .insert(actionLedger)
+        .values({ key: input.key, workItemId: input.workItemId, gateId: input.gateId })
+        .onConflictDoNothing()
+        .returning()
+      if (inserted.length > 0) return { alreadyClaimed: false, result: null }
+      const [row] = await db.select().from(actionLedger).where(eq(actionLedger.key, input.key)).limit(1)
+      return { alreadyClaimed: true, result: row?.result ?? null }
+    },
+
+    async setLedgerResult(key: string, result: Record<string, unknown>): Promise<void> {
+      await db.update(actionLedger).set({ result }).where(eq(actionLedger.key, key))
+    },
+
+    async getActiveChildren(parentId: string): Promise<WorkItem[]> {
+      const rows = await db.select().from(workItems).where(eq(workItems.parentId, parentId))
+      return rows.filter((r) => ACTIVE_STATUSES.includes(r.status))
+    },
+
+    async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
+      const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
+      return rows.filter((r) => ACTIVE_STATUSES.includes(r.status))
     },
   }
 }

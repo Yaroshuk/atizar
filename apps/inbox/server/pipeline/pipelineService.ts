@@ -10,6 +10,7 @@ import {
   type DispatchInput,
   type DispatchResult,
 } from './dispatch.js'
+import { transition } from './transition.js'
 import type { Gate, WorkItem, WorkItemStatus } from './db/schema.js'
 
 // Wires StateStore + EventBus + WorkerPool + RunObserver into one façade the routes call.
@@ -55,6 +56,26 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     boardSeq++
   })
 
+  const publishBoard = (): void => bus.publish('board', { kind: 'refresh' })
+
+  // Stop a work item + cascade to active descendants. Parent first (it leaves `running`,
+  // so a child's terminal edge can't auto-finish it), then descendants ascending-id.
+  async function cancelItem(workItemId: string): Promise<void> {
+    const wi = await store.getWorkItem(workItemId)
+    if (!wi) return
+    if (wi.status === 'queued') pool.dequeue(workItemId, wi.agentId)
+    if (wi.status === 'running') observer.cancel(workItemId)
+    const open = await store.getOpenGate(workItemId)
+    if (open) await store.resolveGateRow(open.id, { comment: 'cancelled' })
+    await transition(db, workItemId, 'cancel').catch(() => {})
+    pool.release(wi.agentId)
+    const children = await store.getActiveChildren(workItemId)
+    for (const child of children.sort((a, b) => a.id.localeCompare(b.id))) {
+      await cancelItem(child.id)
+    }
+    publishBoard()
+  }
+
   return {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
@@ -62,16 +83,79 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       return dispatchChokepoint(db, pool, { ...req, maxInstances })
     },
 
-    // Dev-grade resolve (step 3): resolve the gate + resume. Step 4 replaces this with the
-    // gate-keyed route that checks formRev, writes the ledger, and executes the effect.
     async resolveGate(
-      id: string,
-      resolution: GateResolution
-    ): Promise<{ ok: true } | { ok: false; error: string }> {
-      const gate = await store.getOpenGate(id)
-      if (!gate) return { ok: false, error: 'no open gate' }
-      void observer.resume(id, resolution).catch((e) => console.error('[pipeline] resume', id, e))
+      gateId: string,
+      resolution: GateResolution & { formRev: number }
+    ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+      const gate = await store.getGate(gateId)
+
+      // Idempotent approved path: if the gate was already resolved, check the ledger.
+      // A second approve call after the first succeeded should return ok (not 404).
+      if (!gate) return { ok: false, status: 404, error: 'no open gate' }
+      if (gate.status !== 'open') {
+        if (resolution.decision === 'approved') {
+          const wi = await store.getWorkItem(gate.workItemId)
+          if (!wi) return { ok: false, status: 404, error: 'work item gone' }
+          const key = `${wi.id}:${gate.id}`
+          const claim = await store.claimLedger({ key, workItemId: wi.id, gateId: gate.id })
+          if (claim.alreadyClaimed) return { ok: true }
+        }
+        return { ok: false, status: 404, error: 'no open gate' }
+      }
+
+      const wi = await store.getWorkItem(gate.workItemId)
+      if (!wi) return { ok: false, status: 404, error: 'work item gone' }
+
+      if (resolution.decision === 'rejected') {
+        await store.resolveGateRow(gate.id, { comment: resolution.comment })
+        await transition(db, wi.id, 'reject') // sets resolution='rejected', status → finished
+        publishBoard()
+        return { ok: true }
+      }
+
+      // approved
+      if (gate.formRev !== resolution.formRev) {
+        return { ok: false, status: 409, error: 'formRev mismatch — re-render the gate' }
+      }
+      const form = resolution.form ?? (gate.form as Record<string, unknown>)
+      const key = `${wi.id}:${gate.id}`
+      const claim = await store.claimLedger({ key, workItemId: wi.id, gateId: gate.id })
+
+      let executedResult: Record<string, unknown>
+      if (claim.alreadyClaimed) {
+        executedResult = claim.result ?? {}
+      } else {
+        const runtime = deps.resolveAgent(wi.agentId)
+        const effect = runtime?.effects?.[gate.toolName]
+        if (!effect) return { ok: false, status: 500, error: `no effect bound for "${gate.toolName}"` }
+        // Stamp the approved form on the gate row (audit). observer.resume() will find no open
+        // gate (already resolved) and skip its own resolveGateRow call — clean handoff.
+        await store.resolveGateRow(gate.id, { form })
+        executedResult = await effect(form, { workItemId: wi.id, gateId: gate.id })
+        await store.setLedgerResult(key, executedResult)
+      }
+
+      publishBoard()
+      // observer.resume() handles transition(resume) + pool.resumeAcquire + the run stream.
+      void observer
+        .resume(wi.id, { ...resolution, gateId: gate.id, form, executedResult })
+        .catch((e) => console.error('[pipeline] resume(approve)', wi.id, e))
       return { ok: true }
+    },
+
+    async getOpenGate(workItemId: string): Promise<Gate | undefined> {
+      return store.getOpenGate(workItemId)
+    },
+
+    async cancel(workItemId: string): Promise<void> {
+      await cancelItem(workItemId)
+    },
+
+    async cancelWorkflow(workflowId: string): Promise<void> {
+      const active = await store.getActiveByWorkflow(workflowId)
+      for (const item of active.sort((a, b) => a.id.localeCompare(b.id))) {
+        await cancelItem(item.id)
+      }
     },
 
     async getStatus(id: string): Promise<{ status: WorkItemStatus; done: boolean } | undefined> {

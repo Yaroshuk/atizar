@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@platform/core'
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import type { AgentRuntime } from './runObserver.js'
+import type { EffectFn } from '../../workflows/server-binding.js'
 
 const reachable = await db
   .execute(sql`select 1`)
@@ -63,7 +64,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       provider: gateProvider(),
       renderToolNames: [],
       maxInstances: 2,
-      effects: {},
+      effects: { saveDraft: async () => ({}) },
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime })
 
@@ -74,7 +75,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const gate = board.gates.find((g) => g.workItemId === id)
     expect(gate).toBeDefined()
 
-    await service.resolveGate(id, { gateId: gate!.id, decision: 'approved' })
+    await service.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
     await waitFor(async () => (await service.getStatus(id))?.status === 'finished')
 
     const trace = await service.getTrace(id, 0)
@@ -98,5 +99,62 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const stats = service.stats('cap-agent')
     expect(stats.active).toBe(2)
     expect(stats.queued).toBe(1)
+  })
+
+  // ── Gate-keyed resolveGate tests ───────────────────────────────────────────
+
+  function makeService(opts: { effects: Record<string, EffectFn> }) {
+    const runtime: AgentRuntime = {
+      provider: gateProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: opts.effects,
+    }
+    return makePipelineService({ db, resolveAgent: () => runtime })
+  }
+
+  async function seedGate(
+    svc: ReturnType<typeof makeService>
+  ): Promise<{ workItemId: string; gateId: string }> {
+    const { id: workItemId } = await svc.dispatch(base)
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'awaiting_approval')
+    const board = await svc.getBoard()
+    const gate = board.gates.find((g) => g.workItemId === workItemId)
+    if (!gate) throw new Error('seedGate: no open gate found')
+    return { workItemId, gateId: gate.id }
+  }
+
+  it('approve: wrong formRev → 409, no effect executed', async () => {
+    const effect = vi.fn(async () => ({ draftId: 'd1' }))
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const { gateId } = await seedGate(svc)
+    const res = await svc.resolveGate(gateId, { gateId, decision: 'approved', formRev: 999, form: { threadId: 't', body: 'b' } })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.status).toBe(409)
+    expect(effect).not.toHaveBeenCalled()
+  })
+
+  it('approve: executes the effect exactly once even on double-resolve', async () => {
+    const effect = vi.fn(async () => ({ draftId: 'd1' }))
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const { gateId } = await seedGate(svc)
+    const a = await svc.resolveGate(gateId, { gateId, decision: 'approved', formRev: 0, form: { threadId: 't', body: 'edited' } })
+    const b = await svc.resolveGate(gateId, { gateId, decision: 'approved', formRev: 0, form: { threadId: 't', body: 'edited' } })
+    expect(a.ok).toBe(true)
+    expect(b.ok).toBe(true)
+    expect(effect).toHaveBeenCalledTimes(1)
+    // vi.fn infers call args as a 0-length tuple — cast to access element 0
+    expect((effect.mock.calls[0] as unknown[])[0]).toEqual({ threadId: 't', body: 'edited' })
+  })
+
+  it('reject: no effect, work item finished', async () => {
+    const effect = vi.fn(async () => ({}))
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const { gateId, workItemId } = await seedGate(svc)
+    const res = await svc.resolveGate(gateId, { gateId, decision: 'rejected', formRev: 0, comment: 'no' })
+    expect(res.ok).toBe(true)
+    expect(effect).not.toHaveBeenCalled()
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'finished')
+    expect((await svc.getStatus(workItemId))?.status).toBe('finished')
   })
 })
