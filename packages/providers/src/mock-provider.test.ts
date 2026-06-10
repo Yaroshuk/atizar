@@ -18,7 +18,11 @@ const resolvedMessages = [
   {
     role: 'assistant',
     toolCalls: [
-      { id: 'tc_ok', type: 'function', function: { name: 'saveDraft', arguments: '{"threadId":"t","body":"b"}' } },
+      {
+        id: 'tc_ok',
+        type: 'function',
+        function: { name: 'saveDraft', arguments: '{"threadId":"t","body":"b"}' },
+      },
     ],
   },
   { role: 'tool', toolCallId: 'tc_ok', content: 'approved' },
