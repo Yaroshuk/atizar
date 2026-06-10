@@ -99,6 +99,27 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
      - **Boundary smell flagged (NOT fixed — for a future @platform/server test-harness cleanup):** `packages/server/src/db/test-global-setup.ts` imports `@mastra/pg` (to init Mastra's tables in the shared test DB) — a concrete engine inside a framework package's TEST infra. Test-only, not runtime, not in `@platform/core` → no invariant violated, but the package's test harness shouldn't know Mastra (an `apps/inbox` concern); also `@mastra/pg` is undeclared in the package's deps (resolves via hoisting). Clean up when the package's test-DB setup is designed for standalone consumers.
      - **Browser/runtime E2E verified (`DEV_RECORD_REPLAY=1`, lead-inbox cassettes):** board loads (routes mounted + migrate-on-boot); single run START→qualifier Working→Done (UI); gate opens (`GATE_OPENED`→Gate insert→`awaiting_approval`); **approve WITH an edited body → real Gmail draft fetched by id contained the edit `[EDITED-MARKER-7Q3Z]`** (UI approve; ledger one `{ok,draftId}` row, gate `resolved`, item `finished`; test draft deleted); reject→`finished`/`rejected`, 0 ledger (API); cancel at `awaiting_approval`→`finished`/`cancelled`, gate 404 (API); reload re-attach (fresh nav to `?open=<id>` rebuilt thread+gate from endpoints); `db:reset`/`db:migrate`/`db:generate` scripts work on the moved paths. (Pre-existing robustness gap noticed, NOT 7a's scope: the resolve route does not strictly validate `decision` against `'approved'|'rejected'` — an unknown value falls through to the approve/execute branch; the browser `useGate` always sends the right enum, but a malformed direct POST would execute. Worth a zod parse on the route later.)
    - **Sub-step 7b — `@platform/react` extraction: NEXT, and NOT purely mechanical.** Audit (this session): "machinery in, cards out" holds cleanly EXCEPT `ThreadModal` imports the demo's `renderRegistry` + `workflows` aggregator, and the locked component inventory names `WorkflowBoard`/`registerCard` as PACKAGE primitives — so the card-injection API (how the package receives userland cards + render/HITL specs: a `registerCard` registry vs props/context) is a real design fork. **Start 7b with a short brainstorm on that injection API** before moving files (`registerCard` is the documented intended primitive — confirm and lock it). Then it's a folder move like 7a (hooks/, chrome components, models, renderSpecs, buildRenderToolCall, styles.css → `@platform/react`; LeadCard/TriageCard/ReplyDraftCard/VerdictCard/TicketResultCard/ApprovalDialog + the registry + `workflows.ts` + App shell stay in the demo as userland). `IconName` lives in `components/Icon.tsx`; since Icon + the models both go into the package, no extraction needed. Then 7c = slim demo + packaging tail (DEMO=1/PGlite, README, LICENSE [ask user], scope rename, eval, bearer token).
+     - **7b injection API (ANSWERED 2026-06-10, check-foundation: CLEAR — do not re-ask):**
+       (1) **Typed-spec injection via props + one package `<Provider>` context** (e.g.
+       `<WorkflowBoard renders hitl meta workflows/>` wrapped once), NOT a global mutable
+       `registerCard` singleton — `registerCard` in the inventory named the CAPABILITY (userland
+       plugs cards in), and injection IS that mechanism; React-idiomatic, StrictMode/test-safe,
+       two boards with different configs for free. (2) **Collapse the string-name registry**:
+       `RenderSpec`/`HitlSpec` TYPES live in `@platform/react`; userland instances reference card
+       components DIRECTLY; `renderRegistry.tsx` is deleted. This makes `renders` mirror the
+       `effects` pattern — names in core (classification, I15), implementations in a binding
+       outside (ServerBinding = effect fns; client spec binding = components). Foundation check:
+       core stays React-free (types are in the react package, not core), I15 keys untouched, I5
+       strengthened. **Two conditions:** `defineAgent.renders` in core is NOT touched this step
+       (keys feed I15 + server card-filling; the component-name VALUES become vestigial labels —
+       a possible Record→array tidy happens at the §3 ARCHITECTURE doc level, explicitly via
+       check-foundation, post-extraction, never silently); and the context comes from ONE
+       package-level Provider so userland doesn't thread specs into every component.
+     - **Sub-step 7b — `@platform/react` extraction: ✅ BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10), commits `ea64d0e`…`e61dd1e`. Spec → `docs/superpowers/specs/2026-06-10-extract-platform-react-design.md`; plan → `docs/superpowers/plans/2026-06-10-extract-platform-react.md`. `check-foundation` = CLEAR. 277 unit tests + typecheck/lint/build/format(my files) green.
+       - **As-built:** machinery `git mv`'d → `packages/react/src/` (hooks/{useBoard,useDispatch,useGate,useWorkItemThread}; models aggregate/boardModel/pipelineModel/status/statusDisplay/serverTypes/devMode/threadResults; chrome Icon/AgentCard/AgentModal/PipelineColumn/WorkflowSwitcher/InstancePickerModal/ThreadModal; `InboxView`→`WorkflowBoard`; renderSpecs(types)/buildRenderToolCall; styles.css; the 4 machinery test files). New `workflowsContext.tsx` (`WorkflowsProvider`+`useWorkflowsConfig`). Barrel exports WorkflowBoard, WorkflowsProvider/useWorkflowsConfig, WorkflowsConfig + AgentMeta/DeliverFn/RenderSpec/HitlSpec types, buildRenderToolCall, useThreadResult/ThreadResultsContext, Icon/IconName, and the 4 hooks. `package.json` exports `.` + `./styles.css`; `react`/`react-dom` are peerDeps.
+       - **The injection, as built (matches the locked decision):** `RenderSpec`/`HitlSpec` render closures lost the `registry` param + `renderRegistry.tsx` is DELETED — userland workflow client modules (`workflows/{lead-inbox,github-triage}/client.tsx`) now import their cards DIRECTLY (`<LeadCard/>`, not `registry['LeadCard']`) and import the spec types + `useThreadResult` from `@platform/react`. `buildRenderToolCall(renderSpecs, deliver)` + `ThreadModal` read `renders`/`hitl` from `useWorkflowsConfig()`. `WorkflowBoard` takes `config: WorkflowsConfig` and wraps its tree in ONE `WorkflowsProvider`. Demo: `App = () => <WorkflowBoard config={workflowsConfig}/>`; `client/src/workflows.ts` builds `workflowsConfig` (dedupe-by-toolName) from the workflow modules; `main.tsx` imports `@platform/react/styles.css`.
+       - **Correction to the inventory:** `buckets.ts` (`TriageTicket`/`groupByStatus`) is **vertical-specific** (only TriageCard + github-triage/client use it) — it STAYS userland, NOT in the package. `deliver.ts` (an unused `@platform/core` re-export) was deleted.
+       - **Browser E2E (`DEV_RECORD_REPLAY=1`, lead-inbox cassettes, through `@platform/react`):** app loads + **fully STYLED** (CSS export resolved); single run START→qualifier thread renders; reply gate → **LeadCard + ApprovalDialog render via the injected context + direct card refs**; **approve WITH an edited body (UI Save draft) → real Gmail draft fetched by id contained `[REACT-EDIT-9K2W]`** (ledger one row, item `finished`; test draft deleted); **reject via the UI button** → `finished`/`rejected`, 0 ledger; **cancel via the UI Stop button** → `finished`/`cancelled`, gate 404; reload re-attach (`?open=<id>`); 0 console errors (no `WorkflowsProvider`/import faults). NOT browser-driven (honest, same as prior steps): github-triage live run (read-only, no cassette) — the triage render path's context wiring is covered by typecheck + the renderLead/renderVerdict unit tests through the package's `buildRenderToolCall`.
 
 **Anticipated decisions, steps 3–7 (ANSWERED 2026-06-10 — decide-and-go, do not re-ask the user):**
 
@@ -262,12 +283,13 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
   switch git branches in subagents.
 
-**Starting point for the next session = beta build order step 7, sub-step 7b** (`@platform/react`
-extraction — start it with the card-injection-API brainstorm, see the 7b note above). Steps 1–6 +
-**sub-step 7a (`@platform/server` extracted & browser-verified, commits `6713ba9`…`e7123e5`)** are
-✅ BUILT on `feat/provider-contract-v2` (NOT merged — same branch strategy). The remaining step 7:
-FIRST finish the board/thread UI → `@platform/react` extraction (7b — see the dedicated note above;
-NOT purely mechanical, `ThreadModal` couples to the demo registry/aggregator)
+**Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
+packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
+**sub-step 7b (`@platform/react`, commits `ea64d0e`…`e61dd1e`)** are ✅ BUILT & browser-verified on
+`feat/provider-contract-v2` (NOT merged — same branch strategy). Both extractions done: the
+framework/userland boundary is now physical for BOTH the server spine and the board/thread UI; the
+demo app consumes only `@platform/{core,providers,integrations,server,react}` + its own
+workflows/cards. **7c = the packaging tail**
 (mechanical folder moves — the import discipline held: `server/pipeline/` imports only `@platform/*`
 
 - its own folder; the new client hooks/components import only `@platform/*` + each other). The
