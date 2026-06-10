@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type RunAgentInput } from '@ag-ui/client'
-import { decodeHandoff, HandoffPayloadSchema, type PromptStrategy } from '@platform/core'
+import {
+  decodeHandoff,
+  HandoffPayloadSchema,
+  readGateOpened,
+  type PromptStrategy,
+} from '@platform/core'
 import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider.js'
 
 // Local PromptStrategy fixture. The real reply-agent prompts live in the app
@@ -121,7 +126,11 @@ describe('createClaudeCliProvider', () => {
       .filter((e) => e.type === EventType.TOOL_CALL_START)
       .map((e) => e.toolCallName)
     expect(callNames).toEqual(['renderLead', 'saveDraft'])
-    expect(out.at(-1)).toMatchObject({ type: EventType.TOOL_CALL_END, toolCallId: 'tc_ok' })
+    expect(out.some((e) => e.type === EventType.TOOL_CALL_END && e.toolCallId === 'tc_ok')).toBe(
+      true
+    )
+    // The run suspends at the gate: the LAST event is GATE_OPENED (right after the approval's END).
+    expect(readGateOpened(out.at(-1))).not.toBeNull()
     expect(calls[0].killed).toBe(true)
     expect(calls[0].prompt).toMatch(/qualifier/i)
   })

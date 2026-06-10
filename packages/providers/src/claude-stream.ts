@@ -194,8 +194,9 @@ export async function* mapClaudeStream(
               ? JSON.stringify(b.input)
               : undefined
           yield* emitToolCall(b.id, b.name ?? '', argsJson)
-          if (isApproval(b.name ?? '')) {
-            yield gateFor(stripMcpPrefix(b.name ?? ''), b.id, parseArtifact(b.input))
+          const toolName = stripMcpPrefix(b.name ?? '')
+          if (opts.approvalNames.includes(toolName)) {
+            yield gateFor(toolName, b.id, parseArtifact(b.input))
             return
           }
         }
