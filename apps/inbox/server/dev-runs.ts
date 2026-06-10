@@ -184,6 +184,7 @@ export function createDevRunsRoutes(getProvider: (agentKey: string) => Provider 
     }
     const resume = provider.resume.bind(provider)
 
+    run.gate = undefined // consume the gate so a repeat /resolve can't re-resume it
     setStatus(run, 'running')
     void (async () => {
       try {
