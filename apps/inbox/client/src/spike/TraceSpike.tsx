@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BaseEvent } from '@ag-ui/client'
-import {
-  foldEventsToMessages,
-  pairToolResults,
-  readGateOpened,
-  type GateOpenedValue,
-  type Message,
-} from '@platform/core'
+import { foldEventsToMessages, pairToolResults, type Message } from '@platform/core'
 
 // THROWAWAY step-2 spike page. Proves: attach to a server-side run without CopilotKit,
 // fold the trace, follow the live SSE tail, approve via plain POST (same tail continues).
 type Status = 'running' | 'awaiting_approval' | 'done' | 'error'
+
+type OpenGate = {
+  id: string
+  toolName: string
+  form: Record<string, unknown>
+  formRev: number
+  proposedArtifact: Record<string, unknown>
+}
 
 const AGENT = 'lead-inbox__reply'
 
@@ -23,6 +25,8 @@ export const TraceSpike = () => {
   const [status, setStatus] = useState<Status>('running')
   // Order/dedupe by seq so duplicate or out-of-order SSE delivery is harmless.
   const [bySeq, setBySeq] = useState<Map<number, BaseEvent>>(new Map())
+  const [openGate, setOpenGate] = useState<OpenGate | null>(null)
+  const [editBody, setEditBody] = useState('')
   const esRef = useRef<EventSource | null>(null)
 
   const setEvent = (seq: number, event: BaseEvent) =>
@@ -69,27 +73,48 @@ export const TraceSpike = () => {
     }
   }, [id])
 
+  useEffect(() => {
+    if (!id || status !== 'awaiting_approval') return
+    void (async () => {
+      const res = await fetch(`/api/workitems/${id}/gate`)
+      if (!res.ok) return
+      const g = (await res.json()) as OpenGate
+      setOpenGate(g)
+      setEditBody(typeof g.form.body === 'string' ? g.form.body : '')
+    })()
+  }, [id, status])
+
   const events = useMemo(
     () => [...bySeq.entries()].sort((a, b) => a[0] - b[0]).map(([, e]) => e),
     [bySeq]
   )
   const messages = useMemo(() => foldEventsToMessages(events), [events])
   const toolResults = useMemo(() => pairToolResults(messages), [messages])
-  const gate = useMemo<GateOpenedValue | null>(() => {
-    for (const e of events) {
-      const g = readGateOpened(e)
-      if (g) return g
-    }
-    return null
-  }, [events])
-
   const approve = async () => {
-    if (!id) return
-    await fetch(`/api/dev/workitems/${id}/resolve`, {
+    if (!id || !openGate) return
+    await fetch(`/api/gates/${openGate.id}/resolve`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ decision: 'approved' }),
+      body: JSON.stringify({
+        decision: 'approved',
+        formRev: openGate.formRev,
+        form: { ...openGate.form, body: editBody },
+      }),
     })
+  }
+
+  const reject = async () => {
+    if (!id || !openGate) return
+    await fetch(`/api/gates/${openGate.id}/resolve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'rejected', formRev: openGate.formRev, comment: 'no thanks' }),
+    })
+  }
+
+  const cancel = async () => {
+    if (!id) return
+    await fetch(`/api/workitems/${id}/cancel`, { method: 'POST' })
   }
 
   return (
@@ -109,16 +134,27 @@ export const TraceSpike = () => {
         ))}
       </div>
 
-      {status === 'awaiting_approval' && gate && (
+      {status === 'awaiting_approval' && openGate && (
         <div style={{ marginTop: 16, padding: 12, border: '1px solid #d97706', borderRadius: 8 }}>
           <p style={{ margin: 0 }}>
-            ⏸ Awaiting approval — <strong>{gate.toolName}</strong>
+            ⏸ Awaiting approval — <strong>{openGate.toolName}</strong> (rev {openGate.formRev})
           </p>
-          <pre style={{ fontSize: 12, overflow: 'auto' }}>
-            {JSON.stringify(gate.proposedArtifact, null, 2)}
-          </pre>
-          <button onClick={approve}>Approve</button>
+          <textarea
+            value={editBody}
+            onChange={(e) => setEditBody(e.target.value)}
+            rows={6}
+            style={{ width: '100%', marginTop: 8, fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={approve}>Approve (edited)</button>
+            <button onClick={reject}>Reject</button>
+          </div>
         </div>
+      )}
+      {(status === 'running' || status === 'awaiting_approval') && (
+        <button onClick={cancel} style={{ marginTop: 12 }}>
+          Stop
+        </button>
       )}
     </div>
   )
