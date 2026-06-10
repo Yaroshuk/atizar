@@ -2,6 +2,9 @@ import { eq } from 'drizzle-orm'
 import type { Db } from './db/client.js'
 import { workItems, type WorkItemStatus } from './db/schema.js'
 
+// A live transaction handle (drizzle passes this to the .transaction() callback).
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
 // Every `work_items.status` write goes through here. One transaction:
 // SELECT … FOR UPDATE the row → check the edge is legal from the current status →
 // UPDATE → COMMIT. The row lock serializes concurrent transitions (design §3.6).
@@ -32,6 +35,35 @@ export interface TransitionOpts {
   error?: string
 }
 
+// True when `id` has at least one active (non-terminal) child.
+async function hasActiveChild(tx: Tx, id: string): Promise<boolean> {
+  const children = await tx
+    .select({ status: workItems.status })
+    .from(workItems)
+    .where(eq(workItems.parentId, id))
+  return children.some((c) => ACTIVE.includes(c.status))
+}
+
+// Leaf→root auto-finish walk. Lock the parent FOR UPDATE (consistent child-before-parent
+// order — no lock cycle), and finish it iff it is `running` with no active children left;
+// recurse to the root. The "no active children" check IS the finished entry guard, here
+// in one place (design §4).
+async function autoFinishParent(tx: Tx, parentId: string): Promise<void> {
+  const [parent] = await tx
+    .select()
+    .from(workItems)
+    .where(eq(workItems.id, parentId))
+    .for('update')
+  if (!parent || parent.status !== 'running') return
+  if (await hasActiveChild(tx, parentId)) return
+
+  await tx
+    .update(workItems)
+    .set({ status: 'finished', updatedAt: new Date() })
+    .where(eq(workItems.id, parentId))
+  if (parent.parentId) await autoFinishParent(tx, parent.parentId)
+}
+
 export async function transition(
   db: Db,
   id: string,
@@ -47,6 +79,11 @@ export async function transition(
       throw new IllegalTransition(`cannot "${edge}" from "${row.status}" (work item ${id})`)
     }
 
+    // Finished entry guard: an item with active children does NOT finish — it stays
+    // `running` (shown "Working"); the last child's finish triggers the parent walk.
+    // This is the parent-stream-ended-before-children case; a deferred finish, not an error.
+    if (edge === 'finish' && (await hasActiveChild(tx, id))) return
+
     await tx
       .update(workItems)
       .set({
@@ -55,8 +92,10 @@ export async function transition(
         ...(edge === 'fail' && opts.error ? { error: opts.error } : {}),
       })
       .where(eq(workItems.id, id))
+
+    if (edge === 'finish' && row.parentId) await autoFinishParent(tx, row.parentId)
   })
 }
 
-// Re-exported for Task 2.2 (the auto-finish walk reuses the active-child predicate).
+// Re-exported (the auto-finish walk reuses the active-child predicate).
 export { ACTIVE }
