@@ -47,10 +47,28 @@
   success.
 - The resume run is primed with "the action was executed with <artifact>" — narrative
   continuation only; the model never re-performs or re-types the effect.
-- Validation: `approvals ∩ effects = ∅` enforced in `defineAgent`.
+- Validation (corrected 2026-06-10 with the binding model): **`effects ⊆ approvals`** —
+  `effects` names the subset of approvals whose resolution triggers a server-executed effect;
+  the effect itself is a SERVER FUNCTION in the workflow's ServerBinding
+  (`effects: { saveDraft: (form, ctx) => createDraft(form) }`, keyed by approval-tool name —
+  the same names-in-core/implementation-in-binding pattern as `renders`). The old
+  "`approvals ∩ effects = ∅`" rule is superseded: the model never sees an effect as a tool at
+  all (structural guarantee), and the integration MCP tool leaves the allow-list (CI lint).
+  `buildAgent` checks binding↔declaration exhaustiveness BOTH ways at boot (declared effect
+  without a bound function, or vice versa → boot error, never a silent approve-time no-op).
+  Effect fn signature: `(form, ctx: { workItemId, gateId }) => Promise<result>`; the ledger
+  claim wraps the call ONCE in the resolve route, not inside each binding.
 - **Default-deny at the execution seam:** an undeclared tool is presumed side-effecting — it
   gets the ledger wrapper and (configurably) a gate until explicitly declared `readonly`.
   Forgetting a declaration fails safe, not silent.
+  - **Step-4 scope (decided 2026-06-10):** the RUNTIME default-deny (gate an undeclared tool at
+    call time) is POST-beta and physically impossible under claude-cli (the CLI executes MCP
+    tools itself; the server sees the call detect-after-emit) — it becomes meaningful at the
+    Mastra/server seam. Step 4 takes its enforceable kernel: **boot-time tool classification** —
+    every tool in an agent's allow-list must be declared `readonly | approvals | renders`; an
+    unclassified tool → the server refuses to start. Same fail-at-boot pattern as the effect
+    binding exhaustiveness check. Gate `capabilities` (can_edit/can_respond/can_ignore) are also
+    POST-beta; editability derives from `kind` for now (approval = editable; choice/rate = not).
 
 This closes the audit's one critical finding (effect reachable pre-gate) and three importants
 (model re-types the artifact; revise-loop false dedup; ledger seam living in a foreign OS
@@ -176,6 +194,39 @@ enum reserves an `inbound` machine value now; **no trigger code ships in the bet
 philosophy is clarified rather than violated: machine **dispatch** (visible on the board,
 gated, never acting by itself) is a legitimate origin; machine **action** is forbidden,
 always.
+
+### 1.10 The `@platform/react` surface (decision #7 detail, 2026-06-10)
+
+**Litmus rule:** a component that renders from the generic model
+(Workflow/Agent/WorkItem/Gate/status) belongs to the package; a component that knows the
+vertical's payload (lead, ticket, draft) is a userland card and lives in the demo app as an
+exemplar. The full beta component inventory lives in HANDOFF; the shape:
+
+- **Board chrome:** WorkflowBoard, WorkflowSwitcher (+delivery badges), PipelineColumn +
+  InstanceTree, AgentCard, StartButton (the human-dispatch gesture), InstancePicker, idle
+  description view, DoneDrawer (finished/closed with reopen).
+- **Thread chrome:** ThreadView (fold + SSE tail), GateForm (editable artifact,
+  approve/reject, formRev-409 flow), GateHistory (✓ steps), SourcePanel (source content next
+  to the artifact — the prompt-injection mitigation), StopButton, RejectedState/ErrorState,
+  CostBadge, StatusBadge/StaleBadge, "Open in <workflow>".
+- **Card construction kit (cards are userland, the KIT is the package):** CardShell (the
+  generic frame: head/kicker/badge/body/actions), primitives (Card, Field, Badge, Button,
+  List), `registerCard`, `useThreadResult`. An approval card = CardShell + SourcePanel +
+  GateForm; a userland card = CardShell + primitives + ~30 lines of vertical fields.
+- **Dev/observability:** TraceLog (raw AG-UI event inspector behind `?dev=1` — the beta's run
+  inspector), DevModeToggle, ToolChip. **Infra:** ConnectionStatus. **Hooks (= the headless
+  layer):** useBoard, useWorkItemThread, useGate, useCancel, useStart, useThreadResult,
+  useDevMode, useConnectionState.
+
+**Styling:** plain CSS over design tokens as CSS custom properties — the package exports
+`tokens.css` (documented `--atz-*` variables) + `styles.css` (`atz-` prefixed classes, values
+only via tokens). No Tailwind requirement, no CSS-in-JS, no build step (a port of the
+existing Smedja CSS). Customization is three-layered: (1) integrator rebrand = override
+tokens; (2) full control = `className` on every component + the headless hooks; (3)
+consumer-view branding (brand color/logo/name) = `editableBy: manager` leaf fields from
+config-as-data injected into `:root` — config file in beta, per-account DB overrides later,
+the same mechanism as prompt editing. NOT doing: theme marketplace, dark mode (tokens permit
+it later), Tailwind preset.
 
 ## 2. Beta scope (locked)
 

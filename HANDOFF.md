@@ -73,7 +73,7 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - RunObserver (from the spike, now real): consume `provider.run()`, append trace rows, GATE_OPENED → insert Gate + `transition(awaiting_approval)` + kill via provider; registered render tool → fill `card`; stream end → finalize status.
    - Race tests run against REAL Postgres (the compose container) in CI: concurrent finish-vs-finish and finish-vs-dispatch.
 4. **Server-executed effects + Stop** (+ sweep, guards, Gate fields).
-   - `defineAgent` gains `effects: string[]` (zod: `approvals ∩ effects = ∅`). Effect tools are REMOVED from the model's `allowedTools` (today `mcp__gmail__create_draft` leaks in at `apps/inbox/workflows/lead-inbox/server.ts`); the model only proposes the artifact in the approval-tool args.
+   - `defineAgent` gains `effects: string[]` (zod: **`effects ⊆ approvals`** — corrected from the older `∩ = ∅`; see the "Approval→effect binding" ANSWERED block below) + `readonly: string[]` (for the boot classification). The integration MCP tool (`mcp__gmail__create_draft`, today leaking in at `apps/inbox/workflows/lead-inbox/server.ts`) leaves the allow-list; the model only proposes the artifact in the approval-tool args. Full design → `docs/superpowers/specs/2026-06-10-server-executed-effects-stop-design.md`.
    - `POST /api/gates/:id/resolve` body carries `{ formRev, decision, form }`: tx① check formRev (mismatch → 409) + mark resolved + INSERT `action_ledger` claim (key = `workItemId+gateId`); execute the integration call directly (`@platform/integrations/gmail-basic` createDraft — plain function call, no MCP child needed); tx② record the result; then `provider.resume()` primed with "the action was executed with <artifact>" (narrative only).
    - Cancel: `POST /api/workitems/:id/cancel` → `transition(cancelled)` + kill the executor handle + cascade to active children (ascending id); workflow-level cancel = same loop over the workflow's active items. Reuses the existing HITL kill path.
    - Startup sweep (before `listen`): `running` w/o live executor → `error('executor lost')`; `queued` → re-enqueue by `createdAt`.
@@ -113,6 +113,48 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   Stop button, status/stale badges), the `registerCard` render-registry + primitives kit, and
   the theme. Litmus test: renders from the generic model (Workflow/Agent/WorkItem/Gate/status)
   → package; knows the vertical's payload (lead, ticket, draft) → userland card.
+  **`@platform/react` beta component inventory (decided 2026-06-10):**
+  *Board surface:* WorkflowBoard (desktop grid), WorkflowSwitcher (tabs + delivery badges),
+  PipelineColumn + InstanceTree (L-connectors, `queued: N`), AgentCard (type card: name, START,
+  aggregate), StartButton/dialog (THE human-initiated dispatch gesture), InstancePicker, idle
+  AgentDescription view (the P2 fix), DoneDrawer (finished/closed list with reopen — records
+  leave the board but never vanish).
+  *Thread surface:* ThreadView (foldEventsToMessages + live tail + autoscroll), GateForm
+  (editable artifact, approve/reject, formRev-409 → re-render flow), GateHistory (resolved
+  gates as ✓ steps), SourcePanel (renders the WorkItem's source content NEXT to the proposed
+  artifact — the prompt-injection mitigation; generic "what the agent worked from" frame),
+  StopButton (workitem + workflow variants), RejectedState (comment + explicit re-run),
+  ErrorState (retry/drop actions), CostBadge (cost/latencyMs/tokens fields), StatusBadge +
+  StaleBadge, "Open in <workflow>" jump link.
+  *Dev/observability:* TraceLog — raw AG-UI event inspector behind `?dev=1` (seq, event type
+  filter, tool args/results; the beta's run-inspector and the only observability surface),
+  DevModeToggle, ToolChip (raw tool-call chip in dev mode).
+  *Card construction kit (cards themselves are userland, the KIT is the package):* CardShell —
+  the generic card frame (head/title/kicker/badge/body/actions zone; today implicit in Smedja
+  CSS that each card hand-assembles — extract it ONCE so userland cards inherit the look),
+  primitives kit (Card, Field, Badge, Button, List), `registerCard` registry, and the in-card
+  building blocks (GateForm, SourcePanel, CostBadge, StatusBadge). An approval card is literally
+  CardShell + SourcePanel + GateForm; a userland card = CardShell + primitives + ~30 lines of
+  vertical-specific fields.
+  *Infra:* ConnectionStatus (SSE state + "reconnecting → snapshot refetch" indicator — cheap
+  and trust-critical).
+  *Hooks:* useBoard, useWorkItemThread, useGate, useCancel, useStart, useThreadResult (how a
+  card reads a data-tool's result from the thread — today's ThreadResultsContext, ported),
+  useDevMode, useConnectionState.
+  *Deliberately NOT in the beta package:* approvals-queue inbox view, notifications/email
+  approve links, batch approve, analytics — post-beta (market table-stakes list).
+  **Styling (decided 2026-06-10): plain CSS + design tokens as CSS custom properties.** The
+  package exports `tokens.css` (all `--atz-*` variables: colors, surface, radius, font,
+  spacing — documented) and `styles.css` (components, `atz-` prefixed classes, values ONLY via
+  tokens). No Tailwind requirement, no CSS-in-JS, no build step — works in any bundler or a
+  plain `<link>`; this is a port of the existing Smedja CSS, not a rewrite. Customization is
+  three-layered: (1) integrator rebrand = override tokens (copy tokens.css, change values);
+  (2) full control = every component accepts `className`, and the HOOKS are the headless layer
+  (useBoard/useGate/etc. know no CSS — build your own UI without forking); (3) consumer-view
+  branding (brand color / logo / name) = `editableBy: manager` leaf fields from config-as-data
+  (ARCHITECTURE §3) injected into `:root` at runtime — config file in beta, per-account DB
+  overrides later, the SAME mechanism as prompt editing. NOT doing: theme marketplace, dark
+  mode (token structure permits it later), a Tailwind preset.
   Workflow-specific cards (LeadCard, TriageCard, ReplyDraftCard) are USERLAND — they stay in the
   demo app as exemplars of `registerCard`, never in the package. UI-framework-agnostic logic
   (foldEventsToMessages, status mapping) stays in `@platform/core` (pure TS), so a future
@@ -135,6 +177,27 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   stale badge = client-side age computation (no sweeper, no cron); cancel cascades to active
   descendants in ascending-id order and records `resolution: cancelled` per item; rewrite
   `reply.prompts.ts` to propose-don't-execute (the model never sees `create_draft` again).
+  **Approval→effect binding (ANSWERED 2026-06-10 — do not re-ask): names in core, functions in
+  the workflow ServerBinding** (the `renders` pattern). `defineAgent.effects: string[]` with
+  validation **`effects ⊆ approvals`** (NOT the older `∩ = ∅` — that phrasing assumed effects
+  were model-visible tools; in the binding model the model never sees an effect at all, and the
+  integration MCP tool leaves the allow-list). ServerBinding:
+  `effects: { saveDraft: (form, ctx: {workItemId, gateId}) => createDraft(form) }` — keyed by
+  APPROVAL tool name, returns the result that becomes `executedResult` + trace entry.
+  `buildAgent` enforces binding↔declaration exhaustiveness both ways AT BOOT (missing or extra
+  binding → startup error, never a silent approve-time no-op). The ledger claim wraps the call
+  once in the resolve route, not inside each binding. Spec updated: pipeline-updated-3 §1.1.
+  **Step-4 scope on default-deny & capabilities (ANSWERED 2026-06-10 — do not re-ask):**
+  capabilities (can_edit/can_respond/can_ignore) → POST-beta; editability derives from `kind`
+  for now (approval = editable, choice/rate = not; the jsonb column is a later additive
+  migration). RUNTIME default-deny at the execution seam → post-beta AND physically impossible
+  under claude-cli anyway (the CLI executes MCP tools itself; the server sees calls
+  detect-after-emit — the runtime check becomes meaningful at the Mastra/server seam). BUT take
+  the ~20-line enforceable kernel INTO step 4: **boot-time tool classification** — every tool
+  in an agent's allow-list must be declared `readonly` | `approvals` | `renders`; an
+  unclassified tool = server refuses to start. Same fail-at-boot pattern as the effects-binding
+  exhaustiveness check, and it is the README claim a public auditor will test ("add a mutating
+  MCP tool undeclared → the framework won't boot", not "silently ran it ungated").
 - **Step 5 direction (Mastra):** ask the user for `ANTHROPIC_API_KEY` at the START of this step
   (the only step-gated question). Map `defineAgent` → a Mastra workflow wrapping the agent step;
   a gate = suspend at the approval point with the proposed artifact as the suspend payload;
