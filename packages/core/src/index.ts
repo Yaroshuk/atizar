@@ -1,5 +1,6 @@
 export * from './messages.js'
 export * from './defineAgent.js'
 export * from './providers.js'
+export * from './gate.js'
 export * from './handoff.js'
 export * from './defineWorkflow.js'
