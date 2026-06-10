@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent } from '@ag-ui/client'
-import type { Provider } from '@platform/core'
+import type { Provider, ResumeHandle, GateResolution } from '@platform/core'
 import type { RunAgentInput } from '@ag-ui/client'
 import {
   encodeLine,
@@ -145,6 +145,23 @@ function fakeProvider(events: BaseEvent[]) {
   return { provider, calls: () => calls }
 }
 
+// A fake provider with BOTH run and resume, counting real invocations of each.
+function fakeResumeProvider(runEvents: BaseEvent[], resumeEvents: BaseEvent[]) {
+  let runs = 0
+  let resumes = 0
+  const provider: Provider = {
+    async *run() {
+      runs++
+      for (const e of runEvents) yield e
+    },
+    async *resume() {
+      resumes++
+      for (const e of resumeEvents) yield e
+    },
+  }
+  return { provider, runs: () => runs, resumes: () => resumes }
+}
+
 const APPROVALS = ['confirmSend']
 const step0Input = { messages: [] } as unknown as RunAgentInput
 // messages with one resolved approval → resolvedApprovalCount === 1 → step 1
@@ -160,6 +177,9 @@ const step1Input = {
     { role: 'tool', id: 't1', content: 'ok', toolCallId: 'x1' },
   ],
 } as unknown as RunAgentInput
+
+const resumeHandle: ResumeHandle = { runId: 'r1', input: step0Input } // step0Input → resolvedApprovalCount 0 → resume step 1
+const approvedResolution: GateResolution = { gateId: 'g1', decision: 'approved' as const }
 
 async function collect(it: AsyncIterable<BaseEvent>): Promise<BaseEvent[]> {
   const out: BaseEvent[] = []
@@ -231,5 +251,51 @@ describe('withRecordReplay', () => {
     expect(out1).toEqual([ev('done')])
     expect(fake.calls()).toBe(1) // step 1 was a miss → recorded
     expect(await new CassetteStore(dir, 'wf__a').readStep(1)).toEqual([ev('done')])
+  })
+})
+
+describe('withRecordReplay resume()', () => {
+  it('records the resume run under step (resolvedApprovalCount + 1)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeResumeProvider([], [ev('saved')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'replay',
+    })
+    const out = await collect(wrapped.resume!(resumeHandle, approvedResolution))
+    expect(out).toEqual([ev('saved')])
+    expect(fake.resumes()).toBe(1)
+    // step0Input has 0 resolved approvals → resume is recorded at step 1
+    expect(await new CassetteStore(dir, 'wf__a').readStep(1)).toEqual([ev('saved')])
+  })
+
+  it('replays a recorded resume step WITHOUT calling the real provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeResumeProvider([], [ev('saved')])
+    await new CassetteStore(dir, 'wf__a').writeStep(1, [ev('from-disk')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'replay',
+    })
+    const out = await collect(wrapped.resume!(resumeHandle, approvedResolution))
+    expect(out).toEqual([ev('from-disk')])
+    expect(fake.resumes()).toBe(0)
+  })
+
+  it('does NOT add resume when the wrapped provider has none', () => {
+    const noResume: Provider = {
+      async *run() {},
+    }
+    const wrapped = withRecordReplay(noResume, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir: '/tmp/unused',
+      mode: 'replay',
+    })
+    expect(wrapped.resume).toBeUndefined()
   })
 })

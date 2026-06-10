@@ -2,7 +2,13 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { BaseEvent, RunAgentInput } from '@ag-ui/client'
-import { resolvedApprovalCount, type Provider, type Message } from '@platform/core'
+import {
+  resolvedApprovalCount,
+  type Provider,
+  type Message,
+  type ResumeHandle,
+  type GateResolution,
+} from '@platform/core'
 
 // A cassette file is JSONL: one recorded AG-UI event per line, tagged with its
 // step. Step = how many human approvals are already behind us (see
@@ -156,7 +162,7 @@ export function withRecordReplay(
   provider: Provider,
   opts: { key: string; approvalNames: readonly string[]; dir: string; mode: RecordReplayMode }
 ): Provider {
-  return {
+  const base: Provider = {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames)
@@ -176,6 +182,35 @@ export function withRecordReplay(
         yield event
       }
       // Write only on normal completion — a provider throw unwinds past here, leaving the cassette clean.
+      await store.writeStep(step, captured)
+    },
+  }
+
+  // Wrap resume() with the SAME auto-semantics, keyed one past the resolved-approval
+  // count of the handle's input (the gate being resolved is the NEXT step). Only when
+  // the underlying provider has a resume — a resume-less provider stays resume-less.
+  if (!provider.resume) return base
+  const resume = provider.resume.bind(provider)
+  return {
+    ...base,
+    async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
+      const messages = (handle.input?.messages ?? []) as Message[]
+      const step = resolvedApprovalCount(messages, opts.approvalNames) + 1
+      const store = new CassetteStore(opts.dir, opts.key)
+
+      if (opts.mode === 'replay') {
+        const recorded = await store.readStep(step)
+        if (recorded) {
+          yield* recorded
+          return
+        }
+      }
+
+      const captured: BaseEvent[] = []
+      for await (const event of resume(handle, resolution)) {
+        captured.push(event)
+        yield event
+      }
       await store.writeStep(step, captured)
     },
   }
