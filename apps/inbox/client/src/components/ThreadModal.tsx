@@ -23,6 +23,7 @@ export type ThreadModalProps = {
   notes: HandoffNote[]
   deliver: (origin: string, dest: Destination, payload: unknown, parentId: string) => void
   onStart: () => void
+  onStop: (id: string) => void
   onClose: () => void
   onOpenWorkflow?: (id: string) => void
   onOpenInstance?: (localId: string) => void
@@ -70,6 +71,7 @@ export const ThreadModal = (p: ThreadModalProps) => {
       onOpenWorkflow={p.onOpenWorkflow}
       onOpenInstance={p.onOpenInstance}
       onStart={p.onStart}
+      onStop={() => p.onStop(p.id)}
       onClose={p.onClose}
     />
   )

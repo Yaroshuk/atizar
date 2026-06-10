@@ -32,7 +32,7 @@ const isCrossWorkflowChild = (w: WorkItem, parentOf: (id: string) => WorkItem | 
 
 export const InboxView = () => {
   const board = useBoard()
-  const { start, deliver } = useDispatch()
+  const { start, deliver, cancel } = useDispatch()
 
   const [activeWorkflowId, setActiveWorkflowId] = useState(workflows[0].id)
   // The URL carries the open work item id so a reload re-attaches to the same thread.
@@ -214,6 +214,7 @@ export const InboxView = () => {
             renderableToolNames={renderableToolNames}
             notes={notesFor(openItem.id)}
             deliver={deliver}
+            onStop={(cid) => void cancel(cid)}
             onOpenWorkflow={switchWorkflow}
             onOpenInstance={setOpenId}
             onStart={() => {

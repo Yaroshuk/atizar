@@ -55,6 +55,8 @@ export type AgentModalProps = {
   // Jump to a live target instance (intra-workflow 'sent' note) by its localId.
   onOpenInstance?: (localId: string) => void
   onStart: () => void
+  // Stop the run (cancel the work item). Shown while running/awaiting_approval.
+  onStop?: () => void
   onClose: () => void
 }
 
@@ -73,6 +75,7 @@ export const AgentModal = ({
   onOpenWorkflow,
   onOpenInstance,
   onStart,
+  onStop,
   onClose,
 }: AgentModalProps) => {
   // Index tool result messages by toolCallId so each assistant tool call can be
@@ -213,13 +216,26 @@ export const AgentModal = ({
           </div>
         </ThreadResultsContext.Provider>
 
-        {canStart && status !== 'running' && (
-          <div className='modal-foot'>
-            <button className='btn btn-primary' onClick={onStart}>
-              START
-            </button>
-          </div>
-        )}
+        {(() => {
+          const active = status === 'running' || status === 'awaiting_approval'
+          const showStop = active && onStop
+          const showStart = canStart && !active
+          if (!showStop && !showStart) return null
+          return (
+            <div className='modal-foot'>
+              {showStart && (
+                <button className='btn btn-primary' onClick={onStart}>
+                  START
+                </button>
+              )}
+              {showStop && (
+                <button className='btn btn-ghost' onClick={onStop}>
+                  Stop
+                </button>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
