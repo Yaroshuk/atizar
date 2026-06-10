@@ -5,6 +5,7 @@
     { "path": "./packages/providers" },
     { "path": "./packages/integrations" },
     { "path": "./packages/server" },
+    { "path": "./packages/react" },
     { "path": "./apps/inbox" }
   ]
 }

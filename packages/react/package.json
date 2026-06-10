@@ -1,0 +1,19 @@
+{
+  "name": "@platform/react",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@ag-ui/client": "^0.0.55",
+    "@platform/core": "*",
+    "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
