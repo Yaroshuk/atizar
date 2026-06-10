@@ -28,12 +28,19 @@ assistant-ui = named fallback renderer).
 6. Re-point board/thread UI to server state; delete `@copilotkit/*` deps.
 7. Packaging: zero-cred demo (synthetic cassettes + scanCassette CI gate), README, LICENSE, `@platform/*` rename, golden-set eval, bearer token.
 
+**Starting point for the next session = beta build order step 1** (Provider contract v2 in
+`@platform/core`: optional `resume?` capability + provider-agnostic `GATE_OPENED` signal + a
+conformance suite run against claude-cli / mock / Mastra). It must land BEFORE any
+PipelineService code. The current `@copilotkit/*`-transport client (proxied agents, per-instance
+HITL, `useAgentInstances`) keeps working as the dev surface until step 6 deletes it — do NOT
+invest further in that layer; new work targets the server-authoritative spine.
+
 (The "NEXT — docs/pipeline-plan.md" P1/P2/P3 items below are absorbed by the
-server-authoritative model in updated-3.)
+server-authoritative model in updated-3 — keep for reference, do not build standalone.)
 
 ---
 
-**On `feat/dev-record-replay` (BUILT, browser E2E pending merge):** **dev record/replay** — a
+**On `master` (MERGED `45c5e1f`, BUILT, browser-verified):** **dev record/replay** — a
 `Provider → Provider` decorator (`withRecordReplay`) toggled by `DEV_RECORD_REPLAY` that records
 each real provider run to disk once and replays it instantly on every subsequent run. Recordings
 are one JSONL file per `wf__agent` under `apps/inbox/.cassettes/` (gitignored), each line
@@ -48,10 +55,11 @@ spec → `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`; plan �
 `docs/superpowers/plans/2026-06-08-dev-record-replay.md`; build narrative →
 `docs/BUILD-LOG.md` §10.
 
-### ✅ FIXED & browser-verified — the two agent-instance bugs (this session)
+### ✅ FIXED, MERGED & browser-verified — the two agent-instance bugs
 
-Both bugs from the prior handoff are fixed, on `master` working tree (uncommitted), with
-**166 unit tests + typecheck + lint green** and a full browser E2E pass. Commit when ready.
+Both bugs from the prior handoff are fixed and **merged to `master`** (commit `6d437ad`, merge
+`14e06be`; working tree clean, pushed to `origin/master`), with **166 unit tests + typecheck +
+lint green** and a full browser E2E pass. Nothing left to commit here.
 
 - **✅ One-time deliveries spawned duplicate instances.** Clicking "Draft reply" 3× on ONE email spawned
   3 reply instances. Fix: a delivery now carries a `deliveryKey` derived from the source item
@@ -118,9 +126,9 @@ a handoff note carries an "Open <agent>" jump button; `awaiting_approval` instan
 (claude-cli HITL kills the process at the approval tool call — they must stay, not vanish); opening an
 agent with ≥2 live instances shows an **instance picker** (cards, pick a copy) instead of one thread; the
 pipeline parent→children connector is the prior centered `↓` with a bordered container over the children.
-**Next for the following agent:** the two 🐞 at the top (one-time-delivery dedupe; second
-awaiting-approval instance's approve button is dead) are the priority — both real and reproducible. Then
-the optional follow-ups below. Pre-existing cosmetic: the model sometimes narrates "Let me load the tool
+**Next for the following agent:** both 🐞 are now FIXED & merged (see the "✅ FIXED, MERGED"
+section above) — the next thing to build is **beta build order step 1** (Provider contract v2),
+not these bugs. Pre-existing cosmetic still open: the model sometimes narrates "Let me load the tool
 schemas first" into the thread (deferred-polish list).
 
 **On `master` (MERGED `8b67b83`, BUILT, browser-verified):** the **tool-result surfacing +
