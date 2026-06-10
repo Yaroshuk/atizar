@@ -26,9 +26,14 @@ function buildPrompt(instructions: string, messages: Message[]): string {
     '',
     `A colleague qualified this lead — category "${h.category}", priority "${h.priority}".`,
     `From ${h.from}, subject "${h.subject}". Summary: ${h.summary}`,
-    'Do NOT fetch the email again. Call renderLead with { from, subject, summary }, draft a short',
-    `reply, then call saveDraft with { threadId: "${h.threadId}", body } to ask the human. Do NOT`,
-    'send anything and do not narrate tool usage.',
+    'Do NOT fetch the email again. Take exactly these two tool actions, in order:',
+    '1. Call the renderLead tool with { from, subject, summary }.',
+    `2. Call the saveDraft tool with { threadId: "${h.threadId}", body } — body is the full reply`,
+    '   text you drafted.',
+    'Calling saveDraft IS how you ask the human for approval — it is mandatory. Do NOT write the',
+    'reply text in your message, do NOT ask "should I save this?" in prose, and do NOT end your',
+    "turn without calling saveDraft. Keep any message text to one short sentence; don't narrate",
+    'tools. Do NOT send the email — saveDraft only proposes a draft for approval.',
   ].join('\n')
 }
 
@@ -40,6 +45,23 @@ export interface MastraRunnerConfig {
   renderAndProposeTools: readonly string[] // e.g. ['renderLead','saveDraft'] or ['renderVerdict']
   model: string // e.g. 'claude-sonnet-4-6'
   databaseUrl: string
+}
+
+// ONE Mastra storage shared across every agent. A PostgresStore per agent opened its own pool
+// AND created Mastra's full composite schema (~20 tables) at boot — two of those exhausted
+// Postgres connections ("too many clients", proc.c InitProcess) before any run started. A single
+// bounded pool (max 8) + a single store, created once, fixes it; tables are created once.
+let sharedStore: PostgresStore | undefined
+function getSharedStore(databaseUrl: string): PostgresStore {
+  if (!sharedStore) {
+    sharedStore = new PostgresStore({
+      id: 'mastra',
+      connectionString: databaseUrl,
+      max: 8,
+      idleTimeoutMillis: 10_000,
+    })
+  }
+  return sharedStore
 }
 
 const ALL_TOOLS = {
@@ -68,7 +90,8 @@ export function unwrapStepOutput(raw: MastraChunk): MastraChunk {
 // strongly typed for our purposes (the mapper reads them defensively), so we narrow to just the
 // methods/fields the bridge uses instead of leaking Mastra's deep generics across the seam.
 interface MastraStreamLike {
-  [Symbol.asyncIterator](): AsyncIterator<MastraChunk>
+  // Iterating the WorkflowRunOutput directly is deprecated in Mastra — use `.fullStream`.
+  fullStream: AsyncIterable<MastraChunk>
   result: Promise<{ status: string; error?: unknown }>
 }
 interface MastraRunLike {
@@ -171,7 +194,7 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
   workflow.commit()
 
   const mastra = new Mastra({
-    storage: new PostgresStore({ id: `mastra-${cfg.agentId}`, connectionString: cfg.databaseUrl }),
+    storage: getSharedStore(cfg.databaseUrl),
     workflows: { [workflowId]: workflow },
   })
 
@@ -202,7 +225,7 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
         cancelFn = () => void run.cancel()
         const s = makeStream(run)
         try {
-          for await (const raw of s as AsyncIterable<MastraChunk>) yield unwrapStepOutput(raw)
+          for await (const raw of s.fullStream) yield unwrapStepOutput(raw)
         } finally {
           const r = (await s.result) ?? { status: 'success' }
           resolveResult(toResult(r))

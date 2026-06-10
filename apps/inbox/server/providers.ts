@@ -6,6 +6,7 @@ import {
 } from '@platform/providers'
 import { claudeSpawn } from './claude-spawn.js'
 import { makeMastraRunner } from './mastra/runner.js'
+import { databaseUrl } from './pipeline/db/client.js'
 
 const MASTRA_MODEL = process.env.MASTRA_MODEL ?? 'claude-sonnet-4-6'
 
@@ -27,7 +28,9 @@ const mastraFactory: ProviderFactory = (config) => {
     readTools,
     renderAndProposeTools,
     model: MASTRA_MODEL,
-    databaseUrl: process.env.DATABASE_URL ?? '',
+    // Reuse the pipeline's resolved DB URL (defaults to the compose creds) — a single source
+    // of truth, so PROVIDER=mastra needs no extra env beyond ANTHROPIC_API_KEY.
+    databaseUrl,
   })
   return createMastraProvider({
     approvalNames: config.approvalNames,

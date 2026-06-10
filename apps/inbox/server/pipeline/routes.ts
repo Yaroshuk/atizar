@@ -20,14 +20,20 @@ export function createPipelineRoutes(service: PipelineService): Hono {
   // START a run (dev throwaway — step 6 starts via the production trigger). The agent key is
   // `wf__agent`; the workflow id is its prefix.
   app.post('/api/dev/runs', async (c) => {
-    const { agent } = await c.req.json<{ agent: string }>()
+    // `payload` is optional: an empty object runs an input agent (qualifier) from scratch; a
+    // handoff payload lets a worker agent (reply) run as if handed a lead — needed to drive the
+    // gate flow on a fresh real run (record mode) where there is no cassette to replay.
+    const { agent, payload } = await c.req.json<{
+      agent: string
+      payload?: Record<string, unknown>
+    }>()
     if (!service.knows(agent)) return c.json({ error: `unknown agent: ${agent}` }, 404)
     const [workflowId] = agent.split('__')
     const { id } = await service.dispatch({
       workflowId: workflowId ?? agent,
       agentId: agent,
       origin: 'human',
-      payload: {},
+      payload: payload ?? {},
     })
     return c.json({ id })
   })
