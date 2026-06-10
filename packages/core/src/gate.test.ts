@@ -22,7 +22,12 @@ describe('gateOpened / readGateOpened', () => {
   })
 
   it('returns null for a non-gate event', () => {
-    const other = { type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant', messageId: 'm', delta: 'hi' }
+    const other = {
+      type: EventType.TEXT_MESSAGE_CHUNK,
+      role: 'assistant',
+      messageId: 'm',
+      delta: 'hi',
+    }
     expect(readGateOpened(other as unknown as BaseEvent)).toBeNull()
   })
 

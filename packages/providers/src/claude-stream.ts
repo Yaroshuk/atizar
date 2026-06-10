@@ -112,10 +112,6 @@ export async function* mapClaudeStream(
     yield { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent
   }
 
-  function isApproval(rawName: string): boolean {
-    return opts.approvalNames.includes(stripMcpPrefix(rawName))
-  }
-
   function parseArtifact(raw: unknown): Record<string, unknown> {
     if (typeof raw === 'string') {
       try {

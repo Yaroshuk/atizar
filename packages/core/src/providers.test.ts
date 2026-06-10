@@ -30,6 +30,7 @@ describe('Provider v2 contract types', () => {
       async *run() {
         return
       },
+      // eslint-disable-next-line require-yield
       async *resume(h: ResumeHandle, r: GateResolution) {
         expect(h.runId).toBe('r1')
         expect(r.decision).toBe('approved')
