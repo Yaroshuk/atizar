@@ -19,21 +19,64 @@ allowed / machine action never** (origin reserves `inbound`; no trigger code in 
 SSE tail** (drop `@copilotkit/*` transport; KEEP AG-UI vocabulary + render registry + cards;
 assistant-ui = named fallback renderer).
 
-**Build order (beta):**
-1. Provider contract v2 (`resume?` capability + `GATE_OPENED` signal) + conformance suite — BEFORE any PipelineService code.
-2. Week-0 spike: RunObserver + browser attach to a running WorkItem (trace snapshot + SSE tail).
-3. Server spine on Postgres: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE. **Dev topology: Docker runs ONLY Postgres; the app stays on the host (`yarn dev`) — claude-cli needs the local binary + macOS-keychain auth, so the dev server is never containerized.**
-4. Server-executed effects + cancel edges + startup sweep + finished guards (+ Gate fields: formRev, assignee, comment, both artifact versions).
-5. Mastra provider (production path) beside claude-cli (dev); re-key record/replay cassettes to the server gate count.
-6. Re-point board/thread UI to server state; delete `@copilotkit/*` deps.
-7. Packaging: zero-cred demo (synthetic cassettes + scanCassette CI gate), README, LICENSE, `@platform/*` rename, golden-set eval, bearer token.
+**Read order for a fresh agent:** this section → `docs/pipeline-updated-3.md` (the spec — §1.x
+numbers below refer to it) → CLAUDE.md gotchas. Answers to questions you'd otherwise ask the
+user: dev DB = Postgres in Docker ONLY (`docker compose up -d postgres`; app stays `yarn dev`
+on the host — claude-cli needs the local binary + macOS-keychain auth, NEVER containerize the
+dev server); SQLite is not used at all (locked decision); `ANTHROPIC_API_KEY` is needed only
+at step 5 (Mastra) — do not ask for it earlier; Gmail OAuth already exists at `~/.gmail-mcp/`;
+GitHub stays strictly read-only; every step ends with typecheck/test/lint green AND a browser
+E2E pass (unit tests provably miss this codebase's bug class); one step = one branch.
 
-**Starting point for the next session = beta build order step 1** (Provider contract v2 in
-`@platform/core`: optional `resume?` capability + provider-agnostic `GATE_OPENED` signal + a
-conformance suite run against claude-cli / mock / Mastra). It must land BEFORE any
-PipelineService code. The current `@copilotkit/*`-transport client (proxied agents, per-instance
-HITL, `useAgentInstances`) keeps working as the dev surface until step 6 deletes it — do NOT
-invest further in that layer; new work targets the server-authoritative spine.
+**Build order (beta), with implementation hints:**
+
+1. **Provider contract v2** (`resume?` + `GATE_OPENED`) + conformance suite — BEFORE any PipelineService code. — ✅ **BUILT** on `feat/provider-contract-v2` (2026-06-10), 187 unit tests + typecheck/lint/format green + live browser E2E (HITL approve→resume→draft saved; `GATE_OPENED` captured in the live cassette with the right shape). Spec → `docs/superpowers/specs/2026-06-10-provider-contract-v2-design.md`; plan → `docs/superpowers/plans/2026-06-10-provider-contract-v2.md`.
+   - **As-built:** `@platform/core` gained `gate.ts` (`GATE_OPENED` CUSTOM-event helpers + zod `GateOpenedValueSchema`), `Provider.resume?` + `ResumeHandle`/`GateResolution` in `providers.ts`, and `conformance.ts` (`providerConformanceChecks` — 4 invariants). `claude-stream` emits `GATE_OPENED` at both approval suspend points; `claude-cli` + `mock` implement `resume()` and pass conformance. **The new run-envelope type was NOT added** — the additive surface keeps `RunAgentInput` (the `{workItemId,source,payload,origin}` envelope belongs to the dispatch chokepoint, step 3, not this contract). record/replay untouched (per answer (5)).
+   - Where: `packages/core/src/providers.ts`. Keep `run(input) → AsyncIterable<BaseEvent>` untouched; add optional `resume?(handle, resolution) → AsyncIterable<BaseEvent>` (spec §1.4). [run-envelope: deferred to step 3 dispatch — see As-built.]
+   - `GATE_OPENED` = an AG-UI `CUSTOM` event (typed helper in core). claude-cli synthesizes it inside `claude-stream.ts` exactly where approval-tool-call detection lives today; the orchestrator must listen ONLY for this signal, never for tool names.
+   - Conformance suite = one vitest file parameterized over providers (mock now; claude-cli via the already-injected fake `spawn`): asserts stream shape, GATE_OPENED at the approval point, resume continues with the verbatim artifact. Mastra joins the same suite at step 5.
+   - Don't break the running app: the current CopilotKit path keeps working until step 6 — add an adapter from the old `RunAgentInput` to the new envelope rather than rewiring the server now.
+   - **Step-1 design decisions (ANSWERED 2026-06-10 — do not re-ask):**
+     (1) Coexistence = **additive**: `run()` stays backward-compatible (still detects resume via messages), `resume()`/`GATE_OPENED` added beside it; `resume()` has no prod caller until step 3 — the conformance suite covers it.
+     (2) `GATE_OPENED` = **AG-UI CUSTOM event** with a zod-typed value in `@platform/core`. Value = `{ gateKind, toolName, toolCallId, proposedArtifact }` — **NO `resumeHandle` inside the event**: events get recorded into cassettes (and the Trace table at step 3), so they must stay light and must not duplicate the transcript. The caller of `run()` already owns everything the handle needs — it mints and holds the handle itself.
+     (3) `resume?(handle, resolution)` with `ResumeHandle = { runId, input }` is right for step 1 (opaque-token abstraction deferred until a provider needs it). Two notes: (a) full transcript-seeded resume (§3.1) arrives only at step 3 when Trace exists — until then claude-cli's resume re-primes from input + resolution exactly like today's mechanism, extracted into a shared helper; (b) make the resume PROMPT TEXT a parameter of that helper, not hardcoded "human approved" — at step 4 it changes to "the action was already executed by the server with <artifact>" (server-executed effects), and `GateResolution` will gain an optional `executedResult?` field then.
+     (4) Conformance suite = provider-agnostic `runProviderConformance(makeProvider)` against claude-cli (fake spawn) + mock now, Mastra slot at step 5. Invariants as proposed (GATE_OPENED on approval tool; resume(approved) completes without re-gating; resume(rejected) terminates; surface filtering; one messageId per contiguous text).
+     (5) record/replay **untouched at step 1** (keep `resolvedApprovalCount` keying; old cassettes simply lack GATE_OPENED, which is backward-tolerant). Re-key + wipe happens at step 5 with the envelope change.
+2. **Week-0 spike: RunObserver + browser attach** (throwaway code allowed; the endpoint SHAPES must survive).
+   - Minimal: a dev-only route that calls `provider.run()` purely server-side, teeing events into an in-memory `trace[]` + an EventEmitter. Two read endpoints: `GET /api/workitems/:id/trace?from=seq` (JSON history) and an SSE tail (`text/event-stream`, `id:` = seq, `data:` = AG-UI event).
+   - Client side: fold events → messages by reusing `AgentModal`'s existing pairing logic (`apps/inbox/client/src/components/AgentModal.tsx` walks messages + pairs tool results already).
+   - Iterate on cassettes (`DEV_RECORD_REPLAY=1`), not live claude runs. PASS = open the browser MID-run and see history + live tail; reload mid-run loses nothing. FAIL = stop and redesign the thread plan before step 3.
+3. **Server spine on Postgres**: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE.
+   - `docker-compose.yml` with a `postgres` service only; `DATABASE_URL` in `.env.local`; extend `predev` to start the container if it isn't running.
+   - Drizzle schema (`work_items`, `gates`, `trace` PK `(work_item_id, seq)`, `action_ledger` PK `key`) + drizzle-kit migrations from the very first table (spec §1.7).
+   - ONE `transition(workItemId, edge)` function owns every status change: `BEGIN` → `SELECT … FOR UPDATE` on the row (and the parent for finish/reopen, ascending-id lock order) → guard check → `UPDATE` → `COMMIT`. The `finished` entry guard lives HERE, once, for all five inbound edges (spec §1.2).
+   - ONE `dispatch()` chokepoint mints the WorkItem id, checks one-time dedup (ledger/approved children only) + depth cap, enqueues. WorkerPool ports the pure logic from `apps/inbox/client/src/instancesCore.ts` (cap + queue, already unit-tested) — port, don't redesign.
+   - RunObserver (from the spike, now real): consume `provider.run()`, append trace rows, GATE_OPENED → insert Gate + `transition(awaiting_approval)` + kill via provider; registered render tool → fill `card`; stream end → finalize status.
+   - Race tests run against REAL Postgres (the compose container) in CI: concurrent finish-vs-finish and finish-vs-dispatch.
+4. **Server-executed effects + Stop** (+ sweep, guards, Gate fields).
+   - `defineAgent` gains `effects: string[]` (zod: `approvals ∩ effects = ∅`). Effect tools are REMOVED from the model's `allowedTools` (today `mcp__gmail__create_draft` leaks in at `apps/inbox/workflows/lead-inbox/server.ts`); the model only proposes the artifact in the approval-tool args.
+   - `POST /api/gates/:id/resolve` body carries `{ formRev, decision, form }`: tx① check formRev (mismatch → 409) + mark resolved + INSERT `action_ledger` claim (key = `workItemId+gateId`); execute the integration call directly (`@platform/integrations/gmail-basic` createDraft — plain function call, no MCP child needed); tx② record the result; then `provider.resume()` primed with "the action was executed with <artifact>" (narrative only).
+   - Cancel: `POST /api/workitems/:id/cancel` → `transition(cancelled)` + kill the executor handle + cascade to active children (ascending id); workflow-level cancel = same loop over the workflow's active items. Reuses the existing HITL kill path.
+   - Startup sweep (before `listen`): `running` w/o live executor → `error('executor lost')`; `queued` → re-enqueue by `createdAt`.
+   - Gate columns: `form_rev int`, `proposed_artifact jsonb` (keep BOTH versions), `comment text`, `assignee text null`, `expires_at timestamptz null` (no default, badge-only). Rewrite `reply.prompts.ts`: propose-don't-execute.
+5. **Mastra provider** (production path) beside claude-cli (dev); re-key record/replay.
+   - New `packages/providers/src/mastra-provider.ts`; needs `ANTHROPIC_API_KEY` (ask the user NOW, not before). Mastra emits AG-UI natively — `run()` is mostly passthrough; GATE_OPENED derives from the workflow suspend status (not a tool call); `resume()` = native `resume(runId, resumeData)`, NO kill-and-re-prime.
+   - Keep a `workItemId ↔ runId` mapping in StateStore; do NOT store Mastra's step state (belief #2 boundary, spec §1.4).
+   - Run the step-1 conformance suite against it — that's the two-unlike-providers proof.
+   - record/replay: cassette step key changes from `resolvedApprovalCount(input)` (message scan) to the store's resolved-gate count; wipe `.cassettes/` once (gitignored fixtures).
+6. **Re-point board/thread UI** to server state; delete `@copilotkit/*` deps.
+   - Board reads `GET /api/board` `{items, gates, lastEventId}` + per-account SSE (coarse status events only, resume via `Last-Event-ID`); thread = step-2 trace endpoints. Keep `renderRegistry`, all cards, Smedja styles, `?dev=1`.
+   - Approve/reject/cancel/edit = plain HTTP. DELETE (not port): `useAgentInstances`, `instancesCore` client copy, `statusFrom`, proxied agents, `useHumanInTheLoop`, `<CopilotKit>` tree.
+   - Browser E2E checklist before merge (memory rule — EVERY flow): single run; 3-at-once (cap 2 + `queued: 1`); approve WITH an edited artifact (verify the edited text is what lands in Gmail); reject + re-run; cancel mid-run; reload mid-run; second tab coherence.
+7. **Packaging**: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`).
+
+**Starting point for the next session = beta build order step 2** (Week-0 spike: RunObserver +
+browser attach to a running WorkItem — trace snapshot + SSE tail; throwaway code OK but the
+endpoint SHAPES must survive). Step 1 (Provider contract v2) is ✅ BUILT & browser-verified on
+`feat/provider-contract-v2` — `resume?()`, `GATE_OPENED`, and the conformance suite are in
+`@platform/core` + `@platform/providers`, additive (the live `@copilotkit/*` client is untouched
+and keeps working as the dev surface until step 6). Do NOT invest further in that client layer;
+new work targets the server-authoritative spine.
 
 (The "NEXT — docs/pipeline-plan.md" P1/P2/P3 items below are absorbed by the
 server-authoritative model in updated-3 — keep for reference, do not build standalone.)
@@ -79,6 +122,7 @@ lint green** and a full browser E2E pass. Nothing left to commit here.
   "second button dead" — a replay artifact (see CLAUDE.md); verify concurrent HITL with `=record`.
 
 ### ✅ FIXED — "cassettes don't work" was a stale-server collision
+
 `DEV_RECORD_REPLAY` cassettes are correct; replay was being silently bypassed because a **stale dev
 server held `:4000`**, so a freshly-started replay server hit `EADDRINUSE` (its `tsx watch` child
 isn't matched by the `.bin/tsx` pkill pattern) and Vite kept proxying to the OLD server — which was
@@ -89,9 +133,11 @@ server binds with 0 `EADDRINUSE`; a clean replay run completes in ~2s with the c
 unchanged (true replay, no real `claude`).
 
 ### 🧭 NEXT — `docs/pipeline-plan.md` (three more gaps, design-first)
+
 Three issues surfaced this session are captured (with current model + options + open questions) in
 the new **`docs/pipeline-plan.md`** — think the pipelines through there, then spin specifics into a
 dated spec. Summary:
+
 - **P1 (highest impact):** result-only worker instances (TRIAGE → FEATURE/BUG-FIX/REPLY-DRAFT)
   finalize `done` and are **torn down**, so their result card vanishes and the user can't act. The
   lifecycle has no "completed-with-a-result-to-show" state. Recommended fix anchor: a uniform RESULT
