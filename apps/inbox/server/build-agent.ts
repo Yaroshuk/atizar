@@ -1,22 +1,21 @@
 import { BuiltInAgent } from '@copilotkit/runtime/v2'
-import type { AgentDefinition, ProviderRegistry, PromptStrategy } from '@platform/core'
+import type { AgentDefinition, ProviderRegistry, PromptStrategy, Provider } from '@platform/core'
 import { withRecordReplay, recordReplayMode, cassettesDir } from './record-replay.js'
 
-// Builds the CopilotKit BuiltInAgent for an agent passport: resolves the provider
-// FACTORY from the registry by `def.provider`, then constructs the provider from the
-// passport (approvals/tools) plus this agent's prompt strategy. All approval/turn
-// logic lives in the provider, so there is no hardcoded tool name here.
+// Resolves the provider FACTORY for an agent passport and constructs the provider from
+// the passport (approvals/tools) + this agent's prompt strategy, then wraps it in the
+// dev record/replay decorator when DEV_RECORD_REPLAY is set (unset ⇒ byte-identical
+// production path). `instanceKey` (wf__agent) is the cassette key.
 //
-// `instanceKey` is the runtime instance id (wf__agent) — used only as the cassette
-// key when DEV_RECORD_REPLAY is set. When unset, the provider is returned unwrapped
-// (byte-identical production path).
-export function buildAgent(
+// Returns the raw Provider so both buildAgent (CopilotKit transport) and the step-2
+// RunObserver spike consume the SAME wrapped provider through one code path.
+export function buildProvider(
   def: AgentDefinition,
   prompts: PromptStrategy,
   registry: ProviderRegistry,
   allowedTools: readonly string[],
   instanceKey: string
-): BuiltInAgent {
+): Provider {
   const makeProvider = registry.resolve(def.provider)
   let provider = makeProvider({
     approvalNames: def.approvals,
@@ -35,6 +34,19 @@ export function buildAgent(
     })
   }
 
+  return provider
+}
+
+// Builds the CopilotKit BuiltInAgent for an agent passport, driving the provider built
+// by buildProvider.
+export function buildAgent(
+  def: AgentDefinition,
+  prompts: PromptStrategy,
+  registry: ProviderRegistry,
+  allowedTools: readonly string[],
+  instanceKey: string
+): BuiltInAgent {
+  const provider = buildProvider(def, prompts, registry, allowedTools, instanceKey)
   return new BuiltInAgent({
     type: 'custom',
     factory: ({ input }) => provider.run(input),
