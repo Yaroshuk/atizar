@@ -69,7 +69,10 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     const open = await store.getOpenGate(workItemId)
     if (open) await store.resolveGateRow(open.id, { comment: 'cancelled' })
     await transition(db, workItemId, 'cancel').catch(() => {})
-    pool.release(wi.agentId)
+    // No pool.release here: a queued item never held a slot (dequeue is enough); a running
+    // item's slot is released by its own consume loop when iterator.return() ends the stream;
+    // an awaiting_approval item's slot was already released at the gate. Releasing here would
+    // double-free → over-admit queued work past the cap.
     const children = await store.getActiveChildren(workItemId)
     for (const child of children.sort((a, b) => a.id.localeCompare(b.id))) {
       await cancelItem(child.id)
@@ -135,6 +138,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         await store.resolveGateRow(gate.id, { form })
         executedResult = await effect(form, { workItemId: wi.id, gateId: gate.id })
         await store.setLedgerResult(key, executedResult)
+      }
+
+      if (executedResult.error) {
+        const msg = String(executedResult.error)
+        await transition(db, wi.id, 'fail', { error: msg }).catch(() => {})
+        await store.setError(wi.id, msg)
+        publishBoard()
+        return { ok: false, status: 502, error: msg }
       }
 
       publishBoard()

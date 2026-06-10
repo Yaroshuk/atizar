@@ -115,7 +115,7 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     })
     return result.ok
       ? c.json({ ok: true })
-      : c.json({ error: result.error }, result.status as 404 | 409 | 500)
+      : c.json({ error: result.error }, result.status as 404 | 409 | 500 | 502)
   })
 
   // The open gate for a work item (id + form + formRev for the approve/edit UI).

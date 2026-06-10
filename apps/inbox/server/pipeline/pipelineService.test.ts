@@ -178,6 +178,36 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect((await svc.getStatus(workItemId))?.status).toBe('finished')
   })
 
+  it('approve: a failing effect fails the work item and does not resume as success', async () => {
+    const effect = vi.fn(async () => ({ error: 'gmail boom' }))
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const { gateId, workItemId } = await seedGate(svc)
+    const res = await svc.resolveGate(gateId, {
+      gateId,
+      decision: 'approved',
+      formRev: 0,
+      form: { threadId: 't', body: 'b' },
+    })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.status).toBe(502)
+    await waitFor(async () => {
+      const s = await svc.getStatus(workItemId)
+      return s?.done === true
+    })
+    expect((await svc.getStatus(workItemId))?.status).toBe('error')
+    expect(effect).toHaveBeenCalledTimes(1)
+  })
+
+  // NOTE: the "cancel of a running item starts exactly one queued sibling" cap-hold test is
+  // deferred to browser E2E flow 3 (Stop button with a queued item visible in the pipeline
+  // column). The blockingProvider's `await new Promise(() => {})` cannot be interrupted by
+  // iterator.return() in a pure async generator — the pending await never resolves, so the
+  // consume loop never exits and pool.release never fires in the test harness.
+  // In production the provider generator runs a subprocess; iterator.return() triggers the
+  // generator's finally block which calls child.kill(), immediately resolving the pending
+  // read. The code fix (removing pool.release from cancelItem) is the correctness guarantee;
+  // the runtime path is covered by the browser E2E.
+
   it('cancel on an already-finished item is a safe no-op', async () => {
     const svc = makeService({ effects: { saveDraft: async () => ({}) } })
     const { gateId, workItemId } = await seedGate(svc)
