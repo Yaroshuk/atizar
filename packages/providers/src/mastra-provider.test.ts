@@ -128,6 +128,42 @@ describe('createMastraProvider run()', () => {
     expect(onAbort).toHaveBeenCalledTimes(1)
   })
 
+  it('does NOT abort on a clean suspend (the parked run must survive for native resume)', async () => {
+    const onAbort = vi.fn()
+    const runner: MastraRunner = {
+      start: () =>
+        fakeRun(
+          [{ type: 'tool-call', payload: { toolCallId: 'd', toolName: 'saveDraft', args: DRAFT } }],
+          { status: 'suspended' },
+          onAbort
+        ),
+      resume: () => fakeRun([], { status: 'completed' }),
+    }
+    const p = createMastraProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['saveDraft'],
+      runner,
+    })
+    await collect(p.run(input)) // fully consume to the natural end
+    expect(onAbort).not.toHaveBeenCalled()
+  })
+
+  it('does NOT abort on a clean completion', async () => {
+    const onAbort = vi.fn()
+    const runner: MastraRunner = {
+      start: () =>
+        fakeRun(
+          [{ type: 'text-delta', payload: { text: 'hi' } }],
+          { status: 'completed' },
+          onAbort
+        ),
+      resume: () => fakeRun([], { status: 'completed' }),
+    }
+    const p = createMastraProvider({ approvalNames: [], surfaceTools: [], runner })
+    await collect(p.run(input))
+    expect(onAbort).not.toHaveBeenCalled()
+  })
+
   it('failed result yields an error chunk', async () => {
     const runner: MastraRunner = {
       start: () => fakeRun([], { status: 'failed', error: 'boom' }),

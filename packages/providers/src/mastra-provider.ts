@@ -31,6 +31,12 @@ export function createMastraProvider(opts: {
         artifact: Record<string, unknown>
       } | null
     } = { lastApproval: null }
+    // Did the run settle on its own (finished/suspended/failed)? A `finally` runs on BOTH normal
+    // completion AND an early `iterator.return()` (Stop). We must abort ONLY on the latter: a
+    // SUSPENDED run is parked in Mastra's storage for the native resume, and aborting it would
+    // cancel that snapshot ("This workflow run was not suspended" on resume). So abort iff the
+    // generator was interrupted before settling (caution a) — never on a clean suspend/finish.
+    let settled = false
     try {
       // Tap the stream: forward every chunk to the mapper AND watch for the approval tool-call.
       const tap = (async function* () {
@@ -49,6 +55,7 @@ export function createMastraProvider(opts: {
 
       const result = await run.result
       if (result.status === 'failed') {
+        settled = true
         yield errorChunk(result.error)
         return
       }
@@ -62,8 +69,11 @@ export function createMastraProvider(opts: {
         })
       }
       // completed (or suspended w/o an approval call) → return; RunObserver does transition(finish).
+      settled = true
     } finally {
-      run.abort() // caution (a): iterator.return() reaches Mastra
+      // Abort ONLY if interrupted before settling (Stop via iterator.return). A clean
+      // suspend/finish must NOT abort — that would cancel the parked suspended run.
+      if (!settled) run.abort()
     }
   }
 
