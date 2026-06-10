@@ -143,8 +143,12 @@ export function createDevRunsRoutes(getProvider: (agentKey: string) => Provider 
             .catch(() => {})
         }
         const onStatus = (status: RunStatus) => {
-          void stream.writeSSE({ event: 'status', data: status }).catch(() => {})
-          if (status === 'done' || status === 'error') cleanup()
+          const written = stream.writeSSE({ event: 'status', data: status }).catch(() => {})
+          // On a terminal status, close only AFTER that write flushes — cleanup() resolves
+          // the promise, which lets streamSSE close the stream. Closing synchronously here
+          // would drop the still-queued 'done' write and the client would never leave
+          // 'running'. Stream writes are FIFO, so awaiting this also flushes prior events.
+          if (status === 'done' || status === 'error') void written.then(cleanup)
         }
         const cleanup = () => {
           run.emitter.off('event', writeEvent)
@@ -157,8 +161,10 @@ export function createDevRunsRoutes(getProvider: (agentKey: string) => Provider 
 
         // Backlog (after attaching — dupes are fine, client orders by seq).
         for (const entry of run.trace) writeEvent(entry)
-        void stream.writeSSE({ event: 'status', data: run.status }).catch(() => {})
-        if (run.done) cleanup()
+        const initial = stream.writeSSE({ event: 'status', data: run.status }).catch(() => {})
+        // If the run already finished, close only after the status write flushes (same
+        // reason as onStatus): a client attaching post-completion must still receive 'done'.
+        if (run.done) void initial.then(cleanup)
       })
     })
   })
