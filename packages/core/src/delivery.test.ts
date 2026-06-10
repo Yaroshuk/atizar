@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
-import { defineAgent, defineWorkflow } from '@platform/core'
-import { resolveDelivery, deliveryKey } from './deliver'
+import { defineAgent, defineWorkflow } from './index.js'
+import { resolveDelivery, deliveryKey } from './delivery.js'
 
 const mk = (id: string, role: 'input' | 'worker', handoffs: string[] = []) => ({
   agent: defineAgent({
@@ -58,12 +58,7 @@ describe('resolveDelivery', () => {
     expect(r.ok).toBe(false)
   })
   it('rejects a payload that fails the contract schema', () => {
-    const r = resolveDelivery(
-      wfs,
-      'a',
-      { kind: 'contract', workflow: 'b', input: 'lead' },
-      { x: 123 }
-    )
+    const r = resolveDelivery(wfs, 'a', { kind: 'contract', workflow: 'b', input: 'lead' }, { x: 123 })
     expect(r.ok).toBe(false)
   })
 })
