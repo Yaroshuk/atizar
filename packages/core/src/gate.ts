@@ -1,4 +1,4 @@
-import { EventType, type BaseEvent } from '@ag-ui/client'
+import { EventType, type BaseEvent, type CustomEvent } from '@ag-ui/client'
 import { z } from 'zod'
 
 // A provider-agnostic "a human gate just opened" signal, carried as an AG-UI CUSTOM
@@ -18,15 +18,17 @@ export const GateOpenedValueSchema = z.object({
 })
 export type GateOpenedValue = z.infer<typeof GateOpenedValueSchema>
 
-// Build the BaseEvent so providers don't hand-roll the CUSTOM envelope.
-export function gateOpened(value: GateOpenedValue): BaseEvent {
-  return { type: EventType.CUSTOM, name: GATE_OPENED, value } as BaseEvent
+// Build the CUSTOM event so providers don't hand-roll the envelope. CustomEvent.value is
+// `any` on the wire, so the typed GateOpenedValue assigns without a cast; the precise return
+// type lets callers see exactly what they get (it's still a BaseEvent for stream purposes).
+export function gateOpened(value: GateOpenedValue): CustomEvent {
+  return { type: EventType.CUSTOM, name: GATE_OPENED, value }
 }
 
 // Recognize + parse a gate signal from any BaseEvent. Returns null for non-gate events
 // AND for a malformed payload (so a bad value never reaches a consumer as a "valid" gate).
 export function readGateOpened(event: BaseEvent): GateOpenedValue | null {
-  const e = event as { type?: string; name?: string; value?: unknown }
+  const e = event as { type: EventType; name?: string; value?: unknown }
   if (e.type !== EventType.CUSTOM || e.name !== GATE_OPENED) return null
   const parsed = GateOpenedValueSchema.safeParse(e.value)
   return parsed.success ? parsed.data : null
