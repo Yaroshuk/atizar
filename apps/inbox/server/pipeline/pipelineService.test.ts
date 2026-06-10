@@ -157,4 +157,15 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'finished')
     expect((await svc.getStatus(workItemId))?.status).toBe('finished')
   })
+
+  it('cancel on an already-finished item is a safe no-op', async () => {
+    const svc = makeService({ effects: { saveDraft: async () => ({}) } })
+    const { gateId, workItemId } = await seedGate(svc)
+    // Reject the gate to move the item to finished
+    await svc.resolveGate(gateId, { gateId, decision: 'rejected', formRev: 0 })
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'finished')
+    // Now cancel a work item that is already finished — must be a no-op
+    await expect(svc.cancel(workItemId)).resolves.toBeUndefined()
+    expect((await svc.getStatus(workItemId))?.status).toBe('finished')
+  })
 })

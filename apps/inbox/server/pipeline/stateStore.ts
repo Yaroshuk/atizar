@@ -12,8 +12,7 @@ import {
   type TraceRow,
   type WorkItem,
 } from './db/schema.js'
-
-const ACTIVE_STATUSES: WorkItem['status'][] = ['queued', 'running', 'awaiting_approval', 'awaiting_input']
+import { ACTIVE } from './transition.js'
 
 export interface InsertWorkItemInput {
   id?: string
@@ -177,12 +176,12 @@ export function makeStateStore(db: Db) {
 
     async getActiveChildren(parentId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.parentId, parentId))
-      return rows.filter((r) => ACTIVE_STATUSES.includes(r.status))
+      return rows.filter((r) => ACTIVE.includes(r.status))
     },
 
     async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
-      return rows.filter((r) => ACTIVE_STATUSES.includes(r.status))
+      return rows.filter((r) => ACTIVE.includes(r.status))
     },
   }
 }

@@ -10,7 +10,7 @@ import {
   type DispatchInput,
   type DispatchResult,
 } from './dispatch.js'
-import { transition } from './transition.js'
+import { transition, ACTIVE } from './transition.js'
 import type { Gate, WorkItem, WorkItemStatus } from './db/schema.js'
 
 // Wires StateStore + EventBus + WorkerPool + RunObserver into one façade the routes call.
@@ -63,6 +63,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   async function cancelItem(workItemId: string): Promise<void> {
     const wi = await store.getWorkItem(workItemId)
     if (!wi) return
+    if (!ACTIVE.includes(wi.status)) return // already terminal — nothing to cancel
     if (wi.status === 'queued') pool.dequeue(workItemId, wi.agentId)
     if (wi.status === 'running') observer.cancel(workItemId)
     const open = await store.getOpenGate(workItemId)
