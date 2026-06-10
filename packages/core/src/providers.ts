@@ -3,6 +3,30 @@ import type { RunAgentInput, BaseEvent } from '@ag-ui/client'
 // A provider is the model/runtime seam: given the run input it yields AG-UI events.
 export interface Provider {
   run(input: RunAgentInput): AsyncIterable<BaseEvent>
+  // Optional v2 capability: resume a run that suspended at a gate. The provider OWNS the
+  // resume mechanics (the orchestrator never hard-codes re-prime): claude-cli implements it
+  // as kill-and-re-prime from the transcript + the verbatim approved artifact; Mastra (later)
+  // resumes natively by runId against its own snapshot store. Absent ⇒ no resume capability.
+  resume?(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent>
+}
+
+// What the orchestrator hands back to resume a suspended run. Both fields are always present;
+// each provider reads the slice it needs. claude-cli re-primes from `input` + the resolution;
+// Mastra resumes by `runId` and ignores `input`. A transparent struct (not an opaque token) so
+// a stateless provider, which has no live process to hold a token against, still has the
+// transcript. A private token can be added as an optional field later without breaking callers.
+export interface ResumeHandle {
+  runId: string
+  input: RunAgentInput
+}
+
+// The human's decision at a gate. `form` is the approved/edited artifact (byte-verbatim — it
+// becomes the effect arguments at step 4); `comment` seeds the future revise loop.
+export interface GateResolution {
+  gateId: string
+  decision: 'approved' | 'rejected'
+  form?: Record<string, unknown>
+  comment?: string
 }
 
 // A per-agent prompt strategy: how this agent turns a run into CLI prompts.
