@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { readGateOpened } from '@platform/core'
+import { readGateOpened, providerConformanceChecks, type ConformanceScenario } from '@platform/core'
 import type { ResumeHandle } from '@platform/core'
 import { createMastraProvider } from './mastra-provider.js'
 import type { MastraChunk, MastraRunner, MastraRun, MastraRunResult } from './mastra-types.js'
@@ -200,4 +200,70 @@ describe('createMastraProvider resume()', () => {
     )
     expect(resume).toHaveBeenCalledWith('r1', expect.objectContaining({ decision: 'approved' }))
   })
+})
+
+// A fake runner that satisfies the conformance scenario: turn1 → suspend at saveDraft;
+// resume(approved) → completed text; resume(rejected) → completed text, no tool call.
+function conformanceRunner(): MastraRunner {
+  return {
+    start: () =>
+      fakeRun(
+        [
+          {
+            type: 'tool-call',
+            payload: { toolCallId: 'tc-render', toolName: 'renderLead', args: { from: 'a' } },
+          },
+          {
+            type: 'tool-call',
+            payload: { toolCallId: 'tc-draft', toolName: 'saveDraft', args: DRAFT },
+          },
+        ],
+        { status: 'suspended' }
+      ),
+    resume: (_runId, resolution) =>
+      fakeRun(
+        [
+          {
+            type: 'text-delta',
+            payload: { text: resolution.decision === 'approved' ? 'Saved.' : 'Rejected.' },
+          },
+        ],
+        { status: 'completed' }
+      ),
+  }
+}
+
+const scenario: ConformanceScenario = {
+  approvalNames: ['saveDraft'],
+  surfaceTools: ['renderLead', 'saveDraft'],
+  turn1Input: { messages: [], runId: 'r1' } as unknown as RunAgentInput,
+  approved: {
+    handle: { runId: 'r1', input: { messages: [] } as unknown as RunAgentInput },
+    resolution: {
+      gateId: 'g1',
+      decision: 'approved',
+      form: DRAFT,
+      executedResult: { draftId: 'd1' },
+    },
+  },
+  rejected: {
+    handle: { runId: 'r1', input: { messages: [] } as unknown as RunAgentInput },
+    resolution: { gateId: 'g1', decision: 'rejected' },
+  },
+}
+
+describe('mastra-provider conformance', () => {
+  for (const check of providerConformanceChecks) {
+    it(check.name, () =>
+      check.run(
+        () =>
+          createMastraProvider({
+            approvalNames: ['saveDraft'],
+            surfaceTools: ['renderLead', 'saveDraft'],
+            runner: conformanceRunner(),
+          }),
+        scenario
+      )
+    )
+  }
 })
