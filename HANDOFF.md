@@ -210,6 +210,26 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   propose/render tools — wire `gmail-basic` read functions as native Mastra tools, no MCP.
   Definition of done = the step-1 conformance suite passes against it. Default provider stays
   `claude-cli` locally (env switch, e.g. `PROVIDER=mastra`).
+  **Step-5 design APPROVED (2026-06-10 — do not re-ask), four forks:** (1) INJECT a
+  `MastraRunner` interface into `@platform/providers/mastra-provider.ts` (the spawn-injection
+  pattern; package stays isomorphic; conformance runs on a fake runner, no API key — live key
+  only for E2E; the real Mastra assembly lives in `apps/inbox/server/`). (2) Proposal→gate =
+  a no-op PROPOSE tool (`saveDraft`, args = the artifact) inside agentStep, then gateStep
+  `suspend({proposedArtifact, toolName, toolCallId})` — keeps the conformance invariant that
+  `GATE_OPENED.toolCallId` matches a real TOOL_CALL_START (structured-output alternative
+  rejected). (3) `resume()` = native `run.resume({step, resumeData})`; approved branch = short
+  confirming narrative (the server already executed the effect — propose-don't-execute),
+  rejected = bail; PromptStrategy is legitimately ignored by Mastra. (4) Mastra snapshot
+  storage on OUR Postgres but in ITS OWN tables; StateStore keeps only `workItemId ↔ runId`.
+  **Three cautions to build in:** (a) `MastraRunner` MUST expose `abort()` — the step-4 Stop
+  path kills via the provider, and cancel mid-run under `PROVIDER=mastra` must be in the
+  browser E2E or the Stop button silently no-ops on the production provider; (b) `saveDraft`
+  is the TERMINAL gesture of agentStep — last-call-wins if the model emits it twice, and the
+  no-saveDraft path must finalize as a normal empty finish, never hang; (c) keep Mastra's
+  tables OUT of our drizzle migration set (own prefix/schema; `reset.ts` for the test DB must
+  init both storages). DoD additions: re-key record/replay (cassette step = store's
+  resolved-gate count, wipe `.cassettes/` once) and live E2E for approve AND reject AND
+  cancel.
 - **Step 6 micro-decisions:** the pure `foldEventsToMessages(events) → messages` ALREADY EXISTS
   (built at step 2, `@platform/core`, unit-tested) — render both history and live tail through it
   (the `?spike=1` page already does); do NOT re-extract it. Extend

@@ -198,6 +198,14 @@ skill seed): `docs/dev-record-replay.md`. Build narrative: `docs/BUILD-LOG.md` �
 - **Human-in-the-loop** is the core product moment: the agent pauses at an `approval`,
   the manager clicks, the action proceeds, audit-logged (audit = 💤). ✅ (pause/resume built).
 
+**Beta packaging of this surface (LOCKED 2026-06-10)** → `@platform/react` ships the chrome
+(board, switcher, pipeline tree, thread, GateForm, Stop, TraceLog, ConnectionStatus) + the card
+construction kit (CardShell, primitives, `registerCard`, `useThreadResult`); hooks are the
+headless layer; workflow-specific cards stay USERLAND (demo app exemplars). Styling = plain CSS
+over `--atz-*` design tokens (`tokens.css` + `styles.css`; no Tailwind/CSS-in-JS), three-layer
+customization, consumer branding via `editableBy` config-as-data. Detail →
+`docs/pipeline-updated-3.md` §1.10 + HANDOFF inventory.
+
 ## 7. Skills storage 🎯 (future)
 
 Skills ride **inside packages**, versioned with `npm update` (no drift, no DB):
