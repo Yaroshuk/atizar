@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "lsof -tiTCP:4000 -tiTCP:5173 -sTCP:LISTEN 2>/dev/null | xargs -I{} kill -9 {} 2>/dev/null; sleep 1; true",
+    "predev": "../../scripts/ensure-postgres.sh; lsof -tiTCP:4000 -tiTCP:5173 -sTCP:LISTEN 2>/dev/null | xargs -I{} kill -9 {} 2>/dev/null; sleep 1; true",
     "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",

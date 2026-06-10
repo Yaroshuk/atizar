@@ -1,0 +1,34 @@
+# Dev infrastructure — ONLY the database is containerized.
+# The app runs on the HOST via `yarn dev` (claude-cli needs the local binary +
+# macOS-keychain auth, so the dev server is never put in a container).
+#
+#   docker compose up -d postgres      # bring up just the DB (also auto-run by predev)
+#   docker compose down                # stop it (data persists in the named volume)
+#   docker compose down -v             # stop AND wipe the data volume
+#
+# Default connection string for the server (override via env):
+#   DATABASE_URL=postgres://aiworkflow:aiworkflow@localhost:5432/aiworkflow
+# Postgres is THE backend (dev included) — no SQLite tier (docs/pipeline-updated-3.md §1.7).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aiworkflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aiworkflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiworkflow}
+      POSTGRES_DB: ${POSTGRES_DB:-aiworkflow}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - aiworkflow-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-aiworkflow} -d ${POSTGRES_DB:-aiworkflow}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  aiworkflow-pgdata:
