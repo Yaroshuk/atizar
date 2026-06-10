@@ -17,6 +17,11 @@ export const AgentDefinitionSchema = z
     handoffs: z.array(z.string()).optional(),
     // Max concurrent runtime copies of this agent. A cap of 1 = singleton.
     maxInstances: z.number().int().positive().default(2),
+    // Approval tools whose resolution triggers a SERVER-executed effect (the function
+    // lives in the workflow ServerBinding; the model never sees an effect tool).
+    effects: z.array(z.string()).default([]),
+    // Read-only tools, declared so the boot-time allow-list classification is exhaustive.
+    readonly: z.array(z.string()).default([]),
   })
   .superRefine((def, ctx) => {
     for (const name of def.approvals) {
@@ -32,6 +37,14 @@ export const AgentDefinitionSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `render key "${key}" is not declared in tools`,
+        })
+      }
+    }
+    for (const name of def.effects) {
+      if (!def.approvals.includes(name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `effect "${name}" is not an approval`,
         })
       }
     }

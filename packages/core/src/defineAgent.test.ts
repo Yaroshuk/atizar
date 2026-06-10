@@ -42,6 +42,53 @@ const base = {
   renders: {},
 }
 
+describe('effects + readonly', () => {
+  it('accepts effects that are a subset of approvals', () => {
+    const def = defineAgent({
+      id: 'reply',
+      name: 'REPLY',
+      provider: 'claude-cli',
+      instructions: 'x',
+      tools: ['renderLead', 'saveDraft'],
+      approvals: ['saveDraft'],
+      effects: ['saveDraft'],
+      readonly: [],
+      renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
+    })
+    expect(def.effects).toEqual(['saveDraft'])
+    expect(def.readonly).toEqual([])
+  })
+
+  it('rejects an effect that is not an approval', () => {
+    expect(() =>
+      defineAgent({
+        id: 'reply',
+        name: 'REPLY',
+        provider: 'claude-cli',
+        instructions: 'x',
+        tools: ['renderLead', 'saveDraft'],
+        approvals: ['saveDraft'],
+        effects: ['renderLead'], // not an approval
+        renders: {},
+      })
+    ).toThrow(/effect .*renderLead.* is not an approval/)
+  })
+
+  it('defaults effects and readonly to empty arrays', () => {
+    const def = defineAgent({
+      id: 'q',
+      name: 'Q',
+      provider: 'claude-cli',
+      instructions: 'x',
+      tools: [],
+      approvals: [],
+      renders: {},
+    })
+    expect(def.effects).toEqual([])
+    expect(def.readonly).toEqual([])
+  })
+})
+
 describe('maxInstances', () => {
   it('defaults to 2 when omitted', () => {
     expect(defineAgent({ ...base }).maxInstances).toBe(2)
