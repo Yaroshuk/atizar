@@ -88,10 +88,6 @@ export const GateOpenedValueSchema = z.object({
   toolName: z.string(),                      // the approval tool that opened the gate
   toolCallId: z.string(),                    // correlates with the TOOL_CALL_* events
   proposedArtifact: z.record(z.unknown()),   // the approval tool's args = the agent's proposal
-  // The resume handle, shallow-validated: `runId` is ours; `input` is the AG-UI `RunAgentInput`
-  // (a large foreign type we pass through, not deep-validate — z.any keeps the schema honest
-  // about "we don't own this shape" without re-deriving the whole AG-UI envelope in zod).
-  resumeHandle: z.object({ runId: z.string(), input: z.any() }),
 })
 export type GateOpenedValue = z.infer<typeof GateOpenedValueSchema>
 
@@ -104,6 +100,13 @@ export function readGateOpened(event: BaseEvent): GateOpenedValue | null
 `proposedArtifact` + `toolCallId` are exactly what the RunObserver (step 2) will copy into the
 Gate record. Emitting them now means the gate's audit data exists in the stream before the
 consumer that stores it.
+
+**Why no `resumeHandle` in the event:** `GATE_OPENED` carries only what the consumer does *not*
+otherwise have. The orchestrator already holds `{ runId, input }` (it dispatched the run), so it
+constructs the `ResumeHandle` itself when it calls `resume()`. The provider — not the
+orchestrator and not the event — owns what to *do* with that handle. This also lets the emitter
+(`claude-stream`) produce a complete signal from data it already has (tool name, id, args),
+without reaching for the runId/input it never sees.
 
 ### 3.3 Conformance suite
 
@@ -142,8 +145,8 @@ exactly as today. The approval tool's args (already parsed for `TOOL_CALL_ARGS`)
 
 - Extract the current kill-and-re-prime logic out of `run()`'s resume branch into a shared
   internal helper `primeAndStream(prompt, ...)`.
-- `run()` keeps its message-history resume detection (back-compat) **and** builds the
-  `GATE_OPENED` handle data so the stream can carry it.
+- `run()` keeps its message-history resume detection (back-compat); the `GATE_OPENED` event is
+  emitted by `claude-stream` (§4.1) — `run()` needs no change to carry it.
 - Implement `resume(handle, resolution)`: build the resume prompt from
   `handle.input` + `resolution.form` (the verbatim approved artifact) via the existing
   `PromptStrategy.buildResume`, then `primeAndStream`. A `rejected` resolution primes a
