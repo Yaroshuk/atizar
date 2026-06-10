@@ -5,3 +5,5 @@ coverage
 docs
 dist-types
 **/dist
+# drizzle-kit generated migration artifacts (SQL + snapshot/journal JSON)
+**/db/migrations
