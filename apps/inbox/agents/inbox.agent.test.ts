@@ -29,6 +29,8 @@ describe('inbox agents wiring', () => {
       surfaceTools: [],
       allowedTools: [],
       prompts: { buildFirst: () => '' },
+      instructions: '',
+      agentId: '',
     })
     expect(typeof provider.run).toBe('function')
   })

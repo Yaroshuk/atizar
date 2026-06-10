@@ -58,6 +58,12 @@ export interface ProviderConfig {
   // layer, not just via prompts. The mock provider ignores it.
   allowedTools: readonly string[]
   prompts: PromptStrategy
+  // The agent's system instructions (from defineAgent). claude-cli reads them via PromptStrategy;
+  // Mastra uses them as the Agent's instructions. Always present.
+  instructions: string
+  // A stable unique id for this agent instance (the wf__agent instanceKey). Mastra uses it to
+  // namespace its workflow + storage; claude-cli/mock ignore it. Always present.
+  agentId: string
 }
 
 // Providers are constructed PER AGENT from config (two agents → two configurations

@@ -22,6 +22,8 @@ export function buildProvider(
     surfaceTools: def.tools,
     allowedTools,
     prompts,
+    instructions: def.instructions,
+    agentId: instanceKey,
   })
 
   const mode = recordReplayMode()

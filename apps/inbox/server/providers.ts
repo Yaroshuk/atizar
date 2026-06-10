@@ -1,19 +1,56 @@
-import { defineProviders, type ProviderRegistry } from '@platform/core'
-import { createMockInboxProvider, createClaudeCliProvider } from '@platform/providers'
+import { defineProviders, type ProviderRegistry, type ProviderFactory } from '@platform/core'
+import {
+  createMockInboxProvider,
+  createClaudeCliProvider,
+  createMastraProvider,
+} from '@platform/providers'
 import { claudeSpawn } from './claude-spawn.js'
+import { makeMastraRunner } from './mastra/runner.js'
 
-// Runtime registry (server-only — claude-cli needs Node). Each entry is a FACTORY
-// built per agent from its passport-derived config. `mock` ignores prompts (it
-// scripts its own stream); `claude-cli` uses the injected PromptStrategy + spawn.
-// A future Mastra backend is one more factory here.
+const MASTRA_MODEL = process.env.MASTRA_MODEL ?? 'claude-sonnet-4-6'
+
+// Mastra factory: derive the agent's read vs render/propose tools from its allow-list (strip the
+// mcp prefix), build a MastraRunner, and wrap it in the provider. Fails fast without an API key.
+const mastraFactory: ProviderFactory = (config) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('PROVIDER=mastra requires ANTHROPIC_API_KEY')
+  }
+  const bare = (config.allowedTools ?? []).map((t) => t.replace(/^mcp__[^_]+__/, ''))
+  const renderAndProposeTools = bare.filter((t) => config.surfaceTools.includes(t))
+  const readTools = bare.filter(
+    (t) => !config.surfaceTools.includes(t) && !config.approvalNames.includes(t)
+  )
+  const runner = makeMastraRunner({
+    agentId: config.agentId,
+    instructions: config.instructions,
+    approvalNames: config.approvalNames,
+    readTools,
+    renderAndProposeTools,
+    model: MASTRA_MODEL,
+    databaseUrl: process.env.DATABASE_URL ?? '',
+  })
+  return createMastraProvider({
+    approvalNames: config.approvalNames,
+    surfaceTools: config.surfaceTools,
+    runner,
+  })
+}
+
+const usingMastra = process.env.PROVIDER === 'mastra'
+
+// Runtime registry (server-only). When PROVIDER=mastra, claude-cli-declared agents resolve to the
+// Mastra factory (descriptors keep provider:'claude-cli' — no descriptor churn). Default = claude-cli.
 export const providerRegistry: ProviderRegistry = defineProviders({
   mock: (config) => createMockInboxProvider(config.approvalNames),
-  'claude-cli': (config) =>
-    createClaudeCliProvider({
-      approvalNames: config.approvalNames,
-      surfaceTools: config.surfaceTools,
-      allowedTools: config.allowedTools,
-      prompts: config.prompts,
-      spawn: claudeSpawn,
-    }),
+  'claude-cli': usingMastra
+    ? mastraFactory
+    : (config) =>
+        createClaudeCliProvider({
+          approvalNames: config.approvalNames,
+          surfaceTools: config.surfaceTools,
+          allowedTools: config.allowedTools,
+          prompts: config.prompts,
+          spawn: claudeSpawn,
+        }),
+  mastra: mastraFactory,
 })
