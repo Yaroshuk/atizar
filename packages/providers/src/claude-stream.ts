@@ -112,6 +112,10 @@ export async function* mapClaudeStream(
     yield { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent
   }
 
+  // Normalize the approval tool's args into the gate's `proposedArtifact`. Two callers feed it
+  // different shapes: the streaming path passes the accumulated `argsBuf` JSON STRING (reconstructed
+  // from input_json_delta partials); the complete-message path passes the already-parsed `input`
+  // OBJECT. Hence both the string-parse and object-passthrough branches.
   function parseArtifact(raw: unknown): Record<string, unknown> {
     if (typeof raw === 'string') {
       try {

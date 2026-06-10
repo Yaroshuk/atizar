@@ -85,6 +85,11 @@ export const providerConformanceChecks: ConformanceCheck[] = [
       // a silent empty stream is indistinguishable from "resume did nothing". Symmetric with
       // the approved check; both real providers emit a closing chunk on reject.
       assert(events.length > 0, 'resume(rejected) produced no events')
+      // No effect-shaped continuation (spec §3.3 #3): a rejected resume must not call tools.
+      // TOOL_CALL_START is the provider-agnostic proxy for "an effect was attempted" — a future
+      // provider that fired an action on reject would emit one and fail here.
+      const toolCalls = events.filter((e) => e.type === EventType.TOOL_CALL_START)
+      assert(toolCalls.length === 0, 'resume(rejected) emitted a tool call (possible effect)')
     },
   },
   {
