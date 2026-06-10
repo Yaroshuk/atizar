@@ -6,7 +6,7 @@ const DATABASE_URL =
 
 export default defineConfig({
   dialect: 'postgresql',
-  schema: './server/pipeline/db/schema.ts',
-  out: './server/pipeline/db/migrations',
+  schema: '../../packages/server/src/db/schema.ts',
+  out: '../../packages/server/src/db/migrations',
   dbCredentials: { url: DATABASE_URL },
 })

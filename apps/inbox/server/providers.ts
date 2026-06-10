@@ -6,7 +6,7 @@ import {
 } from '@platform/providers'
 import { claudeSpawn } from './claude-spawn.js'
 import { makeMastraRunner } from './mastra/runner.js'
-import { databaseUrl } from './pipeline/db/client.js'
+import { databaseUrl } from '@platform/server'
 
 const MASTRA_MODEL = process.env.MASTRA_MODEL ?? 'claude-sonnet-4-6'
 

@@ -1,7 +1,11 @@
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { PostgresStore } from '@mastra/pg'
+
+const MIGRATIONS_FOLDER = join(dirname(fileURLToPath(import.meta.url)), 'migrations')
 
 // Vitest globalSetup (runs once, before any worker). Creates the dedicated TEST database and
 // applies migrations so pipeline tests run against a schema identical to dev — but isolated,
@@ -25,7 +29,7 @@ export default async function setup(): Promise<void> {
 
     const sql = postgres(TEST_URL)
     try {
-      await migrate(drizzle(sql), { migrationsFolder: 'apps/inbox/server/pipeline/db/migrations' })
+      await migrate(drizzle(sql), { migrationsFolder: MIGRATIONS_FOLDER })
     } finally {
       await sql.end({ timeout: 5 })
     }

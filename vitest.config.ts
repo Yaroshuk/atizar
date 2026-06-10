@@ -20,7 +20,7 @@ export default defineConfig({
         process.env.TEST_DATABASE_URL ??
         'postgres://aiworkflow:aiworkflow@localhost:5432/aiworkflow_test',
     },
-    globalSetup: ['./apps/inbox/server/pipeline/db/test-global-setup.ts'],
+    globalSetup: ['./packages/server/src/db/test-global-setup.ts'],
     include: ['apps/inbox/**/*.test.{ts,tsx,mjs}', 'packages/*/src/**/*.test.{ts,tsx}'],
     css: true,
     server: {

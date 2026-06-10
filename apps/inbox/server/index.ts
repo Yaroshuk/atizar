@@ -4,12 +4,14 @@ import { instanceId } from '@platform/core'
 import { providerRegistry } from './providers.js'
 import { buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
-import { db } from './pipeline/db/client.js'
-import { runMigrations } from './pipeline/db/migrate.js'
-import { startupSweep } from './pipeline/sweep.js'
-import { makePipelineService } from './pipeline/pipelineService.js'
-import { createPipelineRoutes } from './pipeline/routes.js'
-import type { AgentRuntime } from './pipeline/runObserver.js'
+import {
+  db,
+  runMigrations,
+  startupSweep,
+  makePipelineService,
+  createPipelineRoutes,
+  type AgentRuntime,
+} from '@platform/server'
 import { assertAgentClassification } from './agent-checks.js'
 
 // Wiring-time check: a passport must not hand off to an agent absent from its own workflow.
