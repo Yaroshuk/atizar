@@ -79,6 +79,10 @@ export function createClaudeCliProvider(opts: {
 
   // Build the resume prompt from the approved/edited artifact (resolution.form), falling back
   // to the last approval args in the transcript. Returns null when no usable draft exists.
+  // Precedence is `??` (not `||`) on purpose: an explicitly-passed `form` is honored even when
+  // empty `{}` — the caller's decision wins over the transcript — and an empty form then yields
+  // a null prompt (buildResume rejects it), surfacing "Resume failed" rather than silently
+  // re-priming from a stale transcript. Do not change `??` to `||`.
   function resumePromptFrom(handle: ResumeHandle, resolution: GateResolution): string | null {
     const messages = (handle.input?.messages ?? []) as Message[]
     const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
@@ -90,6 +94,9 @@ export function createClaudeCliProvider(opts: {
       const messages = (input?.messages ?? []) as Message[]
       const resuming = approvalResolved(messages, approvalNames)
       if (resuming) {
+        // Legacy stateless re-prime: the old client drives resume through run() with the
+        // resolved transcript and NO resolution.form, so this reads args from the transcript
+        // only. The explicit resume() path (below) prefers resolution.form via resumePromptFrom.
         const args = lastApprovalArgs(messages, approvalNames) ?? {}
         const resumePrompt = prompts.buildResume?.(args) ?? null
         if (!resumePrompt) {

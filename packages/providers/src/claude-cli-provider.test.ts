@@ -335,9 +335,13 @@ describe('createClaudeCliProvider — resume()', () => {
     const handle: ResumeHandle = { runId: 'r1', input: runInput([]) }
     const out = await drain(provider.resume!(handle, { gateId: 'g1', decision: 'rejected' }))
     expect(spawned).toBe(false)
-    expect(
-      out.some((e) => e.type === EventType.TEXT_MESSAGE_CHUNK && /reject/i.test(e.delta ?? ''))
-    ).toBe(true)
+    // Assert the exact no-effect note (not just any text containing "reject"), so a spawn-error
+    // chunk that happened to mention "rejected" couldn't satisfy this.
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({
+      type: EventType.TEXT_MESSAGE_CHUNK,
+      delta: 'The human rejected the proposed action; no changes were made.',
+    })
   })
 
   it('resume(approved) errors (no spawn) when no usable draft args exist', async () => {
