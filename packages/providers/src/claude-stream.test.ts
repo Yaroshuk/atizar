@@ -95,6 +95,8 @@ describe('mapClaudeStream', () => {
     expect(out.some((e) => e.type === EventType.TOOL_CALL_END && e.toolCallId === 'tc_ok')).toBe(
       true
     )
+    // The run suspends at the gate: the LAST event is GATE_OPENED (right after TOOL_CALL_END).
+    expect(readGateOpened(out.at(-1))).not.toBeNull()
   })
 
   it('skips malformed lines and blanks', async () => {
@@ -181,6 +183,8 @@ describe('mapClaudeStream', () => {
       true
     )
     expect(out.some((e) => e.delta === 'NOPE')).toBe(false)
+    // The run suspends at the gate: the LAST event is GATE_OPENED (right after TOOL_CALL_END).
+    expect(readGateOpened(out.at(-1))).not.toBeNull()
   })
 
   it('does not double-emit when streamed deltas are followed by the complete message', async () => {
