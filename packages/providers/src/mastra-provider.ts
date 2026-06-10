@@ -1,0 +1,82 @@
+import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
+import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@platform/core'
+import { mapMastraStream } from './mastra-stream.js'
+import type { MastraRunner, MastraRun } from './mastra-types.js'
+
+function errorChunk(message: string): BaseEvent {
+  return {
+    type: EventType.TEXT_MESSAGE_CHUNK,
+    role: 'assistant',
+    messageId: crypto.randomUUID(),
+    delta: `Provider error: ${message}`,
+  } as BaseEvent
+}
+
+export function createMastraProvider(opts: {
+  approvalNames: readonly string[]
+  surfaceTools: readonly string[]
+  runner: MastraRunner
+}): Provider {
+  const { approvalNames, surfaceTools, runner } = opts
+
+  // Drive ONE Mastra run (start or resume): map chunks → AG-UI, track the last approval-named
+  // tool-call (= the gate proposal, last-wins), and on a suspended result synthesize GATE_OPENED
+  // from it. `emitGateOnSuspend=false` on resume (a resumed run must not re-open the gate).
+  async function* drive(run: MastraRun, emitGateOnSuspend: boolean): AsyncGenerator<BaseEvent> {
+    // Mutable container avoids TS control-flow narrowing-to-never after async IIFE mutations.
+    const state: {
+      lastApproval: {
+        toolName: string
+        toolCallId: string
+        artifact: Record<string, unknown>
+      } | null
+    } = { lastApproval: null }
+    try {
+      // Tap the stream: forward every chunk to the mapper AND watch for the approval tool-call.
+      const tap = (async function* () {
+        for await (const c of run.stream) {
+          const name = (c.payload?.toolName ?? c.toolName) as string | undefined
+          if (c.type === 'tool-call' && name && approvalNames.includes(name)) {
+            const args = (c.payload?.args ?? c.args ?? {}) as Record<string, unknown>
+            const id = (c.payload?.toolCallId ?? c.toolCallId ?? crypto.randomUUID()) as string
+            state.lastApproval = { toolName: name, toolCallId: id, artifact: args } // last-wins (caution b)
+          }
+          yield c
+        }
+      })()
+
+      yield* mapMastraStream(tap, { surfaceTools })
+
+      const result = await run.result
+      if (result.status === 'failed') {
+        yield errorChunk(result.error)
+        return
+      }
+      const { lastApproval } = state
+      if (result.status === 'suspended' && emitGateOnSuspend && lastApproval) {
+        yield gateOpened({
+          gateKind: 'approval',
+          toolName: lastApproval.toolName,
+          toolCallId: lastApproval.toolCallId,
+          proposedArtifact: lastApproval.artifact,
+        })
+      }
+      // completed (or suspended w/o an approval call) → return; RunObserver does transition(finish).
+    } finally {
+      run.abort() // caution (a): iterator.return() reaches Mastra
+    }
+  }
+
+  return {
+    async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
+      const runId = (input?.runId as string) ?? crypto.randomUUID()
+      const inputData = { messages: input?.messages ?? [] }
+      yield* drive(runner.start(runId, inputData), true)
+    },
+
+    async *resume(_handle: ResumeHandle, _resolution: GateResolution): AsyncIterable<BaseEvent> {
+      // Implemented in Task 4.
+      yield errorChunk('resume not implemented')
+    },
+  }
+}
