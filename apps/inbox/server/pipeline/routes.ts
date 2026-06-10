@@ -5,8 +5,8 @@ import type { PipelineService } from './pipelineService.js'
 
 // HTTP surface over the PipelineService. Read shapes (trace snapshot + SSE tail) are ported
 // verbatim from the step-2 spike (apps/inbox/server/dev-runs.ts) so the existing `?spike=1`
-// client keeps working against the Postgres spine. The dev start/resolve routes are dev-only
-// (the production trigger lands at step 6; the gate-keyed resolve with the ledger at step 4).
+// client keeps working against the Postgres spine. The dev start route is a throwaway until
+// step 6 (production trigger). Gate-keyed resolve + cancel routes are the step-4 production surface.
 
 const TERMINAL = new Set(['finished', 'error', 'closed'])
 
@@ -97,23 +97,49 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     })
   })
 
-  // RESOLVE a gate (dev throwaway — step 4 = gate-keyed /api/gates/:id/resolve with formRev,
-  // ledger, and server-executed effect). Here it resolves the gate and resumes.
-  app.post('/api/dev/workitems/:id/resolve', async (c) => {
-    const id = c.req.param('id')
+  // RESOLVE a gate (step 4): formRev + ledger + server-executed effect + resume.
+  app.post('/api/gates/:id/resolve', async (c) => {
+    const gateId = c.req.param('id')
     const body = await c.req.json<{
+      formRev: number
       decision: 'approved' | 'rejected'
       form?: Record<string, unknown>
       comment?: string
     }>()
-    const result = await service.resolveGate(id, {
-      gateId: id, // dev stub: one open gate per item; Task 8 keys by real gate id
+    const result = await service.resolveGate(gateId, {
+      gateId,
+      formRev: body.formRev,
       decision: body.decision,
       form: body.form,
       comment: body.comment,
-      formRev: 0, // dev stub: no formRev check; Task 8 reads from request body
     })
-    if (!result.ok) return c.json({ error: result.error }, 409)
+    return result.ok
+      ? c.json({ ok: true })
+      : c.json({ error: result.error }, result.status as 404 | 409 | 500)
+  })
+
+  // The open gate for a work item (id + form + formRev for the approve/edit UI).
+  app.get('/api/workitems/:id/gate', async (c) => {
+    const gate = await service.getOpenGate(c.req.param('id'))
+    if (!gate) return c.json({ error: 'no open gate' }, 404)
+    return c.json({
+      id: gate.id,
+      toolName: gate.toolName,
+      form: gate.form,
+      formRev: gate.formRev,
+      proposedArtifact: gate.proposedArtifact,
+    })
+  })
+
+  // STOP a work item (and its active descendants).
+  app.post('/api/workitems/:id/cancel', async (c) => {
+    await service.cancel(c.req.param('id'))
+    return c.json({ ok: true })
+  })
+
+  // STOP every active work item of a workflow.
+  app.post('/api/workflows/:id/cancel', async (c) => {
+    await service.cancelWorkflow(c.req.param('id'))
     return c.json({ ok: true })
   })
 
