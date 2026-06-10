@@ -1,0 +1,18 @@
+{
+  "name": "@platform/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./db/schema": "./src/db/schema.ts"
+  },
+  "dependencies": {
+    "@ag-ui/client": "^0.0.55",
+    "@platform/core": "*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.23",
+    "postgres": "^3.4.9",
+    "zod": "^3.25.76"
+  }
+}
