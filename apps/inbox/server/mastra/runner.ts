@@ -49,6 +49,21 @@ const ALL_TOOLS = {
   saveDraft: saveDraftTool,
 } as const
 
+// Mastra's ToolStream wraps every `writer.write(value)` in a workflow-step-output envelope before
+// it surfaces on `run.stream`. The pure mapper/provider key on 'text-delta'/'tool-call', so we
+// must unwrap here (in the Mastra-specific runner) rather than polluting the pure layer.
+interface StepOutputChunk {
+  type: string
+  payload?: { output?: MastraChunk }
+}
+
+// Exported so the pure unit test can verify the two cases without any Mastra dependency.
+export function unwrapStepOutput(raw: MastraChunk): MastraChunk {
+  if (raw.type !== 'workflow-step-output') return raw
+  const step = raw as unknown as StepOutputChunk
+  return step.payload?.output ?? raw
+}
+
 // Structural views of the Mastra surface we touch. The workflow stream chunk shapes are not
 // strongly typed for our purposes (the mapper reads them defensively), so we narrow to just the
 // methods/fields the bridge uses instead of leaking Mastra's deep generics across the seam.
@@ -187,7 +202,7 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
         cancelFn = () => void run.cancel()
         const s = makeStream(run)
         try {
-          for await (const c of s) yield c
+          for await (const raw of s as AsyncIterable<MastraChunk>) yield unwrapStepOutput(raw)
         } finally {
           const r = (await s.result) ?? { status: 'success' }
           resolveResult(toResult(r))
