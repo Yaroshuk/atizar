@@ -7,6 +7,7 @@ import {
   defineAgent,
   defineWorkflow,
   gateOpened,
+  type EffectFn,
   type GateResolution,
   type Provider,
   type ResumeHandle,
@@ -14,7 +15,6 @@ import {
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import type { AgentRuntime } from './runObserver.js'
-import type { EffectFn } from '../../workflows/server-binding.js'
 
 const reachable = await db
   .execute(sql`select 1`)

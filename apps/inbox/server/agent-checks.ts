@@ -1,5 +1,4 @@
-import type { AgentDefinition } from '@platform/core'
-import type { EffectFn } from '../workflows/server-binding.js'
+import type { AgentDefinition, EffectFn } from '@platform/core'
 
 // Strip the `mcp__<server>__` prefix to the bare tool name the passport declares.
 function bareName(fullyQualified: string): string {

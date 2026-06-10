@@ -1,13 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { encodeHandoff, readGateOpened, type GateResolution, type Provider } from '@platform/core'
+import {
+  encodeHandoff,
+  readGateOpened,
+  type EffectFn,
+  type GateResolution,
+  type Provider,
+} from '@platform/core'
 import type { Db } from './db/client.js'
 import type { StateStore } from './stateStore.js'
 import type { WorkerPool } from './workerPool.js'
 import type { EventBus } from './eventBus.js'
 import { transition } from './transition.js'
 import type { WorkItem } from './db/schema.js'
-import type { EffectFn } from '../../workflows/server-binding.js'
 
 // The server-side consumer of a provider run — runs for EVERY dispatch, browser or not
 // (spec §1.5). Appends Trace, reacts to GATE_OPENED (insert Gate + transition + suspend),
