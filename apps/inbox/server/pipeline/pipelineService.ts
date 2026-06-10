@@ -1,5 +1,11 @@
 import type { BaseEvent } from '@ag-ui/client'
-import type { GateResolution } from '@platform/core'
+import {
+  resolveDelivery,
+  deliveryKey,
+  type Destination,
+  type GateResolution,
+  type WorkflowDescriptor,
+} from '@platform/core'
 import type { Db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
 import { makeEventBus } from './eventBus.js'
@@ -32,6 +38,9 @@ export interface TraceSnapshot {
 export interface PipelineServiceDeps {
   db: Db
   resolveAgent: (agentId: string) => AgentRuntime | undefined
+  // Workflow descriptors — the server resolves a handoff Destination against these
+  // (resolveDelivery) when a card emits a delivery.
+  descriptors: WorkflowDescriptor[]
 }
 
 export function makePipelineService(deps: PipelineServiceDeps) {
@@ -85,6 +94,33 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
       return dispatchChokepoint(db, pool, { ...req, maxInstances })
+    },
+
+    // A human-gated handoff from a rendered card: resolve the Destination server-side
+    // (same validation the client used) and dispatch a CHILD work item (parentId = the
+    // card's work item). Dedup-by-source is the chokepoint's job — a repeated click on
+    // the same source returns { deduped: true }, no second child.
+    async deliver(req: {
+      origin: string
+      dest: Destination
+      payload: Record<string, unknown>
+      parentId: string
+    }): Promise<{ ok: true; id: string; deduped: boolean } | { ok: false; error: string }> {
+      const r = resolveDelivery(deps.descriptors, req.origin, req.dest, req.payload)
+      if (!r.ok) return { ok: false, error: r.error }
+      const [workflowId] = r.instanceId.split('__')
+      const runtime = deps.resolveAgent(r.instanceId)
+      const maxInstances = runtime?.maxInstances ?? 1
+      const result = await dispatchChokepoint(db, pool, {
+        workflowId: workflowId ?? r.instanceId,
+        agentId: r.instanceId,
+        origin: 'agent',
+        payload: req.payload,
+        source: deliveryKey(req.payload) ?? null,
+        parentId: req.parentId,
+        maxInstances,
+      })
+      return { ok: true, ...result }
     },
 
     async resolveGate(

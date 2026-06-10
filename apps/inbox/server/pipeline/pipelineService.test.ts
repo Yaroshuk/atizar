@@ -1,7 +1,16 @@
+import { randomUUID } from 'node:crypto'
 import { describe, it, expect, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@platform/core'
+import {
+  defineAgent,
+  defineWorkflow,
+  gateOpened,
+  type GateResolution,
+  type Provider,
+  type ResumeHandle,
+} from '@platform/core'
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import type { AgentRuntime } from './runObserver.js'
@@ -66,7 +75,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       maxInstances: 2,
       effects: { saveDraft: async () => ({}) },
     }
-    const service = makePipelineService({ db, resolveAgent: () => runtime })
+    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
     const { id } = await service.dispatch(base)
     await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_approval')
@@ -90,7 +99,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       maxInstances: 2,
       effects: {},
     }
-    const service = makePipelineService({ db, resolveAgent: () => runtime })
+    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
     await service.dispatch({ ...base, agentId: 'cap-agent' })
     await service.dispatch({ ...base, agentId: 'cap-agent' })
@@ -110,7 +119,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       maxInstances: 2,
       effects: opts.effects,
     }
-    return makePipelineService({ db, resolveAgent: () => runtime })
+    return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
   }
 
   async function seedGate(
@@ -217,5 +226,93 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     // Now cancel a work item that is already finished — must be a no-op
     await expect(svc.cancel(workItemId)).resolves.toBeUndefined()
     expect((await svc.getStatus(workItemId))?.status).toBe('finished')
+  })
+})
+
+describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real Postgres)', () => {
+  const runtime: AgentRuntime = {
+    provider: blockingProvider(), // occupies its slot; the test asserts rows, not completion
+    renderToolNames: [],
+    maxInstances: 2,
+    effects: {},
+  }
+  // A descriptor with a published cross-workflow input contract (for the schema-reject case).
+  const crossWf = defineWorkflow({
+    id: 'lead-inbox',
+    label: 'L',
+    iconName: 'inbox',
+    agents: [
+      {
+        agent: defineAgent({
+          id: 'qualifier',
+          name: 'q',
+          provider: 'mock',
+          instructions: 'x',
+          tools: ['t'],
+          approvals: [],
+          renders: {},
+        }),
+        role: 'input',
+      },
+    ],
+    entryAgentId: 'qualifier',
+    inputs: [{ name: 'lead', schema: z.object({ threadId: z.string() }), agentId: 'qualifier' }],
+  })
+
+  it('intra-workflow deliver dispatches a CHILD with parentId, source, origin=agent', async () => {
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
+    const threadId = `t-${randomUUID()}`
+    const r = await svc.deliver({
+      origin: 'lead-inbox',
+      dest: { kind: 'agent', agentId: 'reply' },
+      payload: { threadId, from: 'a@b.com', subject: 'Hi' },
+      parentId,
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.deduped).toBe(false)
+
+    const board = await svc.getBoard()
+    const child = board.items.find((i) => i.id === r.id)
+    expect(child?.parentId).toBe(parentId)
+    expect(child?.agentId).toBe('lead-inbox__reply')
+    expect(child?.source).toBe(`thread:${threadId}`)
+    expect(child?.origin).toBe('agent')
+  })
+
+  it('a repeated deliver on the same source dedups (no second child)', async () => {
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
+    const threadId = `t-${randomUUID()}`
+    const payload = { threadId, from: 'a@b.com', subject: 'Hi' }
+    const first = await svc.deliver({
+      origin: 'lead-inbox',
+      dest: { kind: 'agent', agentId: 'reply' },
+      payload,
+      parentId,
+    })
+    const second = await svc.deliver({
+      origin: 'lead-inbox',
+      dest: { kind: 'agent', agentId: 'reply' },
+      payload,
+      parentId,
+    })
+    expect(first.ok && second.ok).toBe(true)
+    if (!first.ok || !second.ok) return
+    expect(second.deduped).toBe(true)
+    expect(second.id).toBe(first.id)
+  })
+
+  it('a cross-workflow payload that fails the contract schema returns ok:false', async () => {
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [crossWf] })
+    const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
+    const r = await svc.deliver({
+      origin: 'github-triage',
+      dest: { kind: 'contract', workflow: 'lead-inbox', input: 'lead' },
+      payload: { nope: 1 }, // missing threadId — fails the schema
+      parentId,
+    })
+    expect(r.ok).toBe(false)
   })
 })

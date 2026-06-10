@@ -54,7 +54,11 @@ for (const { descriptor, bindings } of workflowServers) {
   }
 }
 
-const pipeline = makePipelineService({ db, resolveAgent: (id) => runtimes[id] })
+const pipeline = makePipelineService({
+  db,
+  resolveAgent: (id) => runtimes[id],
+  descriptors: workflowServers.map((w) => w.descriptor),
+})
 
 const runtime = new CopilotRuntime({ agents, runner: new InMemoryAgentRunner() })
 

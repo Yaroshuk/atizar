@@ -1,12 +1,14 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { BaseEvent } from '@ag-ui/client'
+import type { Destination } from '@platform/core'
 import type { PipelineService } from './pipelineService.js'
 
-// HTTP surface over the PipelineService. Read shapes (trace snapshot + SSE tail) are ported
-// verbatim from the step-2 spike (apps/inbox/server/dev-runs.ts) so the existing `?spike=1`
-// client keeps working against the Postgres spine. The dev start route is a throwaway until
-// step 6 (production trigger). Gate-keyed resolve + cancel routes are the step-4 production surface.
+// HTTP surface over the PipelineService — the ONLY transport (CopilotKit dropped at step 6).
+// Read shapes (trace snapshot + SSE tail) originated in the step-2 spike. The production triggers
+// are POST /api/dispatch (human START) + POST /api/deliver (human-gated card handoff); gate-keyed
+// resolve + cancel are the step-4 production surface; GET /api/board + /api/board/stream feed the
+// server-driven board.
 
 const TERMINAL = new Set(['finished', 'error', 'closed'])
 
@@ -17,12 +19,10 @@ const isStatusMsg = (m: WorkItemMsg): m is { kind: 'status'; status: string } =>
 export function createPipelineRoutes(service: PipelineService): Hono {
   const app = new Hono()
 
-  // START a run (dev throwaway — step 6 starts via the production trigger). The agent key is
-  // `wf__agent`; the workflow id is its prefix.
-  app.post('/api/dev/runs', async (c) => {
-    // `payload` is optional: an empty object runs an input agent (qualifier) from scratch; a
-    // handoff payload lets a worker agent (reply) run as if handed a lead — needed to drive the
-    // gate flow on a fresh real run (record mode) where there is no cassette to replay.
+  // DISPATCH — the human-initiated START gesture (an input agent card's START button). The
+  // agent key is `wf__agent`; the workflow id is its prefix. An empty payload runs an input
+  // agent (it reads the inbox itself); a payload is accepted for parity with delivery seeding.
+  app.post('/api/dispatch', async (c) => {
     const { agent, payload } = await c.req.json<{
       agent: string
       payload?: Record<string, unknown>
@@ -36,6 +36,21 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       payload: payload ?? {},
     })
     return c.json({ id })
+  })
+
+  // DELIVER — a human-gated handoff from a rendered card (VerdictCard "Draft reply", TriageCard
+  // route buttons). Resolves the Destination server-side and dispatches a CHILD work item
+  // (parentId = the card's work item). A repeated click on the same source dedups (the
+  // chokepoint returns { deduped: true }); a bad contract/payload → 400.
+  app.post('/api/deliver', async (c) => {
+    const body = await c.req.json<{
+      origin: string
+      dest: Destination
+      payload: Record<string, unknown>
+      parentId: string
+    }>()
+    const r = await service.deliver(body)
+    return r.ok ? c.json({ id: r.id, deduped: r.deduped }) : c.json({ error: r.error }, 400)
   })
 
   // JSON history snapshot from `?from=seq`.
