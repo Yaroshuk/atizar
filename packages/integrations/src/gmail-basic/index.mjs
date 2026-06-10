@@ -7,8 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
-import { parseLatestMessage, errText } from './format.mjs'
-import { getGmail } from './gmail-client.mjs'
+import { getLatestEmail } from './get-latest-email.mjs'
 import { createDraft } from './create-draft.mjs'
 
 // ---------------------------------------------------------------------------
@@ -26,26 +25,8 @@ server.registerTool(
     inputSchema: {},
   },
   async () => {
-    try {
-      const gmail = await getGmail()
-      const list = await gmail.users.messages.list({ userId: 'me', q: 'in:inbox', maxResults: 1 })
-      if (!list.data.messages?.length) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ error: 'No emails found in inbox.' }) }],
-        }
-      }
-      const full = await gmail.users.messages.get({
-        userId: 'me',
-        id: list.data.messages[0].id,
-        format: 'full',
-      })
-      const parsed = parseLatestMessage(full.data)
-      return { content: [{ type: 'text', text: JSON.stringify(parsed) }] }
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: JSON.stringify({ error: errText(err) }) }],
-      }
-    }
+    const res = await getLatestEmail()
+    return { content: [{ type: 'text', text: JSON.stringify(res) }] }
   }
 )
 

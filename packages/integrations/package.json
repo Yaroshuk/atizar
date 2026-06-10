@@ -9,6 +9,10 @@
     "./gmail-basic/create-draft": {
       "types": "./src/gmail-basic/create-draft.d.ts",
       "default": "./src/gmail-basic/create-draft.mjs"
+    },
+    "./gmail-basic/get-latest-email": {
+      "types": "./src/gmail-basic/get-latest-email.d.ts",
+      "default": "./src/gmail-basic/get-latest-email.mjs"
     }
   },
   "dependencies": {
