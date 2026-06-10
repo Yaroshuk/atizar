@@ -16,7 +16,9 @@ const mastraFactory: ProviderFactory = (config) => {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('PROVIDER=mastra requires ANTHROPIC_API_KEY')
   }
-  const bare = (config.allowedTools ?? []).map((t) => t.replace(/^mcp__[^_]+__/, ''))
+  // Strip the `mcp__<server>__` prefix. Non-greedy `.+?__` tolerates a server name with an
+  // underscore (e.g. `mcp__my_server__tool`), unlike a `[^_]+` segment.
+  const bare = (config.allowedTools ?? []).map((t) => t.replace(/^mcp__.+?__/, ''))
   const renderAndProposeTools = bare.filter((t) => config.surfaceTools.includes(t))
   const readTools = bare.filter(
     (t) => !config.surfaceTools.includes(t) && !config.approvalNames.includes(t)

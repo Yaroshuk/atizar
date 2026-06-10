@@ -216,6 +216,9 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
     makeStream: (run: MastraRunLike) => MastraStreamLike,
     getRun: () => Promise<MastraRunLike>
   ): MastraRun {
+    // No-op until the run resolves: an abort() before iteration starts (unreachable today — the
+    // observer only cancels a `running` item that has already emitted events) silently does
+    // nothing rather than throwing.
     let cancelFn: () => void = () => {}
     let resolveResult!: (r: MastraRunResult) => void
     const result = new Promise<MastraRunResult>((res) => (resolveResult = res))
@@ -227,6 +230,8 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
         try {
           for await (const raw of s.fullStream) yield unwrapStepOutput(raw)
         } finally {
+          // Relies on Mastra settling `result` after cancel() (verified by the cancel-mid-run
+          // E2E). If a future version left it pending post-cancel, this await would hang teardown.
           const r = (await s.result) ?? { status: 'success' }
           resolveResult(toResult(r))
         }
