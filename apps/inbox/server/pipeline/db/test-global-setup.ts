@@ -1,6 +1,7 @@
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import { PostgresStore } from '@mastra/pg'
 
 // Vitest globalSetup (runs once, before any worker). Creates the dedicated TEST database and
 // applies migrations so pipeline tests run against a schema identical to dev — but isolated,
@@ -27,6 +28,17 @@ export default async function setup(): Promise<void> {
       await migrate(drizzle(sql), { migrationsFolder: 'apps/inbox/server/pipeline/db/migrations' })
     } finally {
       await sql.end({ timeout: 5 })
+    }
+
+    // Init Mastra's OWN storage tables in the test DB too (kept OUT of our drizzle migration set
+    // — caution c). PostgresStore.init() is idempotent; close() releases the pool so vitest exits
+    // cleanly. No test runs real Mastra today, but a PROVIDER=mastra run against the test DB then
+    // finds its tables present.
+    const mastraStore = new PostgresStore({ id: 'mastra-test', connectionString: TEST_URL })
+    try {
+      await mastraStore.init()
+    } finally {
+      await mastraStore.close()
     }
   } catch (err) {
     console.warn('[test-global-setup] Postgres unreachable — pipeline tests will skip:', err)
