@@ -16,13 +16,21 @@ export type RenderSpec = {
   render: (ctx: { parameters: any }, deliver: DeliverFn, registry: Registry) => ReactElement
 }
 
-// A human-in-the-loop tool (pauses the run for approval).
+// A human-in-the-loop tool (the run is paused at a server-side GATE). The GATE is
+// authoritative — the card edits the gate's `form` and calls approve(editedForm) /
+// reject(comment), which POST /api/gates/:id/resolve (see useGate). There is no CopilotKit
+// `respond` anymore; concurrent approvals are independent gate rows, not a shared resolver.
 export type HitlSpec = {
   toolName: string
   parameters: z.ZodTypeAny
   render: (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ctx: { args: any; status: string; respond?: (v: string) => void | Promise<void> },
+    ctx: {
+      form: Record<string, unknown>
+      formRev: number
+      status: string
+      approve: (form: Record<string, unknown>) => void
+      reject: (comment?: string) => void
+    },
     registry: Registry
   ) => ReactElement
 }

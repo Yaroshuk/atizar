@@ -1036,6 +1036,37 @@ button {
   white-space: pre-wrap;
 }
 
+/* editable approval body (gate-driven: the edited text is what the server executes) */
+.approval-edit {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(240, 192, 0, 0.5);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #4a4332;
+  line-height: 1.5;
+  margin: 10px 0 12px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #6b6456;
+}
+
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 /* card foot hint for handoff-only (non-launchable) agents */
 .foot-hint {
   margin-top: auto;

@@ -73,15 +73,15 @@ export const leadInboxHitl: HitlSpec[] = [
   {
     toolName: 'saveDraft',
     parameters: z.object({ threadId: z.string(), body: z.string() }),
-    render: ({ args, status, respond }, registry) => {
-      if (args.threadId === undefined || args.body === undefined) return <></>
+    render: ({ form, approve, reject }, registry) => {
       const Approval = registry['ApprovalDialog']
+      const threadId = typeof form.threadId === 'string' ? form.threadId : ''
+      const body = typeof form.body === 'string' ? form.body : ''
       return (
         <Approval
-          data={{ threadId: args.threadId, body: args.body }}
-          onApprove={() => {
-            if (status === 'executing' && respond) void respond('approved')
-          }}
+          data={{ threadId, body }}
+          onApprove={(editedBody: string) => approve({ ...form, body: editedBody })}
+          onReject={() => reject('no thanks')}
         />
       )
     },
