@@ -9,7 +9,7 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 // SELECT … FOR UPDATE the row → check the edge is legal from the current status →
 // UPDATE → COMMIT. The row lock serializes concurrent transitions (design §3.6).
 
-export type Edge = 'start' | 'gate' | 'resume' | 'finish' | 'fail'
+export type Edge = 'start' | 'gate' | 'resume' | 'finish' | 'fail' | 'cancel' | 'reject'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -18,14 +18,20 @@ export class IllegalTransition extends Error {
   }
 }
 
-// Step-3 wired subset (design §4). Cancel edges + the full all-inbound-edges guard table
-// land in step 4; the guard *mechanism* (FOR UPDATE + legality check) is built here.
 const EDGES: Record<Edge, { from: WorkItemStatus[]; to: WorkItemStatus }> = {
   start: { from: ['queued'], to: 'running' },
   gate: { from: ['running'], to: 'awaiting_approval' },
   resume: { from: ['awaiting_approval'], to: 'running' },
   finish: { from: ['running'], to: 'finished' },
   fail: { from: ['running', 'awaiting_approval'], to: 'error' },
+  cancel: { from: ['queued', 'running', 'awaiting_approval', 'awaiting_input'], to: 'finished' },
+  reject: { from: ['awaiting_approval'], to: 'finished' },
+}
+
+// Terminal-outcome marker set by explicit human commands (orthogonal to status).
+const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected'>> = {
+  cancel: 'cancelled',
+  reject: 'rejected',
 }
 
 // Statuses that count as an active child (block a parent's auto-finish).
@@ -86,6 +92,7 @@ export async function transition(
         status: spec.to,
         updatedAt: new Date(),
         ...(edge === 'fail' && opts.error ? { error: opts.error } : {}),
+        ...(EDGE_RESOLUTION[edge] ? { resolution: EDGE_RESOLUTION[edge] } : {}),
       })
       .where(eq(workItems.id, id))
 

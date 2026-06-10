@@ -48,4 +48,45 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     expect(row?.status).toBe('error')
     expect(row?.error).toBe('boom')
   })
+
+  it('cancel from running → finished with resolution cancelled', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'cancel')
+    const row = await store.getWorkItem(id)
+    expect(row?.status).toBe('finished')
+    expect(row?.resolution).toBe('cancelled')
+  })
+
+  it('cancel is legal from queued and from awaiting_approval', async () => {
+    const { id: qId } = await newQueued()
+    await transition(db, qId, 'cancel')
+    const qRow = await store.getWorkItem(qId)
+    expect(qRow?.status).toBe('finished')
+    expect(qRow?.resolution).toBe('cancelled')
+
+    const { id: gId } = await newQueued()
+    await transition(db, gId, 'start')
+    await transition(db, gId, 'gate')
+    await transition(db, gId, 'cancel')
+    const gRow = await store.getWorkItem(gId)
+    expect(gRow?.status).toBe('finished')
+    expect(gRow?.resolution).toBe('cancelled')
+  })
+
+  it('reject from awaiting_approval → finished with resolution rejected', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'gate')
+    await transition(db, id, 'reject')
+    const row = await store.getWorkItem(id)
+    expect(row?.status).toBe('finished')
+    expect(row?.resolution).toBe('rejected')
+  })
+
+  it('reject is illegal from running', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await expect(transition(db, id, 'reject')).rejects.toThrow(/cannot "reject"/)
+  })
 })
