@@ -42,10 +42,23 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
      (3) `resume?(handle, resolution)` with `ResumeHandle = { runId, input }` is right for step 1 (opaque-token abstraction deferred until a provider needs it). Two notes: (a) full transcript-seeded resume (§3.1) arrives only at step 3 when Trace exists — until then claude-cli's resume re-primes from input + resolution exactly like today's mechanism, extracted into a shared helper; (b) make the resume PROMPT TEXT a parameter of that helper, not hardcoded "human approved" — at step 4 it changes to "the action was already executed by the server with <artifact>" (server-executed effects), and `GateResolution` will gain an optional `executedResult?` field then.
      (4) Conformance suite = provider-agnostic `runProviderConformance(makeProvider)` against claude-cli (fake spawn) + mock now, Mastra slot at step 5. Invariants as proposed (GATE_OPENED on approval tool; resume(approved) completes without re-gating; resume(rejected) terminates; surface filtering; one messageId per contiguous text).
      (5) record/replay **untouched at step 1** (keep `resolvedApprovalCount` keying; old cassettes simply lack GATE_OPENED, which is backward-tolerant). Re-key + wipe happens at step 5 with the envelope change.
-2. **Week-0 spike: RunObserver + browser attach** (throwaway code allowed; the endpoint SHAPES must survive).
+2. **Week-0 spike: RunObserver + browser attach** — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 201 unit tests + typecheck/lint/format green; all 4 PASS criteria verified in the browser on the `lead-inbox__reply` cassette (`DEV_RECORD_REPLAY=1`, true replay — cassette mtime unchanged). Spec → `docs/superpowers/specs/2026-06-10-runobserver-browser-attach-spike-design.md`; plan → `docs/superpowers/plans/2026-06-10-runobserver-browser-attach-spike.md`.
+   - **As-built — what SURVIVES into steps 3/6:** (1) **`foldEventsToMessages`** in `@platform/core` (`packages/core/src/fold.ts`) — pure left-fold of AG-UI events → `Message[]` (the reduction CopilotKit did internally); the client pairs results with the existing `pairToolResults`. (2) The **read endpoint shapes**: `GET /api/workitems/:id/trace?from=seq` → `{id,status,done,nextSeq,events:[{seq,event}]}` and `GET /api/workitems/:id/stream` (SSE, `id:`=seq, `data:`=AG-UI event, named `event: status` on status change, honors `Last-Event-ID`). (3) The per-WorkItem monotonic `seq` cursor; the client orders/dedupes by `seq` (so duplicate/out-of-order SSE on reconnect is harmless — the server makes no ordering guarantee between backlog and live).
+   - **As-built — THROWAWAY (deleted/replaced at step 3):** the in-memory `Map<id,WorkItemRun>` store + RunObserver consume loop (`apps/inbox/server/dev-runs.ts`); the dev start/resolve routes (`POST /api/dev/runs`, `POST /api/dev/workitems/:id/resolve`); the `?spike=1` client page (`apps/inbox/client/src/spike/TraceSpike.tsx`, mounted in `main.tsx`). Step 3 replaces the store with Postgres-backed Trace + the dispatch chokepoint; step 4 replaces resolve with gate-keyed `POST /api/gates/:id/resolve` (transition + ledger).
+   - **As-built — durable refactor:** `buildProvider` extracted from `buildAgent` (`build-agent.ts`) so the RunObserver consumes the SAME wrapped provider (incl. record/replay) as the CopilotKit agents — one code path. `withRecordReplay` now also wraps `resume()` (Variant A, key = `resolvedApprovalCount(handle.input)+1`), exercising the real v2 `resume()` and reusing the recorded `step:1`.
+   - **Browser E2E (all 4 PASS):** (1) attach mid-run → `renderLead` done + `saveDraft` running + gate banner with the proposed draft artifact, `awaiting_approval`; (2) reload mid-run (id rides in `?spike=1&id=…`) → re-attaches to the same live server run, full history restored, nothing lost; (3) Approve (plain POST) → the already-open SSE tail continues across the resume boundary (no reconnect), resume text appears, status flips to `done`; (4) reload after approve → full **stitched** history (one trace, two provider runs: `run()` 18 events + `resume()` 2 → `nextSeq` 20). **Loss boundary** = a SERVER restart (in-memory store) — exactly what step 3's Postgres Trace removes; not hardened now (2-day timebox).
+   - **Lesson (spike bug found ONLY by the browser, fixed):** the terminal `done`/`error` status SSE write was fire-and-forget, then `cleanup()` synchronously resolved the `streamSSE` promise → the stream closed before the queued write flushed → the UI stayed `running` though the server was `done`. Fix: close only AFTER the terminal write resolves (stream writes are FIFO, so this also flushes the preceding event writes); same guard on the backlog already-done path. Invisible to typecheck/unit tests — only the browser E2E surfaced it. (`saveDraft` chip stays "running" is EXPECTED — the approval tool never gets a `TOOL_CALL_RESULT` under the HITL-kill model.)
    - Minimal: a dev-only route that calls `provider.run()` purely server-side, teeing events into an in-memory `trace[]` + an EventEmitter. Two read endpoints: `GET /api/workitems/:id/trace?from=seq` (JSON history) and an SSE tail (`text/event-stream`, `id:` = seq, `data:` = AG-UI event).
    - Client side: fold events → messages by reusing `AgentModal`'s existing pairing logic (`apps/inbox/client/src/components/AgentModal.tsx` walks messages + pairs tool results already).
    - Iterate on cassettes (`DEV_RECORD_REPLAY=1`), not live claude runs. PASS = open the browser MID-run and see history + live tail; reload mid-run loses nothing. FAIL = stop and redesign the thread plan before step 3.
+   - **Resume replay from cassettes (ANSWERED 2026-06-10 — do not re-ask): wrap `resume()` in
+     `withRecordReplay` too** (additive, same decorator at the same `build-agent` seam), key =
+     `resolvedApprovalCount(handle.input) + 1` — reuses the already-recorded `step:1` and
+     exercises the REAL v2 `resume()` (the legacy synthesized-transcript path is what step 3
+     deletes — replaying through it would validate the wrong thing). Auto-mode semantics stay:
+     no recorded step at that key → fall through to the real provider and record under it. Use
+     cassettes recorded AFTER the step-1 branch (older ones lack `GATE_OPENED`).
+   - **Spike boundary on approve (ANSWERED 2026-06-10 — do not re-ask): include approve→resume, minimally.** The spike must prove BOTH unproven client assumptions: (a) attach without CopilotKit, and (b) approve as a plain HTTP POST with the SAME open SSE tail continuing across the resume boundary — one WorkItem = one trace stitched from two provider runs is a load-bearing invariant of the thread design, and `resume()` already exists from step 1 (~20-30 lines: dev-only `POST .../resolve` flips an IN-MEMORY gate flag and calls `provider.resume()`, teeing into the same `trace[]` + emitter). HARD boundary — none of: `transition()`/guards, Gate table, ledger, formRev, server-executed effects (approve resumes, it executes nothing). Extra PASS line: after resolve, the already-open tail continues WITHOUT reconnecting, and a reload after approve shows the full stitched history. The 2-day timebox wins: if approve→resume threatens it, ship attach-only and note it.
 3. **Server spine on Postgres**: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE.
    - `docker-compose.yml` with a `postgres` service only; `DATABASE_URL` in `.env.local`; extend `predev` to start the container if it isn't running.
    - Drizzle schema (`work_items`, `gates`, `trace` PK `(work_item_id, seq)`, `action_ledger` PK `key`) + drizzle-kit migrations from the very first table (spec §1.7).
@@ -70,13 +83,79 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - Browser E2E checklist before merge (memory rule — EVERY flow): single run; 3-at-once (cap 2 + `queued: 1`); approve WITH an edited artifact (verify the edited text is what lands in Gmail); reject + re-run; cancel mid-run; reload mid-run; second tab coherence.
 7. **Packaging**: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`).
 
-**Starting point for the next session = beta build order step 2** (Week-0 spike: RunObserver +
-browser attach to a running WorkItem — trace snapshot + SSE tail; throwaway code OK but the
-endpoint SHAPES must survive). Step 1 (Provider contract v2) is ✅ BUILT & browser-verified on
-`feat/provider-contract-v2` — `resume?()`, `GATE_OPENED`, and the conformance suite are in
-`@platform/core` + `@platform/providers`, additive (the live `@copilotkit/*` client is untouched
-and keeps working as the dev surface until step 6). Do NOT invest further in that client layer;
-new work targets the server-authoritative spine.
+**Anticipated decisions, steps 3–7 (ANSWERED 2026-06-10 — decide-and-go, do not re-ask the user):**
+
+- **Coexistence model for steps 3–5 (the big one):** the new pipeline is built BESIDE the old
+  CopilotKit path, not into it. During steps 3–5 the new spine drives the lead-inbox flow through
+  the spike's dev surface (dev page + trace/SSE endpoints); the old board stays untouched and
+  working. The swap happens once, at step 6. Never half-migrate the old board mid-step, and do
+  NOT write an old↔new adapter beyond what step 1 already shipped.
+- **Code layout:** pipeline code lives in `apps/inbox/server/pipeline/` (PipelineService,
+  StateStore, RunObserver, WorkerPool, transition, dispatch). Do NOT create `@platform/server` —
+  package extraction is explicitly deferred until the boundary settles (ARCHITECTURE §9).
+- **Step 3 micro-decisions:** Drizzle over `pg` (node-postgres) — don't bikeshed the driver;
+  WorkItem id = `crypto.randomUUID()` ("deterministic at dispatch" in the spec means minted at an
+  engine-controlled moment, NOT derived from model output — dedup uses `source`, never the id);
+  `agentId` on WorkItem = the existing `wf__agent` instance id; status wire-strings exactly as in
+  spec §5 (`queued|running|awaiting_approval|awaiting_input|result|finished|error|closed` +
+  `resolution: cancelled|rejected` marker column, NOT extra statuses); Trace `seq` = in-memory
+  per-run counter (RunObserver is the single writer per WorkItem — no SELECT max(seq) needed);
+  executor handles (kill fns) live in an in-memory `Map<workItemId, handle>` — they are
+  process-local by nature, the sweep covers restarts; EventBus = one in-process EventEmitter with
+  `board` + `workitem:<id>` topics; port lead-inbox first, GitHub-triage second (it's read-only —
+  porting it is mostly config).
+- **Step 4 micro-decisions:** the server executes effects by importing
+  `@platform/integrations/gmail-basic` DIRECTLY (plain function call — the stdio MCP child is for
+  the claude CLI, not for the server; no loopback API needed); the approval tool's args ARE the
+  initial Gate `form` AND `proposedArtifact`; `GateResolution` gains `executedResult?` now;
+  stale badge = client-side age computation (no sweeper, no cron); cancel cascades to active
+  descendants in ascending-id order and records `resolution: cancelled` per item; rewrite
+  `reply.prompts.ts` to propose-don't-execute (the model never sees `create_draft` again).
+- **Step 5 direction (Mastra):** ask the user for `ANTHROPIC_API_KEY` at the START of this step
+  (the only step-gated question). Map `defineAgent` → a Mastra workflow wrapping the agent step;
+  a gate = suspend at the approval point with the proposed artifact as the suspend payload;
+  `resume()` = Mastra's native `resume(runId, resumeData)`. Known frictions (from the audit —
+  expect them, don't rediscover): Mastra signals suspension via run STATUS, not a tool call → the
+  provider synthesizes `GATE_OPENED` from it; keep a `workItemId ↔ runId` map in StateStore; do
+  NOT mirror Mastra's snapshot/step state into StateStore (belief #2). Big simplification
+  available: by step 5 effects are server-side, so the Mastra agent needs only read tools +
+  propose/render tools — wire `gmail-basic` read functions as native Mastra tools, no MCP.
+  Definition of done = the step-1 conformance suite passes against it. Default provider stays
+  `claude-cli` locally (env switch, e.g. `PROVIDER=mastra`).
+- **Step 6 micro-decisions:** the pure `foldEventsToMessages(events) → messages` ALREADY EXISTS
+  (built at step 2, `@platform/core`, unit-tested) — render both history and live tail through it
+  (the `?spike=1` page already does); do NOT re-extract it. Extend
+  `client/src/status.ts` to the server status union (server is now the source of truth);
+  `pipelineModel` keeps working — feed it real `parentId` trees from the board snapshot; the Vite
+  `/api` proxy carries SSE fine (no extra config beyond existing `changeOrigin`); delete
+  `@copilotkit/*` deps in the FINAL commit of the step, only after the full browser checklist
+  passes on the new path.
+- **Step 7 micro-decisions:** demo DB = PGlite (Postgres-in-WASM via npm, same dialect, drizzle
+  supports it) so `DEMO=1` needs no Docker; synthetic cassettes are authored from scratch with
+  invented names/emails (NEVER scrub real recordings); bearer token = `AUTH_TOKEN` env checked by
+  middleware on every mutating route (demo mode may default it); LICENSE is the user's call —
+  one question, recommend MIT for adoption simplicity vs Apache-2.0 for the patent grant.
+- **Ask the user ONLY about:** `ANTHROPIC_API_KEY` (step 5), LICENSE (step 7), and anything that
+  would touch real outbound email (never send — draft-only is a product law). Everything else:
+  decide, note the decision in HANDOFF as-built, move on.
+- **Process invariants:** update this file's step line to ✅ BUILT + an "As-built" note after each
+  step (step 1 set the pattern); use record/replay for iteration and FORCE REAL runs
+  (`DEV_RECORD_REPLAY=record`) only to verify concurrent HITL (replay masks it — CLAUDE.md);
+  before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
+  switch git branches in subagents.
+
+**Starting point for the next session = beta build order step 3** (Server spine on Postgres:
+StateStore via drizzle-kit + `schema_version`, the `dispatch()` chokepoint, `transition()` with
+guards, WorkerPool ported from `instancesCore.ts`, board SSE; the spike's RunObserver becomes
+real — append Trace rows, GATE_OPENED → insert Gate + `transition(awaiting_approval)` + kill,
+finalize on stream end). Steps 1 & 2 are ✅ BUILT & browser-verified on `feat/provider-contract-v2`.
+Step 2 gives you the durable pieces to build ON: `foldEventsToMessages` (`@platform/core`), the
+`/api/workitems/:id/{trace,stream}` endpoint shapes, and the per-WorkItem `seq` cursor — port the
+in-memory RunObserver/store (`apps/inbox/server/dev-runs.ts`) onto Postgres rather than redesign.
+`docker compose up -d postgres` is already wired into `predev` (DB up; step 3 is the first to use
+it). Do NOT invest further in the `@copilotkit/*` client layer — it stays the dev surface until
+step 6; the new work targets the server-authoritative spine and drives lead-inbox through the
+spike's dev page + trace/SSE endpoints.
 
 > **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
 > the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
