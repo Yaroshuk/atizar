@@ -59,7 +59,13 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
      no recorded step at that key → fall through to the real provider and record under it. Use
      cassettes recorded AFTER the step-1 branch (older ones lack `GATE_OPENED`).
    - **Spike boundary on approve (ANSWERED 2026-06-10 — do not re-ask): include approve→resume, minimally.** The spike must prove BOTH unproven client assumptions: (a) attach without CopilotKit, and (b) approve as a plain HTTP POST with the SAME open SSE tail continuing across the resume boundary — one WorkItem = one trace stitched from two provider runs is a load-bearing invariant of the thread design, and `resume()` already exists from step 1 (~20-30 lines: dev-only `POST .../resolve` flips an IN-MEMORY gate flag and calls `provider.resume()`, teeing into the same `trace[]` + emitter). HARD boundary — none of: `transition()`/guards, Gate table, ledger, formRev, server-executed effects (approve resumes, it executes nothing). Extra PASS line: after resolve, the already-open tail continues WITHOUT reconnecting, and a reload after approve shows the full stitched history. The 2-day timebox wins: if approve→resume threatens it, ship attach-only and note it.
-3. **Server spine on Postgres**: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE.
+3. **Server spine on Postgres**: StateStore (drizzle-kit + `schema_version`), dispatch chokepoint, `transition()` API with guards, WorkerPool, board SSE. — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 226 unit tests (incl. real-PG integration + race tests) + typecheck/lint/format green; all 4 spike PASS criteria verified on the Postgres spine PLUS the new durability guarantee (restart mid-`awaiting_approval` → gate survives). Spec → `docs/superpowers/specs/2026-06-10-server-spine-postgres-design.md`; plan → `docs/superpowers/plans/2026-06-10-server-spine-postgres.md`. Commits `1012cd3`…`f4ac81c`.
+   - **As-built — code layout** (`apps/inbox/server/pipeline/`): `db/{schema,client,migrate,reset}.ts` + `db/migrations/` (drizzle-kit); `stateStore.ts` (typed CRUD — the ONLY status writer is `transition`); `transition.ts` (`start|gate|resume|finish|fail` edges, `SELECT … FOR UPDATE`, leaf→root auto-finish walk = the finished entry guard, in one place); `dispatch.ts` (mint id + dedup-by-`source` + depth cap 5 + finish-vs-dispatch reopen); `workerPool.ts` (per-agent cap+queue ported from `instancesCore`); `eventBus.ts` (one EventEmitter, `board` + `workitem:<id>` topics); `runObserver.ts` (consume `provider.run`/`resume`, append Trace, GATE_OPENED → insert Gate + `transition(gate)` + release slot, render-tool → `card`, finalize); `pipelineService.ts` (façade); `routes.ts` (ported spike endpoint shapes); `sweep.ts` (startup reconciliation). `dev-runs.ts` (the spike store) is **deleted**.
+   - **As-built — schema** = spec §3 verbatim. Status pgEnum carries the full §5 union; step 3 WIRES `queued→running→awaiting_approval→running→finished|error` only (`result/closed/awaiting_input` + cancel edges = step 4). `resolution` is a marker column. `form_rev`/`assignee`/`expires_at`/`action_ledger` are seams written at step 4.
+   - **As-built — DB topology:** `client.ts` DEFAULTS `DATABASE_URL` to the compose creds so zero env setup is needed. **Migrate-on-boot** + a **startup sweep** (`running`→`error('executor lost')`, `queued` re-enqueued, `awaiting_approval` LEFT durable). `predev` now `docker compose up -d --wait postgres`.
+   - **As-built — test isolation (IMPORTANT footgun fixed):** pipeline tests run against a SEPARATE `aiworkflow_test` DB (vitest `test.env.DATABASE_URL` + a `globalSetup` that creates+migrates it). The no-truncate test strategy (unique uuids/sources per test, membership-based board asserts → DB test files run parallel-safe) left rows in the shared DB; on the next dev boot the **startup sweep re-enqueued those `queued` rows and spawned REAL `claude`** (DEV_RECORD_REPLAY unset). Separate DBs remove it. **If you add pipeline tests, keep them on `aiworkflow_test` and DO NOT truncate in `beforeEach`** (clobbers parallel files).
+   - **As-built — resolve is dev-grade (step-4 boundary held):** `POST /api/dev/workitems/:id/resolve` → `transition(resume)` + `provider.resume()` ONLY. NO formRev/ledger/server-executed effect (that is step 4); the model proposes, nothing is executed. The step-2 `withRecordReplay` resume wrapper replays `step:1` so approve→resume works under `DEV_RECORD_REPLAY=1`.
+   - **For the step-4 agent:** the gate-keyed `POST /api/gates/:id/resolve` (formRev 409 + `action_ledger` claim + execute `@platform/integrations/gmail-basic` createDraft directly + `resume` primed with "executed with <artifact>") replaces the dev `/api/dev/workitems/:id/resolve`; `GateResolution` gains `executedResult?`; cancel edges + the full all-inbound-edges guard table extend `transition.ts`; the effect tool leaves the model allow-list (`apps/inbox/workflows/lead-inbox/server.ts`) and `reply.prompts.ts` becomes propose-don't-execute. The `transition()` guard mechanism + `action_ledger` table + `form_rev` column already exist.
    - `docker-compose.yml` with a `postgres` service only; `DATABASE_URL` in `.env.local`; extend `predev` to start the container if it isn't running.
    - Drizzle schema (`work_items`, `gates`, `trace` PK `(work_item_id, seq)`, `action_ledger` PK `key`) + drizzle-kit migrations from the very first table (spec §1.7).
    - ONE `transition(workItemId, edge)` function owns every status change: `BEGIN` → `SELECT … FOR UPDATE` on the row (and the parent for finish/reopen, ascending-id lock order) → guard check → `UPDATE` → `COMMIT`. The `finished` entry guard lives HERE, once, for all five inbound edges (spec §1.2).
@@ -81,7 +87,7 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - Board reads `GET /api/board` `{items, gates, lastEventId}` + per-account SSE (coarse status events only, resume via `Last-Event-ID`); thread = step-2 trace endpoints. Keep `renderRegistry`, all cards, Smedja styles, `?dev=1`.
    - Approve/reject/cancel/edit = plain HTTP. DELETE (not port): `useAgentInstances`, `instancesCore` client copy, `statusFrom`, proxied agents, `useHumanInTheLoop`, `<CopilotKit>` tree.
    - Browser E2E checklist before merge (memory rule — EVERY flow): single run; 3-at-once (cap 2 + `queued: 1`); approve WITH an edited artifact (verify the edited text is what lands in Gmail); reject + re-run; cancel mid-run; reload mid-run; second tab coherence.
-7. **Packaging**: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`).
+7. **Extraction + packaging (the beta IS the framework — locked decision #7, 2026-06-10)**: FIRST extract `apps/inbox/server/pipeline/` → `@platform/server` and the board/thread UI → `@platform/react` (mechanical folder moves if the import discipline below held), then slim the demo app down to workflows/config that consume ONLY the public packages — the living proof of belief #3 (userland never imports internals). The beta deliverable = the monorepo of libraries + this thin demo app, NOT a clone-template app. Then: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`). npm publish at launch vs monorepo-first is a launch-time call — the package BOUNDARY is the deliverable, the registry is logistics.
 
 **Anticipated decisions, steps 3–7 (ANSWERED 2026-06-10 — decide-and-go, do not re-ask the user):**
 
@@ -91,13 +97,26 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   working. The swap happens once, at step 6. Never half-migrate the old board mid-step, and do
   NOT write an old↔new adapter beyond what step 1 already shipped.
 - **Code layout:** pipeline code lives in `apps/inbox/server/pipeline/` (PipelineService,
-  StateStore, RunObserver, WorkerPool, transition, dispatch). Do NOT create `@platform/server` —
-  package extraction is explicitly deferred until the boundary settles (ARCHITECTURE §9).
-  **Extraction discipline so the later move is mechanical:** CONTRACTS/types/pure helpers go into
+  StateStore, RunObserver, WorkerPool, transition, dispatch) **during steps 3–6**. Do NOT create
+  `@platform/server` mid-build — extraction happens ONCE, at step 7, after the API stops churning
+  (it IS a beta deliverable, not post-beta — locked decision #7).
+  **Extraction discipline so the step-7 move is mechanical:** CONTRACTS/types/pure helpers go into
   `@platform/core` immediately (the steps-1/2 pattern: `gate.ts`, `conformance.ts`, `fold.ts`);
   implementation stays in the app, and `server/pipeline/` may import ONLY `@platform/*` + its own
-  folder — never the rest of `apps/inbox` (no reaching into workflows/, client/, mcp/). Post-beta,
-  `pipeline/` → `@platform/server` and the board/thread UI → `@platform/react` become folder moves.
+  folder — never the rest of `apps/inbox` (no reaching into workflows/, client/, mcp/). Same rule
+  for the new board/thread UI at step 6: components destined for `@platform/react` import only
+  `@platform/*` + each other.
+  **`@platform/react` boundary (decided 2026-06-10): machinery in, cards out.** The package ships
+  the data hooks (useBoard / useWorkItemThread / useGate-with-formRev / useCancel), the chrome
+  (workflow board/desktop, workflow SWITCHER tabs with delivery badges, pipeline column +
+  instance tree, AgentCard type-cards, thread view, editable GateForm with approve/reject,
+  Stop button, status/stale badges), the `registerCard` render-registry + primitives kit, and
+  the theme. Litmus test: renders from the generic model (Workflow/Agent/WorkItem/Gate/status)
+  → package; knows the vertical's payload (lead, ticket, draft) → userland card.
+  Workflow-specific cards (LeadCard, TriageCard, ReplyDraftCard) are USERLAND — they stay in the
+  demo app as exemplars of `registerCard`, never in the package. UI-framework-agnostic logic
+  (foldEventsToMessages, status mapping) stays in `@platform/core` (pure TS), so a future
+  `@platform/vue` would rewrite only the thin binding layer.
 - **Step 3 micro-decisions:** Drizzle over `pg` (node-postgres) — don't bikeshed the driver;
   WorkItem id = `crypto.randomUUID()` ("deterministic at dispatch" in the spec means minted at an
   engine-controlled moment, NOT derived from model output — dedup uses `source`, never the id);
@@ -149,18 +168,19 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
   switch git branches in subagents.
 
-**Starting point for the next session = beta build order step 3** (Server spine on Postgres:
-StateStore via drizzle-kit + `schema_version`, the `dispatch()` chokepoint, `transition()` with
-guards, WorkerPool ported from `instancesCore.ts`, board SSE; the spike's RunObserver becomes
-real — append Trace rows, GATE_OPENED → insert Gate + `transition(awaiting_approval)` + kill,
-finalize on stream end). Steps 1 & 2 are ✅ BUILT & browser-verified on `feat/provider-contract-v2`.
-Step 2 gives you the durable pieces to build ON: `foldEventsToMessages` (`@platform/core`), the
-`/api/workitems/:id/{trace,stream}` endpoint shapes, and the per-WorkItem `seq` cursor — port the
-in-memory RunObserver/store (`apps/inbox/server/dev-runs.ts`) onto Postgres rather than redesign.
-`docker compose up -d postgres` is already wired into `predev` (DB up; step 3 is the first to use
-it). Do NOT invest further in the `@copilotkit/*` client layer — it stays the dev surface until
-step 6; the new work targets the server-authoritative spine and drives lead-inbox through the
-spike's dev page + trace/SSE endpoints.
+**Starting point for the next session = beta build order step 4** (Server-executed effects + Stop:
+the gate-keyed `POST /api/gates/:id/resolve` with formRev 409 + `action_ledger` claim + the SERVER
+executing the approved artifact via `@platform/integrations/gmail-basic` createDraft DIRECTLY +
+`resume` primed with "executed with <artifact>"; cancel edges + startup-sweep cancel + the full
+all-inbound-edges finished guard in `transition.ts`; `defineAgent.effects` with the effect tool
+REMOVED from the model allow-list; `reply.prompts.ts` rewritten propose-don't-execute; Gate
+fields formRev/assignee/comment/both-artifact-versions). Steps 1–3 are ✅ BUILT & browser-verified
+on `feat/provider-contract-v2`. Step 3 gives you the spine to build ON: `transition()` with the
+guard mechanism, the `dispatch()` chokepoint, the StateStore, the `action_ledger` table + `form_rev`
+column (seams already present), and the RunObserver/PipelineService. The current dev resolve
+(`/api/dev/workitems/:id/resolve`) is the throwaway step-4 replaces. Do NOT invest further in the
+`@copilotkit/*` client layer — it stays the dev surface until step 6; drive lead-inbox through the
+`?spike=1` page + the Postgres trace/SSE endpoints.
 
 > **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
 > the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
@@ -190,6 +210,23 @@ spike's dev page + trace/SSE endpoints.
 > the real RunObserver's SSE. **Browser-verify gotcha hit this session (now in CLAUDE.md):** a stale
 > Playwright-MCP Chrome holds the profile lock → `browser_navigate` errors "Browser is already in
 > use"; kill `mcp-chrome-*` procs + remove the `SingletonLock` before driving the browser.
+
+> **CONTINUATION NOTE (2026-06-10, after step 3) — for the step-4 agent.** Steps 1–3 stay on
+> `feat/provider-contract-v2` (NOT merged — same branch strategy). Step 3 commits run
+> `1012cd3`…`f4ac81c`. The spine is in `apps/inbox/server/pipeline/` (see the step-3 As-built
+> above). **Drive it exactly as step 2:** `DEV_RECORD_REPLAY=1 yarn dev`, open
+> `http://localhost:5173/?spike=1`, **Start reply run** → gate → **Approve** → `finished`. The
+> dev resolve (`/api/dev/workitems/:id/resolve`) is what step 4's gate-keyed
+> `/api/gates/:id/resolve` (formRev + ledger + execute + resume) replaces. **Two hard rules learned
+> this session (don't relearn):** (1) pipeline tests run against `aiworkflow_test` (vitest
+> `test.env` + `globalSetup`) — keep new DB tests there, NEVER truncate in `beforeEach` (clobbers
+> parallel files); use unique uuids/sources + membership board asserts instead. (2) the startup
+> sweep **re-enqueues `queued` rows on boot** → with stale rows + DEV_RECORD_REPLAY unset that
+> spawns REAL `claude`; this is correct recovery behavior — keep the dev DB clean (`yarn workspace
+inbox db:reset`) if leftovers accumulate. `client.ts` defaults `DATABASE_URL` to the compose
+> creds; migrate-on-boot means a fresh clone + `yarn dev` just works. Verify gate the step ended on:
+> 226 unit tests + typecheck/lint/format green + the 4 browser PASS criteria + durability
+> (restart mid-`awaiting_approval` → gate survives).
 
 (The "NEXT — docs/pipeline-plan.md" P1/P2/P3 items below are absorbed by the
 server-authoritative model in updated-3 — keep for reference, do not build standalone.)

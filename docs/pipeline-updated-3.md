@@ -193,7 +193,10 @@ scanCassette CI gate, golden-set eval harness per workflow).
 sweeper (column + edge stay); accountId/auth/RBAC beyond the bearer token; chat
 `awaiting_input` producer; graph/cycles (depth cap + chokepoint stay); cross-process pub/sub;
 GitHub-triage in the onboarding critical path (stays as a second "bring your own board"
-example); npm publish as a semver SDK (beta distributes as a clone-template).
+example). Note (decision #7): package extraction (`@platform/server` + `@platform/react`) is
+IN the beta as step 7; whether the packages also go to npm at launch or ship via the monorepo
+first is a launch-time call — the package BOUNDARY (demo consumes only public packages) is the
+non-negotiable deliverable, the registry is logistics.
 
 **Three public embarrassments (non-negotiable):** (1) HITL integrity failure — an effect
 firing before approval or sent text ≠ approved text; (2) zombie/stale state after a restart
@@ -216,8 +219,11 @@ crash window (drafts are reversible; even Stripe can't close it).
    formRev / assignee / comment / both artifact versions).
 5. **Mastra provider** (production path) beside claude-cli (dev); re-key record/replay.
 6. **Re-point the UI** (board + thread from server state); delete `@copilotkit/*` deps.
-7. **Packaging:** zero-cred demo (synthetic cassettes + scanCassette CI gate), README,
-   LICENSE, `@platform/*` rename, golden-set eval, bearer token.
+7. **Extraction + packaging (decision #7):** move `server/pipeline/` → `@platform/server`
+   and the board/thread UI → `@platform/react` (mechanical if the import discipline held);
+   slim the demo app to workflows/config consuming ONLY public packages — the belief-#3
+   proof; then zero-cred demo (synthetic cassettes + scanCassette CI gate), README, LICENSE,
+   `@platform/*` rename, golden-set eval, bearer token.
 
 ## 4. Market references (delta vs updated-2)
 

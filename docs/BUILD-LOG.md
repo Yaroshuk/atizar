@@ -486,3 +486,50 @@ finding with `file:line`, and wait for the user to confirm or scrub. This rule i
 Developer guide (the skill seed): `docs/dev-record-replay.md`. Spec:
 `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`; plan:
 `docs/superpowers/plans/2026-06-08-dev-record-replay.md`.
+
+## 11 · Server spine on Postgres (BUILT, `feat/provider-contract-v2`, browser-verified)
+
+Beta build order **step 3** (after step 1 Provider contract v2 + step 2 the RunObserver/browser-attach
+spike — both detailed in `HANDOFF.md`, on the same unmerged branch). Replaces the step-2 in-memory
+spike store (`apps/inbox/server/dev-runs.ts`, now deleted) with a durable, server-authoritative
+pipeline on Postgres. Spec → `docs/superpowers/specs/2026-06-10-server-spine-postgres-design.md`;
+plan → `docs/superpowers/plans/2026-06-10-server-spine-postgres.md`.
+
+**What it is.** Everything lives in `apps/inbox/server/pipeline/` (no `@platform/server` extraction
+yet — deferred). drizzle-orm + postgres.js over the dev Postgres container (`docker compose up -d
+postgres`; app stays on the host). One `transition(db, id, edge)` owns every `work_items.status`
+write (`SELECT … FOR UPDATE`, edges `start|gate|resume|finish|fail`, a leaf→root auto-finish walk
+that IS the finished entry guard). One `dispatch()` chokepoint mints the id, dedups by `source`,
+caps depth (5), reopens a parent on the finish-vs-dispatch race, and enqueues. `workerPool.ts` ports
+the per-agent cap+queue from the client's `instancesCore.ts`. `runObserver.ts` consumes the SAME
+wrapped provider the CopilotKit agents use (`buildProvider`, incl. record/replay): appends a lossless
+Trace (PK `(work_item_id, seq)`), reacts to `GATE_OPENED` (insert Gate + `transition(gate)` + release
+the slot — claude-cli kills its process at the approval tool), fills `card` from a registered render
+tool, finalizes status, and republishes on an in-process `eventBus` (`board` + `workitem:<id>`).
+`pipelineService.ts` is the façade; `routes.ts` ports the spike's trace/SSE endpoint shapes (the SSE
+closes only AFTER the terminal status write flushes — the step-2 lesson) + a board snapshot/SSE.
+
+**Schema** (`db/schema.ts`, drizzle-kit migrated from the first table): `schema_meta`, `work_items`,
+`gates`, `trace`, `action_ledger`. The status pgEnum carries the full spec-§5 union; step 3 wires only
+`queued→running→awaiting_approval→running→finished|error`. `resolution` is a marker column;
+`form_rev`/`assignee`/`expires_at`/`action_ledger` are step-4 seams. Migrate-on-boot + a startup sweep
+(`running`→`error('executor lost')`, `queued` re-enqueued, `awaiting_approval` left durable) make a
+fresh clone + `yarn dev` just work and kill zombie state after a restart.
+
+**Resolve is dev-grade** — `POST /api/dev/workitems/:id/resolve` does `transition(resume)` +
+`provider.resume()` ONLY; no formRev/ledger/server-executed effect (step 4). The model proposes the
+artifact; nothing is executed.
+
+**Test isolation (footgun fixed).** Pipeline tests run against a separate `aiworkflow_test` DB (vitest
+`test.env.DATABASE_URL` + a `globalSetup` that creates+migrates it). The no-truncate strategy (unique
+uuids/sources per test, membership-based board asserts → parallel-safe DB test files) had left rows in
+the shared dev DB; the dev server's startup sweep then re-enqueued those `queued` rows and spawned REAL
+`claude`. Race tests assert concurrent finish-vs-finish (one parent auto-finish) and finish-vs-dispatch
+(a new child keeps the parent active) on real Postgres.
+
+**Verified.** 226 unit tests (incl. real-PG integration + race) + typecheck/lint/format green. Browser
+E2E on `?spike=1` over the Postgres spine: attach mid-run → folded thread + gate banner +
+`awaiting_approval`; reload → full history; Approve → SSE tail continues across resume → `finished`;
+**and the new guarantee — a server restart mid-`awaiting_approval` then reload shows the gate STILL
+there** (the in-memory spike lost this). Final DB: 20 stitched trace rows (run+resume), status
+`finished`, gate `resolved`.
