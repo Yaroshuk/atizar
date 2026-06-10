@@ -38,17 +38,14 @@ function handoffFirst(instructions: string, h: HandoffPayload): string {
   ].join('\n')
 }
 
-function resume(instructions: string, threadId: string, body: string): string {
+function resume(instructions: string, draftId: string): string {
   return [
     instructions,
     '',
-    'The human APPROVED saving this reply. Create it as a Gmail DRAFT now by',
-    `calling create_draft, replying within thread "${threadId}", with this body:`,
-    '',
-    body,
-    '',
-    'Do not send. After the draft is created, reply with one short sentence',
-    'confirming the draft was saved to Gmail. Do not narrate tool usage.',
+    'The human APPROVED the reply and the SERVER has ALREADY created the Gmail draft',
+    `(draft id "${draftId}"). You do NOT create or send anything — it is done.`,
+    'Reply with ONE short sentence confirming the draft was saved. Do not call any tool',
+    'and do not narrate tool usage.',
   ].join('\n')
 }
 
@@ -58,11 +55,9 @@ export function createReplyPrompts(instructions: string): PromptStrategy {
       const h = decodeHandoff(input, HandoffPayloadSchema)
       return h ? handoffFirst(instructions, h) : noLeadFirst(instructions)
     },
-    buildResume(args: Record<string, unknown>): string | null {
-      const threadId = typeof args.threadId === 'string' ? args.threadId : ''
-      const body = typeof args.body === 'string' ? args.body : ''
-      if (!threadId || !body) return null
-      return resume(instructions, threadId, body)
+    buildResume(_args: Record<string, unknown>, executedResult?: Record<string, unknown>): string | null {
+      const draftId = typeof executedResult?.draftId === 'string' ? executedResult.draftId : 'saved'
+      return resume(instructions, draftId)
     },
   }
 }

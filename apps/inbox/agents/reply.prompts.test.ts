@@ -28,14 +28,27 @@ describe('reply prompt strategy', () => {
     expect(p).not.toContain('get_latest_email')
   })
 
-  it('buildResume returns a create_draft prompt from approval args', () => {
-    const p = prompts.buildResume?.({ threadId: 't_7', body: 'Hello Ivan' })
-    expect(p).toContain('t_7')
-    expect(p).toContain('Hello Ivan')
-    expect(p).toContain('create_draft')
+  it('buildResume narrates the server-created draft when executedResult contains draftId', () => {
+    const p = prompts.buildResume?.({ threadId: 't_7', body: 'Hello Ivan' }, { draftId: 'd-42' })
+    expect(p).toMatch(/already (created|saved)/i)
+    expect(p).toContain('d-42')
+    expect(p).not.toContain('create_draft')
   })
 
-  it('buildResume returns null when args lack threadId/body', () => {
-    expect(prompts.buildResume?.({})).toBeNull()
+  it('buildResume uses "saved" as fallback draftId when executedResult is absent', () => {
+    const p = prompts.buildResume?.({})
+    expect(p).not.toBeNull()
+    expect(p).toMatch(/already (created|saved)/i)
+    expect(p).not.toContain('create_draft')
+  })
+})
+
+describe("reply resume prompt (propose-don't-execute)", () => {
+  it('narrates the server-created draft and forbids tool calls', () => {
+    const strat = createReplyPrompts('INSTR')
+    const prompt = strat.buildResume!({ threadId: 't', body: 'hi' }, { draftId: 'd-9' })
+    expect(prompt).toMatch(/already (created|saved)/i)
+    expect(prompt).toMatch(/d-9/)
+    expect(prompt).not.toMatch(/create_draft/)
   })
 })

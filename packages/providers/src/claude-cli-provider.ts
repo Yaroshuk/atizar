@@ -86,7 +86,7 @@ export function createClaudeCliProvider(opts: {
   function resumePromptFrom(handle: ResumeHandle, resolution: GateResolution): string | null {
     const messages = (handle.input?.messages ?? []) as Message[]
     const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
-    return prompts.buildResume?.(args) ?? null
+    return prompts.buildResume?.(args, resolution.executedResult) ?? null
   }
 
   return {
