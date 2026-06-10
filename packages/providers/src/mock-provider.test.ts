@@ -14,6 +14,9 @@ function input(messages: unknown[]): RunAgentInput {
   return { messages } as unknown as RunAgentInput
 }
 
+// A transcript with an answered saveDraft approval. Shared by both scenario branches: the mock's
+// resume() ignores the handle entirely, so the same fixture stands in for approved AND rejected
+// (the decision comes from `resolution`, not the transcript). Task 6's claude-cli fixture differs.
 const resolvedMessages = [
   {
     role: 'assistant',
@@ -61,7 +64,7 @@ describe('mockInboxProvider', () => {
     expect(toolNames).toEqual(['renderLead', 'saveDraft'])
   })
 
-  it('resume: emits only the done text once the approval is answered', async () => {
+  it('run() with resolved messages: exits early with done text (legacy back-compat path)', async () => {
     const resumed = [
       {
         role: 'assistant',
