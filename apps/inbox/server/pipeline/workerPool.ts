@@ -15,6 +15,7 @@ interface AgentSlot {
 
 export interface WorkerPool {
   enqueue(id: string, agentId: string, cap: number): void
+  dequeue(id: string, agentId: string): void
   release(agentId: string): void
   resumeAcquire(id: string, agentId: string): void
   activeCount(agentId: string): number
@@ -44,6 +45,13 @@ export function makeWorkerPool(opts: { run: (id: string) => void }): WorkerPool 
       const s = slot(agentId, cap)
       if (s.active < s.cap) start(id, s)
       else s.queue.push(id)
+    },
+
+    dequeue(id, agentId) {
+      const s = slots.get(agentId)
+      if (!s) return
+      const i = s.queue.indexOf(id)
+      if (i !== -1) s.queue.splice(i, 1)
     },
 
     release(agentId) {

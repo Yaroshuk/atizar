@@ -17,6 +17,7 @@ function fakePool() {
   const enqueue = vi.fn<(id: string, agentId: string, cap: number) => void>()
   const pool: WorkerPool = {
     enqueue,
+    dequeue: vi.fn(),
     release: vi.fn(),
     resumeAcquire: vi.fn(),
     activeCount: () => 0,

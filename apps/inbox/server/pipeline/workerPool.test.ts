@@ -52,4 +52,17 @@ describe('WorkerPool (cap + queue)', () => {
     expect(run).toHaveBeenLastCalledWith('d') // ran immediately, ahead of c
     expect(pool.queuedCount('X')).toBe(1) // c still waiting
   })
+
+  it('dequeue removes a queued id without starting it', () => {
+    const started: string[] = []
+    const pool = makeWorkerPool({ run: (id) => started.push(id) })
+    pool.enqueue('a', 'agent', 1) // starts a (cap 1)
+    pool.enqueue('b', 'agent', 1) // queued
+    pool.enqueue('c', 'agent', 1) // queued
+    expect(pool.queuedCount('agent')).toBe(2)
+    pool.dequeue('b', 'agent')
+    expect(pool.queuedCount('agent')).toBe(1)
+    pool.release('agent') // frees a → next in queue is c (b was removed)
+    expect(started).toEqual(['a', 'c'])
+  })
 })

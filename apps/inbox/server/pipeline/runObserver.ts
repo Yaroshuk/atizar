@@ -34,6 +34,7 @@ export interface RunObserverDeps {
 export interface RunObserver {
   run(id: string): Promise<void>
   resume(id: string, resolution: GateResolution): Promise<void>
+  cancel(id: string): void
 }
 
 type ToolEvent = BaseEvent & {
@@ -44,6 +45,10 @@ type ToolEvent = BaseEvent & {
 
 export function makeRunObserver(deps: RunObserverDeps): RunObserver {
   const { db, store, pool, bus } = deps
+
+  // Live executor iterators, so Stop can interrupt a running stream: iterator.return()
+  // runs the provider generator's finally → child.kill(). Keyed by workItemId.
+  const live = new Map<string, AsyncIterator<BaseEvent>>()
 
   const publishStatus = (id: string, status: string): void => {
     // Per-WorkItem topic carries status alongside trace events (the thread SSE tail);
@@ -79,9 +84,15 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
     let gateOpened = false
     // Accumulate render-tool-call args to fill the card on TOOL_CALL_END.
     const openCalls = new Map<string, { name: string; args: string }>()
+    const iterator = iterable[Symbol.asyncIterator]()
+    live.set(id, iterator)
 
     try {
-      for await (const event of iterable) {
+      while (true) {
+        const next = await iterator.next()
+        if (next.done) break
+        const event = next.value
+
         await store.appendTrace(id, seq, event)
         bus.publish(`workitem:${id}`, { seq, event })
         seq++
@@ -119,7 +130,13 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       }
 
       if (gateOpened) {
-        // Suspended at a gate — the provider process is dead (claude-cli kill), free the slot.
+        // Suspended at a gate — provider process is dead (claude-cli kill); free the slot.
+        pool.release(wi.agentId)
+        return
+      }
+      const current = (await store.getWorkItem(id))?.status
+      if (current === 'finished' || current === 'error' || current === 'closed') {
+        // A concurrent cancel already finalized this item — do not override it.
         pool.release(wi.agentId)
         return
       }
@@ -133,6 +150,8 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       await store.setError(id, message)
       publishStatus(id, 'error')
       pool.release(wi.agentId)
+    } finally {
+      live.delete(id)
     }
   }
 
@@ -181,6 +200,14 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       const input = buildInput(wi)
       const handle = { runId: wi.runId ?? input.runId, input }
       await consume(id, wi, runtime, runtime.provider.resume(handle, resolution))
+    },
+
+    cancel(id) {
+      // Interrupt a live stream: return() the iterator → provider generator finally → kill.
+      // Status transition + slot release are the caller's (PipelineService.cancel) job;
+      // here we only stop the executor. No-op if not currently running.
+      const iterator = live.get(id)
+      if (iterator?.return) void iterator.return(undefined).catch(() => {})
     },
   }
 }
