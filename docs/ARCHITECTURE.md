@@ -59,9 +59,11 @@ _Architecture-locked (pipeline):_
 - **I13 — Approval expiry = a stale badge, never an auto-resolve.**
 - **I14 — Thread = Trace render + per-WorkItem SSE tail;** AG-UI is the event vocabulary.
 - **I15 — Boot-time tool classification.** Every allow-listed tool is declared
-  `readonly | approvals | renders | effects`; an unclassified tool → the framework refuses to
-  boot. Effects are bound server-side (names in core, functions in the `ServerBinding`);
-  `effects ⊆ approvals`.
+  `readonly | approvals | renders | effects | dispatches`; an unclassified tool → the framework
+  refuses to boot. Effects are bound server-side (names in core, functions in the `ServerBinding`);
+  `effects ⊆ approvals`. A `dispatches` tool is machine dispatch: the model calls it to produce a
+  child **work item** (validated against the agent's `handoffs`), never an action — consistent with
+  I2.
 
 ## 1. The two views (the spine)
 
