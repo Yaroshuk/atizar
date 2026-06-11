@@ -13,6 +13,27 @@
     "./gmail-basic/get-latest-email": {
       "types": "./src/gmail-basic/get-latest-email.d.ts",
       "default": "./src/gmail-basic/get-latest-email.mjs"
+    },
+    "./gmail-basic/check-credentials": {
+      "types": "./src/gmail-basic/check-credentials.d.ts",
+      "default": "./src/gmail-basic/check-credentials.mjs"
+    },
+    "./gmail-viewer": "./src/gmail-viewer/index.mjs",
+    "./gmail-viewer/list-unread": {
+      "types": "./src/gmail-viewer/list-unread.d.ts",
+      "default": "./src/gmail-viewer/list-unread.mjs"
+    },
+    "./gmail-viewer/get-email": {
+      "types": "./src/gmail-viewer/get-email.d.ts",
+      "default": "./src/gmail-viewer/get-email.mjs"
+    },
+    "./gmail-viewer/modify": {
+      "types": "./src/gmail-viewer/modify.d.ts",
+      "default": "./src/gmail-viewer/modify.mjs"
+    },
+    "./gmail-viewer/check-credentials": {
+      "types": "./src/gmail-viewer/check-credentials.d.ts",
+      "default": "./src/gmail-viewer/check-credentials.mjs"
     }
   },
   "dependencies": {
