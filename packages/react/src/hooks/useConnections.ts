@@ -15,6 +15,8 @@ export interface ConnectionStatus {
 export const useConnections = (): { connections: ConnectionStatus[]; refetch: () => void } => {
   const [connections, setConnections] = useState<ConnectionStatus[]>([])
 
+  // Exported refetch (used by Connections after a DELETE) — an explicit user action, so it
+  // fires-and-forgets without an unmount guard. It shares the same endpoint as the mount fetch.
   const refetch = useCallback((): void => {
     void (async () => {
       const r = (await (await fetch('/api/connections')).json()) as ConnectionStatus[]
@@ -23,7 +25,16 @@ export const useConnections = (): { connections: ConnectionStatus[]; refetch: ()
   }, [])
 
   useEffect(() => {
-    refetch()
+    let cancelled = false
+    // The effect owns the cancellation flag so the mount + focus fetches never set state on a
+    // torn-down component (matches the useBoard pattern).
+    const load = (): void => {
+      void (async () => {
+        const r = (await (await fetch('/api/connections')).json()) as ConnectionStatus[]
+        if (!cancelled) setConnections(r)
+      })()
+    }
+    load()
     // The OAuth callback redirects back with ?connected= (or ?connect_error=). Refetch to
     // pick up the new state, then strip the params so they don't linger across reloads.
     const params = new URLSearchParams(window.location.search)
@@ -34,10 +45,13 @@ export const useConnections = (): { connections: ConnectionStatus[]; refetch: ()
       url.search = params.toString()
       window.history.replaceState(null, '', url)
     }
-    const onFocus = (): void => refetch()
+    const onFocus = (): void => load()
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [refetch])
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
 
   return { connections, refetch }
 }

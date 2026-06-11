@@ -12,7 +12,7 @@ const fakeConnections = [
     connection: 'default',
     provider: 'google',
     connected: true,
-    detail: 'sjuser95@gmail.com',
+    detail: 'test@example.com',
   },
   { integration: 'slack', connection: 'default', provider: 'google', connected: false },
 ]
@@ -23,13 +23,13 @@ afterEach(() => {
 
 describe('Connections', () => {
   it('shows the detail for a connected row', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse(fakeConnections)) as never
+    vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fakeConnections) as Response)
     render(<Connections />)
-    await waitFor(() => expect(screen.getByText(/sjuser95@gmail\.com/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/test@example\.com/)).toBeInTheDocument())
   })
 
   it('shows a Connect link with the right href for a not-connected row', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse(fakeConnections)) as never
+    vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fakeConnections) as Response)
     render(<Connections />)
     const link = await screen.findByRole('link', { name: /connect/i })
     expect(link.getAttribute('href')).toContain('/api/connect/google?integration=slack')
@@ -37,14 +37,13 @@ describe('Connections', () => {
 
   it('disconnects then refetches when Disconnect is clicked', async () => {
     const fetchMock = vi
-      .fn()
+      .spyOn(global, 'fetch')
       // initial GET
-      .mockResolvedValueOnce(jsonResponse(fakeConnections))
+      .mockResolvedValueOnce(jsonResponse(fakeConnections) as Response)
       // DELETE
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response)
       // refetch GET
-      .mockResolvedValueOnce(jsonResponse(fakeConnections))
-    global.fetch = fetchMock as never
+      .mockResolvedValueOnce(jsonResponse(fakeConnections) as Response)
 
     render(<Connections />)
     const disconnect = await screen.findByRole('button', { name: /disconnect/i })
