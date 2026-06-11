@@ -16,7 +16,9 @@ export interface ApplyDeps {
   trash?: BatchFn
   star?: BatchFn
 }
-export interface ApplyResult {
+// A `type` (not `interface`) so it is assignable to Record<string, unknown> at the EffectFn seam
+// (TS interfaces lack an implicit index signature; an effect must return Record<string, unknown>).
+export type ApplyResult = {
   applied: number
   failed: { messageId: string; error: string }[]
   byAction: Record<string, number>

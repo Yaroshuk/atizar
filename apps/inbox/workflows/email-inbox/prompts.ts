@@ -29,9 +29,11 @@ function sorterFirst(instructions: string): string {
   ].join('\n')
 }
 
-export function createSorterPrompts(instructions: string, _origin?: string): PromptStrategy {
+// The sorter dispatches via route_emails (not a render-tool handoff), so it has no `origin`
+// to weave into a render — the param is omitted (unlike the lead-inbox qualifier prompts).
+export function createSorterPrompts(instructions: string): PromptStrategy {
   return {
-    buildFirst(_input: RunAgentInput): string {
+    buildFirst(): string {
       return sorterFirst(instructions)
     },
     // No buildResume: the sorter has no approvals, so it never resumes.
