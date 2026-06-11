@@ -10,9 +10,12 @@ import {
   startupSweep,
   makePipelineService,
   createPipelineRoutes,
+  makeCredentialStore,
+  createConnectRoutes,
   type AgentRuntime,
 } from '@platform/server'
 import { assertAgentClassification } from './agent-checks.js'
+import { scopesFor, connectionList } from './connections.js'
 import { aggregateHealth, providerHealth } from './health.js'
 
 // Wiring-time check: a passport must not hand off to an agent absent from its own workflow.
@@ -109,6 +112,14 @@ const pipeline = makePipelineService({
 // board + per-WorkItem trace/SSE + dispatch/deliver/resolve/cancel, all on Postgres.
 const app = new Hono()
 app.route('/', createPipelineRoutes(pipeline))
+
+// OAuth connect flow + connection-status reporting (auth sub-stage 3). The app supplies its
+// integrations' scopes and the (integration, connection, provider) tuples to report; the routes
+// themselves stay integration-agnostic.
+app.route(
+  '/',
+  createConnectRoutes({ store: makeCredentialStore(db), scopesFor, list: connectionList })
+)
 
 // Boot: apply migrations (so a fresh clone + `yarn dev` just works) and reconcile any rows
 // left dangling by a prior process (the zombie/stale-state public-embarrassment guard).
