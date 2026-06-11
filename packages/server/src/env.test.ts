@@ -43,6 +43,13 @@ describe('atizarEnv', () => {
     expect(atizarEnv.connection()).toBe('home')
   })
 
+  it('publicUrl defaults to http://localhost:5173 when ATIZAR_PUBLIC_URL is unset', () => {
+    delete process.env.ATIZAR_PUBLIC_URL
+    expect(atizarEnv.publicUrl()).toBe('http://localhost:5173')
+    process.env.ATIZAR_PUBLIC_URL = 'https://app.example.com'
+    expect(atizarEnv.publicUrl()).toBe('https://app.example.com')
+  })
+
   it('databaseUrl precedence: ATIZAR_DATABASE_URL > DATABASE_URL > compose default', () => {
     delete process.env.ATIZAR_DATABASE_URL
     delete process.env.DATABASE_URL

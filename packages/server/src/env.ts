@@ -37,6 +37,12 @@ export const atizarEnv = {
     return process.env.ATIZAR_CONNECTION || 'default'
   },
 
+  // The public origin used to build redirect_uri for OAuth callbacks. Defaults to the local Vite
+  // dev server so a fresh dev checkout needs no env file.
+  publicUrl(): string {
+    return process.env.ATIZAR_PUBLIC_URL || 'http://localhost:5173'
+  },
+
   // DB URL precedence: ATIZAR_DATABASE_URL (namespaced) > DATABASE_URL (legacy) > compose default.
   // Keeps today's default so a fresh `docker compose up -d postgres` still needs no env file.
   databaseUrl(): string {
