@@ -52,6 +52,9 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   //   (a) the RunObserver (machine dispatch — F2), and
   //   (b) the public `deliver` method (human-gated handoff from a rendered card).
   // Behavior is identical to the original inline implementation.
+  // NOTE: async function declaration — hoisted, but only ever called after construction
+  // completes (via the RunObserver and the public `deliver` method), so the forward
+  // references to `pool` and `publishBoard` are safe.
   async function deliverImpl(req: {
     origin: string
     dest: Destination

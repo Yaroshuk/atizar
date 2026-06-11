@@ -56,9 +56,7 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
       payload: {},
     })
 
-    const delivered: Parameters<
-      Parameters<typeof makeRunObserver>[0]['deliver']
-    >[0][] = []
+    const delivered: Parameters<Parameters<typeof makeRunObserver>[0]['deliver']>[0][] = []
 
     const { pool } = fakePool()
     const observer = makeRunObserver({
@@ -113,7 +111,12 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
       db,
       store,
       pool,
-      bus: { publish: (_topic, msg) => { busMsgs.push(msg) }, subscribe: () => () => {} },
+      bus: {
+        publish: (_topic, msg) => {
+          busMsgs.push(msg)
+        },
+        subscribe: () => () => {},
+      },
       resolveAgent: () => ({
         provider: fakeDispatchProvider('route_emails', {
           to: 'nope',

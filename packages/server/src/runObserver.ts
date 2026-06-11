@@ -143,7 +143,7 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
               const to = typeof parsed.to === 'string' ? parsed.to : ''
               if (runtime.handoffs.includes(to)) {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured to strip `to` from the payload
-              const { to: _to, ...payload } = parsed
+                const { to: _to, ...payload } = parsed
                 await deps
                   .deliver({
                     origin: wi.workflowId,
