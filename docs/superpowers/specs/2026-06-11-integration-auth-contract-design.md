@@ -45,15 +45,23 @@ export type ResolvedCredential =
   | { kind: 'oauth2'; accessToken: string; refreshToken?: string; expiresAt?: number; raw?: unknown }
   | { kind: string; [key: string]: unknown }
 
-// A pluggable resolver: given the spec + the target account, produce the live credential. Built-in
-// resolvers (apiKey, oauth2) ship in @platform/server; a custom-kind integration ships its OWN
-// resolver in userland — core only defines the interface.
+// A pluggable resolver: given the spec + the target CONNECTION, produce the live credential.
+// `connectionId` is a developer-chosen connection LABEL (NOT a user account — there is no login
+// system yet): 'default', 'home', 'work', … It decouples multi-account from user identity. Two
+// workflows can reuse the same integration code under two connection labels (home vs work mailbox).
+// Built-in resolvers (apiKey, oauth2) ship in @platform/server; a custom-kind integration ships
+// its OWN resolver in userland — core only defines the interface.
 export type CredentialResolver = (ctx: {
   integration: string
-  accountId: string
+  connectionId: string
   auth: AuthSpec
 }) => Promise<ResolvedCredential>
 ```
+
+**`connectionId` is threaded everywhere from day one (decided 2026-06-11), but the beta wires a
+single `'default'` label** (the multi-connection UI + a second workflow are deferred — §4). Laying
+the label into the whole resolve path now is cheap and avoids a later rework; flipping on two
+mailboxes later is then a config + UI change, not a plumbing change.
 
 - `apiKey` covers the common custom case (a Telegram bot token, a Slack token, a Stripe key) → the
   developer declares `{ kind: 'apiKey' }` and the built-in resolver reads `ATIZAR_<INTEGRATION>_API_KEY`. **Zero core change.**
@@ -100,44 +108,62 @@ applied in ONE place (no scattered `process.env.ATIZAR_…` strings).
 
 ## 3. Credential store + resolution (`@platform/server`)
 
-- **Table `credentials`** (drizzle): PK `(account_id, integration)`; columns `kind`, `secret`
+- **Table `credentials`** (drizzle): PK `(connection_id, integration)`; columns `kind`, `secret`
   (the encrypted blob — the oauth2 token JSON or the apiKey), `expires_at` (nullable),
   `connected_at`, `updated_at`. AES-256-GCM with the key from `ATIZAR_SECRET_KEY`; a tiny
   `crypto.ts` (encrypt/decrypt) — Node `crypto`, no new dep.
-- **Account model:** `account_id` is part of the key from day one (multi-ready), but the beta wires
-  a single `'default'` account (no user-login system yet — bearer token is the packaging stage).
+- **Connection model:** `connection_id` is a developer-chosen LABEL, part of the key from day one
+  (multi-ready). The beta wires a single `'default'` label everywhere; two workflows on two
+  mailboxes (home/work) is a later config+UI flip, not a schema change. `connection_id` is NOT a
+  user account — there is no login system yet (bearer token is the packaging stage).
+- **Connection binding (threaded now):** a workflow (or an agent binding) declares which connection
+  its integration uses — `connection?: string` (default `'default'`). This `connectionId` flows to
+  `resolveCredential` in ALL paths: the server-effect ctx, the native Mastra tool, and the spawned
+  MCP child (`claude-spawn.ts` passes `ATIZAR_CONNECTION=<id>` in that agent's env so its children
+  resolve the right token). Wiring it everywhere now is the cheap part; the only thing deferred is
+  using a non-`'default'` value + the UI to manage multiple.
 - **`resolveCredential` (the single path):** built-in resolvers keyed by `kind`:
   - `apiKey` → `ATIZAR_<INTEGRATION>_API_KEY` (no DB; never stored).
-  - `oauth2` → load+decrypt the row; if `expires_at` passed, refresh via the provider's token
-    endpoint using `ATIZAR_<PROVIDER>_CLIENT_*`, persist the new token, return the access token.
+  - `oauth2` → load+decrypt the `(connectionId, integration)` row; if `expires_at` passed, refresh
+    via the provider's token endpoint using `ATIZAR_<PROVIDER>_CLIENT_*`, persist the new token,
+    return the access token.
   - a custom `kind` → the integration's own registered resolver.
   - Missing/expired-unrefreshable → returns a typed "not connected" so the F3 health surface shows
     the agent as needing a connection (the existing `checkCredentials` becomes "is there a usable
     resolved credential?").
 - **One resolution path for all three runtimes:** server effects (in-process), native Mastra read
   tools (in-process), AND the stdio MCP children for claude-cli. The MCP child resolves the
-  credential ITSELF — `claude-spawn.ts` passes `ATIZAR_SECRET_KEY` + `ATIZAR_DATABASE_URL` (and the
-  provider client envs) through to the child, and the child imports the SAME `resolveCredential`
-  + integration `auth`. (Without this, the child process has no token.)
+  credential ITSELF — `claude-spawn.ts` passes `ATIZAR_SECRET_KEY` + `ATIZAR_DATABASE_URL` +
+  `ATIZAR_CONNECTION` (and the provider client envs) through to the child, and the child imports
+  the SAME `resolveCredential` + integration `auth`. (Without this, the child process has no token.)
 - A new resolver registry seam: built-ins registered in `@platform/server`; a custom-kind resolver
   is registered by the app when it wires the integration (userland), so core stays closed-free.
 
 ## 4. The OAuth "Connect" flow
 
 - **Routes (`@platform/server`):**
-  - `GET /api/connect/:provider?integration=<id>` → build the provider's auth URL
-    (`ATIZAR_<PROVIDER>_CLIENT_ID` + the integration's `auth.scopes` + a signed `state`) → 302 to
-    the provider. `access_type=offline` + `prompt=consent` for Google so a refresh token comes back.
+  - `GET /api/connect/:provider?integration=<id>&connection=<connId>` → build the provider's auth
+    URL (`ATIZAR_<PROVIDER>_CLIENT_ID` + the integration's `auth.scopes` + a signed `state` that
+    carries `integration` + `connection`) → 302 to the provider. `access_type=offline` +
+    `prompt=consent` for Google so a refresh token comes back. `connection` defaults to `'default'`.
   - `GET /api/connect/:provider/callback` → verify `state` → exchange `code` for tokens (using
-    `ATIZAR_<PROVIDER>_CLIENT_SECRET`) → encrypt → upsert into `credentials` (`account='default'`)
-    → 302 back to the UI `/?connected=<integration>`.
-- **UI (React):** a **Connections** view (its own small surface, fits with the Stage-4 chrome but
-  is independent): one row per integration with status (connected / not connected, from the health
-  surface) and a **Connect** / **Reconnect** / **Disconnect** button. "Connect" navigates to
-  `/api/connect/:provider?integration=…`. **The consumer never touches files** — this is the
-  "понятный механизм".
-- **Disconnect** → `DELETE /api/connections/:integration` removes the row (revoking at the provider
-  is post-beta).
+    `ATIZAR_<PROVIDER>_CLIENT_SECRET`) → encrypt → upsert into `credentials`
+    (`(connectionId, integration)` from the `state`) → 302 back to the UI `/?connected=<integration>`.
+- **UI (React) — placement (decided 2026-06-11):** the connection STATUS surfaces in two places,
+  the connect ACTION lives in ONE: (a) each dependent agent card shows the F3 health badge
+  (greyed-out + "needs Gmail" + START disabled) — it surfaces the problem where you act; (b) a
+  single **Connect** affordance in the GLOBAL header (a status chip per required integration:
+  "Gmail — not connected [Connect]" / "Gmail — me@x.com ✓" / "Gmail — reconnect needed
+  [Reconnect]"). The button is GLOBAL, not per-workflow, because a connection is per-integration
+  and shared across workflows (connect once → every workflow using it lights up). "Connect"
+  navigates to `/api/connect/:provider?integration=…&connection=default`. **The consumer never
+  touches files.** Expiry → resolve fails → the SAME chip flips to "reconnect" (one gesture for
+  login and for expiry).
+  - **Deferred (multi-connection UI):** grouping the chips by `(connection, integration)` and a
+    second mailbox workflow (home/work) is NOT in the beta UI — the beta shows the single
+    `'default'` connection. The `connectionId` plumbing is in place so this is a later UI flip.
+- **Disconnect** → `DELETE /api/connections/:integration?connection=<id>` removes the row (revoking
+  at the provider is post-beta).
 
 ## 5. `write-integration` skill — the auth interview (MANDATORY stop-and-ask)
 
@@ -202,8 +228,10 @@ the updated skill**:
 
 ## 9. Out of scope (explicit)
 
-- A user-login / multi-tenant identity system (bearer token = packaging stage; `account_id` is just
-  `'default'` for the beta but the schema is ready).
+- A user-login / multi-tenant identity system (bearer token = packaging stage). `connection_id` is
+  threaded everywhere now but wired to a single `'default'` label; the multi-connection UI (two
+  mailboxes home/work, chip grouping by connection, a second workflow bound to a non-default
+  connection) is a later UI flip — the plumbing is laid so no schema/resolve change is needed then.
 - Revoking tokens at the provider on disconnect (delete the row only, for now).
 - A secrets vault integration (env + encrypted Postgres is the beta; a Vault/KMS adapter is a later
   resolver).
