@@ -147,6 +147,40 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect(stats.queued).toBe(0)
   })
 
+  it('machine dispatch (origin=agent) to a saturated singleton is NOT rejected by the START guard', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+
+    // First human START occupies the sole slot.
+    const first = await service.dispatch({
+      ...base,
+      agentId: 'singleton-machine-agent',
+      origin: 'human',
+    })
+    expect(first.rejected).toBeUndefined()
+
+    // Machine dispatch (origin='agent', e.g. F2 child dispatch) to the same saturated singleton
+    // must NOT be rejected — it goes to the chokepoint cap/queue instead of the human guard.
+    const machine = await service.dispatch({
+      ...base,
+      agentId: 'singleton-machine-agent',
+      origin: 'agent',
+    })
+    expect(machine.rejected).toBeUndefined()
+
+    // The machine dispatch was accepted: 1 active (blocking) + 1 queued.
+    const stats = service.stats('singleton-machine-agent')
+    expect(stats.active).toBe(1)
+    expect(stats.queued).toBe(1)
+  })
+
   // ── Gate-keyed resolveGate tests ───────────────────────────────────────────
 
   function makeService(opts: { effects: Record<string, EffectFn> }) {
