@@ -490,10 +490,33 @@ updated `write-integration` skill.
   - `connectionId` is threaded into the resolver signature + `atizarEnv.connection()` from day one
     (multi-mailbox-ready) but wired to a single `'default'`; actually USING a non-default value + the
     multi-connection UI is deferred (spec §9).
-  - **Next = sub-stage 2** (encrypted Postgres `credentials` table + `crypto.ts` AES-256-GCM +
-    `resolveCredential` + built-in apiKey/oauth2 resolvers + resolver registry + token refresh +
-    `.env.example`). Plan already written →
-    `docs/superpowers/plans/2026-06-11-integration-auth-substage2-credential-store.md`.
+- **Sub-stage 2 — encrypted credential store + `resolveCredential`: ✅ BUILT** on `feat/gmail-viewer`
+  (2026-06-11), commits `444fcad`…`bb8df03`. Plan →
+  `docs/superpowers/plans/2026-06-11-integration-auth-substage2-credential-store.md`. 361 unit tests
+  (344 + 17 new) + typecheck/lint green; touched files Prettier-clean. `check-foundation` = CLEAR
+  (I3 held — all in `@platform/server`, core only consumed; I5 reinforced — `registerResolver` seam;
+  I7 aligned — secrets AES-encrypted at rest, never plaintext DB, apiKey env-only).
+  - **As-built (all `@platform/server`):** `credentials` table (drizzle, PK `(connection_id,
+    integration)`, `secret` = AES blob, `kind` plain text not enum, `expires_at` drives refresh) +
+    migration `0001_*.sql`. `crypto.ts` — AES-256-GCM `deriveKey`(sha256→32B)/`encryptSecret`/
+    `decryptSecret` (blob `base64(iv):base64(tag):base64(ct)`), pure (caller supplies the key).
+    `credentialStore.ts` — `makeCredentialStore(db)` → `upsert`/`get`/`remove`, encrypt-on-write /
+    decrypt-on-read; throws if `ATIZAR_SECRET_KEY` unset; **real-PG test asserts the raw column ≠
+    plaintext** (encryption at rest). `oauthProviders.ts` — `oauthProvider('google')` auth/token URLs
+    (beta ships google; one entry per provider). `resolveCredential.ts` — registry + built-ins
+    (`none`→null, `apiKey`→`ATIZAR_<INTEGRATION>_API_KEY` env never stored, `oauth2`→load+decrypt,
+    refresh-on-expiry via the provider token endpoint with 60s skew + persist + keep refreshToken,
+    `null` when no row / refresh fails) + `registerResolver(kind, fn)` for custom kinds (the I5 seam —
+    a custom kind plugs in WITHOUT editing core or this file); `store`/`fetchFn`/`now` injectable for
+    tests. Barrel exports `resolveCredential`/`registerResolver`/`makeCredentialStore`/`oauthProvider`
+    + types (NOT `crypto.ts` — internal). `.env.example` reworked to the single-source format
+    (framework `ATIZAR_*` block + provider + google OAuth app + dev tooling).
+  - **No consumer yet** (by design): sub-stage 3 writes INTO the store via the OAuth connect flow;
+    sub-stage 5 (gmail rewrite) consumes `resolveCredential`. This sub-stage ships the API they need.
+  - **Next = sub-stage 3** (OAuth connect/callback routes + signed `state` + global-header Connect
+    chip + Connections UI + `claude-spawn.ts` env pass-through `ATIZAR_SECRET_KEY`/`ATIZAR_DATABASE_URL`/
+    `ATIZAR_CONNECTION` so MCP children resolve). Browser E2E of connect/disconnect. Plan to be
+    written from spec §4 + §7 step 3.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
