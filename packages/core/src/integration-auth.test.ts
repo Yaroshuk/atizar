@@ -54,6 +54,8 @@ describe('integration auth contract', () => {
     expect(cred).toEqual({ kind: 'apiKey', apiKey: 'sk-x' })
     // null is a valid "not connected" result.
     const none: CredentialResolver = async () => null
-    expect(await none({ integration: 'x', connectionId: 'default', auth: { kind: 'none' } })).toBeNull()
+    expect(
+      await none({ integration: 'x', connectionId: 'default', auth: { kind: 'none' } })
+    ).toBeNull()
   })
 })
