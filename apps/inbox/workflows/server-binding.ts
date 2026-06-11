@@ -1,4 +1,4 @@
-import type { PromptStrategy, EffectFn } from '@platform/core'
+import type { PromptStrategy, EffectFn, HealthCheck } from '@platform/core'
 
 export type { EffectFn }
 
@@ -14,4 +14,8 @@ export type ServerBinding = {
   prompts: PromptStrategy
   allowedTools: string[]
   effects?: Record<string, EffectFn>
+  // Named credential/provider checks this agent depends on. The server aggregates these
+  // per instance into GET /api/health. Boot never fails on a failing check — missing
+  // credentials is an expected user state that surfaces as a UI badge (Stage 4).
+  health?: { name: string; check: () => Promise<HealthCheck> }[]
 }
