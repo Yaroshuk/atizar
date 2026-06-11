@@ -17,7 +17,7 @@ export const Connections = () => {
   }
 
   return (
-    <div className='connections'>
+    <div className='workflow-tabs'>
       {connections.map((c) => (
         <ConnectionChip
           key={`${c.integration}:${c.connection}`}

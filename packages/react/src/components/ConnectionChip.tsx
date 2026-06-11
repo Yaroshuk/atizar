@@ -14,7 +14,7 @@ export const ConnectionChip = ({ connection: c, onDisconnect }: ConnectionChipPr
       c.integration
     )}&connection=${encodeURIComponent(c.connection)}`
     return (
-      <span className='connection-chip'>
+      <span className='workflow-tab'>
         <span>{c.integration}</span>
         <a href={href} className='btn btn-ghost'>
           Connect
@@ -24,7 +24,7 @@ export const ConnectionChip = ({ connection: c, onDisconnect }: ConnectionChipPr
   }
 
   return (
-    <span className='connection-chip'>
+    <span className='workflow-tab'>
       <span>
         {c.integration} ✓{c.detail ? ` ${c.detail}` : ''}
       </span>
