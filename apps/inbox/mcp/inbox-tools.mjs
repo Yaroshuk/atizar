@@ -45,4 +45,72 @@ server.registerTool(
   async () => ({ content: [{ type: 'text', text: 'Verdict surfaced to the user.' }] })
 )
 
+// ── email-inbox tools ────────────────────────────────────────────────────────
+// All three are pure echoes (surfaces): the SERVER does the real work from the
+// observed tool call — renderSort fills the card, route_emails dispatches a child
+// (RunObserver), applyActions opens the gate + runs the server effect on approval.
+// NONE of them performs any Gmail action.
+
+const emailRefShape = {
+  messageId: z.string(),
+  threadId: z.string().optional(),
+  from: z.string().optional(),
+  subject: z.string().optional(),
+  date: z.string().optional(),
+  snippet: z.string().optional(),
+}
+
+server.registerTool(
+  'renderSort',
+  {
+    description: 'Surface a short summary of how the unread inbox was sorted.',
+    inputSchema: {
+      summary: z.string(),
+      counts: z
+        .object({
+          reply: z.number(),
+          reader: z.number(),
+          spam: z.number(),
+          important: z.number(),
+        })
+        .partial()
+        .optional(),
+    },
+  },
+  async () => ({ content: [{ type: 'text', text: 'Sort summary surfaced to the user.' }] })
+)
+
+server.registerTool(
+  'route_emails',
+  {
+    description:
+      'Dispatch emails to a worker. Call once per destination: { to: "reply", email } for a single reply, or { to: "reader"|"spam"|"important", emails: [...] } for a batch.',
+    inputSchema: {
+      to: z.string(),
+      email: z.object(emailRefShape).optional(),
+      emails: z.array(z.object(emailRefShape)).optional(),
+    },
+  },
+  async () => ({ content: [{ type: 'text', text: 'Routed.' }] })
+)
+
+server.registerTool(
+  'applyActions',
+  {
+    description:
+      'Ask the human to apply a per-row action to a batch of emails. Args carry the proposed actions; the human may edit any row before approving. No action is performed here.',
+    inputSchema: {
+      items: z.array(
+        z.object({
+          messageId: z.string(),
+          from: z.string().optional(),
+          subject: z.string().optional(),
+          action: z.enum(['read', 'trash', 'star', 'keep']),
+        })
+      ),
+    },
+  },
+  async () => ({ content: [{ type: 'text', text: 'Awaiting human approval.' }] })
+)
+
 await server.connect(new StdioServerTransport())
