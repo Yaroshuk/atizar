@@ -3,6 +3,7 @@ import type { HealthCheck } from '@platform/core'
 
 // Aggregate a set of credential/provider checks for ONE agent into a single HealthCheck:
 // the first failing check (so an agent with any unhealthy dependency is unhealthy), else ok.
+// An empty array has no failing checks and returns ok:true (no checks = no constraints).
 export function aggregateHealth(checks: HealthCheck[]): HealthCheck {
   for (const c of checks) {
     if (!c.ok) return c
@@ -36,5 +37,7 @@ export function providerHealth(provider: string): HealthCheck {
       }
     }
   }
+  // Unknown provider: validated by registry.resolve() at wiring time, so this is unreachable in
+  // production. Treat as ok rather than surfacing a confusing false-negative.
   return { ok: true }
 }

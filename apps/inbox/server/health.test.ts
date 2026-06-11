@@ -16,7 +16,11 @@ describe('providerHealth', () => {
   it('mastra needs ANTHROPIC_API_KEY', () => {
     const saved = process.env.ANTHROPIC_API_KEY
     delete process.env.ANTHROPIC_API_KEY
-    expect(providerHealth('mastra').ok).toBe(false)
-    if (saved) process.env.ANTHROPIC_API_KEY = saved
+    try {
+      expect(providerHealth('mastra').ok).toBe(false)
+    } finally {
+      if (saved !== undefined) process.env.ANTHROPIC_API_KEY = saved
+      else delete process.env.ANTHROPIC_API_KEY
+    }
   })
 })
