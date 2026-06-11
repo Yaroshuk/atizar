@@ -317,10 +317,37 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     user maintains in parallel (`.claude/skills/README.md`, `.claude/skills/check-foundation/SKILL.md`)
     — `README.md` failed Prettier already at `57481e6`, before stage-1 touched it; left alone per
     the parallel-docs rule.
-- **Stage 2 — core/server capabilities (NEXT):** F1 workflow-level prompt (`defineWorkflow.prompt`
-  composed over agent prompts), F2 `dispatches` tool class + RunObserver→`deliver` wiring (machine
-  dispatch), F3 credential-health surface (wire `checkCredentials` per agent → board badge),
-  F4 activity feed, F6 singleton START guard, `POST /api/cancel-all`. Spec §2.
+- **Stage 2 — core/server capabilities: ✅ BUILT** on `feat/gmail-viewer` (2026-06-11). 318 unit
+  tests + typecheck/lint/prettier-clean green. Plan →
+  `docs/superpowers/plans/2026-06-11-email-inbox-stage2-core-server.md`.
+  - **F9 — thin integration contract (types-only):** `HealthCheck`/`ReadResult<T>`/`BatchActionResult`
+    in `@platform/core`; gmail-basic + gmail-viewer `.d.ts` retyped against them;
+    `write-integration` + `gmail-viewer` skills + `docs/AGENTIC.md` reference the contract.
+  - **F1 — workflow-level prompt (mechanism):** `composeInstructions()` helper +
+    `defineWorkflow.prompt` field in core; threaded into `buildProvider` via a composed-instructions
+    param (Mastra path wired). **Mechanism only** — the claude-cli prompt-strategy composition for
+    the email-inbox `server.ts` is Stage 3. Zero regression on lead-inbox (no prompt field).
+  - **F2 — machine dispatch:** `defineAgent.dispatches` tool class (subset of `tools`); boot
+    classifier accepts `dispatches` (unclassified tool still refuses to boot); RunObserver detects a
+    dispatch tool call → `deliver`s a child work item (origin agent, validated against `handoffs`),
+    bad target = trace warning, never an action (I2); conformance suite asserts surfaced dispatch
+    tool calls pair START/END. **Foundation note:** `ARCHITECTURE.md` I15 updated to enumerate
+    `dispatches` alongside `readonly`/`approvals`/`renders`/`effects` (protected-doc edit, done
+    with explicit check-foundation confirmation).
+  - **F3 — credential-health surface:** `ServerBinding.health` + `aggregateHealth`/`providerHealth`
+    helpers; `computeAgentHealth`/`refreshHealth` in the app; `GET /api/health` (on-demand refresh);
+    `agentHealth` on the board snapshot (cheap cached read). Boot logs a one-line health summary,
+    never throws. **UI badge is Stage 4.**
+  - **F4 — activity feed:** in-memory ring buffer + `activity` bus topic; recorded at
+    dispatch/deliver/resolveGate/cancel + runObserver running/gate/finished/error seams;
+    `getActivity()`/`subscribeActivity()` façade; `GET /api/activity` + `/api/activity/stream`
+    (SSE). **Panel UI is Stage 4.**
+  - **F6 — singleton START guard + cancel-all:** duplicate HUMAN start of a `maxInstances:1` agent
+    → 409 (machine dispatch unaffected); `POST /api/cancel-all` reuses the cancelWorkflow cascade.
+- **Stage 3 — email-inbox workflow (NEXT):** assemble sorter + reply + reader/spam/important agents
+  consuming the Stage-1 gmail-viewer integration and Stage-2 capabilities; wire F1's claude-cli
+  prompt-strategy path in the email-inbox `server.ts`; live Gmail mutations (mark-read/trash/star)
+  as server-executed effects; full browser E2E including machine dispatch and batch gates. Spec §3.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
