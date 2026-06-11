@@ -4,38 +4,10 @@ import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { PostgresStore } from '@mastra/pg'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
-import {
-  decodeHandoff,
-  HandoffPayloadSchema,
-  type GateResolution,
-  type Message,
-} from '@platform/core'
+import { type GateResolution, type Message, type PromptStrategy } from '@platform/core'
+import type { RunAgentInput } from '@ag-ui/client'
 import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@platform/providers'
 import { getLatestEmailTool, renderLeadTool, renderVerdictTool, saveDraftTool } from './tools.js'
-
-// Build the first-turn prompt from the run's messages (the handoff payload). Mirrors
-// reply.prompts handoffFirst/noLeadFirst — Mastra ignores PromptStrategy, so the per-turn lead
-// context is assembled here, server-side. `decodeHandoff` reads `input.messages`, so we pass a
-// minimal RunAgentInput-shaped object carrying just the messages.
-function buildPrompt(instructions: string, messages: Message[]): string {
-  const h = decodeHandoff({ messages } as never, HandoffPayloadSchema)
-  if (!h)
-    return `${instructions}\n\nNo lead was handed off. Reply with ONE short sentence asking the user to start from the Lead Qualifier. Do not call any tool.`
-  return [
-    instructions,
-    '',
-    `A colleague qualified this lead — category "${h.category}", priority "${h.priority}".`,
-    `From ${h.from}, subject "${h.subject}". Summary: ${h.summary}`,
-    'Do NOT fetch the email again. Take exactly these two tool actions, in order:',
-    '1. Call the renderLead tool with { from, subject, summary }.',
-    `2. Call the saveDraft tool with { threadId: "${h.threadId}", body } — body is the full reply`,
-    '   text you drafted.',
-    'Calling saveDraft IS how you ask the human for approval — it is mandatory. Do NOT write the',
-    'reply text in your message, do NOT ask "should I save this?" in prose, and do NOT end your',
-    "turn without calling saveDraft. Keep any message text to one short sentence; don't narrate",
-    'tools. Do NOT send the email — saveDraft only proposes a draft for approval.',
-  ].join('\n')
-}
 
 export interface MastraRunnerConfig {
   agentId: string
@@ -45,6 +17,10 @@ export interface MastraRunnerConfig {
   renderAndProposeTools: readonly string[] // e.g. ['renderLead','saveDraft'] or ['renderVerdict']
   model: string // e.g. 'claude-sonnet-4-6'
   databaseUrl: string
+  // The agent's prompt strategy — the SAME object claude-cli uses. The runner builds the
+  // first-turn prompt from `buildFirst` so both providers share ONE prompt source (per workflow's
+  // `prompts` module); there is no Mastra-specific prompt path.
+  prompts: PromptStrategy
 }
 
 // ONE Mastra storage shared across every agent. A PostgresStore per agent opened its own pool
@@ -166,14 +142,14 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
       if (resumeData?.decision === 'rejected') {
         await writer.write({
           type: 'text-delta',
-          payload: { text: 'The human rejected the draft; nothing was saved.' },
+          payload: { text: 'The human rejected the proposal; nothing was applied.' },
         })
         return bail({ done: false })
       }
       if (resumeData?.decision === 'approved') {
         await writer.write({
           type: 'text-delta',
-          payload: { text: 'The Gmail draft was saved.' },
+          payload: { text: 'The action was approved and applied.' },
         })
         return { done: true }
       }
@@ -249,7 +225,18 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
   return {
     start(runId, inputData) {
       const messages = (inputData.messages ?? []) as Message[]
-      const prompt = buildPrompt(cfg.instructions, messages)
+      // The provider hands us only the messages; reconstruct the minimal RunAgentInput the
+      // PromptStrategy reads (it decodes the handoff payload from `messages`).
+      const input = {
+        messages,
+        threadId: runId,
+        runId,
+        state: {},
+        tools: [],
+        context: [],
+        forwardedProps: {},
+      } as RunAgentInput
+      const prompt = cfg.prompts.buildFirst(input)
       return deferRun(
         (run) => run.stream({ inputData: { prompt } }),
         () => createRun(runId)

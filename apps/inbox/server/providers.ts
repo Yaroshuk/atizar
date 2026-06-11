@@ -33,6 +33,8 @@ const mastraFactory: ProviderFactory = (config) => {
     // Reuse the pipeline's resolved DB URL (defaults to the compose creds) — a single source
     // of truth, so PROVIDER=mastra needs no extra env beyond ANTHROPIC_API_KEY.
     databaseUrl,
+    // The SAME PromptStrategy claude-cli uses — one prompt source for both providers.
+    prompts: config.prompts,
   })
   return createMastraProvider({
     approvalNames: config.approvalNames,
