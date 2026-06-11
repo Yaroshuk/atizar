@@ -16,12 +16,14 @@ skill's first run); `gmail-basic` is the original pattern source.
   takes `(args, deps = {})` where `deps.getClient` (e.g. `getGmail`) overrides the real
   client. Tests pass a fake; the server imports the function directly (no MCP child).
 - **Never throw — return `{ error }`.** Callers (server effects, MCP wrappers) branch on
-  `res.error`. Use a shared `errText(err)` helper for messages.
+  `res.error`. Use a shared `errText(err)` helper for messages — reads return `ReadResult<T>`
+  (`T | { error }`) from `@platform/core`.
 - **Parsing is pure and separate.** Data-in/data-out helpers live in a `format.mjs` with no
   fs/env/network so they unit-test trivially.
 - **Batch mutations are best-effort.** A multi-id action returns
   `{ done: string[], failed: { id, error }[] }` — one bad row must not abort the rest.
-  A wholesale failure (client unavailable) returns `{ error }`.
+  A wholesale failure (client unavailable) returns `{ error }` — this shape IS the exported
+  `BatchActionResult` type in `@platform/core`; import it, don't redefine it.
 - **`.d.ts` beside `.mjs`** for every module a TypeScript consumer imports; the package
   `exports` map points `types` at it. The package tsconfig has `allowJs:true, checkJs:false`
   — tests in `.test.ts` import `.mjs` directly.
@@ -29,10 +31,14 @@ skill's first run); `gmail-basic` is the original pattern source.
   approval gates; the model NEVER sees a mutating tool (the boot-time classification kernel
   enforces this — an unclassified tool refuses to boot). The wrapper is a thin stdio
   `McpServer` whose tools delegate to the pure functions.
-- **`checkCredentials()` is mandatory.** Shape:
-  `{ ok: true, ... } | { ok: false, error, hint }` — a cheap real ping (e.g. a 1-unit
+- **`checkCredentials()` is mandatory.** Returns the `HealthCheck` type from `@platform/core`
+  (`{ ok:true; detail? } | { ok:false; error; hint }`) — a cheap real ping (e.g. a 1-unit
   profile call). The `hint` names where credentials live and points at the integration's
   embedded skill. The server's health surface (spec F3) calls this.
+- **Type the `.d.ts` against `@platform/core`** — import `HealthCheck` / `ReadResult` /
+  `BatchActionResult` rather than re-declaring result shapes; add `@platform/core` to the
+  package deps. The contract is types only — there is no `defineIntegration()` and no base
+  class (belief #3).
 - **Optional heavy peers.** A large SDK (`googleapis`) is an optional peerDependency,
   lazy-imported with a fail-fast error (`optional-peer.mjs` pattern).
 - **Subpath exports, no build step.** Each module gets its own `exports` entry

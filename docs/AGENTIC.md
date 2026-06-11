@@ -211,6 +211,11 @@ shipped inside its package:
   credential-health `hint` points at it. A3's "after the contracts stabilize" bar is met for the
   `@platform/integrations` contract (it's stable; only the workflow/react contracts are still
   moving). This is the first concrete instance of the `add-integration` flagship below.
+- ✅ **Thin integration contract landed (email-inbox stage 2):** `HealthCheck` /
+  `ReadResult<T>` / `BatchActionResult` — types only in `@platform/core`, no
+  `defineIntegration()`, no base class (belief #3). The `write-integration` skill and the
+  gmail-viewer consumer skill now reference these types; integrations import them from
+  `@platform/core` instead of re-declaring result shapes.
 - ❌ `add-integration` (in `@platform/integrations`) — the flagship; proves "Claude writes your
   integration in a minute, guided by the skill". (Its L1 dev twin `write-integration` is BUILT —
   see Phase 1 #3; this L2 twin is the lighter userland-facing rewrite.)

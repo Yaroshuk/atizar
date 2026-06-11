@@ -13,11 +13,13 @@ behind approval gates — never expose them to a model.
 
 | import | function | kind |
 |---|---|---|
-| `@platform/integrations/gmail-viewer/list-unread` | `listUnread({ sinceHours? })` → `{ emails: EmailRef[] } \| { error }` | read |
-| `@platform/integrations/gmail-viewer/get-email` | `getEmail({ messageId })` → parsed email incl. `body` | read |
-| `@platform/integrations/gmail-viewer/modify` | `markRead\|trash\|star({ messageIds })` → `{ done, failed } \| { error }` | mutation |
-| `@platform/integrations/gmail-viewer/check-credentials` | `checkCredentials()` → `{ ok, email } \| { ok:false, error, hint }` | health |
+| `@platform/integrations/gmail-viewer/list-unread` | `listUnread({ sinceHours? })` → `ReadResult<{ emails: EmailRef[] }>` | read |
+| `@platform/integrations/gmail-viewer/get-email` | `getEmail({ messageId })` → `ReadResult<ParsedEmail>` incl. `body` | read |
+| `@platform/integrations/gmail-viewer/modify` | `markRead\|trash\|star({ messageIds })` → `BatchActionResult` | mutation |
+| `@platform/integrations/gmail-viewer/check-credentials` | `checkCredentials()` → `HealthCheck` | health |
 | `@platform/integrations/gmail-viewer` | stdio MCP server: `list_unread`, `get_email` (READ ONLY) | model tools |
+
+Result shapes (`HealthCheck` / `ReadResult` / `BatchActionResult`) are the shared `@platform/core` integration contract — import them, they are not gmail-specific.
 
 `EmailRef = { messageId, threadId, from, subject, date, snippet }`. Mutations are
 best-effort per message: `failed` lists per-id errors; `{ error }` means the client
