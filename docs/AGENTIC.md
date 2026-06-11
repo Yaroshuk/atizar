@@ -195,7 +195,12 @@ public SDK, not framework internals, so a userland developer runs them on top of
 
 Post-beta first drafts of their L2 twins (gated on beta progress, NOT now):
 
-- ❌ **`add-provider`** — after beta step 5 (Mastra); the conformance suite is the definition-of-done.
+- ❌ **`add-provider` / `write-provider`** (in `@platform/providers`) — parked for later by the user
+  (2026-06-11), explicitly AFTER the beta demo. Teaches the `AgentRuntime`/provider seam (the
+  injected-runner pattern, the AG-UI chunk→event mapping, `GATE_OPENED` synthesis, native vs
+  re-prime resume); the **provider conformance suite is the definition-of-done**. The first real
+  exercise is adding a non-Mastra, non-CLI provider — the Anthropic SDK directly — gated on demand
+  (the two shipped providers, claude-cli + Mastra, already satisfy I4 for the beta).
 - ❌ **`add-integration`** — after beta step 7 (extraction); the `@platform/integrations` contract +
   the `ServerBinding` effects seam, with `gmail-basic` as the worked example. The flagship L2 skill.
 

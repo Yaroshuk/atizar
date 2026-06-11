@@ -400,13 +400,56 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     gets it), and `EmailBatchCard` has no per-row "Draft reply" button, so that handoff is currently
     inert. Wiring it needs a small `@platform/react` addition (deliver-from-a-HITL-card) → its own
     step + `check-foundation`.
-  - **For Stage 3b (Mastra — MANDATORY, the public demo runs on Mastra):** plan →
-    `docs/superpowers/plans/2026-06-11-email-inbox-stage3b-mastra.md`. Generalize the Mastra runner
-    (today hardcoded to the lead-inbox reply shape) to the sorter/reply/batch shapes; ideally thread
-    the `prompts.ts` `PromptStrategy` into the runner so both providers share one prompt source.
     **For Stage 4 (UI chrome):** the F3 health badge, F6 START-disable, F7 "Delegating"/"Done" pipeline
     states, the ActivityLog panel, and the polished EmailBatchCard styling (it currently reuses the
     approval/lead Smedja classes + raw `.batch-row*` classes that have no CSS yet) are all Stage 4.
+- **Stage 3b — email-inbox on the Mastra production provider: ✅ BUILT & live-verified** on
+  `feat/gmail-viewer` (2026-06-11). 334 unit tests + typecheck/lint/build green; all six flows
+  verified on a LIVE `PROVIDER=mastra` run (real Anthropic API + real Gmail) AND claude-cli
+  regression confirmed. Plan → `docs/superpowers/plans/2026-06-11-email-inbox-stage3b-mastra.md`.
+  `check-foundation` = CLEAR (I4 strengthened — two unlike providers run the SAME flagship workflow).
+  - **As-built — one prompt source (A1):** the Mastra runner's hardcoded lead-inbox `buildPrompt`
+    (+ its `decodeHandoff`/`HandoffPayloadSchema` imports) is DELETED; `MastraRunnerConfig` gained
+    `prompts: PromptStrategy` and `start()` builds the first-turn prompt from `cfg.prompts.buildFirst(input)`
+    — the SAME object claude-cli uses (`config.prompts` threaded through `mastraFactory`). claude-cli +
+    Mastra now share ONE prompt source per workflow (`workflows/<id>/prompts`); there is no
+    Mastra-specific prompt path. The gateStep narrative was neutralized ("The action was approved and
+    applied." / "…rejected; nothing was applied.") so it fits any effect, not just the draft.
+  - **As-built — tools (B1/B2):** `mastra/tools.ts` gained `listUnreadTool`/`getEmailTool` (real reads
+    → the gmail-viewer functions) + `routeEmailsTool`/`renderSortTool`/`applyActionsTool` (capture
+    surfaces); `ALL_TOOLS` extended. A **fail-fast** throws on an unregistered tool name (B2) instead
+    of building an Agent with `undefined` tools.
+  - **As-built — github-triage stays claude-cli-only (the B2 fail-fast surfaced this):** under
+    `PROVIDER=mastra` EVERY workflow's agents resolve through the Mastra factory at boot, so the
+    github-triage tools (never Mastra-ready — they read the private board via `gh`) had to be
+    registered or the fail-fast aborts the whole server. The 3 render tools are capture surfaces; the
+    2 reads (`list_my_tickets`/`get_ticket`) are HONEST "not supported on the Mastra provider" stubs.
+    **Follow-up:** wire the real `gh` reads as Mastra tools if github-triage should run on Mastra
+    (it's read-only, so safe).
+  - **Live Mastra E2E (PROVIDER=mastra, real LLM + real Gmail, all 6 PASS):** (1) **sort + machine
+    dispatch** — the sorter `list_unread` → `route_emails` per group → THREE children (spam/reader/
+    important) nested in the pipeline + `renderSort` (machine dispatch on the prod provider — the
+    keystone). (2) **batch approve with an edited row** — edited reader's IFTTT read→star, Applied →
+    real Gmail STARRED + ledger `{applied:1,byAction:{star:1}}`, item finished; undone. (3) **reply
+    approve → real draft** — the reply child reached the saveDraft gate, edited body
+    (`[MASTRA-EDIT-5T8K]`) approved → **the real Gmail draft contained the edit** (native Mastra
+    resume), draft deleted. (4) **reject** important → finished/rejected, Sportmonks unchanged, zero
+    ledger. (5) **cancel-mid-run (the load-bearing Mastra check)** — Stopped `spam` while running →
+    cancelled, while the SUSPENDED `reader` gate SURVIVED untouched (the beta's `abort()`-only-on-
+    interrupt guard holds: a clean suspend is never aborted). (6) **singleton 409** — a second START
+    while the sorter's executor is active → 409 (provider-agnostic WorkerPool guard).
+  - **THE bug the live Mastra E2E caught + fixed:** with the shared prompt, `claude-sonnet-4-6`
+    (Mastra) narrated the reply in PROSE and asked "save to Gmail?" instead of calling `saveDraft`,
+    so the gate never opened. Fixed by hardening the email-inbox reply prompt to the mandatory-
+    saveDraft discipline (numbered tool steps + "calling saveDraft IS how you ask — do NOT ask in
+    prose"), the same language the old hardcoded Mastra prompt carried. Re-verified: the reply child
+    reaches the gate on Mastra. (claude-cli replay unaffected — the cassette replays events, not the
+    prompt text; the claude-cli reply→approve→draft regression re-passed.)
+  - **Two pre-existing findings carried from Stage 3 (NOT 3b-introduced, still open):** (a) a parent
+    work item stays "running" when its only children terminate via reject/cancel (the leaf→root
+    auto-finish walk is scoped to the `finish` edge); (b) the singleton 409 guard has a TOCTOU race —
+    two TRULY-concurrent STARTs both pass (sequential double-start correctly 409s). Both are
+    provider-agnostic dispatch-layer behaviors. **Next = Stage 4 (UI chrome).**
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
