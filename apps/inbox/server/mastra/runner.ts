@@ -7,7 +7,17 @@ import { z } from 'zod'
 import { type GateResolution, type Message, type PromptStrategy } from '@platform/core'
 import type { RunAgentInput } from '@ag-ui/client'
 import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@platform/providers'
-import { getLatestEmailTool, renderLeadTool, renderVerdictTool, saveDraftTool } from './tools.js'
+import {
+  getLatestEmailTool,
+  renderLeadTool,
+  renderVerdictTool,
+  saveDraftTool,
+  listUnreadTool,
+  getEmailTool,
+  routeEmailsTool,
+  renderSortTool,
+  applyActionsTool,
+} from './tools.js'
 
 export interface MastraRunnerConfig {
   agentId: string
@@ -45,6 +55,11 @@ const ALL_TOOLS = {
   renderLead: renderLeadTool,
   renderVerdict: renderVerdictTool,
   saveDraft: saveDraftTool,
+  list_unread: listUnreadTool,
+  get_email: getEmailTool,
+  route_emails: routeEmailsTool,
+  renderSort: renderSortTool,
+  applyActions: applyActionsTool,
 } as const
 
 // Mastra's ToolStream wraps every `writer.write(value)` in a workflow-step-output envelope before
