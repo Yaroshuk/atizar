@@ -19,7 +19,7 @@ import {
 } from './dispatch.js'
 import { transition, ACTIVE } from './transition.js'
 import type { Gate, WorkItem, WorkItemStatus } from './db/schema.js'
-import { makeActivityLog } from './activity.js'
+import { makeActivityLog, type ActivityEntry } from './activity.js'
 
 // Wires StateStore + EventBus + WorkerPool + RunObserver into one façade the routes call.
 // The provider lookup is injected (the same buildProvider the spike used), so the service
@@ -237,6 +237,22 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         await store.setLedgerResult(key, executedResult)
       }
 
+      if (executedResult.error) {
+        const msg = String(executedResult.error)
+        activity.record({
+          ts: Date.now(),
+          workflowId: wi.workflowId,
+          agentId: wi.agentId,
+          workItemId: wi.id,
+          kind: 'error',
+          summary: msg.slice(0, 80),
+        })
+        await transition(db, wi.id, 'fail', { error: msg }).catch(() => {})
+        await store.setError(wi.id, msg)
+        publishBoard()
+        return { ok: false, status: 502, error: msg }
+      }
+
       activity.record({
         ts: Date.now(),
         workflowId: wi.workflowId,
@@ -246,14 +262,6 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         summary: `approved ${gate.toolName}`,
       })
 
-      if (executedResult.error) {
-        const msg = String(executedResult.error)
-        await transition(db, wi.id, 'fail', { error: msg }).catch(() => {})
-        await store.setError(wi.id, msg)
-        publishBoard()
-        return { ok: false, status: 502, error: msg }
-      }
-
       if (!claim.alreadyClaimed) {
         activity.record({
           ts: Date.now(),
@@ -261,7 +269,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           agentId: wi.agentId,
           workItemId: wi.id,
           kind: 'effect',
-          summary: gate.toolName,
+          summary: `executed ${gate.toolName}`,
         })
       }
 
@@ -347,8 +355,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       return activity.snapshot()
     },
 
-    subscribeActivity(fn: (entry: unknown) => void): () => void {
-      return bus.subscribe('activity', fn)
+    subscribeActivity(fn: (entry: ActivityEntry) => void): () => void {
+      return bus.subscribe('activity', fn as (msg: unknown) => void)
     },
   }
 }
