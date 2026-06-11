@@ -2,6 +2,7 @@
 // transition, WorkerPool, RunObserver, gate-keyed resolve, board/thread HTTP+SSE).
 // Public surface consumed by the app's composition root.
 export { db, databaseUrl, closeDb } from './db/client.js'
+export { atizarEnv } from './env.js'
 export type { Db } from './db/client.js'
 export { runMigrations } from './db/migrate.js'
 export { resetDb } from './db/reset.js'
