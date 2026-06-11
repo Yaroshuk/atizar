@@ -87,6 +87,12 @@ export const claudeSpawn: ClaudeSpawn = (prompt, allowedTools) => {
     })
   )
 
+  // The child inherits the full process env (spread), so the framework's ATIZAR_* vars
+  // — ATIZAR_SECRET_KEY / ATIZAR_DATABASE_URL / ATIZAR_CONNECTION / ATIZAR_<PROVIDER>_CLIENT_*
+  // — flow through to the spawned MCP servers automatically; that is REQUIRED so an MCP child
+  // can `resolveCredential` against the same encrypted store. Do NOT switch to an allow-list of
+  // env keys here without also forwarding the ATIZAR_* set, or credential resolution in MCP
+  // children breaks silently. ANTHROPIC_API_KEY is the one deliberate removal (subscription auth).
   const env = { ...process.env }
   delete env.ANTHROPIC_API_KEY
 
