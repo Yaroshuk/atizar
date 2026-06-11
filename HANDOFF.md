@@ -283,6 +283,45 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   before any browser verify, kill stale dev stacks + free ports per the CLAUDE.md gotcha; never
   switch git branches in subagents.
 
+### 🆕 ACTIVE TRACK (2026-06-11) — email-inbox workflow BEFORE the packaging tail
+
+By the user's call, a new flagship demo workflow is built before sub-step 7c, so the framework is
+stress-tested by a real new consumer (new integration, machine dispatch, batch gates, UI chrome)
+before packaging. 7c (slim demo + packaging) resumes AFTER this track, with email-inbox as the
+demo. Spec → `docs/superpowers/specs/2026-06-11-email-inbox-workflow-design.md` (sorter
+machine-dispatches a REPLY instance per email + READER/SPAM/IMPORTANT batch agents; batch gates
+with per-row trash/read/star/keep; all Gmail mutations are server-executed effects). Build stages
+→ spec §6.
+
+- **Stage 1 — gmail-viewer integration + write-integration skill: ✅ BUILT** on `feat/gmail-viewer`
+  (2026-06-11, off `master`; commits `8e0fc6d`…`061b65e` + `c70ab81` + the stage-1 docs commit).
+  Plan → `docs/superpowers/plans/2026-06-11-gmail-viewer-integration.md`. 291 unit tests +
+  typecheck/lint green; all gmail-viewer files Prettier-clean.
+  - **As-built:** `@platform/integrations/gmail-viewer/*` — `list-unread` (unread inbox window,
+    metadata-only, capped 25, hours round up to whole days for Gmail search), `get-email` (full
+    body by id, reuses gmail-basic's `parseLatestMessage`), `modify` (markRead/trash/star,
+    best-effort batch: per-row `{messageId,error}` collected, wholesale `{error}` on client
+    failure; `trash` = reversible Gmail Trash, NOT permanent delete), `check-credentials`
+    (re-export). The health check lives in **gmail-basic** (`check-credentials.mjs`, shared OAuth
+    client + account) and gmail-viewer re-exports it; the `.d.ts` re-export uses a `.js` specifier
+    (TS resolves to the sibling decl). Read-only stdio MCP `index.mjs` exposes ONLY `list_unread`
+    + `get_email` — mutations are NEVER model-visible (verified). 10 subpath exports in
+    `package.json`.
+  - **Skills:** `write-integration` (L1 Task skill, first of its genre — `.claude/skills/`); first
+    A7 consumer skill shipped INSIDE the package
+    (`packages/integrations/skills/gmail-viewer/SKILL.md`).
+  - **Live read-only smoke PASS** (real creds): health ok (`sjuser95@gmail.com`); `listUnread` 7d
+    → 25; `getEmail` first body → 201 chars. Mutations are unit-tested only — their live
+    verification is stage 3's browser E2E.
+  - **Known pre-existing (NOT this stage):** repo-wide `yarn format:check` is red on two docs the
+    user maintains in parallel (`.claude/skills/README.md`, `.claude/skills/check-foundation/SKILL.md`)
+    — `README.md` failed Prettier already at `57481e6`, before stage-1 touched it; left alone per
+    the parallel-docs rule.
+- **Stage 2 — core/server capabilities (NEXT):** F1 workflow-level prompt (`defineWorkflow.prompt`
+  composed over agent prompts), F2 `dispatches` tool class + RunObserver→`deliver` wiring (machine
+  dispatch), F3 credential-health surface (wire `checkCredentials` per agent → board badge),
+  F4 activity feed, F6 singleton START guard, `POST /api/cancel-all`. Spec §2.
+
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
 **sub-step 7b (`@platform/react`, commits `ea64d0e`…`e61dd1e`)** are ✅ BUILT & browser-verified on

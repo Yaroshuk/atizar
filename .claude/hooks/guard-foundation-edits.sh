@@ -31,9 +31,14 @@ if ! echo "$TARGET" | grep -qE 'docs/(PHILOSOPHY|ARCHITECTURE)\.md'; then
   exit 0
 fi
 
-# For Bash, only prompt on a WRITE to the doc (redirect / sed -i / tee / perl -i). A read is fine.
+# For Bash, READING a foundation doc is ALWAYS allowed (cat/sed -n/grep/head/less/…) — only a
+# WRITE prompts. We match the few unambiguous write vectors that don't collide with read
+# commands: a redirect into the file (`>`/`>>`) and the in-place editors (sed -i / perl -i / tee).
+# This is deliberately a SMALL, precise set: broadening it to cp/mv/dd reintroduced false
+# prompts on reads (e.g. `grep -n cp <doc>`), and a read must never be blocked. The Edit/Write
+# tools are the real edit path and are caught above regardless. Anything else here → read → defer.
 if [ "$TOOL" = "Bash" ]; then
-  if ! echo "$TARGET" | grep -qE '(>>?|sed[[:space:]]+-i|tee|perl[[:space:]]+-i)'; then
+  if ! echo "$TARGET" | grep -qE '(>>?|sed[[:space:]]+-i|perl[[:space:]]+-i|tee)'; then
     exit 0
   fi
 fi

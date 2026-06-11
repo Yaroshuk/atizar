@@ -168,9 +168,22 @@ pointer once the skill owns the procedure — CLAUDE.md stays the map, skills ow
    rule in `.claude/skills/rules/`, pointing to `docs/dev-record-replay.md` for depth. Registered
    in the skills README.
 
+3. ✅ **`write-integration`** — BUILT (2026-06-11), the first **Task**-genre skill
+   (`.claude/skills/write-integration/SKILL.md`, Stages 1–8 incl. the mandatory self-improvement
+   + check-foundation stages). Authoring an integration recurred (gmail-basic was the first;
+   gmail-viewer the second) once the **email-inbox workflow track** was inserted before the
+   packaging tail (`docs/superpowers/specs/2026-06-11-email-inbox-workflow-design.md`), so A4's
+   recurrence bar is met now rather than post-beta. Validated by its first real run:
+   `@platform/integrations/gmail-viewer` (listUnread/getEmail reads, markRead/trash/star
+   best-effort batch mutations, a shared `checkCredentials` health ping in gmail-basic, a
+   read-only stdio MCP wrapper). Registered in `.claude/skills/README.md`. **Roadmap
+   reconciliation:** this is the L1 dev twin of the planned post-step-7 `add-integration` (L2,
+   below) — the L1 skill exists now because the dev task recurred; the L2 consumer twin (lighter,
+   for userland with no repo context) is still Phase 2.
+
 **L1 dev skills are complete for now.** The recurring dev-side procedures are captured
-(`browser-verify` + `cassettes` + the foundation/conventions infra). We add another L1 skill ONLY
-when a dev task actually recurs and bites (A4) — not by marching a list.
+(`browser-verify` + `cassettes` + `write-integration` + the foundation/conventions infra). We add
+another L1 skill ONLY when a dev task actually recurs and bites (A4) — not by marching a list.
 
 The following were considered for L1 but are **CONSUMER skills (L2 → Phase 2)** — they teach the
 public SDK, not framework internals, so a userland developer runs them on top of the framework:
@@ -191,8 +204,16 @@ Post-beta first drafts of their L2 twins (gated on beta progress, NOT now):
 The "no integrations catalog" differentiator made literal. One skill per public contract,
 shipped inside its package:
 
+- ✅ **First A7 consumer skill shipped (2026-06-11):**
+  `packages/integrations/skills/gmail-viewer/SKILL.md` — how-to-use + wiring (read tools vs
+  server-effect mutations) + credentials setup + a `checkCredentials` failure-diagnosis table.
+  It ships INSIDE the package, versioned with the code (A7), and the email-inbox spec's
+  credential-health `hint` points at it. A3's "after the contracts stabilize" bar is met for the
+  `@platform/integrations` contract (it's stable; only the workflow/react contracts are still
+  moving). This is the first concrete instance of the `add-integration` flagship below.
 - ❌ `add-integration` (in `@platform/integrations`) — the flagship; proves "Claude writes your
-  integration in a minute, guided by the skill".
+  integration in a minute, guided by the skill". (Its L1 dev twin `write-integration` is BUILT —
+  see Phase 1 #3; this L2 twin is the lighter userland-facing rewrite.)
 - ❌ `add-workflow` / `add-agent` (in `@platform/core` or `@platform/server` post-extraction).
 - ❌ `add-render-card` (in `@platform/react` post-extraction) — register a custom card on the
   render registry; `ThreadResultsContext`/`useThreadResult` for data tools.
