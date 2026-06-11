@@ -9,7 +9,7 @@ const HINT =
 
 // Health check shared by gmail-basic and gmail-viewer (same OAuth client + account).
 // A 1-quota-unit real ping — proves the token actually works, not just that files exist.
-// Returns { ok: true, email } or { ok: false, error, hint }.
+// Returns { ok: true, detail } or { ok: false, error, hint }.
 export async function checkCredentials(deps = {}) {
   const getGmail = deps.getGmail ?? defaultGetGmail
   try {
