@@ -11,6 +11,7 @@ import { ThreadModal } from './components/ThreadModal'
 import { InstancePickerModal } from './components/InstancePickerModal'
 import { PipelineColumn } from './components/PipelineColumn'
 import { WorkflowSwitcher } from './components/WorkflowSwitcher'
+import { Connections } from './components/Connections'
 import { Icon } from './components/Icon'
 import type { WorkItem } from './serverTypes'
 import { WorkflowsProvider, type WorkflowsConfig } from './workflowsContext'
@@ -157,6 +158,7 @@ export const WorkflowBoard = ({ config }: { config: WorkflowsConfig }) => {
         unread={unread}
         onSelect={switchWorkflow}
       />
+      <Connections />
 
       <div className='workspace-body'>
         <PipelineColumn blocks={blocks} onOpen={setOpenId} />
