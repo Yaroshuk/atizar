@@ -81,6 +81,8 @@ export function createConnectRoutes(deps: ConnectRoutesDeps): Hono {
     if (!state) return c.json({ error: 'bad state' }, 400)
 
     const { clientId, clientSecret } = atizarEnv.oauthClient(provider)
+    if (!clientId || !clientSecret)
+      return c.json({ error: `OAuth client for "${provider}" is not configured` }, 500)
     const publicUrl = atizarEnv.publicUrl()
 
     const res = await fetchFn(endpoint.tokenUrl, {
@@ -89,12 +91,13 @@ export function createConnectRoutes(deps: ConnectRoutesDeps): Hono {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        client_id: clientId ?? '',
-        client_secret: clientSecret ?? '',
+        client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: redirectUri(provider),
       }),
     })
-    if (!res.ok) return c.redirect(`${publicUrl}/?connect_error=${state.integration}`)
+    if (!res.ok)
+      return c.redirect(`${publicUrl}/?connect_error=${encodeURIComponent(state.integration)}`)
 
     const json = (await res.json()) as {
       access_token: string
@@ -115,7 +118,7 @@ export function createConnectRoutes(deps: ConnectRoutesDeps): Hono {
       secret: JSON.stringify(token),
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     })
-    return c.redirect(`${publicUrl}/?connected=${state.integration}`)
+    return c.redirect(`${publicUrl}/?connected=${encodeURIComponent(state.integration)}`)
   })
 
   // STATUS — connected = a stored row exists for each reported (connection, integration).

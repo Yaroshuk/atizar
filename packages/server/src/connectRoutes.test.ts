@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createConnectRoutes } from './connectRoutes.js'
-import { signState } from './oauthState.js'
+import { signState, verifyState } from './oauthState.js'
 import type { CredentialStore, UpsertArgs } from './credentialStore.js'
 
 const saved = { ...process.env }
@@ -53,6 +53,9 @@ describe('createConnectRoutes', () => {
       expect(url.searchParams.get('prompt')).toBe('consent')
       expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/gmail.modify')
       expect(url.searchParams.get('state')).toBeTruthy()
+      const decoded = verifyState(url.searchParams.get('state')!, 'test-secret')
+      expect(decoded).not.toBeNull()
+      expect(decoded).toEqual({ integration: 'gmail', connection: 'default' })
     })
 
     it('404s for an unknown provider', async () => {
@@ -129,6 +132,25 @@ describe('createConnectRoutes', () => {
       const body = (await res.json()) as Array<{ integration: string; connected: boolean }>
       expect(body).toEqual([
         { integration: 'gmail', connection: 'default', provider: 'google', connected: false },
+      ])
+    })
+
+    it('reports connected:true when a row exists', async () => {
+      const store = {
+        upsert: async () => {},
+        get: async () => ({ secret: '{}' }),
+        remove: async () => {},
+      } as unknown as CredentialStore
+      const app = createConnectRoutes({
+        store,
+        scopesFor: () => [],
+        list: [{ integration: 'gmail', connection: 'default', provider: 'google' }],
+      })
+      const res = await app.request('/api/connections')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as Array<{ integration: string; connected: boolean }>
+      expect(body).toEqual([
+        { integration: 'gmail', connection: 'default', provider: 'google', connected: true },
       ])
     })
   })
