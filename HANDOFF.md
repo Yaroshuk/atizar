@@ -515,8 +515,10 @@ updated `write-integration` skill.
     sub-stage 5 (gmail rewrite) consumes `resolveCredential`. This sub-stage ships the API they need.
   - **Next = sub-stage 3** (OAuth connect/callback routes + signed `state` + global-header Connect
     chip + Connections UI + `claude-spawn.ts` env pass-through `ATIZAR_SECRET_KEY`/`ATIZAR_DATABASE_URL`/
-    `ATIZAR_CONNECTION` so MCP children resolve). Browser E2E of connect/disconnect. Plan to be
-    written from spec §4 + §7 step 3.
+    `ATIZAR_CONNECTION` so MCP children resolve). Browser E2E of connect/disconnect.
+    **Plans for sub-stages 3, 4, 5 are ALL written** (`docs/superpowers/plans/2026-06-11-integration-auth-substage{3-oauth-flow,4-skill,5-gmail-rewrite}.md`) — execute in order via subagent-driven-development.
+    **Keys are already in `.env.local`** (`ATIZAR_SECRET_KEY` + the Google Web client `ATIZAR_GOOGLE_CLIENT_ID/SECRET`, redirect `http://localhost:5173/api/connect/google/callback`); `set -a; . ./.env.local; set +a` before `yarn dev` (the server does not auto-load it yet).
+    **Honest E2E note (sub-stage 3):** gmail still reads files until sub-stage 5, so sub-stage 3's E2E proves the connect FLOW only (Connect → encrypted `credentials` row → `resolveCredential` yields a token → Disconnect), not gmail consuming it.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
