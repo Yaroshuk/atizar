@@ -53,13 +53,7 @@ function replyNoEmail(instructions: string): string {
 
 function replyFirst(
   instructions: string,
-  email: {
-    messageId: string
-    threadId: string
-    from: string
-    subject: string
-    snippet: string
-  }
+  email: { messageId: string; threadId: string; from: string; subject: string }
 ): string {
   return [
     instructions,

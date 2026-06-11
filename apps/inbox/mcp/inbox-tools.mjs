@@ -51,11 +51,15 @@ server.registerTool(
 // (RunObserver), applyActions opens the gate + runs the server effect on approval.
 // NONE of them performs any Gmail action.
 
+// Required fields MUST match the workflow's EmailRefSchema decode (descriptor.ts): a route_emails
+// call missing messageId/threadId/from/subject is rejected here (the model sees the error and
+// retries) rather than silently failing decodeHandoff on the receiving child. date/snippet are
+// optional (passed through from list_unread, never consumed downstream).
 const emailRefShape = {
   messageId: z.string(),
-  threadId: z.string().optional(),
-  from: z.string().optional(),
-  subject: z.string().optional(),
+  threadId: z.string(),
+  from: z.string(),
+  subject: z.string(),
   date: z.string().optional(),
   snippet: z.string().optional(),
 }
