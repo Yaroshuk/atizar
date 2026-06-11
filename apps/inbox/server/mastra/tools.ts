@@ -68,6 +68,30 @@ export const routeEmailsTool = captureTool(
   })
 )
 export const renderSortTool = captureTool('renderSort', z.object({}).passthrough())
+
+// ── github-triage tools (NOT Mastra-ready — registered so PROVIDER=mastra BOOTS) ──────────────
+// github-triage runs on claude-cli only (it reads the private Magma board via the gh CLI). Under
+// PROVIDER=mastra EVERY workflow's agents resolve through the Mastra factory at boot, so these tool
+// names must exist or the runner's fail-fast aborts the whole server. The three renders are real
+// capture surfaces (identical in kind to renderSort); the two reads are HONEST stubs — a
+// github-triage run on the Mastra provider is unsupported and says so, rather than silently
+// returning empty data. Wiring the real gh reads as Mastra tools is a deferred follow-up.
+function unsupportedOnMastra(id: string) {
+  return createTool({
+    id,
+    description: `${id} — not available on the Mastra provider (github-triage runs on claude-cli).`,
+    inputSchema: z.object({}).passthrough(),
+    execute: async () => ({
+      error: `"${id}" is not supported on the Mastra provider yet; run github-triage on the claude-cli provider.`,
+    }),
+  })
+}
+
+export const listMyTicketsTool = unsupportedOnMastra('list_my_tickets')
+export const getTicketTool = unsupportedOnMastra('get_ticket')
+export const renderTriageTool = captureTool('render_triage', z.object({}).passthrough())
+export const renderTicketResultTool = captureTool('render_ticket_result', z.object({}).passthrough())
+export const renderReplyDraftTool = captureTool('render_reply_draft', z.object({}).passthrough())
 export const applyActionsTool = captureTool(
   'applyActions',
   z.object({

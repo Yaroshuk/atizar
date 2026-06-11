@@ -17,6 +17,11 @@ import {
   routeEmailsTool,
   renderSortTool,
   applyActionsTool,
+  listMyTicketsTool,
+  getTicketTool,
+  renderTriageTool,
+  renderTicketResultTool,
+  renderReplyDraftTool,
 } from './tools.js'
 
 export interface MastraRunnerConfig {
@@ -60,6 +65,12 @@ const ALL_TOOLS = {
   route_emails: routeEmailsTool,
   renderSort: renderSortTool,
   applyActions: applyActionsTool,
+  // github-triage (claude-cli only) — registered so PROVIDER=mastra boots; reads are stubs.
+  list_my_tickets: listMyTicketsTool,
+  get_ticket: getTicketTool,
+  render_triage: renderTriageTool,
+  render_ticket_result: renderTicketResultTool,
+  render_reply_draft: renderReplyDraftTool,
 } as const
 
 // Mastra's ToolStream wraps every `writer.write(value)` in a workflow-step-output envelope before
