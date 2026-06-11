@@ -449,7 +449,14 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     work item stays "running" when its only children terminate via reject/cancel (the leaf→root
     auto-finish walk is scoped to the `finish` edge); (b) the singleton 409 guard has a TOCTOU race —
     two TRULY-concurrent STARTs both pass (sequential double-start correctly 409s). Both are
-    provider-agnostic dispatch-layer behaviors. **Next = Stage 4 (UI chrome).**
+    provider-agnostic dispatch-layer behaviors.
+  - **Final review = READY-TO-MERGE** (no Critical/Important). Two MINOR pre-existing/cosmetic
+    follow-ups noted, not fixed (fixing M1 would need a re-run of the live Mastra E2E for a harmless
+    redundancy): (M1) on the Mastra turn the composed instructions ride in BOTH `Agent.instructions`
+    and the leading line of `buildFirst`'s prompt — a benign duplication (the old hardcoded prompt
+    did the same); (M2) the github-triage descriptor lists its read tools in `tools` (not `readonly`),
+    so `mastraFactory` classifies them as render/propose — no functional effect (they're stubs),
+    align it when github-triage gets real Mastra reads. **Next = Stage 4 (UI chrome).**
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
