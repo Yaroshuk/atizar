@@ -511,14 +511,60 @@ updated `write-integration` skill.
     tests. Barrel exports `resolveCredential`/`registerResolver`/`makeCredentialStore`/`oauthProvider`
     + types (NOT `crypto.ts` — internal). `.env.example` reworked to the single-source format
     (framework `ATIZAR_*` block + provider + google OAuth app + dev tooling).
-  - **No consumer yet** (by design): sub-stage 3 writes INTO the store via the OAuth connect flow;
-    sub-stage 5 (gmail rewrite) consumes `resolveCredential`. This sub-stage ships the API they need.
-  - **Next = sub-stage 3** (OAuth connect/callback routes + signed `state` + global-header Connect
-    chip + Connections UI + `claude-spawn.ts` env pass-through `ATIZAR_SECRET_KEY`/`ATIZAR_DATABASE_URL`/
-    `ATIZAR_CONNECTION` so MCP children resolve). Browser E2E of connect/disconnect.
-    **Plans for sub-stages 3, 4, 5 are ALL written** (`docs/superpowers/plans/2026-06-11-integration-auth-substage{3-oauth-flow,4-skill,5-gmail-rewrite}.md`) — execute in order via subagent-driven-development.
-    **Keys are already in `.env.local`** (`ATIZAR_SECRET_KEY` + the Google Web client `ATIZAR_GOOGLE_CLIENT_ID/SECRET`, redirect `http://localhost:5173/api/connect/google/callback`); `set -a; . ./.env.local; set +a` before `yarn dev` (the server does not auto-load it yet).
-    **Honest E2E note (sub-stage 3):** gmail still reads files until sub-stage 5, so sub-stage 3's E2E proves the connect FLOW only (Connect → encrypted `credentials` row → `resolveCredential` yields a token → Disconnect), not gmail consuming it.
+  - **No consumer yet at sub-stage 2** (by design): sub-stage 3 (below) writes INTO the store via the
+    OAuth connect flow; sub-stage 5 (gmail rewrite) consumes `resolveCredential`.
+- **Sub-stage 3 — OAuth connect flow + Connections UI: ✅ BUILT & browser-verified (LIVE Google
+  OAuth)** on `feat/gmail-viewer` (2026-06-11), commits `f991024`…`e3a617d`. Plan →
+  `docs/superpowers/plans/2026-06-11-integration-auth-substage3-oauth-flow.md`. 380 unit tests +
+  typecheck/lint/build green; built task-by-task via subagent-driven-development (each task: spec +
+  code-quality review). `check-foundation` = CLEAR (I1 human gesture; I3/I5 routes/UI outside core,
+  flow generic over `oauthProvider`, userland injects scopes/list; I7 consistent with sub-stage 2 —
+  client secrets env-only, user tokens encrypted-at-rest, never plaintext).
+  - **As-built — `@platform/server`:** `oauthState.ts` (`signState`/`verifyState` — HMAC-SHA256
+    `base64url(json).base64url(sig)`, anti-CSRF/tamper, key = `ATIZAR_SECRET_KEY`); `atizarEnv.publicUrl()`
+    (default `http://localhost:5173`, the `redirect_uri` origin); `connectRoutes.ts`
+    (`createConnectRoutes({ store, scopesFor, list, fetchFn? })`) — `GET /api/connect/:provider` (404
+    unknown provider / 500 unconfigured client or missing secret key → else 302 to the provider auth
+    URL with client_id, redirect_uri, scope, signed state), `GET /api/connect/:provider/callback`
+    (verifyState → 400; form-encoded `authorization_code` exchange via injectable `fetchFn`; on ok →
+    `store.upsert` an oauth2 blob byte-identical to `resolveCredential`'s reader — `{accessToken,
+    refreshToken, expiresAt:number ms}` — then 302 `?connected=`; non-ok → 302 `?connect_error=`),
+    `GET /api/connections` (per-`list` `{integration, connection, provider, connected}`), `DELETE
+    /api/connections/:integration` (`store.remove`). Barrel exports `createConnectRoutes` +
+    `ConnectRoutesDeps`/`ConnectionDescriptor`.
+  - **As-built — app wiring:** `apps/inbox/server/connections.ts` (the app-side glue — `scopesFor`
+    map `{gmail: ['…/auth/gmail.modify']}` + `connectionList` `[{gmail, default, google}]`; sub-stage 5
+    replaces this hand-written list with the integrations' own `auth.scopes`); `index.ts` mounts
+    `createConnectRoutes({ store: makeCredentialStore(db), scopesFor, list })` beside the pipeline
+    routes. `claude-spawn.ts` got a load-bearing COMMENT: the child inherits `process.env` (spread),
+    so `ATIZAR_*` reach MCP children automatically — a future env allow-list MUST keep forwarding them
+    or credential resolution in MCP children breaks silently.
+  - **As-built — `@platform/react`:** `hooks/useConnections.ts` (fetch `GET /api/connections`,
+    refetch on focus + strip `?connected=`/`?connect_error=` from the URL after the redirect lands,
+    unmount-guarded like `useBoard`), `components/ConnectionChip.tsx` (presentational: not-connected →
+    a real `<a href="/api/connect/:provider?…">` FULL NAVIGATION (an OAuth redirect can't happen in
+    fetch); connected → `"<integration> ✓ <detail?>"` + a Disconnect `<button>`), `components/
+    Connections.tsx` (self-fetching panel; Disconnect = `DELETE` then `refetch`), wired into the
+    `WorkflowBoard` header after `WorkflowSwitcher`. Reuses existing Smedja classes (`workflow-tabs`/
+    `workflow-tab`/`btn btn-ghost`) — no `styles.css` edit. First `.test.tsx` in the package (RTL +
+    happy-dom).
+  - **Browser E2E (LIVE — real Google OAuth + real tokens, NOT replay):** (1) chip renders
+    `gmail [Connect]` (not connected) with the correct href; (2) Connect → 302 → real Google login
+    (the developer authenticated + consented to `gmail.modify`) → redirect back → chip flips to
+    `gmail ✓` + the `?connected=` param is stripped from the URL (the useConnections fix, live);
+    (3) the stored `credentials` row `(default, gmail)` = `kind oauth2`, `secret` an AES-GCM
+    `iv:tag:ct` blob (NOT plaintext — encryption at rest), `expires_at` set; a one-off `resolveCredential`
+    returned a LIVE `accessToken` (Google `tokeninfo` confirmed `scope=…/gmail.modify`); (4) Disconnect →
+    `/api/connections` `connected:false`, the DB row removed (count 0), chip back to `[Connect]`. 0
+    console errors in the verified flows.
+  - **Honest scope note:** gmail still reads files until sub-stage 5, so this proves the connect FLOW
+    (Connect → encrypted row → live token → Disconnect), NOT gmail consuming the stored token (that is
+    sub-stage 5's E2E).
+  - **Next = sub-stage 4** (skill auth interview). Plans for sub-stages 4 + 5 are written
+    (`docs/superpowers/plans/2026-06-11-integration-auth-substage{4-skill,5-gmail-rewrite}.md`).
+    **Keys live in `.env.local`** (`ATIZAR_SECRET_KEY` + Google Web client `ATIZAR_GOOGLE_CLIENT_ID/SECRET`,
+    redirect `http://localhost:5173/api/connect/google/callback`); `set -a; . ./.env.local; set +a`
+    before `yarn dev` (the server does not auto-load it yet).
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
