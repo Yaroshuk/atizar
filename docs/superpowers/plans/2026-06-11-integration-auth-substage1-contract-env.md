@@ -248,10 +248,12 @@ describe('atizarEnv', () => {
 
 ```ts
 // The ONE place ATIZAR_* environment variables are read. Keeping the prefix here (never scattered
-// as raw process.env.ATIZAR_… strings) is the env-namespace contract (spec 2026-06-11 §2): the
-// framework's official vars are namespaced so they never collide with a developer's own env. Vendor
-// conventions (ANTHROPIC_API_KEY, PROVIDER, MASTRA_MODEL, DEV_RECORD_REPLAY) are NOT namespaced —
-// they belong to their vendors, not to us.
+// as raw process.env.ATIZAR_… strings) is the env-namespace contract (spec 2026-06-11 §2):
+//   RULE — every OFFICIAL framework env var carries the ATIZAR_ prefix and is read here; every
+//   UNOFFICIAL/vendor var (a convention we merely consume) stays WITHOUT the prefix and is read as
+//   the vendor names it. ATIZAR_* = ours; anything else = not ours.
+// So ANTHROPIC_API_KEY, PROVIDER, MASTRA_MODEL, DEV_RECORD_REPLAY are NOT namespaced (they belong
+// to their vendors), and a NEW official var must be ATIZAR_-prefixed and added to this accessor.
 
 const COMPOSE_DEFAULT_DB = 'postgres://aiworkflow:aiworkflow@localhost:5432/aiworkflow'
 

@@ -90,6 +90,14 @@ export async function listUnread({ sinceHours } = {}, deps = {}) {
 
 ## 2. Env namespace (`ATIZAR_` prefix)
 
+**The rule (decided 2026-06-11): every OFFICIAL env var the framework defines carries the
+`ATIZAR_` prefix; every UNOFFICIAL var (a third-party/vendor convention we merely consume) stays
+WITHOUT it.** This makes ownership readable at a glance — `ATIZAR_*` = ours, anything else = not
+ours — and guarantees the framework's vars never collide with a developer's own or a vendor's. A
+new official var MUST be `ATIZAR_`-prefixed and read through `atizarEnv` (no bare `process.env`
+for our own config); a vendor var (e.g. the Anthropic SDK's `ANTHROPIC_API_KEY`) is read as the
+vendor names it and is NEVER renamed under the prefix.
+
 All framework-owned + integration config is namespaced so it can't collide with a developer's own
 env:
 - `ATIZAR_SECRET_KEY` — the master AES key for the credential store (required when any oauth2
