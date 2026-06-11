@@ -70,8 +70,8 @@ classification kernel stays exhaustive — an unclassified tool still refuses to
 
 ### F3 — credential health ("the agent is disabled, here's why")
 
-- Integrations export `checkCredentials(): Promise<{ ok: true } | { ok: false; error: string;
-  hint: string }>` (gmail-viewer ships it; gmail-basic gets one too — cheap).
+- Integrations export `checkCredentials(): Promise<HealthCheck>` (the `HealthCheck` type is the
+  F9 thin contract; gmail-viewer + gmail-basic already ship the function — F9 retypes them).
 - Providers get the same check (claude-cli: binary on PATH; mastra: `ANTHROPIC_API_KEY` set).
 - `ServerBinding` gains optional `health?: () => Promise<HealthCheck[]>` per agent; the server
   runs all checks at boot AND on `GET /api/health`; the board snapshot carries
@@ -120,6 +120,45 @@ A finished input agent currently shows "Working" in the pipeline column. Fix in
 Primary fix is the workflow-level prompt (F1): "never narrate tool plumbing, no 'let me load
 schemas' text". No client-side text filtering (hiding model text would mask real errors);
 dev mode keeps showing everything raw.
+
+### F9 — thin integration contract (decided 2026-06-11, build in this stage)
+
+Today nothing structurally binds two integrations — gmail-basic/gmail-viewer share a SHAPE
+(pure injectable fns, `{error}` returns, a `checkCredentials`, an MCP wrapper) only by the
+discipline of the `write-integration` skill's prose. That is intentional at the heavy end
+(belief #3: "no integrations catalog", thin contract + skills, NOT a base class), but two
+things genuinely recur and deserve a TYPED contract so integrations stop being purely
+"each its own thing":
+
+- **`HealthCheck` type** — the `checkCredentials()` result shape
+  (`{ ok: true; detail?: string } | { ok: false; error: string; hint: string }`), today hand-
+  retyped per integration. Make it ONE exported type; `checkCredentials` implementations and
+  the F3 health surface both reference it. This is the first shared integration contract type
+  and the natural anchor for F3 (which collects health across integrations anyway).
+- **A light result/classification convention, as TYPES not a base class** — name the recurring
+  result shapes so consumers and the `ServerBinding` effect seam are uniform:
+  `ReadResult<T> = T | { error: string }` and
+  `BatchActionResult = { done: string[]; failed: { messageId: string; error: string }[] } | { error: string }`
+  (gmail-viewer's `modify` already returns exactly this — lift it into the contract). The
+  read/effect/health **classification** stays where it is enforced (I15 boot-time kernel +
+  `defineAgent.readonly/approvals/effects`); F9 only adds the typed result shapes the functions
+  return, it does NOT add a runtime registration step or a `defineIntegration()` wrapper (that
+  would be the base-class the philosophy rejects).
+
+**Placement (decide in the stage-2 plan, lean):** pure TS types → the contract home is
+`@platform/core` (it is engine-free and React-free and already holds the public contracts), OR
+a tiny shared `@platform/integrations` index if we want to keep node-batteries types out of
+core. Recommendation: types in `@platform/core` (a new `integration.ts`, types only — no fs, no
+googleapis), so userland's integration code imports the contract from the SDK like everything
+else; `@platform/integrations` modules implement it. **No base class, no `defineIntegration`,
+no runtime coupling — types only.**
+
+**Docs/skills updated in THIS stage (not later):** the `write-integration` skill's "integration
+contract (FACTS)" block references the typed `HealthCheck`/`ReadResult`/`BatchActionResult`
+instead of describing them in prose; the gmail-viewer consumer skill's surface table points at
+the shared types; gmail-basic + gmail-viewer `checkCredentials`/`modify`/read `.d.ts` are
+retyped against the contract (no behavior change, byte-compatible); `docs/AGENTIC.md` records
+the thin-contract decision under the integration track.
 
 ## 3. gmail-viewer integration (built VIA the new skill)
 
@@ -197,9 +236,13 @@ deliberate (tests the framework's reuse story).
 
 1. **`write-integration` skill → `gmail-viewer`** (+ embedded consumer skill +
    `checkCredentials` on both gmail integrations). Pure integration work, no framework change.
-2. **Core + server capabilities:** F1 workflow prompt, F2 `dispatches` class + RunObserver
-   dispatch + deliver wiring, F3 health checks + board exposure, F4 activity feed,
-   F6 singleton guard, `POST /api/cancel-all`. Unit + conformance tests; both providers.
+2. **Core + server capabilities:** F9 thin integration contract (typed `HealthCheck` /
+   `ReadResult` / `BatchActionResult` in `@platform/core`; retype the gmail integrations'
+   `.d.ts` against it; update the `write-integration` + gmail-viewer skills + `docs/AGENTIC.md`
+   to reference the types) — do this FIRST so F3 builds on the typed `HealthCheck`. Then
+   F1 workflow prompt, F2 `dispatches` class + RunObserver dispatch + deliver wiring, F3 health
+   checks + board exposure, F4 activity feed, F6 singleton guard, `POST /api/cancel-all`.
+   Unit + conformance tests; both providers.
 3. **The workflow itself:** descriptor/server/client modules, prompts (workflow + 5 agents),
    `EmailBatchCard` + sorter summary card, effects binding. Browser E2E on recorded cassettes:
    sort → 4-way dispatch → batch approve with edited rows → real Gmail markRead/trash/star;
