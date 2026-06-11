@@ -6,16 +6,16 @@ import { withRecordReplay, recordReplayMode, cassettesDir } from './record-repla
 // dev record/replay decorator when DEV_RECORD_REPLAY is set (unset ⇒ byte-identical
 // production path). `instanceKey` (wf__agent) is the cassette key. The RunObserver spine
 // is the sole consumer (the CopilotKit transport was dropped at step 6).
-// `instructionsOverride` lets the caller pass a composed string (workflow prompt +
-// agent instructions) without mutating the definition — falls back to def.instructions
-// when absent so existing callers are unaffected.
+// `composedInstructions` carries the fully composed string (workflow prompt + agent
+// instructions) built by the caller — falls back to def.instructions when absent so
+// existing callers are unaffected.
 export function buildProvider(
   def: AgentDefinition,
   prompts: PromptStrategy,
   registry: ProviderRegistry,
   allowedTools: readonly string[],
   instanceKey: string,
-  instructionsOverride?: string
+  composedInstructions?: string
 ): Provider {
   const makeProvider = registry.resolve(def.provider)
   let provider = makeProvider({
@@ -23,7 +23,7 @@ export function buildProvider(
     surfaceTools: def.tools,
     allowedTools,
     prompts,
-    instructions: instructionsOverride ?? def.instructions,
+    instructions: composedInstructions ?? def.instructions,
     agentId: instanceKey,
   })
 

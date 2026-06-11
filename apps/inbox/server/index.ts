@@ -42,10 +42,9 @@ for (const { descriptor, bindings } of workflowServers) {
       throw new Error(`server binding for unknown agent "${b.agentId}" in "${descriptor.id}"`)
     assertAgentClassification(def, { allowedTools: b.allowedTools, effects: b.effects })
     const key = instanceId(descriptor.id, b.agentId)
-    // Compose the workflow-level prompt (if declared) with the agent's own instructions
-    // for the Mastra path (config.instructions). The claude-cli path's prompt-strategy
-    // composition is the workflow server.ts's job (it has descriptor.prompt available via
-    // the aggregator) and is wired in Stage 3 — Stage 2 ships the mechanism + Mastra threading.
+    // Compose workflow prompt + agent instructions for the Mastra path (config.instructions).
+    // The claude-cli PromptStrategy has its own composition point (built in the workflow's
+    // server.ts factory); that wiring is deferred to Stage 3.
     const composed = composeInstructions(descriptor.prompt, def.instructions)
     const provider = buildProvider(def, b.prompts, providerRegistry, b.allowedTools, key, composed)
     runtimes[key] = {
