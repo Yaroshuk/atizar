@@ -158,7 +158,10 @@ export const sorterAgent = defineAgent({
   provider: 'claude-cli',
   instructions:
     'Read the unread inbox emails of the last 24 hours and sort each one. For an email that needs a personal reply, dispatch it to the reply agent. Group the rest into: informational (reader), suspected spam (spam), and important-but-no-reply (important). Then surface a short summary.',
-  tools: ['list_unread', 'route_emails', 'renderSort'],
+  // CONVENTION (matches lead-inbox qualifier): read tools go in `readonly` ONLY, never in `tools`.
+  // `tools` holds the surface/render/propose/approval/dispatch tools. The Mastra factory derives
+  // render-vs-read from membership in `tools`, so a read tool in `tools` would be misclassified.
+  tools: ['route_emails', 'renderSort'],
   readonly: ['list_unread'],
   dispatches: ['route_emails'],
   renders: { renderSort: 'SortSummaryCard' },
@@ -769,7 +772,9 @@ This is where the workflow is proven. Invoke the **`browser-verify`** skill befo
 
 ---
 
-## STAGE 3b (DEFERRED) — Mastra support for email-inbox
+## STAGE 3b (MANDATORY — the public demo runs on Mastra) — Mastra support for email-inbox
+
+> **Decided 2026-06-11 by the user: Mastra is NOT optional — the public/beta demo ships on the Mastra production provider, so email-inbox MUST run on Mastra.** Stage 3b is its own plan (`docs/superpowers/plans/2026-06-11-email-inbox-stage3b-mastra.md`) and is the next step AFTER Stage 3. It is split out only because it depends on the Stage-3 workflow existing first (descriptor/prompts/cards), not because it is skippable. (The `DEMO=1` zero-cred path still uses the mock provider + synthetic cassettes for a key-less clone; that is a separate packaging concern and does not remove the Mastra requirement.)
 
 The current Mastra runner (`apps/inbox/server/mastra/runner.ts`) is hardcoded to the lead-inbox reply shape. To run email-inbox on the production provider, generalize it:
 - `buildPrompt` must dispatch per-agent (sorter / reply / batch) instead of always decoding `HandoffPayloadSchema` and emitting the reply prompt — ideally delegate to the same `PromptStrategy` builders from `prompts.ts` (today Mastra ignores `PromptStrategy` and rebuilds the prompt server-side; the cleanest fix is to thread the agent's `PromptStrategy.buildFirst`/`buildResume` into the runner so claude-cli and Mastra share ONE prompt source).
