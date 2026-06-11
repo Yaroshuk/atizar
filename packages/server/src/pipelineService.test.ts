@@ -15,6 +15,7 @@ import {
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import type { AgentRuntime } from './runObserver.js'
+import { ACTIVE } from './transition.js'
 
 const reachable = await db
   .execute(sql`select 1`)
@@ -402,11 +403,7 @@ describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
     const board = await svc.getBoard()
     const stillActive = board.items
       .filter((i) => i.id === id1 || i.id === id2)
-      .filter((i) =>
-        (['queued', 'running', 'awaiting_approval', 'awaiting_input'] as string[]).includes(
-          i.status
-        )
-      )
+      .filter((i) => ACTIVE.includes(i.status))
     expect(stillActive).toHaveLength(0)
   }, 10_000)
 })

@@ -152,6 +152,13 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     publishBoard()
   }
 
+  async function cancelWorkflowImpl(workflowId: string): Promise<void> {
+    const active = await store.getActiveByWorkflow(workflowId)
+    for (const item of active.sort((a, b) => a.id.localeCompare(b.id))) {
+      await cancelItem(item.id)
+    }
+  }
+
   return {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
@@ -296,25 +303,17 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     },
 
     async cancelWorkflow(workflowId: string): Promise<void> {
-      const active = await store.getActiveByWorkflow(workflowId)
-      for (const item of active.sort((a, b) => a.id.localeCompare(b.id))) {
-        await cancelItem(item.id)
-      }
+      await cancelWorkflowImpl(workflowId)
     },
 
     // Stop every active work item across ALL workflows. Reuses the tested cascade by
-    // looping cancelWorkflow over the distinct workflowIds present in the board snapshot.
+    // looping cancelWorkflowImpl over the distinct workflowIds present in the board snapshot.
     async cancelAll(): Promise<void> {
       const snap = await store.getBoardSnapshot()
       const activeWorkflowIds = [
         ...new Set(snap.items.filter((i) => ACTIVE.includes(i.status)).map((i) => i.workflowId)),
       ]
-      for (const workflowId of activeWorkflowIds) {
-        const active = await store.getActiveByWorkflow(workflowId)
-        for (const item of active.sort((a, b) => a.id.localeCompare(b.id))) {
-          await cancelItem(item.id)
-        }
-      }
+      for (const workflowId of activeWorkflowIds) await cancelWorkflowImpl(workflowId)
     },
 
     async getStatus(id: string): Promise<{ status: WorkItemStatus; done: boolean } | undefined> {
