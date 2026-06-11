@@ -6,9 +6,7 @@
 
 // The result of an integration's credentials/health probe (the F3 health surface consumes it).
 // `ok:false` MUST carry an actionable `hint` (where creds live + which skill explains setup).
-export type HealthCheck =
-  | { ok: true; detail?: string }
-  | { ok: false; error: string; hint: string }
+export type HealthCheck = { ok: true; detail?: string } | { ok: false; error: string; hint: string }
 
 // A read function's result: the value, or a soft error (integrations never throw — they return).
 export type ReadResult<T> = T | { error: string }
