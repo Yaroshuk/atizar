@@ -92,11 +92,14 @@ interface MastraRunLike {
 }
 
 export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
+  // Fail fast on an unregistered tool name rather than building an Agent with an `undefined` tool
+  // (which fails mysteriously only at run time). With more agents a typo here is easy to make.
   const tools = Object.fromEntries(
-    [...cfg.readTools, ...cfg.renderAndProposeTools].map((n) => [
-      n,
-      ALL_TOOLS[n as keyof typeof ALL_TOOLS],
-    ])
+    [...cfg.readTools, ...cfg.renderAndProposeTools].map((n) => {
+      const t = ALL_TOOLS[n as keyof typeof ALL_TOOLS]
+      if (!t) throw new Error(`Mastra has no tool "${n}" — add it to ALL_TOOLS in mastra/runner.ts`)
+      return [n, t]
+    })
   )
 
   const agent = new Agent({
