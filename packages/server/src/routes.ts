@@ -192,5 +192,22 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     })
   })
 
+  // ACTIVITY — F4 activity feed.
+  app.get('/api/activity', (c) => c.json(service.getActivity()))
+
+  app.get('/api/activity/stream', (c) =>
+    streamSSE(c, async (stream) => {
+      await new Promise<void>((resolve) => {
+        const unsub = service.subscribeActivity((m) => {
+          void stream.writeSSE({ event: 'activity', data: JSON.stringify(m) }).catch(() => {})
+        })
+        stream.onAbort(() => {
+          unsub()
+          resolve()
+        })
+      })
+    })
+  )
+
   return app
 }

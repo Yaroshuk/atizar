@@ -19,6 +19,7 @@ import {
 } from './dispatch.js'
 import { transition, ACTIVE } from './transition.js'
 import type { Gate, WorkItem, WorkItemStatus } from './db/schema.js'
+import { makeActivityLog } from './activity.js'
 
 // Wires StateStore + EventBus + WorkerPool + RunObserver into one façade the routes call.
 // The provider lookup is injected (the same buildProvider the spike used), so the service
@@ -53,6 +54,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   const { db } = deps
   const store = makeStateStore(db)
   const bus = makeEventBus()
+  const activity = makeActivityLog({ bus })
 
   // deliverImpl is extracted so it can be shared between:
   //   (a) the RunObserver (machine dispatch — F2), and
@@ -81,6 +83,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       parentId: req.parentId,
       maxInstances,
     })
+    activity.record({
+      ts: Date.now(),
+      workflowId: workflowId ?? r.instanceId,
+      agentId: r.instanceId,
+      workItemId: result.id,
+      kind: 'delivered',
+      summary: `→ ${r.instanceId}`,
+    })
     publishBoard()
     return { ok: true, ...result }
   }
@@ -101,6 +111,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     bus,
     resolveAgent: deps.resolveAgent,
     deliver: deliverImpl,
+    activity,
   })
 
   // Coarse board cursor (Last-Event-ID); reconnect = snapshot refetch (spec §1.6).
@@ -126,6 +137,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     // item's slot is released by its own consume loop when iterator.return() ends the stream;
     // an awaiting_approval item's slot was already released at the gate. Releasing here would
     // double-free → over-admit queued work past the cap.
+    activity.record({
+      ts: Date.now(),
+      workflowId: wi.workflowId,
+      agentId: wi.agentId,
+      workItemId,
+      kind: 'cancelled',
+      summary: 'cancelled',
+    })
     const children = await store.getActiveChildren(workItemId)
     for (const child of children.sort((a, b) => a.id.localeCompare(b.id))) {
       await cancelItem(child.id)
@@ -138,6 +157,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
+      activity.record({
+        ts: Date.now(),
+        workflowId: req.workflowId,
+        agentId: req.agentId,
+        workItemId: result.id,
+        kind: 'queued',
+        summary: req.origin === 'human' ? `START ${req.agentId}` : `dispatched ${req.agentId}`,
+      })
       publishBoard() // a newly-queued item should appear on the board even before its run starts
       return result
     },
@@ -175,6 +202,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       if (resolution.decision === 'rejected') {
         await store.resolveGateRow(gate.id, { comment: resolution.comment })
         await transition(db, wi.id, 'reject') // sets resolution='rejected', status → finished
+        activity.record({
+          ts: Date.now(),
+          workflowId: wi.workflowId,
+          agentId: wi.agentId,
+          workItemId: wi.id,
+          kind: 'resolved',
+          summary: 'rejected',
+        })
         publishBoard()
         return { ok: true }
       }
@@ -202,12 +237,32 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         await store.setLedgerResult(key, executedResult)
       }
 
+      activity.record({
+        ts: Date.now(),
+        workflowId: wi.workflowId,
+        agentId: wi.agentId,
+        workItemId: wi.id,
+        kind: 'resolved',
+        summary: `approved ${gate.toolName}`,
+      })
+
       if (executedResult.error) {
         const msg = String(executedResult.error)
         await transition(db, wi.id, 'fail', { error: msg }).catch(() => {})
         await store.setError(wi.id, msg)
         publishBoard()
         return { ok: false, status: 502, error: msg }
+      }
+
+      if (!claim.alreadyClaimed) {
+        activity.record({
+          ts: Date.now(),
+          workflowId: wi.workflowId,
+          agentId: wi.agentId,
+          workItemId: wi.id,
+          kind: 'effect',
+          summary: gate.toolName,
+        })
       }
 
       publishBoard()
@@ -286,6 +341,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     reenqueue(item: { id: string; agentId: string }): void {
       const cap = deps.resolveAgent(item.agentId)?.maxInstances ?? 1
       pool.enqueue(item.id, item.agentId, cap)
+    },
+
+    getActivity(): ReturnType<typeof activity.snapshot> {
+      return activity.snapshot()
+    },
+
+    subscribeActivity(fn: (entry: unknown) => void): () => void {
+      return bus.subscribe('activity', fn)
     },
   }
 }

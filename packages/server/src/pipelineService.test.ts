@@ -233,6 +233,25 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     await expect(svc.cancel(workItemId)).resolves.toBeUndefined()
     expect((await svc.getStatus(workItemId))?.status).toBe('finished')
   })
+
+  it('dispatch records a queued activity entry retrievable via getActivity()', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const req = { ...base, agentId: 'lead-inbox__qualifier', origin: 'human' as const }
+    const { id } = await svc.dispatch(req)
+    const entries = svc.getActivity()
+    const entry = entries.find((e) => e.workItemId === id)
+    expect(entry).toBeDefined()
+    expect(entry?.kind).toBe('queued')
+    expect(entry?.agentId).toBe('lead-inbox__qualifier')
+  })
 })
 
 describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {

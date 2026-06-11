@@ -13,6 +13,7 @@ import type { WorkerPool } from './workerPool.js'
 import type { EventBus } from './eventBus.js'
 import { transition } from './transition.js'
 import type { WorkItem } from './db/schema.js'
+import type { ActivityLog } from './activity.js'
 
 // The server-side consumer of a provider run — runs for EVERY dispatch, browser or not
 // (spec §1.5). Appends Trace, reacts to GATE_OPENED (insert Gate + transition + suspend),
@@ -47,6 +48,8 @@ export interface RunObserverDeps {
     payload: Record<string, unknown>
     parentId: string
   }) => Promise<unknown>
+  // F4 activity feed — optional so tests that omit it stay zero-overhead.
+  activity?: ActivityLog
 }
 
 export interface RunObserver {
@@ -180,6 +183,14 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
           })
           await transition(db, id, 'gate')
           publishStatus(id, 'awaiting_approval')
+          deps.activity?.record({
+            ts: Date.now(),
+            workflowId: wi.workflowId,
+            agentId: wi.agentId,
+            workItemId: id,
+            kind: 'gate',
+            summary: gate.toolName,
+          })
           gateOpened = true
         }
       }
@@ -198,12 +209,28 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       await transition(db, id, 'finish')
       const final = (await store.getWorkItem(id))?.status ?? 'finished'
       publishStatus(id, final)
+      deps.activity?.record({
+        ts: Date.now(),
+        workflowId: wi.workflowId,
+        agentId: wi.agentId,
+        workItemId: id,
+        kind: 'finished',
+        summary: 'finished',
+      })
       pool.release(wi.agentId)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       await transition(db, id, 'fail', { error: message }).catch(() => {})
       await store.setError(id, message)
       publishStatus(id, 'error')
+      deps.activity?.record({
+        ts: Date.now(),
+        workflowId: wi.workflowId,
+        agentId: wi.agentId,
+        workItemId: id,
+        kind: 'error',
+        summary: message.slice(0, 80),
+      })
       pool.release(wi.agentId)
     } finally {
       live.delete(id)
@@ -228,6 +255,14 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
 
       await transition(db, id, 'start')
       publishStatus(id, 'running')
+      deps.activity?.record({
+        ts: Date.now(),
+        workflowId: wi.workflowId,
+        agentId: wi.agentId,
+        workItemId: id,
+        kind: 'running',
+        summary: `running ${wi.agentId}`,
+      })
       const input = buildInput(wi)
       await store.setRunId(id, input.runId)
       await consume(id, { ...wi, runId: input.runId }, runtime, runtime.provider.run(input))
