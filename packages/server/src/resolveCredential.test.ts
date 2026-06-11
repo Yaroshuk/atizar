@@ -123,4 +123,20 @@ describe('resolveCredential', () => {
       )
     ).toBeNull()
   })
+
+  it('oauth2 returns null (not throw) on a malformed/legacy stored blob', async () => {
+    const store = fakeStore({
+      'default:gmail': { kind: 'oauth2', secret: 'not-json', expiresAt: null },
+    })
+    expect(
+      await resolveCredential(
+        {
+          integration: 'gmail',
+          connectionId: 'default',
+          auth: { kind: 'oauth2', provider: 'google', scopes: [] },
+        },
+        { store: store as any }
+      )
+    ).toBeNull()
+  })
 })

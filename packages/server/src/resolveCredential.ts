@@ -66,7 +66,14 @@ registry.set('oauth2', async (ctx, deps) => {
   })
   if (!stored) return null
 
-  const token: OAuthToken = JSON.parse(stored.secret)
+  // A malformed/legacy blob is "not connected" (reconnect), not a crash — the store is the only
+  // writer so this is defensive, but a hand-edited row must not throw the whole run.
+  let token: OAuthToken
+  try {
+    token = JSON.parse(stored.secret)
+  } catch {
+    return null
+  }
   const skewMs = 60_000
   const expired = typeof token.expiresAt === 'number' && token.expiresAt <= deps.now() + skewMs
   const client = provider
