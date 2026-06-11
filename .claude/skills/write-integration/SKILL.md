@@ -82,6 +82,15 @@ mutations from this skill — that is the consuming workflow's browser-E2E job (
 `browser-verify` procedure, invoked by the workflow build, not here — this skill's output
 is a library, not running-app behavior).
 
+**Run the smoke as a temp `.mts` file INSIDE the repo, not `yarn tsx -e "…"`.** Past-run
+incident (gmail-viewer, 2026-06-11): `tsx -e` failed twice — first `Top-level await is not
+supported with the "cjs" output format` (the `-e` eval is CJS), then, after moving to a file
+in `/tmp`, `ERR_MODULE_NOT_FOUND: Cannot find package '@platform/integrations'` (Node
+resolves the workspace symlink only from within the repo tree). Both vanish with a throwaway
+`./smoke.mts` at the repo root (`import {...} from '@platform/integrations/<name>/<fn>'`;
+top-level `await`), run via `yarn tsx smoke.mts`, then `rm` it. Print only counts/lengths —
+never real fetched content into logs.
+
 ## Stage 7 — Foundation check
 
 Run the `check-foundation` procedure on the result (new package surface; verify no engine
