@@ -235,6 +235,47 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
   })
 })
 
+describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {
+  it('includes agentHealth from getAgentHealth when provided', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const agentHealth = { 'lead-inbox__reply': { ok: true as const } }
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      getAgentHealth: () => agentHealth,
+    })
+    const board = await svc.getBoard()
+    expect(board.agentHealth).toEqual(agentHealth)
+  })
+
+  it('returns empty agentHealth when getAgentHealth is not provided', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      // getAgentHealth intentionally omitted
+    })
+    const board = await svc.getBoard()
+    expect(board.agentHealth).toEqual({})
+  })
+})
+
 describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real Postgres)', () => {
   const runtime: AgentRuntime = {
     provider: blockingProvider(), // occupies its slot; the test asserts rows, not completion

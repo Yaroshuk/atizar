@@ -38,4 +38,13 @@ export type Gate = {
   status: 'open' | 'resolved'
 }
 
-export type Board = { items: WorkItem[]; gates: Gate[]; lastEventId: number }
+// Hand-written mirror of core's HealthCheck for the client — intentionally omits the
+// optional `detail?` field on the ok-branch (client only needs ok/error/hint for the badge).
+export type AgentHealth = { ok: true } | { ok: false; error: string; hint: string }
+
+export type Board = {
+  items: WorkItem[]
+  gates: Gate[]
+  lastEventId: number
+  agentHealth: Record<string, AgentHealth>
+}

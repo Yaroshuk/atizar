@@ -5,6 +5,7 @@ import {
   type Destination,
   type GateResolution,
   type WorkflowDescriptor,
+  type HealthCheck,
 } from '@platform/core'
 import type { Db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
@@ -41,6 +42,11 @@ export interface PipelineServiceDeps {
   // Workflow descriptors — the server resolves a handoff Destination against these
   // (resolveDelivery) when a card emits a delivery.
   descriptors: WorkflowDescriptor[]
+  // F3 credential-health surface: sync cache read for board snapshots, async re-compute for
+  // the health endpoint and boot sweep. Both are optional so tests that don't need health
+  // can omit them without any wiring overhead.
+  getAgentHealth?: () => Record<string, HealthCheck>
+  refreshHealth?: () => Promise<Record<string, HealthCheck>>
 }
 
 export function makePipelineService(deps: PipelineServiceDeps) {
@@ -245,9 +251,18 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       }
     },
 
-    async getBoard(): Promise<{ items: WorkItem[]; gates: Gate[]; lastEventId: number }> {
+    async getBoard(): Promise<{
+      items: WorkItem[]
+      gates: Gate[]
+      lastEventId: number
+      agentHealth: Record<string, HealthCheck>
+    }> {
       const snap = await store.getBoardSnapshot()
-      return { ...snap, lastEventId: boardSeq }
+      return { ...snap, lastEventId: boardSeq, agentHealth: deps.getAgentHealth?.() ?? {} }
+    },
+
+    async refreshHealth(): Promise<Record<string, HealthCheck>> {
+      return deps.refreshHealth?.() ?? Promise.resolve({})
     },
 
     subscribeWorkItem(id: string, fn: (msg: unknown) => void): () => void {

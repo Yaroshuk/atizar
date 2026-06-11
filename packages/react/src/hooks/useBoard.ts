@@ -5,7 +5,12 @@ import type { Board } from '../serverTypes'
 // refetch the snapshot (coarse model — the SSE is just a poke, the snapshot is the truth).
 // So duplicate/out-of-order pokes, reconnects, and a second tab are all harmless.
 export const useBoard = (): Board => {
-  const [board, setBoard] = useState<Board>({ items: [], gates: [], lastEventId: 0 })
+  const [board, setBoard] = useState<Board>({
+    items: [],
+    gates: [],
+    lastEventId: 0,
+    agentHealth: {},
+  })
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {

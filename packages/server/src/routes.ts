@@ -164,6 +164,11 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json({ ok: true })
   })
 
+  // CREDENTIAL HEALTH — re-runs all provider + binding checks and returns the per-agent map.
+  app.get('/api/health', async (c) => {
+    return c.json(await service.refreshHealth())
+  })
+
   // BOARD snapshot.
   app.get('/api/board', async (c) => {
     return c.json(await service.getBoard())
