@@ -103,4 +103,20 @@ export const providerConformanceChecks: ConformanceCheck[] = [
         assert(s.surfaceTools.includes(n), `surfaced an undeclared tool: "${n}"`)
     },
   },
+  {
+    name: 'every TOOL_CALL_START on turn 1 has a matching TOOL_CALL_END with the same toolCallId',
+    async run(makeProvider, s) {
+      const events = await collect(makeProvider().run(s.turn1Input))
+      const startIds = events
+        .filter((e) => e.type === EventType.TOOL_CALL_START)
+        .map((e) => (e as unknown as { toolCallId: string }).toolCallId)
+      const endIds = new Set(
+        events
+          .filter((e) => e.type === EventType.TOOL_CALL_END)
+          .map((e) => (e as unknown as { toolCallId: string }).toolCallId)
+      )
+      for (const id of startIds)
+        assert(endIds.has(id), `TOOL_CALL_START id "${id}" has no matching TOOL_CALL_END`)
+    },
+  },
 ]
