@@ -21,7 +21,7 @@ skill's first run); `gmail-basic` is the original pattern source.
 - **Parsing is pure and separate.** Data-in/data-out helpers live in a `format.mjs` with no
   fs/env/network so they unit-test trivially.
 - **Batch mutations are best-effort.** A multi-id action returns
-  `{ done: string[], failed: { id, error }[] }` — one bad row must not abort the rest.
+  `{ done: string[], failed: { messageId, error }[] }` — one bad row must not abort the rest.
   A wholesale failure (client unavailable) returns `{ error }` — this shape IS the exported
   `BatchActionResult` type in `@platform/core`; import it, don't redefine it.
 - **`.d.ts` beside `.mjs`** for every module a TypeScript consumer imports; the package
