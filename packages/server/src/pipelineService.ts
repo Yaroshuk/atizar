@@ -262,6 +262,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     },
 
     async refreshHealth(): Promise<Record<string, HealthCheck>> {
+      // Empty-object fallback is only the test/unwired path; app always wires deps.refreshHealth.
       return deps.refreshHealth?.() ?? Promise.resolve({})
     },
 

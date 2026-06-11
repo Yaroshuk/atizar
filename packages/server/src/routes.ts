@@ -164,7 +164,10 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json({ ok: true })
   })
 
-  // CREDENTIAL HEALTH — re-runs all provider + binding checks and returns the per-agent map.
+  // CREDENTIAL HEALTH — explicit on-demand refresh: re-runs every agent's credential/provider
+  // checks (claude-cli's probe shells out via execSync). The UI badge reads the CHEAP cached map
+  // on the board snapshot (board.agentHealth via GET /api/board), NOT this endpoint — do not wire
+  // a polling client here.
   app.get('/api/health', async (c) => {
     return c.json(await service.refreshHealth())
   })
