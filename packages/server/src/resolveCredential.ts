@@ -32,7 +32,10 @@ interface OAuthToken {
 
 // A resolver as held in the registry — it also receives the resolved runtime deps. Custom resolvers
 // registered via `registerResolver` get the ctx-only `CredentialResolver` shape (deps ignored).
-type InternalResolver = (ctx: ResolveCtx, deps: Required<ResolveDeps>) => Promise<ResolvedCredential | null>
+type InternalResolver = (
+  ctx: ResolveCtx,
+  deps: Required<ResolveDeps>
+) => Promise<ResolvedCredential | null>
 
 const registry = new Map<string, InternalResolver>()
 
@@ -66,7 +69,9 @@ registry.set('oauth2', async (ctx, deps) => {
   const token: OAuthToken = JSON.parse(stored.secret)
   const skewMs = 60_000
   const expired = typeof token.expiresAt === 'number' && token.expiresAt <= deps.now() + skewMs
-  const client = provider ? atizarEnv.oauthClient(provider) : { clientId: undefined, clientSecret: undefined }
+  const client = provider
+    ? atizarEnv.oauthClient(provider)
+    : { clientId: undefined, clientSecret: undefined }
   const endpoint = provider ? oauthProvider(provider) : undefined
 
   if (expired && token.refreshToken && client.clientId && client.clientSecret && endpoint) {
