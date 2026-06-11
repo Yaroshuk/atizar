@@ -10,7 +10,7 @@ function bareName(fullyQualified: string): string {
 
 // Boot-time invariants (fail-fast — never a silent approve-time no-op or an ungated effect):
 //   1. effect-binding exhaustiveness BOTH ways (declared ⇔ bound).
-//   2. every allow-listed tool is classified readonly | approvals | renders.
+//   2. every allow-listed tool is classified readonly | approvals | renders | dispatches | effects.
 export function assertAgentClassification(
   def: AgentDefinition,
   binding: { allowedTools: string[]; effects?: Record<string, EffectFn> }
@@ -30,12 +30,13 @@ export function assertAgentClassification(
     ...def.readonly,
     ...def.approvals,
     ...Object.keys(def.renders),
+    ...def.dispatches,
   ])
   for (const tool of binding.allowedTools) {
     const bare = bareName(tool)
     if (!classified.has(bare)) {
       throw new Error(
-        `agent "${def.id}": tool "${bare}" (from "${tool}") is not classified — declare it in readonly | approvals | renders`
+        `agent "${def.id}": tool "${bare}" (from "${tool}") is not classified — declare it in readonly | approvals | renders | dispatches | effects`
       )
     }
   }
