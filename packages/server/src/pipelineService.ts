@@ -302,6 +302,21 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       }
     },
 
+    // Stop every active work item across ALL workflows. Reuses the tested cascade by
+    // looping cancelWorkflow over the distinct workflowIds present in the board snapshot.
+    async cancelAll(): Promise<void> {
+      const snap = await store.getBoardSnapshot()
+      const activeWorkflowIds = [
+        ...new Set(snap.items.filter((i) => ACTIVE.includes(i.status)).map((i) => i.workflowId)),
+      ]
+      for (const workflowId of activeWorkflowIds) {
+        const active = await store.getActiveByWorkflow(workflowId)
+        for (const item of active.sort((a, b) => a.id.localeCompare(b.id))) {
+          await cancelItem(item.id)
+        }
+      }
+    },
+
     async getStatus(id: string): Promise<{ status: WorkItemStatus; done: boolean } | undefined> {
       const wi = await store.getWorkItem(id)
       return wi ? { status: wi.status, done: DONE.has(wi.status) } : undefined

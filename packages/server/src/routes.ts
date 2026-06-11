@@ -165,6 +165,12 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json({ ok: true })
   })
 
+  // STOP every active work item across ALL workflows ("Stop all").
+  app.post('/api/cancel-all', async (c) => {
+    await service.cancelAll()
+    return c.json({ ok: true })
+  })
+
   // CREDENTIAL HEALTH — explicit on-demand refresh: re-runs every agent's credential/provider
   // checks (claude-cli's probe shells out via execSync). The UI badge reads the CHEAP cached map
   // on the board snapshot (board.agentHealth via GET /api/board), NOT this endpoint — do not wire

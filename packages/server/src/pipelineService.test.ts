@@ -362,6 +362,55 @@ describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {
   })
 })
 
+describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
+  it('stops every active item across two distinct workflows', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+
+    // Dispatch two items into two different workflows (agent key = wf__agent).
+    // Items are written to DB as 'queued' synchronously inside dispatch().
+    const { id: id1 } = await svc.dispatch({
+      workflowId: 'wf-alpha',
+      agentId: 'wf-alpha__agent',
+      origin: 'human',
+      payload: {},
+    })
+    const { id: id2 } = await svc.dispatch({
+      workflowId: 'wf-beta',
+      agentId: 'wf-beta__agent',
+      origin: 'human',
+      payload: {},
+    })
+
+    // Items are in the DB (queued or running) — cancel everything.
+    await svc.cancelAll()
+
+    // Both items must now be terminal (done). cancelItem transitions queued/running → finished.
+    const s1 = await svc.getStatus(id1)
+    const s2 = await svc.getStatus(id2)
+    expect(s1?.done).toBe(true)
+    expect(s2?.done).toBe(true)
+
+    // Board must have zero active items belonging to these two workflows.
+    const board = await svc.getBoard()
+    const stillActive = board.items
+      .filter((i) => i.id === id1 || i.id === id2)
+      .filter((i) =>
+        (['queued', 'running', 'awaiting_approval', 'awaiting_input'] as string[]).includes(
+          i.status
+        )
+      )
+    expect(stillActive).toHaveLength(0)
+  }, 10_000)
+})
+
 describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real Postgres)', () => {
   const runtime: AgentRuntime = {
     provider: blockingProvider(), // occupies its slot; the test asserts rows, not completion
