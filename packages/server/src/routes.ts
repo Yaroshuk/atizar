@@ -29,13 +29,14 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     }>()
     if (!service.knows(agent)) return c.json({ error: `unknown agent: ${agent}` }, 404)
     const [workflowId] = agent.split('__')
-    const { id } = await service.dispatch({
+    const result = await service.dispatch({
       workflowId: workflowId ?? agent,
       agentId: agent,
       origin: 'human',
       payload: payload ?? {},
     })
-    return c.json({ id })
+    if (result.rejected) return c.json({ error: 'already running' }, 409)
+    return c.json({ id: result.id })
   })
 
   // DELIVER — a human-gated handoff from a rendered card (VerdictCard "Draft reply", TriageCard

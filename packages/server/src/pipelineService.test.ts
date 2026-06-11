@@ -114,6 +114,39 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect(stats.queued).toBe(1)
   })
 
+  it('rejects a duplicate human START of a singleton agent (maxInstances=1) with rejected=already_running', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+
+    // First human START: should succeed and occupy the sole slot.
+    const first = await service.dispatch({
+      ...base,
+      agentId: 'singleton-agent',
+      origin: 'human',
+    })
+    expect(first.rejected).toBeUndefined()
+
+    // Second human START: maxInstances=1 and one already active → rejected.
+    const second = await service.dispatch({
+      ...base,
+      agentId: 'singleton-agent',
+      origin: 'human',
+    })
+    expect(second.rejected).toBe('already_running')
+
+    // The second dispatch must NOT have been enqueued.
+    const stats = service.stats('singleton-agent')
+    expect(stats.active).toBe(1)
+    expect(stats.queued).toBe(0)
+  })
+
   // ── Gate-keyed resolveGate tests ───────────────────────────────────────────
 
   function makeService(opts: { effects: Record<string, EffectFn> }) {

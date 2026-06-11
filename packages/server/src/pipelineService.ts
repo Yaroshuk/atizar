@@ -156,6 +156,12 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
+      // F6: a second human START of a singleton agent (maxInstances=1) is rejected (not queued).
+      // Applies only to singletons — agents with maxInstances > 1 continue to queue overflow.
+      // Machine dispatch (origin 'agent') is unaffected — the chokepoint handles its own cap/queue.
+      if (req.origin === 'human' && maxInstances === 1 && pool.activeCount(req.agentId) >= 1) {
+        return { id: '', deduped: false, rejected: 'already_running' }
+      }
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
       activity.record({
         ts: Date.now(),
