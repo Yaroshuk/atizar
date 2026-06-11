@@ -26,6 +26,10 @@ export interface AgentRuntime {
   maxInstances: number
   // Server-executed effects, keyed by approval tool name (step 4). Empty for read-only agents.
   effects: Record<string, EffectFn>
+  // F2 machine dispatch: tool names the model calls to route work to a child agent.
+  dispatchToolNames: string[]
+  // F2 machine dispatch: the allowed child agent ids (from defineAgent.handoffs).
+  handoffs: string[]
 }
 
 export interface RunObserverDeps {
@@ -34,6 +38,15 @@ export interface RunObserverDeps {
   pool: WorkerPool
   bus: EventBus
   resolveAgent: (agentId: string) => AgentRuntime | undefined
+  // F2 machine dispatch: create a child work item. Called by RunObserver when a dispatch
+  // tool call resolves to a valid handoff target. Errors are caught internally — never
+  // bubble into the stream.
+  deliver: (req: {
+    origin: string
+    dest: { kind: 'agent'; agentId: string }
+    payload: Record<string, unknown>
+    parentId: string
+  }) => Promise<unknown>
 }
 
 export interface RunObserver {
@@ -116,6 +129,43 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
               await store.setCard(id, { tool: call.name, props })
             } catch {
               // Malformed/partial args — skip the card; the trace is still lossless.
+            }
+          }
+          // F2 machine dispatch: if the model called a dispatch tool, create a child work item.
+          // A bad target is a model error — record a trace warning, do NOT throw (I2: machine
+          // dispatch produces a work item only, never an action; bad target is non-fatal).
+          if (call && runtime.dispatchToolNames.includes(call.name)) {
+            try {
+              const parsed = JSON.parse(call.args || '{}') as { to?: string } & Record<
+                string,
+                unknown
+              >
+              const to = typeof parsed.to === 'string' ? parsed.to : ''
+              if (runtime.handoffs.includes(to)) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured to strip `to` from the payload
+              const { to: _to, ...payload } = parsed
+                await deps
+                  .deliver({
+                    origin: wi.workflowId,
+                    dest: { kind: 'agent', agentId: to },
+                    payload,
+                    parentId: id,
+                  })
+                  .catch((e) => console.error('[runObserver] dispatch deliver failed', id, e))
+              } else {
+                // Invalid target: append a synthetic warning to the trace and publish it.
+                // The stream continues — this is a model-side routing mistake, not a system fault.
+                const warn = {
+                  type: 'CUSTOM',
+                  name: 'dispatch_rejected',
+                  value: { to, reason: 'not in handoffs' },
+                } as unknown as BaseEvent
+                await store.appendTrace(id, seq, warn)
+                bus.publish(`workitem:${id}`, { seq, event: warn })
+                seq++
+              }
+            } catch {
+              // Malformed dispatch args — skip. The trace is still lossless.
             }
           }
         }

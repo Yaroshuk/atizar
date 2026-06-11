@@ -48,6 +48,34 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   const store = makeStateStore(db)
   const bus = makeEventBus()
 
+  // deliverImpl is extracted so it can be shared between:
+  //   (a) the RunObserver (machine dispatch — F2), and
+  //   (b) the public `deliver` method (human-gated handoff from a rendered card).
+  // Behavior is identical to the original inline implementation.
+  async function deliverImpl(req: {
+    origin: string
+    dest: Destination
+    payload: Record<string, unknown>
+    parentId: string
+  }): Promise<{ ok: true; id: string; deduped: boolean } | { ok: false; error: string }> {
+    const r = resolveDelivery(deps.descriptors, req.origin, req.dest, req.payload)
+    if (!r.ok) return { ok: false, error: r.error }
+    const [workflowId] = r.instanceId.split('__')
+    const runtime = deps.resolveAgent(r.instanceId)
+    const maxInstances = runtime?.maxInstances ?? 1
+    const result = await dispatchChokepoint(db, pool, {
+      workflowId: workflowId ?? r.instanceId,
+      agentId: r.instanceId,
+      origin: 'agent',
+      payload: req.payload,
+      source: deliveryKey(req.payload) ?? null,
+      parentId: req.parentId,
+      maxInstances,
+    })
+    publishBoard()
+    return { ok: true, ...result }
+  }
+
   // run() is the RunObserver — wired after the pool via a late binding (the pool only
   // invokes it asynchronously, well after construction).
   // eslint-disable-next-line prefer-const -- circular: pool.run closes over observer, set below
@@ -57,7 +85,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       void observer.run(id).catch((e) => console.error('[pipeline] run failed', id, e))
     },
   })
-  observer = makeRunObserver({ db, store, pool, bus, resolveAgent: deps.resolveAgent })
+  observer = makeRunObserver({
+    db,
+    store,
+    pool,
+    bus,
+    resolveAgent: deps.resolveAgent,
+    deliver: deliverImpl,
+  })
 
   // Coarse board cursor (Last-Event-ID); reconnect = snapshot refetch (spec §1.6).
   let boardSeq = 0
@@ -102,29 +137,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     // (same validation the client used) and dispatch a CHILD work item (parentId = the
     // card's work item). Dedup-by-source is the chokepoint's job — a repeated click on
     // the same source returns { deduped: true }, no second child.
-    async deliver(req: {
-      origin: string
-      dest: Destination
-      payload: Record<string, unknown>
-      parentId: string
-    }): Promise<{ ok: true; id: string; deduped: boolean } | { ok: false; error: string }> {
-      const r = resolveDelivery(deps.descriptors, req.origin, req.dest, req.payload)
-      if (!r.ok) return { ok: false, error: r.error }
-      const [workflowId] = r.instanceId.split('__')
-      const runtime = deps.resolveAgent(r.instanceId)
-      const maxInstances = runtime?.maxInstances ?? 1
-      const result = await dispatchChokepoint(db, pool, {
-        workflowId: workflowId ?? r.instanceId,
-        agentId: r.instanceId,
-        origin: 'agent',
-        payload: req.payload,
-        source: deliveryKey(req.payload) ?? null,
-        parentId: req.parentId,
-        maxInstances,
-      })
-      publishBoard() // surface the new child (and any parent reopen) on the board immediately
-      return { ok: true, ...result }
-    },
+    // NOTE: delegates to deliverImpl (shared with the RunObserver's machine-dispatch path).
+    deliver: deliverImpl,
 
     async resolveGate(
       gateId: string,

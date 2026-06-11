@@ -72,7 +72,10 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
         renderToolNames: ['renderLead'],
         maxInstances: 2,
         effects: {},
+        dispatchToolNames: [],
+        handoffs: [],
       }),
+      deliver: vi.fn().mockResolvedValue({ ok: true, id: 'child', deduped: false }),
     })
 
     await observer.run(id)

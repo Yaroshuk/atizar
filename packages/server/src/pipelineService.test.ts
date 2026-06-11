@@ -74,6 +74,8 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       renderToolNames: [],
       maxInstances: 2,
       effects: { saveDraft: async () => ({}) },
+      dispatchToolNames: [],
+      handoffs: [],
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
@@ -98,6 +100,8 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       renderToolNames: [],
       maxInstances: 2,
       effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
@@ -118,6 +122,8 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       renderToolNames: [],
       maxInstances: 2,
       effects: opts.effects,
+      dispatchToolNames: [],
+      handoffs: [],
     }
     return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
   }
@@ -235,6 +241,8 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
     renderToolNames: [],
     maxInstances: 2,
     effects: {},
+    dispatchToolNames: [],
+    handoffs: [],
   }
   // A descriptor with a published cross-workflow input contract (for the schema-reject case).
   const crossWf = defineWorkflow({

@@ -52,6 +52,8 @@ for (const { descriptor, bindings } of workflowServers) {
       renderToolNames: Object.keys(def.renders),
       maxInstances: def.maxInstances,
       effects: b.effects ?? {},
+      dispatchToolNames: def.dispatches,
+      handoffs: def.handoffs ?? [],
     }
   }
 }
