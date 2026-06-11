@@ -106,6 +106,17 @@ env:
 A small `env.ts` helper in `@platform/server` reads `ATIZAR_*` by a typed accessor so the prefix is
 applied in ONE place (no scattered `process.env.ATIZAR_…` strings).
 
+**`.env.example` (the single source of "what keys do I need", decided 2026-06-11).** A committed
+`.env.example` at the repo root lists EVERY required/optional env var with an empty value + a
+one-line comment (what it is, where to get it): framework vars (`ATIZAR_SECRET_KEY=`,
+`ATIZAR_GOOGLE_CLIENT_ID=`, `ATIZAR_GOOGLE_CLIENT_SECRET=`, `ATIZAR_DATABASE_URL=`,
+`ANTHROPIC_API_KEY=`) and one block per integration the repo ships. It is committed (it holds NO
+values); the real `.env.local` stays gitignored. The `write-integration` skill appends to this file
+whenever it adds an integration that needs a secret (§5). A developer's first step becomes "copy
+`.env.example` → `.env.local`, fill what you use." Note: the dev server does not auto-load
+`.env.local` yet (a carried packaging cleanup) — until then, `set -a; . ./.env.local; set +a`
+before `yarn dev`.
+
 ## 3. Credential store + resolution (`@platform/server`)
 
 - **Table `credentials`** (drizzle): PK `(connection_id, integration)`; columns `kind`, `secret`
@@ -182,6 +193,19 @@ The skill then enforces the contract: the integration **declares `auth`** and it
 block is updated: "Auth is declared, never self-read. Credentials are injected (`deps.credential`).
 Use the `ATIZAR_` env namespace. If you don't understand the service's auth, STOP and ask."
 
+**The skill MUST name the exact env var(s) and seed `.env.example` (decided 2026-06-11).** Whatever
+auth the integration uses, the skill states the precise variable name out loud to the developer and
+**adds a commented, empty-valued line to `.env.example`** so the required keys are discoverable in
+one place:
+- `apiKey` → `ATIZAR_<INTEGRATION>_API_KEY=` (e.g. `ATIZAR_TELEGRAM_API_KEY=`) + a comment on what
+  it is and where to obtain it.
+- `oauth2` → `ATIZAR_<PROVIDER>_CLIENT_ID=` / `ATIZAR_<PROVIDER>_CLIENT_SECRET=` (the one-time app
+  registration) + a comment pointing at the provider's console; the per-user token is NOT an env
+  var (it comes from the Connect flow).
+- a custom `kind` → whatever env var(s) the custom resolver reads, each named explicitly and seeded.
+The skill never invents a name outside the `ATIZAR_` namespace, and never leaves a required secret
+undocumented.
+
 ## 6. Validation — rewrite the gmail integration through the new skill
 
 After Stage 3 lands, **delete the gmail integration(s) and rewrite a single `gmail` integration via
@@ -207,11 +231,14 @@ the updated skill**:
    `@platform/core`; the `ATIZAR_` `env.ts` accessor in `@platform/server`. Pure, unit-tested.
 2. **Credential store + resolution** — the `credentials` table + `crypto.ts` + `resolveCredential`
    + the built-in `apiKey`/`oauth2` resolvers + the resolver registry + token refresh. Real-PG
-   tests (encrypt round-trip, refresh-on-expiry, apiKey-from-env, not-connected).
+   tests (encrypt round-trip, refresh-on-expiry, apiKey-from-env, not-connected). **Also create
+   `.env.example`** here (the framework block: `ATIZAR_SECRET_KEY`, `ATIZAR_GOOGLE_CLIENT_ID/SECRET`,
+   `ATIZAR_DATABASE_URL`, `ANTHROPIC_API_KEY`, each empty + commented).
 3. **OAuth connect flow** — the connect/callback routes + `state` signing + the Connections UI +
    `claude-spawn` env pass-through so MCP children resolve. Browser E2E of connect/disconnect.
 4. **Skill update** — the `write-integration` auth interview + the "stop and ask" rule + the
-   no-self-read enforcement.
+   no-self-read enforcement + **the skill names the exact env var and appends it to `.env.example`**
+   (§5).
 5. **Gmail rewrite (validation)** — delete + rewrite via the skill; re-point both workflows; full
    browser E2E on the connected account.
 
