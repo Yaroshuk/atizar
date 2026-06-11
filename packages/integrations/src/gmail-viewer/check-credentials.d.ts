@@ -1,1 +1,4 @@
-export { checkCredentials } from '../gmail-basic/check-credentials.js'
+import type { HealthCheck } from '@platform/core'
+export declare function checkCredentials(deps?: {
+  getGmail?: () => Promise<unknown>
+}): Promise<HealthCheck>

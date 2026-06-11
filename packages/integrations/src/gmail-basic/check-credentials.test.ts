@@ -8,7 +8,7 @@ describe('checkCredentials', () => {
       users: { getProfile: async () => ({ data: { emailAddress: 'me@example.com' } }) },
     }
     const res = await checkCredentials({ getGmail: async () => gmail })
-    expect(res).toEqual({ ok: true, email: 'me@example.com' })
+    expect(res).toEqual({ ok: true, detail: 'me@example.com' })
   })
 
   it('returns ok:false with error + hint when auth fails', async () => {

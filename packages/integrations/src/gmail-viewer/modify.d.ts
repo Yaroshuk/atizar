@@ -1,7 +1,5 @@
 // Type declarations for modify.mjs (JS module — no TS source).
-export type BatchActionResult =
-  | { done: string[]; failed: { messageId: string; error: string }[] }
-  | { error: string }
+import type { BatchActionResult } from '@platform/core'
 
 export declare function markRead(
   args: { messageIds: string[] },

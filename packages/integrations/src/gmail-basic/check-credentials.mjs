@@ -15,7 +15,7 @@ export async function checkCredentials(deps = {}) {
   try {
     const gmail = await getGmail()
     const profile = await gmail.users.getProfile({ userId: 'me' })
-    return { ok: true, email: profile.data.emailAddress ?? '' }
+    return { ok: true, detail: profile.data.emailAddress ?? '' }
   } catch (err) {
     return { ok: false, error: errText(err), hint: HINT }
   }

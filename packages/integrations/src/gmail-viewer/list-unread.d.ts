@@ -1,4 +1,6 @@
 // Type declaration for list-unread.mjs (JS module — no TS source).
+import type { ReadResult } from '@platform/core'
+
 export type EmailRef = {
   messageId: string
   threadId: string
@@ -11,4 +13,4 @@ export type EmailRef = {
 export declare function listUnread(
   args?: { sinceHours?: number },
   deps?: { getGmail?: () => Promise<unknown> }
-): Promise<{ emails: EmailRef[] } | { error: string }>
+): Promise<ReadResult<{ emails: EmailRef[] }>>
