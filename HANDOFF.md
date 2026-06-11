@@ -456,7 +456,44 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     and the leading line of `buildFirst`'s prompt — a benign duplication (the old hardcoded prompt
     did the same); (M2) the github-triage descriptor lists its read tools in `tools` (not `readonly`),
     so `mastraFactory` classifies them as render/propose — no functional effect (they're stubs),
-    align it when github-triage gets real Mastra reads. **Next = Stage 4 (UI chrome).**
+    align it when github-triage gets real Mastra reads. **Next (by the user's call 2026-06-11) =
+    the integration auth contract track below, NOT Stage 4 (UI chrome) — Stage 4 is parked.**
+
+### 🆕 ACTIVE TRACK (2026-06-11) — integration authentication contract
+
+By the user's call, the credential/connection mechanism is built next (ahead of email-inbox Stage 4
+UI chrome, which is parked). Today an integration reads its own secret files (`gmail-client.mjs` →
+`~/.gmail-mcp/*.json`) — not production-ready. This track inverts it: an integration **declares**
+its `AuthSpec` and **receives** a resolved credential; the framework owns provisioning, encrypted
+Postgres storage, and an OAuth "Connect" flow; the `ATIZAR_` env namespace stops framework vars
+colliding with a developer's own. Spec → `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md`
+(§7 = 5 sub-stages). Validated at the end by deleting + rewriting the gmail integration through the
+updated `write-integration` skill.
+
+- **Sub-stage 1 — contract types + `ATIZAR_` env namespace: ✅ BUILT** on `feat/gmail-viewer`
+  (2026-06-11), commits `b917c9f`…`0e81010`. Plan →
+  `docs/superpowers/plans/2026-06-11-integration-auth-substage1-contract-env.md`. 354 unit tests
+  (344 + 10 new) + typecheck/lint green; touched files Prettier-clean. `check-foundation` = CLEAR
+  (I3 purity held — core imports nothing; I5 reinforced — open `kind`; I7 aligned — secrets by name).
+  - **As-built:** `@platform/core` `integration-auth.ts` — `AuthSpec` (OPEN `kind`: `none`/`apiKey`/
+    `oauth2`/`{kind:string;…}` escape hatch — a custom auth method needs NO core edit), `ResolvedCredential`
+    (per-kind payload), `CredentialResolver` (`(ctx:{integration,connectionId,auth}) => Promise<cred|null>`;
+    `null` = not connected), `isOAuth2` guard. Sibling of `integration.ts`, pure (no fs/env/engine).
+  - `@platform/server` `env.ts` — `atizarEnv`, the SINGLE reader of `ATIZAR_*` (never scattered as raw
+    `process.env.ATIZAR_…`): `secretKey()`, `apiKey(integration)` → `ATIZAR_<INTEGRATION>_API_KEY`,
+    `oauthClient(provider)` → `ATIZAR_<PROVIDER>_CLIENT_ID/_SECRET`, `connection()` (defaults `'default'`),
+    `databaseUrl()` (precedence `ATIZAR_DATABASE_URL` > `DATABASE_URL` > compose default). Rule encoded:
+    OFFICIAL framework vars carry `ATIZAR_`; vendor vars (`ANTHROPIC_API_KEY`/`PROVIDER`/`MASTRA_MODEL`/
+    `DEV_RECORD_REPLAY`) stay un-prefixed. `db/client.ts` `databaseUrl` now routes through `atizarEnv`
+    (same default — zero behavior change; the DB-test globalSetup still works via the `DATABASE_URL`
+    middle precedence). Both barrels export the new surface.
+  - `connectionId` is threaded into the resolver signature + `atizarEnv.connection()` from day one
+    (multi-mailbox-ready) but wired to a single `'default'`; actually USING a non-default value + the
+    multi-connection UI is deferred (spec §9).
+  - **Next = sub-stage 2** (encrypted Postgres `credentials` table + `crypto.ts` AES-256-GCM +
+    `resolveCredential` + built-in apiKey/oauth2 resolvers + resolver registry + token refresh +
+    `.env.example`). Plan already written →
+    `docs/superpowers/plans/2026-06-11-integration-auth-substage2-credential-store.md`.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
