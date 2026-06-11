@@ -22,6 +22,9 @@ export const AgentDefinitionSchema = z
     effects: z.array(z.string()).default([]),
     // Read-only tools, declared so the boot-time allow-list classification is exhaustive.
     readonly: z.array(z.string()).default([]),
+    // Tools the model calls to spawn a child work item (machine dispatch — I2: allowed).
+    // A dispatch tool produces a work item; it never executes an action directly.
+    dispatches: z.array(z.string()).default([]),
   })
   .superRefine((def, ctx) => {
     for (const name of def.approvals) {
@@ -45,6 +48,14 @@ export const AgentDefinitionSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `effect "${name}" is not an approval`,
+        })
+      }
+    }
+    for (const name of def.dispatches) {
+      if (!def.tools.includes(name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `dispatch "${name}" is not declared in tools`,
         })
       }
     }

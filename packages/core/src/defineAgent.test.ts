@@ -89,6 +89,51 @@ describe('effects + readonly', () => {
   })
 })
 
+describe('dispatches', () => {
+  it('accepts dispatches as a subset of tools', () => {
+    const def = defineAgent({
+      id: 'sorter',
+      name: 'Sorter',
+      provider: 'claude-cli',
+      instructions: 'x',
+      tools: ['route_emails'],
+      approvals: [],
+      renders: {},
+      dispatches: ['route_emails'],
+      handoffs: ['reply'],
+    })
+    expect(def.dispatches).toEqual(['route_emails'])
+  })
+
+  it('rejects a dispatch tool not declared in tools', () => {
+    expect(() =>
+      defineAgent({
+        id: 'sorter',
+        name: 'Sorter',
+        provider: 'claude-cli',
+        instructions: 'x',
+        tools: [],
+        approvals: [],
+        renders: {},
+        dispatches: ['route_emails'],
+      })
+    ).toThrow(/dispatch .*route_emails.* is not declared in tools/)
+  })
+
+  it('defaults dispatches to an empty array', () => {
+    const def = defineAgent({
+      id: 'a',
+      name: 'A',
+      provider: 'claude-cli',
+      instructions: 'x',
+      tools: [],
+      approvals: [],
+      renders: {},
+    })
+    expect(def.dispatches).toEqual([])
+  })
+})
+
 describe('maxInstances', () => {
   it('defaults to 2 when omitted', () => {
     expect(defineAgent({ ...base }).maxInstances).toBe(2)
