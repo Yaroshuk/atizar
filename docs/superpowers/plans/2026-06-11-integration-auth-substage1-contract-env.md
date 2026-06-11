@@ -94,7 +94,7 @@ describe('integration auth contract', () => {
     expect(tok.kind === 'oauth2' && tok.accessToken).toBe('at')
   })
 
-  it('a CredentialResolver is a function of {integration, connectionId, auth}', async () => {
+  it('a CredentialResolver is a function of {integration, connectionId, auth} returning cred|null', async () => {
     const resolver: CredentialResolver = async ({ integration, connectionId, auth }) => {
       expect(integration).toBe('gmail')
       expect(connectionId).toBe('default')
@@ -103,6 +103,9 @@ describe('integration auth contract', () => {
     }
     const cred = await resolver({ integration: 'gmail', connectionId: 'default', auth: { kind: 'apiKey' } })
     expect(cred).toEqual({ kind: 'apiKey', apiKey: 'sk-x' })
+    // null is a valid "not connected" result.
+    const none: CredentialResolver = async () => null
+    expect(await none({ integration: 'x', connectionId: 'default', auth: { kind: 'none' } })).toBeNull()
   })
 })
 ```
@@ -148,7 +151,7 @@ export type CredentialResolver = (ctx: {
   integration: string
   connectionId: string
   auth: AuthSpec
-}) => Promise<ResolvedCredential>
+}) => Promise<ResolvedCredential | null> // null = not connected / no usable credential
 
 // Narrow an AuthSpec to the built-in oauth2 shape.
 export function isOAuth2(
