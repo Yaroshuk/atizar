@@ -24,6 +24,10 @@ export type WorkflowDescriptor = {
   agents: WorkflowAgent[]
   entryAgentId: string
   inputs: WorkflowInput[]
+  // Optional shared context prepended to every agent's instructions in this workflow (tone,
+  // rules). Threaded through at binding time via composeInstructions(). A workflow that
+  // declares no prompt is entirely unaffected.
+  prompt?: string
 }
 
 // A delivery destination: an internal worker (same workflow) or another workflow's

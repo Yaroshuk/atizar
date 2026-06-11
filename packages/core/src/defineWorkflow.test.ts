@@ -93,4 +93,10 @@ describe('defineWorkflow', () => {
       })
     ).toThrow(/duplicate agent/i)
   })
+  it('passes prompt through unchanged', () => {
+    expect(defineWorkflow({ ...base, prompt: 'shared context' }).prompt).toBe('shared context')
+  })
+  it('passes through when prompt is absent (no-op for existing workflows)', () => {
+    expect(defineWorkflow(base).prompt).toBeUndefined()
+  })
 })
