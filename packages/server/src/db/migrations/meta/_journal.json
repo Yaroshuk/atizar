@@ -8,6 +8,13 @@
       "when": 1781082729280,
       "tag": "0000_fine_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781183338007,
+      "tag": "0001_fantastic_red_ghost",
+      "breakpoints": true
     }
   ]
 }

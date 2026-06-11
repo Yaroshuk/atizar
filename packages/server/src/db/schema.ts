@@ -115,8 +115,29 @@ export const actionLedger = pgTable('action_ledger', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// Encrypted per-connection credentials (integration auth, spec 2026-06-11 §3). PK
+// (connection_id, integration): connection_id is a developer-chosen LABEL ('default'|'home'|…),
+// NOT a user account. `secret` is the AES-256-GCM blob (oauth2 token JSON or an apiKey) — plaintext
+// NEVER hits the DB. `kind` is the open AuthSpec kind (plain text, not an enum). expires_at drives
+// the oauth2 refresh-on-resolve.
+export const credentials = pgTable(
+  'credentials',
+  {
+    connectionId: text('connection_id').notNull(),
+    integration: text('integration').notNull(),
+    kind: text('kind').notNull(),
+    secret: text('secret').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    connectedAt: timestamp('connected_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.connectionId, t.integration] })]
+)
+
 export type WorkItem = typeof workItems.$inferSelect
 export type NewWorkItem = typeof workItems.$inferInsert
+export type Credential = typeof credentials.$inferSelect
+export type NewCredential = typeof credentials.$inferInsert
 export type Gate = typeof gates.$inferSelect
 export type NewGate = typeof gates.$inferInsert
 export type TraceRow = typeof trace.$inferSelect
