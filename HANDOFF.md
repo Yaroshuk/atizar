@@ -344,10 +344,69 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     (SSE). **Panel UI is Stage 4.**
   - **F6 — singleton START guard + cancel-all:** duplicate HUMAN start of a `maxInstances:1` agent
     → 409 (machine dispatch unaffected); `POST /api/cancel-all` reuses the cancelWorkflow cascade.
-- **Stage 3 — email-inbox workflow (NEXT):** assemble sorter + reply + reader/spam/important agents
-  consuming the Stage-1 gmail-viewer integration and Stage-2 capabilities; wire F1's claude-cli
-  prompt-strategy path in the email-inbox `server.ts`; live Gmail mutations (mark-read/trash/star)
-  as server-executed effects; full browser E2E including machine dispatch and batch gates. Spec §3.
+- **Stage 3 — email-inbox workflow: ✅ BUILT & browser-verified** on `feat/gmail-viewer`
+  (2026-06-11). 330 unit tests + typecheck/lint/build green; all six target browser E2E flows PASS
+  on the claude-cli provider (live record → true replay; cassette mtimes unchanged). Plan →
+  `docs/superpowers/plans/2026-06-11-email-inbox-stage3-workflow.md`. `check-foundation` = CLEAR
+  (I2/I9/I15 upheld — see below).
+  - **As-built — module** (`apps/inbox/workflows/email-inbox/`): `descriptor.ts` (sorter +
+    reply + reader/spam/important via a shared `batchAgent` factory; `EmailRefSchema`/
+    `EmailBatchSchema`/`ReplyPayloadSchema`; `emailInbox` carries a workflow-level `prompt`),
+    `apply-actions.ts` (the `applyEmailActions` batch effect — groups rows by action, one
+    gmail-viewer batch mutation per group, `keep`=no-op, best-effort per-row failures, wholesale
+    `{error}` aborts → fails the item, never a false "applied"; gmail fns injected), `prompts.ts`
+    (claude-cli `PromptStrategy` for sorter/reply/batch — **this is where F1's claude-cli prompt
+    path is finally wired**: `composeInstructions(emailInbox.prompt, agent.instructions)` in
+    `server.ts`), `server.ts` (allow-lists + `effects` + `health`), `client.tsx` (meta +
+    `renderSort` RenderSpec + `applyActions` HitlSpec; reuses lead-inbox's `renderLead`/`saveDraft`
+    via the aggregator's dedup-by-toolName). One line added to each of the three aggregators.
+  - **As-built — the batch gate** = ONE `applyActions` approval whose tool-args ARE the editable
+    form (`{items:[{messageId,from,subject,action}]}`); `EmailBatchCard` (userland, `client/src/
+    components/`) renders one row per email with a per-row action `<select>` (read/trash/star/keep);
+    the edited rows flow to `approve(form)`; the SERVER runs `applyEmailActions` on approval (the
+    `effects` binding), ledger-keyed once. `SortSummaryCard` renders the sorter's `renderSort`.
+  - **As-built — machine dispatch** = the sorter's `route_emails` (`dispatches` class); the model
+    CALLS it, the Stage-2 RunObserver turns the observed call into a CHILD work item (origin
+    `agent`, payload = the args minus `to`, validated against `handoffs`). MCP additions
+    (`apps/inbox/mcp/inbox-tools.mjs`): `renderSort`/`route_emails`/`applyActions` are PURE echo
+    surfaces — none performs a Gmail action; the gmail-viewer stdio MCP server is wired in
+    `claude-spawn.ts` (exposes ONLY `list_unread`+`get_email` to the model — mutations are never
+    model-visible).
+  - **Browser E2E (claude-cli, record→replay):** (1) **sort + machine dispatch** — START sorter →
+    `list_unread` → one `route_emails` (all 5 promo emails → reader) → `renderSort` summary card →
+    reader child nested under the sorter with the ↓ connector (machine dispatch visible); sorter
+    stays "Working" (deferred — has a live child). (2) **batch approve WITH an edited row** — edited
+    IFTTT read→star, Applied → DB gate `resolved` with the edited form, `action_ledger` one row
+    `{applied:5,failed:[],byAction:{read:1,star:1,trash:3}}`, item `finished`; **verified via the
+    Gmail API the real actions happened** (3 trashed, 1 starred, 1 marked-read — the edited star
+    landed), then **UNDID all** (untrash+re-add INBOX, unstar, restore UNREAD → exact before-state).
+    (3) **reply approve → real draft** — reply child read the body (get_email) + drafted + saveDraft
+    gate; edited the body (`[EDIT-MARKER-9X4Q]`), approved → **fetched the real Gmail draft by id →
+    the edit was present**, ledger one row, item finished; test draft deleted. (4) **reject** a
+    batch gate → `finished`/`rejected`, **zero ledger rows**, no Gmail change. (5) **Stop** — per-item
+    Stop at `awaiting_approval` → `finished`/`cancelled`, gate 404; `POST /api/cancel-all` → the
+    deferred sorter → `cancelled`. (6) **singleton 409** — second START of the `maxInstances:1` sorter
+    while one is active → **409 "already running"** (F6 guard at runtime).
+  - **Cassettes recorded** (gitignored, REAL data — never commit): `email-inbox__{sorter,reader,reply}`.
+  - **Two findings (NOT foundation violations — follow-ups, NOT fixed this stage):**
+    (a) **Parent stays "running" when its only child terminates via reject/cancel** (not a normal
+    `finish`): the leaf→root auto-finish walk in `transition.ts` is scoped to the `finish` edge, so
+    `reject`/`cancel` of a child don't re-trigger the parent's finish check — the sorter sits
+    deferred-`running` until itself cancelled (cleared by `cancel-all`). First surfaced by Stage 3's
+    parent-dispatches-children topology; a framework lifecycle wrinkle, not an invariant breach (the
+    item stays visible/audited/stoppable). Fix = also run the parent finish-walk on a child's
+    terminal `reject`/`cancel`. (b) **Flow "re-route a batch row to reply" is NOT wired** — the batch
+    agents declare `handoffs:['reply']` but `HitlSpec.render` ctx has no `deliver` (only `RenderSpec`
+    gets it), and `EmailBatchCard` has no per-row "Draft reply" button, so that handoff is currently
+    inert. Wiring it needs a small `@platform/react` addition (deliver-from-a-HITL-card) → its own
+    step + `check-foundation`.
+  - **For Stage 3b (Mastra — MANDATORY, the public demo runs on Mastra):** plan →
+    `docs/superpowers/plans/2026-06-11-email-inbox-stage3b-mastra.md`. Generalize the Mastra runner
+    (today hardcoded to the lead-inbox reply shape) to the sorter/reply/batch shapes; ideally thread
+    the `prompts.ts` `PromptStrategy` into the runner so both providers share one prompt source.
+    **For Stage 4 (UI chrome):** the F3 health badge, F6 START-disable, F7 "Delegating"/"Done" pipeline
+    states, the ActivityLog panel, and the polished EmailBatchCard styling (it currently reuses the
+    approval/lead Smedja classes + raw `.batch-row*` classes that have no CSS yet) are all Stage 4.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
