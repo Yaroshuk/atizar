@@ -279,7 +279,8 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
 
       const gate = await store.getOpenGate(id)
       if (gate) {
-        // resolvedBy comes from the bearer-token identity at step 4; null in the dev path.
+        // resolvedBy stays null: the bearer token (7c-C) authorises but is a single SHARED
+        // secret with no per-user identity. Per-identity attribution needs real auth (post-beta).
         await store.resolveGateRow(gate.id, { comment: resolution.comment, form: resolution.form })
       }
 
