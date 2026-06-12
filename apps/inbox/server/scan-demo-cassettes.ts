@@ -11,7 +11,13 @@ import { scanCassette } from './record-replay.js'
 // cover those. scanCassette itself is left untouched (it gates real-cassette sharing).
 const RESERVED_TLD = /@[\w-]+\.(?:example|test|invalid|localhost)\b/i
 const dir = fileURLToPath(new URL('../demo-cassettes/', import.meta.url))
-const files = (await readdir(dir)).filter((f) => f.endsWith('.jsonl'))
+let files: string[]
+try {
+  files = (await readdir(dir)).filter((f) => f.endsWith('.jsonl'))
+} catch (err) {
+  console.error(`[demo:scan-cassettes] cannot read ${dir}: ${(err as Error).message}`)
+  process.exit(1)
+}
 let findings = 0
 for (const f of files) {
   const text = await readFile(new URL(`../demo-cassettes/${f}`, import.meta.url), 'utf8')
