@@ -1,0 +1,160 @@
+<!--
+  DRAFT — do not publish/merge to a public default branch until:
+  (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
+  (2) the @platform/* → @atizar/* rename is done,
+  (3) the approval-gate demo GIF is recorded.
+  Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
+-->
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/atizar-dark.svg" />
+  <img alt="Atizar" src="assets/atizar-mark.svg" width="120" />
+</picture>
+
+# Atizar
+
+**Developer builds. Human directs. Agent runs.**
+
+*Don't light a fire and walk away. Tend it.*
+
+An open-source TypeScript framework for building agentic automations — agentic-first, human-in-the-loop.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-e6562e.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-e6562e.svg)](https://www.typescriptlang.org/)
+[![Status: beta](https://img.shields.io/badge/status-beta-e6562e.svg)](#status)
+
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Concepts](#core-concepts) · [Philosophy](docs/PHILOSOPHY.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+<!-- TODO: approval-gate demo GIF here once DEMO=1 lands -->
+
+---
+
+Autonomous agents are easy to start and hard to trust. The moment one touches your inbox, your data, or your money, "fire and forget" stops being a feature and starts being a liability.
+
+**Atizar keeps a human's hand on the poker.** The agent does the work — reads, drafts, proposes — and a person approves every step that matters. The approved action is run by the server, never by the model. Everything is audited.
+
+The name is the Spanish verb *atizar* — to stoke a fire that's already burning. That's the whole idea: the agent is the fire, you're the one tending it.
+
+### Two views of one pipeline.
+
+Developers want code. The people who run it want a UI. So atizar gives each its own:
+
+- **Developer → code.** Real TypeScript, no node canvas.
+- **Consumer → a clean UI.** Cards and buttons, never your codebase.
+
+### Agentic-first — coated in skills.
+
+No 400-node marketplace. Ask, and your coding agent writes the integration in ~10 minutes. You describe, it builds.
+
+### The model never acts.
+
+The agent proposes, the human approves, the server executes — every action audited.
+
+## See it work
+
+<!-- TODO: GIF — agent board → thread → approval-gate card → approve → action executed & audited -->
+<!-- TODO: side-by-side — a defineAgent snippet next to the clean operator UI -->
+
+*Demo media lands with the zero-credential demo mode — see [Status](#status).*
+
+## Quick start
+
+> **Beta.** A zero-credential demo mode is landing: it runs entirely on an in-process database and a mock agent — no Docker, no API keys. The one-command quick start will appear here when it ships ([status](#status)).
+
+The smallest thing you write looks like this:
+
+```ts
+import { defineAgent } from '@atizar/core'
+
+export const reply = defineAgent({
+  id: 'reply',
+  name: 'Reply',
+  role: 'worker',
+  provider: 'claude-cli', // a name in the provider registry
+  instructions: 'Draft a reply to the latest email.',
+  readonly: ['get_latest_email'], // pure reads, no side effects
+  tools: ['get_latest_email', 'saveDraft'],
+  approvals: ['saveDraft'], // opens a gate — pauses for a human
+  effects: ['saveDraft'], // the SERVER runs this once approved
+  renders: { saveDraft: 'ApprovalDialog' }, // tool name → UI component
+})
+```
+
+The agent drafts a reply and proposes it; the human approves; the server saves the draft. The model never sends anything on its own.
+
+## How it works
+
+Atizar is a thin layer, not another engine. You bring an agent runtime; atizar gives it a spine and two faces.
+
+```
+  Developer code + config        defineAgent / defineWorkflow  (TypeScript)
+            │
+            ▼
+  Swappable runtime              Mastra (production)  ·  claude-cli (dev)
+            │
+            ▼
+  Server spine                   Postgres state · server-executed effects · audit ledger
+            │
+            ▼
+  AG-UI events  ───────────────▶ React UI — two views:
+                                   code for the developer · a clean UI for the operator
+```
+
+The core knows no concrete engine. Swap the runtime without rewriting your workflows — a provider **conformance suite** proves the contract holds across both.
+
+## Core concepts
+
+- **Human-in-the-loop is a first-class gate.** Approvals are part of the agent contract (`approvals`), not a bolted-on callback. No consequential action runs without a human's yes.
+- **The model proposes, the server executes.** On approval the *server* runs the effect through an action ledger (keyed `workItemId + gateId`), exactly once. The model never holds the trigger.
+- **Two views from one config.** A single validated config drives both faces: the developer edits code; the operator edits only declared leaf fields (prompt, name) through the UI.
+- **Agentic-first: skills ride inside the packages.** Knowledge ships *with* the code it describes, so your coding agent reads it to extend the framework instead of guessing.
+- **Integrations on demand.** No marketplace. The `write-integration` skill walks an agent through a new integration in minutes (the Gmail integration was built this way).
+- **Swap the runtime, keep the code.** Providers (Mastra, claude-cli, a test mock) sit behind one `AgentRuntime` contract — proven, not just declared, by the conformance suite.
+
+## The flagship example: an inbox
+
+The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come in → an agent **qualifies** them → it **drafts** a reply or proposes actions → a human **approves** → the server acts (saves the draft, applies the labels). It runs on both providers and is the best place to see every concept above working together.
+
+## What's included
+
+| Package | What it is |
+|---|---|
+| `@atizar/core` | The isomorphic contract: `defineAgent`, the message layer, the provider interface, gates. React- and Node-free. |
+| `@atizar/providers` | Agent runtimes behind one interface: Mastra, claude-cli, and a mock for tests. |
+| `@atizar/integrations` | Batteries (e.g. Gmail) as injectable functions + read-only MCP wrappers. |
+| `@atizar/server` | The server spine: Postgres-authoritative state, the dispatch chokepoint, server-executed effects, SSE. |
+| `@atizar/react` | The UI: board, thread, approval gates, and the card-construction kit. |
+
+## Status
+
+**Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
+
+Not done yet: the zero-credential demo mode, the `@platform/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
+
+## Roadmap
+
+- **Zero-credential demo** (`DEMO=1`) — in-process Postgres (PGlite) + a mock provider + synthetic fixtures, so anyone can try it with one command and no keys.
+- **Workflows that learn** *(planned — not built yet).* A direction we're designing toward: the agent improves from how you correct it, without fine-tuning. Two channels — implicit few-shot memory from past corrections, and explicit rules a distiller proposes and **you approve**. The model never changes, only the context it receives.
+- **Packaging** — the `@atizar/*` scope rename, an npm release, a shared bearer token on mutation routes, and per-workflow golden-set evals.
+
+## Docs & community
+
+- [Architecture](docs/ARCHITECTURE.md) · [Philosophy](docs/PHILOSOPHY.md)
+- Examples: the [inbox workflows](apps/inbox)
+- Questions & ideas: open a GitHub Discussion or Issue.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Atizar is agentic-first by design: the skills shipped inside each package guide you — and your coding agent — when you extend the framework or add an integration. That's the intended way in.
+
+## License
+
+[MIT](LICENSE) © Atizar contributors. Security disclosures: [SECURITY.md](SECURITY.md).
+
+<div align="center">
+<sub>atizar — to stoke a fire. Keep it alive.</sub>
+</div>
