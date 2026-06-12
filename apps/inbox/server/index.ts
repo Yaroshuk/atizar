@@ -85,6 +85,13 @@ for (const { descriptor, bindings } of activeWorkflowServers) {
 let agentHealthCache: Record<string, HealthCheck> = {}
 
 async function computeAgentHealth(): Promise<Record<string, HealthCheck>> {
+  // Demo mode uses strict synthetic-cassette replay (the real provider is never called) and faked
+  // effects (no Gmail credential), so credential/provider/binary probes are irrelevant — report
+  // every agent healthy so START is enabled. Without this, the no-cred gmail check (and the
+  // claude-binary check on a fresh machine) would disable START and break the zero-cred demo.
+  if (isDemo()) {
+    return Object.fromEntries(Object.keys(healthInputs).map((key) => [key, { ok: true }]))
+  }
   const entries = await Promise.all(
     Object.entries(healthInputs).map(async ([key, { provider, checks }]) => {
       const provCheck = providerHealth(provider)
