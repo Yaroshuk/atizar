@@ -40,7 +40,7 @@ const isCrossWorkflowChild = (w: WorkItem, parentOf: (id: string) => WorkItem | 
 // Every Stop scope confirms before halting in-flight work.
 type Confirm = { kind: 'item'; id: string } | { kind: 'workflow' } | { kind: 'all' } | null
 
-export const WorkflowBoard = ({ config, demo }: { config: WorkflowsConfig; demo?: boolean }) => {
+const BoardInner = ({ config, demo }: { config: WorkflowsConfig; demo?: boolean }) => {
   const { workflows, meta: META, renders: renderSpecs, hitl: hitlSpecs } = config
   const board = useBoard()
   const { start, deliver, cancel, cancelWorkflow, cancelAll } = useDispatch()
@@ -214,8 +214,7 @@ export const WorkflowBoard = ({ config, demo }: { config: WorkflowsConfig; demo?
   const pickerInstances = openPickerId ? liveOf(openPickerId) : []
 
   return (
-    <WorkflowsProvider config={config}>
-      <div className='app'>
+    <div className='app'>
         <AppHeader
           workflows={workflows}
           activeId={activeWorkflowId}
@@ -394,6 +393,11 @@ export const WorkflowBoard = ({ config, demo }: { config: WorkflowsConfig; demo?
           />
         )}
       </div>
-    </WorkflowsProvider>
   )
 }
+
+export const WorkflowBoard = ({ config, demo }: { config: WorkflowsConfig; demo?: boolean }) => (
+  <WorkflowsProvider config={config}>
+    <BoardInner config={config} demo={demo} />
+  </WorkflowsProvider>
+)
