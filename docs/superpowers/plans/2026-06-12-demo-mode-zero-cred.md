@@ -528,11 +528,15 @@ Expected: `{"demo":true,"workflows":["email-inbox"]}`
 Stop it; start non-demo (needs Docker Postgres up): `yarn dev:server`, then `curl -s localhost:4000/api/config`
 Expected: `{"demo":false,"workflows":["email-inbox","github-triage","lead-inbox"]}` (order per descriptors).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Demo health short-circuit (gap found during verification)**
+
+In demo there is no Gmail credential and (on a fresh machine) no `claude` binary, so `computeAgentHealth` would report every email-inbox agent `ok:false` → Stage 4's AgentCard would DISABLE START → demo unusable. Fix at the single aggregation point in `apps/inbox/server/index.ts`: short-circuit `computeAgentHealth` to `{ ok: true }` per agent when `isDemo()` (strict replay never calls the provider; effects are faked → health is trivially ok). Verify `curl -s localhost:4000/api/health` in demo shows all `ok:true`.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/inbox/server/index.ts
-git commit -m "feat(7c-B): GET /api/config + email-inbox-only registration in demo
+git commit -m "feat(7c-B): GET /api/config + email-inbox-only registration + demo health ok
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -679,28 +683,35 @@ import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { scanCassette } from './record-replay.js'
 
-// CI gate: scan every committed synthetic demo cassette for accidental real PII
-// (emails/phones/secrets patterns). Exit 1 on any finding. Names/addresses are not
-// regex-detectable — the synthetic-authoring discipline + review cover those.
+// CI gate: scan every committed synthetic demo cassette for accidental REAL PII
+// (emails/phones/secrets patterns) via the shared scanCassette. Exit 1 on any finding.
+// scanCassette flags ALL email-shaped strings, but synthetic cassettes intentionally use
+// RFC-2606 reserved domains (*.example/.test/.invalid/.localhost) — these can never be real,
+// so we drop those email findings (a real email like foo@gmail.com is still flagged).
+// Names/postal addresses are not regex-detectable — the synthetic-authoring discipline + review
+// cover those. scanCassette itself is left untouched (it gates real-cassette sharing).
+const RESERVED_TLD = /@[\w-]+\.(?:example|test|invalid|localhost)$/i
 const dir = fileURLToPath(new URL('../demo-cassettes/', import.meta.url))
 const files = (await readdir(dir)).filter((f) => f.endsWith('.jsonl'))
 let findings = 0
 for (const f of files) {
   const text = await readFile(new URL(`../demo-cassettes/${f}`, import.meta.url), 'utf8')
-  const hits = scanCassette(text) // returns the array of findings ({line, snippet, kind})
+  const hits = scanCassette(text).filter(
+    (h) => !(h.kind === 'email' && RESERVED_TLD.test(h.snippet))
+  )
   for (const h of hits) {
     findings++
-    console.error(`${f}: ${JSON.stringify(h)}`)
+    console.error(`${f}:${h.line} [${h.kind}] ${h.snippet}`)
   }
 }
 if (findings > 0) {
-  console.error(`\n[demo:scan-cassettes] ${findings} potential PII finding(s) — fix before commit.`)
+  console.error(`\n[demo:scan-cassettes] ${findings} potential REAL PII finding(s) — fix before commit.`)
   process.exit(1)
 }
 console.log(`[demo:scan-cassettes] ${files.length} cassette(s) clean.`)
 ```
 
-Confirm `scanCassette`'s exact return shape against `record-replay.ts` (read its signature) and adapt the `console.error(JSON.stringify(h))` line to the real finding fields; if `scanCassette` is not exported, add it to the exports.
+`scanCassette` returns `Finding[]` where `Finding = { line: number; kind: 'email'|'phone'|'secret'; snippet: string }` (confirmed in `record-replay.ts`) and IS exported. If a reserved-TLD email snippet has trailing chars after the domain (so the `$` anchor misses), relax `RESERVED_TLD` to non-anchored `@[\w-]+\.(?:example|test|invalid|localhost)\b` — verify against the actual findings.
 
 - [ ] **Step 2: Add the scripts**
 
