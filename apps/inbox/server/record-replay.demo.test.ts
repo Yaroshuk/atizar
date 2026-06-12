@@ -5,9 +5,13 @@ import type { Provider } from '@platform/core'
 // A provider that MUST NOT be called in demo mode (a real claude stand-in). It has a `resume`
 // too so withRecordReplay wraps the resume branch (it only wraps resume when the provider has one).
 const exploding: Provider = {
+  // These generators throw before yielding by design (they assert they're never reached in demo
+  // mode), so require-yield does not apply.
+  // eslint-disable-next-line require-yield
   async *run() {
     throw new Error('real provider was called in demo mode — should never happen')
   },
+  // eslint-disable-next-line require-yield
   async *resume() {
     throw new Error('real provider resume was called in demo mode — should never happen')
   },
