@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { db, closeDb } from './client.js'
 import { schemaMeta } from './schema.js'
+import { isDemo } from '../env.js'
 
 // Resolved relative to THIS file so it is cwd-independent — the engine package can be
 // consumed from any app dir, and boot/predev/test all share one path.
@@ -12,7 +12,10 @@ const SCHEMA_VERSION = '1'
 // Apply pending migrations, then upsert the app-readable schema_version row. Idempotent:
 // safe to run on every `yarn dev` (predev) and at server boot (migrate-on-boot).
 export async function runMigrations(): Promise<void> {
-  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER })
+  const { migrate } = isDemo()
+    ? await import('drizzle-orm/pglite/migrator')
+    : await import('drizzle-orm/postgres-js/migrator')
+  await migrate(db as never, { migrationsFolder: MIGRATIONS_FOLDER })
   await db
     .insert(schemaMeta)
     .values({ key: 'schema_version', value: SCHEMA_VERSION })
