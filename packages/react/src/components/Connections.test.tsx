@@ -2,6 +2,13 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { Connections } from './Connections.js'
+import { WorkflowsProvider } from '../workflowsContext.js'
+
+// Minimal config — Connections only reads authToken; other fields unused in these tests.
+const cfg = { workflows: [], meta: {}, renders: [], hitl: [] }
+const withProvider = (ui: React.ReactElement) => (
+  <WorkflowsProvider config={cfg}>{ui}</WorkflowsProvider>
+)
 
 // A Response-like stub for our fetch mock (only the bits the hook/component read).
 const jsonResponse = (body: unknown) => ({ ok: true, json: async () => body })
@@ -24,13 +31,13 @@ afterEach(() => {
 describe('Connections', () => {
   it('shows the detail for a connected row', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fakeConnections) as Response)
-    render(<Connections />)
+    render(withProvider(<Connections />))
     await waitFor(() => expect(screen.getByText(/test@example\.com/)).toBeInTheDocument())
   })
 
   it('shows a Connect link with the right href for a not-connected row', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fakeConnections) as Response)
-    render(<Connections />)
+    render(withProvider(<Connections />))
     const link = await screen.findByRole('link', { name: /connect/i })
     expect(link.getAttribute('href')).toContain('/api/connect/google?integration=slack')
   })
@@ -45,7 +52,7 @@ describe('Connections', () => {
       // refetch GET
       .mockResolvedValueOnce(jsonResponse(fakeConnections) as Response)
 
-    render(<Connections />)
+    render(withProvider(<Connections />))
     const disconnect = await screen.findByRole('button', { name: /disconnect/i })
     fireEvent.click(disconnect)
 

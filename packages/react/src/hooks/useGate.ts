@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Gate } from '../serverTypes'
+import { useWorkflowsConfig } from '../workflowsContext'
+import { authHeaders } from '../authHeaders'
 
 // The gate is authoritative (its form + formRev, not the stream args). Fetch it when the
 // thread is awaiting approval; approve/reject POST /api/gates/:id/resolve with the gate's
@@ -7,6 +9,7 @@ import type { Gate } from '../serverTypes'
 // rev — never a silent failure.
 export const useGate = (workItemId: string | null, awaiting: boolean) => {
   const [gate, setGate] = useState<Gate | null>(null)
+  const { authToken } = useWorkflowsConfig()
 
   const refetch = useCallback(async (): Promise<void> => {
     if (!workItemId) return
@@ -39,12 +42,12 @@ export const useGate = (workItemId: string | null, awaiting: boolean) => {
       if (!gate) return
       const res = await fetch(`/api/gates/${gate.id}/resolve`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders(authToken) },
         body: JSON.stringify({ decision, formRev: gate.formRev, form, comment }),
       })
       if (res.status === 409) await refetch() // rev moved — re-render against the live gate
     },
-    [gate, refetch]
+    [gate, refetch, authToken]
   )
 
   return {
