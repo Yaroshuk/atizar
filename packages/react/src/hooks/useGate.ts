@@ -45,6 +45,7 @@ export const useGate = (workItemId: string | null, awaiting: boolean) => {
         headers: { 'content-type': 'application/json', ...authHeaders(authToken) },
         body: JSON.stringify({ decision, formRev: gate.formRev, form, comment }),
       })
+      if (!res.ok && res.status !== 409) throw new Error(`gate resolve failed: ${res.status}`)
       if (res.status === 409) await refetch() // rev moved — re-render against the live gate
     },
     [gate, refetch, authToken]

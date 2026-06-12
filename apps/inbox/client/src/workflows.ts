@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 import type { WorkflowsConfig, AgentMeta, RenderSpec, HitlSpec } from '@platform/react'
 import { workflowDescriptors } from '../../workflows'
 import { leadInboxMeta, leadInboxRenders, leadInboxHitl } from '../../workflows/lead-inbox/client'
