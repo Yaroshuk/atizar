@@ -5,15 +5,13 @@ import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRequire } from 'node:module'
 import type { ClaudeSpawn } from '@platform/providers'
-
-const require = createRequire(import.meta.url)
 
 // Absolute path to the stdio MCP server scripts.
 const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.url))
-const GMAIL_SERVER = require.resolve('@platform/integrations/gmail-basic')
-const GMAIL_VIEWER_SERVER = require.resolve('@platform/integrations/gmail-viewer')
+// The gmail MCP server is a `.mts` file (it imports `@platform/server` for resolveCredential,
+// which is `.ts` source) → spawned via the tsx loader: `node --import tsx <path>`.
+const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mts', import.meta.url))
 const GITHUB_SERVER = fileURLToPath(new URL('../mcp/github-tools.mjs', import.meta.url))
 
 // Built-in tools the model must not use — only our two MCP tools are allowed.
@@ -69,8 +67,7 @@ export const claudeSpawn: ClaudeSpawn = (prompt, allowedTools) => {
     JSON.stringify({
       mcpServers: {
         inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
-        gmail: { type: 'stdio', command: 'node', args: [GMAIL_SERVER] },
-        'gmail-viewer': { type: 'stdio', command: 'node', args: [GMAIL_VIEWER_SERVER] },
+        gmail: { type: 'stdio', command: 'node', args: ['--import', 'tsx', GMAIL_SERVER] },
         github: { type: 'stdio', command: 'node', args: [GITHUB_SERVER] },
       },
     })

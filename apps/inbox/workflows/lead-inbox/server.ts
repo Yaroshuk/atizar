@@ -2,7 +2,9 @@ import type { ServerBinding } from '../server-binding.js'
 import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
-import { createDraft } from '@platform/integrations/gmail-basic/create-draft'
+import { createDraft } from '@platform/integrations/gmail/create-draft'
+import { resolveCredential, atizarEnv } from '@platform/server'
+import { auth as gmailAuth } from '@platform/integrations/gmail/auth'
 
 export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
@@ -17,8 +19,19 @@ export const leadInboxServer = (origin: string): ServerBinding[] => [
     allowedTools: ['mcp__inbox__renderLead', 'mcp__inbox__saveDraft'],
     effects: {
       // The approved/edited form { threadId, body } IS the createDraft args, byte-verbatim.
-      saveDraft: (form) =>
-        createDraft({ threadId: String(form.threadId ?? ''), body: String(form.body ?? '') }),
+      // Resolve the live Gmail credential first; a null credential = not connected.
+      saveDraft: async (form) => {
+        const cred = await resolveCredential({
+          integration: 'gmail',
+          connectionId: atizarEnv.connection(),
+          auth: gmailAuth,
+        })
+        if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
+        return createDraft(
+          { threadId: String(form.threadId ?? ''), body: String(form.body ?? '') },
+          { credential: cred }
+        )
+      },
     },
   },
 ]

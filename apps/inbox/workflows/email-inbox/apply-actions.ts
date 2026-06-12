@@ -1,20 +1,24 @@
+import type { ResolvedCredential } from '@platform/core'
 import {
   markRead as realMarkRead,
   trash as realTrash,
   star as realStar,
-} from '@platform/integrations/gmail-viewer/modify'
+} from '@platform/integrations/gmail/modify'
 
 type Action = 'read' | 'trash' | 'star' | 'keep'
 type Row = { messageId: string; action: Action }
-type BatchFn = (args: {
-  messageIds: string[]
-}) => Promise<
-  { done: string[]; failed: { messageId: string; error: string }[] } | { error: string }
->
+// The batch fns now take a second `deps` arg ({ credential }) so the real gmail mutations build a
+// client from the injected credential. Test fakes use the `(args) => …` shape — being called with a
+// second arg is harmless (extra positional args are ignored).
+type BatchFn = (
+  args: { messageIds: string[] },
+  deps?: { credential?: ResolvedCredential }
+) => Promise<{ done: string[]; failed: { messageId: string; error: string }[] } | { error: string }>
 export interface ApplyDeps {
   markRead?: BatchFn
   trash?: BatchFn
   star?: BatchFn
+  credential?: ResolvedCredential
 }
 // A `type` (not `interface`) so it is assignable to Record<string, unknown> at the EffectFn seam
 // (TS interfaces lack an implicit index signature; an effect must return Record<string, unknown>).
@@ -53,7 +57,7 @@ export async function applyEmailActions(
   const byAction: Record<string, number> = {}
   const run = async (fn: BatchFn, ids: string[], label: string): Promise<string | undefined> => {
     if (ids.length === 0) return undefined
-    const r = await fn({ messageIds: ids })
+    const r = await fn({ messageIds: ids }, { credential: deps.credential })
     if ('error' in r) return r.error
     applied += r.done.length
     failed.push(...r.failed)

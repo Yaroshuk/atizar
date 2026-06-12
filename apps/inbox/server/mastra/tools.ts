@@ -1,8 +1,14 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { getLatestEmail } from '@platform/integrations/gmail-basic/get-latest-email'
-import { listUnread } from '@platform/integrations/gmail-viewer/list-unread'
-import { getEmail } from '@platform/integrations/gmail-viewer/get-email'
+import { getLatestEmail } from '@platform/integrations/gmail/get-latest-email'
+import { listUnread } from '@platform/integrations/gmail/list-unread'
+import { getEmail } from '@platform/integrations/gmail/get-email'
+import { resolveCredential, atizarEnv } from '@platform/server'
+import { auth as gmailAuth } from '@platform/integrations/gmail/auth'
+
+// Resolve the live Gmail credential for the single beta connection ('default'); null = not connected.
+const resolveGmail = () =>
+  resolveCredential({ integration: 'gmail', connectionId: atizarEnv.connection(), auth: gmailAuth })
 
 // Render/propose tools are NO-OPs whose args = the artifact. They appear as tool-calls (the
 // mapper surfaces them) but perform no side effect — the SERVER executes effects (step 4) and
@@ -34,25 +40,37 @@ export const getLatestEmailTool = createTool({
   id: 'get_latest_email',
   description: 'Read the most recent email in the inbox.',
   inputSchema: z.object({}),
-  execute: async () => getLatestEmail(),
+  execute: async () => {
+    const cred = await resolveGmail()
+    if (!cred) return { error: 'Gmail not connected' }
+    return getLatestEmail({}, { credential: cred })
+  },
 })
 
 // ── email-inbox read tools ───────────────────────────────────────────────────
-// Call the gmail-viewer functions (the SAME functions the stdio MCP wrapper delegates to).
+// Call the gmail integration functions (the SAME functions the stdio MCP wrapper delegates to).
 // Reads only — no mutation is ever a Mastra tool (effects are server-side, behind a gate).
 export const listUnreadTool = createTool({
   id: 'list_unread',
   description:
     'List unread inbox emails of the last N hours (default 24). Metadata + snippet, no bodies.',
   inputSchema: z.object({ sinceHours: z.number().int().positive().optional() }),
-  execute: async (inputData: { sinceHours?: number }) => listUnread(inputData ?? {}),
+  execute: async (inputData: { sinceHours?: number }) => {
+    const cred = await resolveGmail()
+    if (!cred) return { error: 'Gmail not connected' }
+    return listUnread(inputData ?? {}, { credential: cred })
+  },
 })
 
 export const getEmailTool = createTool({
   id: 'get_email',
   description: 'Fetch one email by messageId, including the full text body.',
   inputSchema: z.object({ messageId: z.string() }),
-  execute: async (inputData: { messageId: string }) => getEmail(inputData),
+  execute: async (inputData: { messageId: string }) => {
+    const cred = await resolveGmail()
+    if (!cred) return { error: 'Gmail not connected' }
+    return getEmail(inputData, { credential: cred })
+  },
 })
 
 // ── email-inbox capture (no-op surface) tools ────────────────────────────────
@@ -90,7 +108,10 @@ function unsupportedOnMastra(id: string) {
 export const listMyTicketsTool = unsupportedOnMastra('list_my_tickets')
 export const getTicketTool = unsupportedOnMastra('get_ticket')
 export const renderTriageTool = captureTool('render_triage', z.object({}).passthrough())
-export const renderTicketResultTool = captureTool('render_ticket_result', z.object({}).passthrough())
+export const renderTicketResultTool = captureTool(
+  'render_ticket_result',
+  z.object({}).passthrough()
+)
 export const renderReplyDraftTool = captureTool('render_reply_draft', z.object({}).passthrough())
 export const applyActionsTool = captureTool(
   'applyActions',
