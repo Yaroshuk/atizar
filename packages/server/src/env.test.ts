@@ -50,6 +50,16 @@ describe('atizarEnv', () => {
     expect(atizarEnv.publicUrl()).toBe('https://app.example.com')
   })
 
+  it('reads the shared bearer token', () => {
+    process.env.ATIZAR_AUTH_TOKEN = 'sekret'
+    expect(atizarEnv.authToken()).toBe('sekret')
+  })
+
+  it('returns undefined when no bearer token is set', () => {
+    delete process.env.ATIZAR_AUTH_TOKEN
+    expect(atizarEnv.authToken()).toBeUndefined()
+  })
+
   it('databaseUrl precedence: ATIZAR_DATABASE_URL > DATABASE_URL > compose default', () => {
     delete process.env.ATIZAR_DATABASE_URL
     delete process.env.DATABASE_URL

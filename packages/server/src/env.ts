@@ -18,6 +18,11 @@ export const atizarEnv = {
     return process.env.ATIZAR_SECRET_KEY
   },
 
+  // The shared bearer token gating mutating routes. Undefined ⇒ auth disabled (fail-open).
+  authToken(): string | undefined {
+    return process.env.ATIZAR_AUTH_TOKEN
+  },
+
   // The single secret string for an `apiKey` integration: ATIZAR_<INTEGRATION>_API_KEY.
   apiKey(integration: string): string | undefined {
     return process.env[`ATIZAR_${seg(integration)}_API_KEY`]
