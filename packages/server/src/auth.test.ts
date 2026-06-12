@@ -10,6 +10,7 @@ const makeApp = (opts: { token: string | undefined; demo: boolean }) => {
   app.get('/api/board', (c) => c.json({ ok: true }))
   app.post('/api/dispatch', (c) => c.json({ id: 'x' }))
   app.delete('/api/connections/:i', (c) => c.json({ ok: true }))
+  app.put('/api/items/:i', (c) => c.json({ ok: true }))
   return app
 }
 const bearer = (t: string) => ({ headers: { Authorization: `Bearer ${t}` } })
@@ -50,6 +51,26 @@ describe('createAuthMiddleware', () => {
       expect((await app.request('/api/connections/gmail', { method: 'DELETE' })).status).toBe(401)
       const ok = await app.request('/api/connections/gmail', { method: 'DELETE', ...bearer('sek') })
       expect(ok.status).toBe(200)
+    })
+
+    it('401s a POST with "Bearer " prefix but no value', async () => {
+      const res = await app.request('/api/dispatch', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' },
+      })
+      expect(res.status).toBe(401)
+    })
+
+    it('passes a POST with a lowercase authorization header', async () => {
+      const res = await app.request('/api/dispatch', {
+        method: 'POST',
+        headers: { authorization: 'Bearer sek' },
+      })
+      expect(res.status).toBe(200)
+    })
+
+    it('401s a PUT with no header', async () => {
+      expect((await app.request('/api/items/1', { method: 'PUT' })).status).toBe(401)
     })
   })
 })
