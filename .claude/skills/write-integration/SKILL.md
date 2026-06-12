@@ -7,14 +7,38 @@ description: Author a new integration module in @platform/integrations — pure 
 
 Task skill — owns the run end-to-end: from "we need an integration that does X" to a
 tested, documented module in `@platform/integrations` that agents and the server can
-consume. The worked exemplar is `packages/integrations/src/gmail-viewer/` (built by this
-skill's first run); `gmail-basic` is the original pattern source.
+consume. The worked exemplar for STRUCTURE is `packages/integrations/src/gmail-viewer/`
+(built by this skill's first run); `gmail-basic` is the original pattern source. The
+worked exemplar for the AUTH CONTRACT is the rewritten `gmail` integration once auth
+sub-stage 5 lands; until then, follow the spec
+`docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md` (§1 the contract,
+§5 the resolver surface).
 
 ## The integration contract (FACTS — read before stage 1)
 
-- **Pure functions, injectable client.** Every function is a plain ESM `.mjs` export that
-  takes `(args, deps = {})` where `deps.getClient` (e.g. `getGmail`) overrides the real
-  client. Tests pass a fake; the server imports the function directly (no MCP child).
+- **Pure functions, injected credential.** Every function is a plain ESM `.mjs` export that
+  takes `(args, deps = {})`. The framework injects the resolved credential as
+  `deps.credential` (a `ResolvedCredential` from `@platform/core`) — and/or a client built
+  from it. Tests pass a fake; the server imports the function directly (no MCP child).
+- **Auth is DECLARED, never self-read.** The integration exports an `auth: AuthSpec` (from
+  `@platform/core`); its functions receive the live credential via `deps.credential`. The
+  integration MUST NOT read `process.env` or files for secrets — resolving credentials is
+  the framework's job (`resolveCredential` in `@platform/server`).
+- **`AuthSpec.kind` is OPEN.** `none` / `apiKey` / `oauth2` are built-in (framework
+  resolvers); a CUSTOM kind ships its OWN `CredentialResolver` (from `@platform/core`),
+  registered via `registerResolver(kind, fn)` (from `@platform/server`) in USERLAND — never
+  edit `@platform/core` to add an auth method (invariant I5).
+- **Env naming.** Official secrets are `ATIZAR_`-prefixed and reached via `atizarEnv` (from
+  `@platform/server`) — `ATIZAR_<INTEGRATION>_API_KEY` for `apiKey`;
+  `ATIZAR_<PROVIDER>_CLIENT_ID` / `ATIZAR_<PROVIDER>_CLIENT_SECRET` for the `oauth2` app
+  registration (e.g. `ATIZAR_GOOGLE_CLIENT_ID`). Vendor vars (e.g. `ANTHROPIC_API_KEY`,
+  `DATABASE_URL`) are NOT namespaced. The integration never reads these directly — it
+  declares `auth` and receives `deps.credential`.
+- **`.env.example` seeding.** Every required secret gets an empty, commented line in the
+  repo-root `.env.example`: a `# --- <Integration/Provider> ---` header + a `# what it is +
+  where to get it` line + `ATIZAR_FOO=` (empty, no value). This skill ADDS the integration's
+  block there. The per-user `oauth2` TOKEN is NOT in `.env.example` — it comes from the
+  in-app Connect flow, not the env.
 - **Never throw — return `{ error }`.** Callers (server effects, MCP wrappers) branch on
   `res.error`. Use a shared `errText(err)` helper for messages — reads return `ReadResult<T>`
   (`T | { error }`) from `@platform/core`.
@@ -32,9 +56,12 @@ skill's first run); `gmail-basic` is the original pattern source.
   enforces this — an unclassified tool refuses to boot). The wrapper is a thin stdio
   `McpServer` whose tools delegate to the pure functions.
 - **`checkCredentials()` is mandatory.** Returns the `HealthCheck` type from `@platform/core`
-  (`{ ok:true; detail? } | { ok:false; error; hint }`) — a cheap real ping (e.g. a 1-unit
-  profile call). The `hint` names where credentials live and points at the integration's
-  embedded skill. The server's health surface (spec F3) calls this.
+  (`{ ok:true; detail? } | { ok:false; error; hint }`). Health now means: does
+  `resolveCredential` yield a USABLE credential for this `(integration, connection)`? A null
+  (not connected) or a throw → `{ ok:false, error, hint }`, where the `hint` points the
+  developer at the in-app **Connect** flow (for `oauth2`) or names the env var to set
+  (`ATIZAR_<INTEGRATION>_API_KEY` for `apiKey`). The server's health surface (spec F3)
+  consumes this.
 - **Type the `.d.ts` against `@platform/core`** — import `HealthCheck` / `ReadResult` /
   `BatchActionResult` rather than re-declaring result shapes; add `@platform/core` to the
   package deps. The contract is types only — there is no `defineIntegration()` and no base
@@ -60,17 +87,36 @@ function classified **read / mutation / health**; the credentials source; which
 agent/workflow will consume it. Do NOT ask things the spec or code already answers.
 Wait for confirmation before writing files.
 
+> **AUTH INTERVIEW (mandatory). Determine the `AuthSpec`. If you cannot tell from the
+> service's docs or the developer's description HOW authentication works, STOP and ask the
+> developer — never guess.** Establish: the `kind`; for `oauth2`, the provider + the EXACT
+> scopes (ask if unstated); for `apiKey`, the env var it reads
+> (`ATIZAR_<INTEGRATION>_API_KEY`); for a custom kind, that the integration ships its OWN
+> `CredentialResolver` (scaffold a stub — it registers in userland via `registerResolver`,
+> NOT in core). State the exact env var name(s) out loud and confirm you will add them to
+> `.env.example`.
+
 ## Stage 3 — TDD loop, one function at a time
 
-For each function: write the failing vitest with a fake client FIRST → run it, see it fail
-for the predicted reason → implement the minimal `.mjs` → green → write the `.d.ts` if a TS
-consumer will import it → commit. Order: pure `format.mjs` helpers first, then reads, then
-mutations, then `checkCredentials`.
+For each function: write the failing vitest with a fake credential FIRST → run it, see it
+fail for the predicted reason → implement the minimal `.mjs` → green → write the `.d.ts` if a
+TS consumer will import it → commit. Functions take `deps.credential` (a `ResolvedCredential`)
+and/or a client built from it — the test passes a fake. Order: pure `format.mjs` helpers
+first, then reads, then mutations, then `checkCredentials`.
+
+The scaffold also includes an **`auth` export** — an `auth.mjs` + `auth.d.ts` (or an `auth`
+field) declaring the `AuthSpec` agreed in the Stage 2 interview. For a custom `kind`,
+scaffold the integration's own `CredentialResolver` stub here (registered in userland via
+`registerResolver`, never in core).
 
 ## Stage 4 — MCP wrapper + exports
 
 Write the stdio `index.mjs` (READ tools only — restate per tool why mutations are absent),
-add all subpath `exports` entries, run `yarn typecheck && yarn test && yarn lint`.
+add all subpath `exports` entries. **Append the integration's secret block to the repo-root
+`.env.example`** — a `# --- <Integration/Provider> ---` header + a `# what it is + where to
+get it` comment line + the empty `ATIZAR_*=` line(s) agreed in Stage 2 (no per-user `oauth2`
+token — that comes from the in-app Connect flow). Then run
+`yarn typecheck && yarn test && yarn lint`.
 
 ## Stage 5 — Embedded consumer skill
 
@@ -82,8 +128,10 @@ their package; the repo index covers dev skills.
 
 ## Stage 6 — Validate
 
-`yarn typecheck && yarn test && yarn lint && yarn format:check`. If real credentials exist
-on this machine, run a live READ-ONLY smoke (the health check + one read). NEVER live-run
+`yarn typecheck && yarn test && yarn lint && yarn format:check`. Grep the integration for
+`process.env` / file reads of secrets — there must be NONE (auth is injected via
+`deps.credential`; the framework resolves it). If real credentials exist on this machine,
+run a live READ-ONLY smoke (the health check + one read). NEVER live-run
 mutations from this skill — that is the consuming workflow's browser-E2E job (the
 `browser-verify` procedure, invoked by the workflow build, not here — this skill's output
 is a library, not running-app behavior).
