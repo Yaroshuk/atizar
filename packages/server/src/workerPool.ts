@@ -63,10 +63,14 @@ export function makeWorkerPool(opts: { run: (id: string) => void }): WorkerPool 
     },
 
     // Continuing a suspended run: re-take a slot immediately, bypassing the queue. May
-    // briefly exceed the cap (acceptable — the work was already admitted).
-    resumeAcquire(id, agentId) {
+    // briefly exceed the cap (acceptable — the work was already admitted). This ONLY reserves
+    // the slot — it does NOT call `run`: the resume stream is driven by `runObserver.resume`
+    // via `consume()`, and the item is already `running` (it was just transitioned by the
+    // `resume` edge), so issuing `run`'s `transition('start')` here logged a benign but noisy
+    // `IllegalTransition: cannot "start" from "running"` on every resume.
+    resumeAcquire(_id, agentId) {
       const s = slots.get(agentId) ?? slot(agentId, 1)
-      start(id, s)
+      s.active++
     },
 
     activeCount(agentId) {

@@ -41,15 +41,20 @@ describe('WorkerPool (cap + queue)', () => {
     expect(pool.queuedCount('X')).toBe(1)
   })
 
-  it('resumeAcquire bypasses the queue (continuing work has priority)', () => {
+  it('resumeAcquire reserves a slot ahead of the queue WITHOUT starting the run', () => {
+    // The resume stream is driven by runObserver.resume → consume(), not by opts.run.
+    // resumeAcquire only reserves the concurrency slot; calling run here would re-issue a
+    // transition('start') on an already-running item (the IllegalTransition log we fixed).
     const run = vi.fn()
     const pool = makeWorkerPool({ run })
     pool.enqueue('a', 'X', 2)
-    pool.enqueue('b', 'X', 2)
+    pool.enqueue('b', 'X', 2) // active = 2 (cap)
     pool.enqueue('c', 'X', 2) // queued
 
     pool.resumeAcquire('d', 'X')
-    expect(run).toHaveBeenLastCalledWith('d') // ran immediately, ahead of c
+    expect(run).not.toHaveBeenCalledWith('d') // resume is driven by the caller, not the pool
+    expect(run.mock.calls.map((c) => c[0])).toEqual(['a', 'b']) // only the two admitted runs
+    expect(pool.activeCount('X')).toBe(3) // slot reserved ahead of the queue (may exceed cap)
     expect(pool.queuedCount('X')).toBe(1) // c still waiting
   })
 

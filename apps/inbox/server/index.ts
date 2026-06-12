@@ -1,3 +1,4 @@
+import './load-dev-env.js' // MUST be first: loads .env.local (dev) before any env read below
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { instanceId, composeInstructions, type HealthCheck } from '@platform/core'
