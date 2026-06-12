@@ -661,10 +661,11 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
     approve/reject through the new chrome (the replayed spam email didn't hand off → no gate this run,
     and approve hits real Gmail which wasn't connected) — the gate path (ThreadModal/useGate) is
     unchanged by this track.
-  - **Deferred from the design (not this track, candidates for follow-up):** the collapsible rail +
-    slide-out menu overlay (Inbox/Leads/Analytics/Settings nav); the **Leads table** + Analytics
-    screens; the **admin Manager/Admin toggle + AgentSettingsModal** prompt editing (no persistence
-    backend yet — config-as-data is future, would be a fake save); run-history inside the thread.
+  - **Present in the Smedja prototype but OUT OF SCOPE (NOT planned — do not build without an
+    explicit request):** the collapsible rail + slide-out menu overlay (Inbox/Leads/Analytics/Settings
+    nav); the Leads table + Analytics screens; the admin Manager/Admin toggle + agent prompt-editing;
+    run-history inside the thread. The user scoped Stage 4 to: primitives, Activity/Trace log, the
+    three Stop controls, workflow tabs — those only. Being in the design ≠ in scope.
     Pre-existing pipeline quirk surfaced (not new): a kept input agent shows "Working" in the pipeline
     even when its board item is `finished`, so its per-item Stop is a no-op on a done item.
   - **Revision round (user feedback, same day, re-verified in the browser):** stripped prototype-only
@@ -682,6 +683,38 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
     clean + brand static; gmail ✓/Disconnect in header; Email-inbox cards show NO not-connected error
     (health fresh); legend dots colored; per-item Stop → "Stop this item?" confirm modal. `useHealth`
     exported; `NotificationsDropdown` deleted.
+  - **Connection chip (2nd feedback pass):** the loose `gmail ✓ Disconnect` labels were replaced by
+    ONE cohesive pill (`.conn-chip`: surface + border + pill radius; a status dot [green connected /
+    grey not] + integration name + a real `.btn btn-soft btn-sm` button inside). Connect is an `<a>`
+    (OAuth needs a full navigation) styled with the same `.btn` system. Browser-verified.
+  - **Activity log (3rd feedback pass):** the "↓ New events" jump button is REMOVED entirely
+    (`act-jump` / `jumpLatest` gone); auto-follow stays, scrolling up just pauses it. `.act-jump` CSS
+    is now dead (harmless, not cleaned).
+
+> **CONTINUATION NOTE (2026-06-12, after Stage 4 chrome) — for the next agent.** Stage 4 chrome is
+> **committed `c3b4aa5` and PUSHED to `origin/feat/gmail-viewer`** (new remote branch; PR not opened).
+> Built into `@platform/react`: 9 primitives (`primitives/`), `AppHeader`/`WorkflowTabs`/`ActivityPanel`,
+> `useActivity`/`useHealth`, rewritten `PipelineColumn`/`AgentCard`/`ConnectionChip`. NOT merged
+> (same branch strategy). The dev server may still be running (`:4000`/`:5173`); a `db:reset` was run
+> so the board is clean (creds kept — gmail stays connected).
+> - **SCOPE DISCIPLINE (the user was emphatic):** Stage 4 = ONLY primitives + Activity/Trace log +
+>   the three Stop controls + workflow tabs. The Smedja prototype ALSO contains a rail/slide-out menu,
+>   a Leads table, Analytics, admin prompt-editing, account/notifications — these are **OUT OF SCOPE,
+>   NOT planned**. Do NOT build them, and do NOT list them as follow-ups. Design-present ≠ in scope.
+>   (Account/notifications/menu were stripped from the header for this reason.)
+> - **OPEN VERIFICATION GAPS (close these to call Stage 4 fully done):** under `DEV_RECORD_REPLAY=1`
+>   the replay finishes instantly, so these were NOT browser-driven on a live active state — run
+>   `DEV_RECORD_REPLAY=record` (real claude; gmail is connected so the effect hits real Gmail —
+>   draft-only, delete the test draft after) and verify in the browser: (a) gate **approve WITH an
+>   edited body → real Gmail draft contains the edit**; (b) **reject** → finished/rejected, 0 ledger;
+>   (c) **Stop workflow** + **Stop all** on a genuinely active multi-item state → the ConfirmDialog
+>   enables + cancels (Stop-all/Stop-workflow are disabled when nothing is active, so you need a live
+>   run in flight to exercise them). The per-item Stop confirm modal IS already browser-verified.
+> - **Known pre-existing quirk (not Stage 4's bug):** a kept input agent shows "Working" in the
+>   pipeline even when its board item is `finished` (the pipeline forces kept-input-as-Working), so its
+>   per-item Stop is a no-op on a done item. Fixing means deriving the pipeline leaf status from the
+>   real board item, not the forced view.
+> - **Then:** resume **sub-step 7c** (packaging tail) below — the original beta roadmap.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
