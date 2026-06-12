@@ -22,6 +22,7 @@ type AppHeaderProps = {
   activityOpen: boolean
   onToggleActivity: () => void
   workspaceName?: string
+  demo?: boolean
 }
 
 export const AppHeader = ({
@@ -35,6 +36,7 @@ export const AppHeader = ({
   activityOpen,
   onToggleActivity,
   workspaceName = 'Acme Inbox',
+  demo,
 }: AppHeaderProps) => (
   <header className='app-header'>
     <div className='ah-brand'>
@@ -47,8 +49,8 @@ export const AppHeader = ({
     <span className='ah-spacer' />
 
     <div className='ah-right'>
-      <Connections />
-      <span className='ah-vline' />
+      {!demo && <Connections />}
+      {!demo && <span className='ah-vline' />}
       <StopButton
         scope='all'
         label='Stop all'
