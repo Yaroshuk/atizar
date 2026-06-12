@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "../../scripts/ensure-postgres.sh; lsof -tiTCP:4000 -tiTCP:5173 -sTCP:LISTEN 2>/dev/null | xargs -I{} kill -9 {} 2>/dev/null; sleep 1; true",
+    "predev": "[ \"$DEMO\" = \"1\" ] || ../../scripts/ensure-postgres.sh; lsof -tiTCP:4000 -tiTCP:5173 -sTCP:LISTEN 2>/dev/null | xargs -I{} kill -9 {} 2>/dev/null; sleep 1; true",
     "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "demo": "DEMO=1 concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "demo:scan-cassettes": "tsx server/scan-demo-cassettes.ts",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
     "db:generate": "drizzle-kit generate",
