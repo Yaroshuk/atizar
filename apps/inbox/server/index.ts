@@ -13,6 +13,8 @@ import {
   createPipelineRoutes,
   makeCredentialStore,
   createConnectRoutes,
+  createAuthMiddleware,
+  atizarEnv,
   isDemo,
   type AgentRuntime,
 } from '@platform/server'
@@ -129,6 +131,11 @@ const pipeline = makePipelineService({
 // board + per-WorkItem trace/SSE + dispatch/deliver/resolve/cancel, all on Postgres.
 const app = new Hono()
 
+// Bearer-token gate on every mutating route (spec 7c-C). Active only when a token is set and
+// not in demo; GET/SSE stay open. Mounted before the route factories so it covers both.
+const authToken = atizarEnv.authToken()
+app.use('*', createAuthMiddleware({ token: authToken, demo: isDemo() }))
+
 // Tells the client which workflows are enabled + whether this is the zero-cred demo, so it can
 // filter the workflow tabs and hide the Connect chip. Read-only, no auth.
 app.get('/api/config', (c) =>
@@ -152,6 +159,9 @@ async function boot(): Promise<void> {
   await startupSweep(db, (item) => pipeline.reenqueue(item))
   serve({ fetch: app.fetch, port: 4000 })
   console.log('server on http://localhost:4000')
+  if (!isDemo() && !authToken) {
+    console.warn('[auth] disabled — set ATIZAR_AUTH_TOKEN to require a token on mutations')
+  }
   // Credential-health sweep (F3 — never throws; logs a one-line summary).
   try {
     const health = await refreshHealth()
