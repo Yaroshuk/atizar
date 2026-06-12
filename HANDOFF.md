@@ -702,14 +702,29 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
 >   a Leads table, Analytics, admin prompt-editing, account/notifications — these are **OUT OF SCOPE,
 >   NOT planned**. Do NOT build them, and do NOT list them as follow-ups. Design-present ≠ in scope.
 >   (Account/notifications/menu were stripped from the header for this reason.)
-> - **OPEN VERIFICATION GAPS (close these to call Stage 4 fully done):** under `DEV_RECORD_REPLAY=1`
->   the replay finishes instantly, so these were NOT browser-driven on a live active state — run
->   `DEV_RECORD_REPLAY=record` (real claude; gmail is connected so the effect hits real Gmail —
->   draft-only, delete the test draft after) and verify in the browser: (a) gate **approve WITH an
->   edited body → real Gmail draft contains the edit**; (b) **reject** → finished/rejected, 0 ledger;
->   (c) **Stop workflow** + **Stop all** on a genuinely active multi-item state → the ConfirmDialog
->   enables + cancels (Stop-all/Stop-workflow are disabled when nothing is active, so you need a live
->   run in flight to exercise them). The per-item Stop confirm modal IS already browser-verified.
+> - **OPEN VERIFICATION GAPS — ✅ ALL CLOSED (2026-06-12, live browser E2E, `DEV_RECORD_REPLAY=record`,
+>   real claude + real Gmail).** Verified in the browser: (a) lead-inbox gate **approve WITH an edited
+>   body** (textarea set to insert `[E2E-EDIT-MARKER-7Q3Z]`, Save draft) → item `finished`, gate
+>   `resolved`, action_ledger ONE row `{ok:true,draftId}`, and the **real Gmail draft fetched by id
+>   contained the edited marker** (test draft then deleted); (b) lead-inbox gate **reject** → item
+>   `finished`/`rejected`, gate `resolved`, **0 ledger rows**; (c) **Stop workflow** AND **Stop all** on
+>   a genuinely live multi-item **email-inbox** state (sorter machine-dispatched reader/spam children, 2–3
+>   items Working/awaiting_approval) → the right **ConfirmDialog** appeared each time ("Stop this
+>   workflow?" / "Stop all workflows?"), confirm cancelled the cascade (all items `finished`/`cancelled`,
+>   0 active after, **0 ledger rows** so no Gmail mutation executed — items were cancelled at the gate
+>   pre-approve). The per-item Stop confirm modal was already browser-verified. New chrome (AppHeader,
+>   WorkflowTabs, Connect chip→Disconnect, gate ApprovalDialog, board SSE live multi-item updates)
+>   exercised throughout. **Stage 4 is now fully done.**
+>   - **Two environment notes for the next agent (cost me time, save yours):** (1) the dev server does
+>     NOT auto-load `.env.local` — start it `set -a; . ./.env.local; set +a && DEV_RECORD_REPLAY=record
+>     yarn dev`, else `ATIZAR_SECRET_KEY` (credential decryption) + the Google OAuth client vars are
+>     absent and EVERY gmail flow fails (boot `health` may still print lead-inbox "ok" — that probe does
+>     not match runtime credential resolution; trust an actual run). (2) Gmail credential did NOT survive
+>     from the chrome session — the `credentials` table was empty; reconnect via the header **Connect**
+>     chip (interactive Google consent, the user's account; stored server-side in Postgres so any browser
+>     works). (3) Handoff **dedup-by-source**: the qualifier always reads the SAME latest email, so a
+>     second lead-inbox run's "Draft reply" is deduped (no child) until you `yarn db:reset` (clears the
+>     prior child's source; preserves creds).
 > - **Known pre-existing quirk (not Stage 4's bug):** a kept input agent shows "Working" in the
 >   pipeline even when its board item is `finished` (the pipeline forces kept-input-as-Working), so its
 >   per-item Stop is a no-op on a done item. Fixing means deriving the pipeline leaf status from the
