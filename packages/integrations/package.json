@@ -34,6 +34,39 @@
     "./gmail-viewer/check-credentials": {
       "types": "./src/gmail-viewer/check-credentials.d.ts",
       "default": "./src/gmail-viewer/check-credentials.mjs"
+    },
+    "./gmail/auth": {
+      "types": "./src/gmail/auth.d.ts",
+      "default": "./src/gmail/auth.mjs"
+    },
+    "./gmail/client": {
+      "types": "./src/gmail/client.d.ts",
+      "default": "./src/gmail/client.mjs"
+    },
+    "./gmail/format": "./src/gmail/format.mjs",
+    "./gmail/list-unread": {
+      "types": "./src/gmail/list-unread.d.ts",
+      "default": "./src/gmail/list-unread.mjs"
+    },
+    "./gmail/get-email": {
+      "types": "./src/gmail/get-email.d.ts",
+      "default": "./src/gmail/get-email.mjs"
+    },
+    "./gmail/get-latest-email": {
+      "types": "./src/gmail/get-latest-email.d.ts",
+      "default": "./src/gmail/get-latest-email.mjs"
+    },
+    "./gmail/create-draft": {
+      "types": "./src/gmail/create-draft.d.ts",
+      "default": "./src/gmail/create-draft.mjs"
+    },
+    "./gmail/modify": {
+      "types": "./src/gmail/modify.d.ts",
+      "default": "./src/gmail/modify.mjs"
+    },
+    "./gmail/check-credentials": {
+      "types": "./src/gmail/check-credentials.d.ts",
+      "default": "./src/gmail/check-credentials.mjs"
     }
   },
   "dependencies": {
