@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { WorkflowsConfig, AgentMeta, RenderSpec, HitlSpec } from '@platform/react'
 import { workflowDescriptors } from '../../workflows'
 import { leadInboxMeta, leadInboxRenders, leadInboxHitl } from '../../workflows/lead-inbox/client'
@@ -29,4 +30,7 @@ export const workflowsConfig: WorkflowsConfig = {
   meta: META,
   renders: renderSpecs,
   hitl: hitlSpecs,
+  // Build-time token (deploy sets it to match the server's ATIZAR_AUTH_TOKEN). Unset in
+  // dev/demo ⇒ undefined ⇒ no header, which matches the fail-open / demo-disabled server.
+  authToken: import.meta.env.VITE_ATIZAR_AUTH_TOKEN as string | undefined,
 }
