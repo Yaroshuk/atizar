@@ -38,9 +38,11 @@ only the public packages).
 
 ### B1 — `DEMO` flag plumbing
 
-`DEMO=1` is read via a single helper `atizarEnv.demo()` in `@platform/server` `env.ts` (so BOTH
-the server package's DB layer and the app's registration/wiring read the same source of truth). It
-gates B2–B5. The
+`DEMO=1` is read via a single standalone helper `isDemo()` exported from `@platform/server`
+`env.ts` — NOT on `atizarEnv` (that object is the documented "ONE place ATIZAR_* vars are read";
+`DEMO` is an unprefixed dev/demo tooling flag, the same class as `DEV_RECORD_REPLAY`, so it stays
+unprefixed). Both the server package's DB layer and the app's registration/wiring import `isDemo()`
+as the single source of truth. It gates B2–B5. The
 demo is launched with a single command; add a `demo` script (`DEMO=1 yarn dev`) so the flag reaches
 **both** halves — the client learns DEMO from `GET /api/config`, so only the server process needs
 the env var. `predev` still frees ports; PGlite needs no Postgres container, so the demo path must
