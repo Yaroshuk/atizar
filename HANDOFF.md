@@ -565,6 +565,23 @@ updated `write-integration` skill.
     **Keys live in `.env.local`** (`ATIZAR_SECRET_KEY` + Google Web client `ATIZAR_GOOGLE_CLIENT_ID/SECRET`,
     redirect `http://localhost:5173/api/connect/google/callback`); `set -a; . ./.env.local; set +a`
     before `yarn dev` (the server does not auto-load it yet).
+- **Sub-stage 4 — write-integration auth interview: ✅ BUILT (docs-only)** on `feat/gmail-viewer`
+  (2026-06-12), commits `877e0de`…this docs commit. Plan →
+  `docs/superpowers/plans/2026-06-11-integration-auth-substage4-skill.md`.
+  - **As-built:** the `write-integration` skill (`.claude/skills/write-integration/SKILL.md`) now
+    enforces the auth contract — FACTS rewritten (auth is DECLARED via `auth: AuthSpec`, functions
+    get `deps.credential`/`ResolvedCredential`, NEVER read `process.env`/files for secrets; open
+    `AuthSpec.kind` with custom kinds shipping their own `CredentialResolver` via `registerResolver`
+    in userland, never editing core; `ATIZAR_` env naming via `atizarEnv`; `.env.example` seeding;
+    health = "does `resolveCredential` yield a usable credential?"); Stage 2 gained a MANDATORY
+    auth-interview gate (stop-and-ask if auth is unclear — never guess); Stages 3/4 scaffold the
+    `auth` export + append the secret block to `.env.example`; Stage 6 greps for no `process.env`/
+    file secret reads. The gmail-viewer consumer skill's Credentials section + `docs/AGENTIC.md`
+    reflect the contract (with an honest transition note — gmail-viewer still reads files until
+    sub-stage 5). All cited symbols grep-verified against sub-stage 1–3 as-built.
+  - **Next = sub-stage 5** (gmail rewrite via the updated skill = the end-to-end validation: delete
+    the file-reading path, declare `auth`, consume `resolveCredential`, browser-E2E that gmail runs
+    off the Connect-stored token).
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +

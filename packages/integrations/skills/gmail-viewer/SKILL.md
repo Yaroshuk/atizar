@@ -40,22 +40,33 @@ permanently deletes.
 
 ## Credentials
 
-OAuth client + token files, read at call time:
+Credentials follow the framework auth contract. The OAuth **app** registration (client
+id/secret) is set ONCE in the repo-root `.env.example` → `.env.local`:
 
-- `~/.gmail-mcp/gcp-oauth.keys.json` — the OAuth client (GCP Console → APIs & Services →
-  Credentials → OAuth client ID, type Desktop; download the JSON). Override path with
-  `GMAIL_OAUTH_KEYS`.
-- `~/.gmail-mcp/credentials.json` — the user token (an OAuth2 grant for the account, scope
-  `https://www.googleapis.com/auth/gmail.modify` — covers read, labels, trash, drafts).
-  Override path with `GMAIL_OAUTH_CREDENTIALS`.
-- `googleapis` is an optional peer — `yarn add googleapis` in the consuming app.
+- `ATIZAR_GOOGLE_CLIENT_ID` + `ATIZAR_GOOGLE_CLIENT_SECRET` — the OAuth client (GCP Console →
+  APIs & Services → Credentials → OAuth client ID).
+- `ATIZAR_SECRET_KEY` — the AES master key for the encrypted credential store.
+
+The **per-user token** is obtained by clicking **Connect** in the app header (the OAuth flow,
+sub-stage 3) and is stored ENCRYPTED in the `credentials` table — NOT by hand-placing files.
+`resolveCredential` yields the live token to the integration.
+
+`googleapis` is an optional peer — `yarn add googleapis` in the consuming app.
+
+> **Transition note (until sub-stage 5):** the gmail-viewer build CURRENTLY still reads
+> `~/.gmail-mcp/gcp-oauth.keys.json` + `~/.gmail-mcp/credentials.json` at call time (paths
+> overridable via `GMAIL_OAUTH_KEYS` / `GMAIL_OAUTH_CREDENTIALS`); sub-stage 5 rewrites it to
+> consume `resolveCredential` and the Connect flow. So TODAY both paths exist — the files are
+> still the live path for gmail. Once the gmail rewrite lands, the files go away and **Connect**
+> is the only path.
 
 ## Diagnosing checkCredentials failures
 
 | error contains | meaning | fix |
 |---|---|---|
-| `ENOENT` … `gcp-oauth.keys.json` | no OAuth client file | create/download the client JSON (above) |
-| `ENOENT` … `credentials.json` | no user token | run your OAuth flow for the account with scope `gmail.modify` |
-| `invalid_grant` | token expired/revoked | re-run the OAuth flow; replace credentials.json |
+| not connected (no stored token / `resolveCredential` → null) | no per-user token in the credential store (the post-sub-stage-5 path) | click **Connect** in the app header; ensure `ATIZAR_GOOGLE_CLIENT_ID/SECRET` + `ATIZAR_SECRET_KEY` are set |
+| `ENOENT` … `gcp-oauth.keys.json` | no OAuth client file (transition path, still real today) | create/download the client JSON, or set `ATIZAR_GOOGLE_CLIENT_ID/SECRET` + use Connect |
+| `ENOENT` … `credentials.json` | no user token file (transition path, still real today) | click **Connect**, or run your OAuth flow for the account with scope `gmail.modify` |
+| `invalid_grant` | token expired/revoked | re-Connect; or re-run the OAuth flow and replace credentials.json |
 | `insufficient.*scope` / 403 | token has a narrower scope | re-grant with `gmail.modify` |
 | `Optional dependency "googleapis" is not installed` | peer missing | `yarn add googleapis` |

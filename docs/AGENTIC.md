@@ -176,7 +176,11 @@ pointer once the skill owns the procedure — CLAUDE.md stays the map, skills ow
    recurrence bar is met now rather than post-beta. Validated by its first real run:
    `@platform/integrations/gmail-viewer` (listUnread/getEmail reads, markRead/trash/star
    best-effort batch mutations, a shared `checkCredentials` health ping in gmail-basic, a
-   read-only stdio MCP wrapper). Registered in `.claude/skills/README.md`. **Roadmap
+   read-only stdio MCP wrapper). Registered in `.claude/skills/README.md`. As of sub-stage 4
+   (2026-06-11) the `write-integration` skill ENFORCES the integration auth contract —
+   declare-not-self-read (the integration exports `auth: AuthSpec` and receives `deps.credential`,
+   never reads secrets itself), a mandatory stop-and-ask auth interview, `ATIZAR_` env naming, and
+   seeding the repo-root `.env.example`. **Roadmap
    reconciliation:** this is the L1 dev twin of the planned post-step-7 `add-integration` (L2,
    below) — the L1 skill exists now because the dev task recurred; the L2 consumer twin (lighter,
    for userland with no repo context) is still Phase 2.
