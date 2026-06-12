@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, afterEach } from 'vitest'
-import { atizarEnv } from './env.js'
+import { atizarEnv, isDemo } from './env.js'
 
 const saved = { ...process.env }
 afterEach(() => {
@@ -60,5 +60,28 @@ describe('atizarEnv', () => {
     expect(atizarEnv.databaseUrl()).toBe('postgres://x/y')
     process.env.ATIZAR_DATABASE_URL = 'postgres://a/b'
     expect(atizarEnv.databaseUrl()).toBe('postgres://a/b')
+  })
+})
+
+describe('isDemo', () => {
+  const prev = process.env.DEMO
+  afterEach(() => {
+    if (prev === undefined) delete process.env.DEMO
+    else process.env.DEMO = prev
+  })
+
+  it('is true only when DEMO is exactly "1"', () => {
+    process.env.DEMO = '1'
+    expect(isDemo()).toBe(true)
+  })
+
+  it('is false when DEMO is unset', () => {
+    delete process.env.DEMO
+    expect(isDemo()).toBe(false)
+  })
+
+  it('is false for other truthy strings (avoids accidental demo in prod)', () => {
+    process.env.DEMO = 'true'
+    expect(isDemo()).toBe(false)
   })
 })

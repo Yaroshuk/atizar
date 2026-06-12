@@ -49,3 +49,10 @@ export const atizarEnv = {
     return process.env.ATIZAR_DATABASE_URL ?? process.env.DATABASE_URL ?? COMPOSE_DEFAULT_DB
   },
 }
+
+// DEMO is a dev/demo tooling flag (NOT an ATIZAR_ runtime var — same class as DEV_RECORD_REPLAY),
+// so it is read here as a standalone helper, not on atizarEnv. `DEMO=1` ⇒ zero-credential demo mode
+// (PGlite in-memory, strict synthetic-cassette replay, fake effects, email-inbox only).
+export function isDemo(): boolean {
+  return process.env.DEMO === '1'
+}
