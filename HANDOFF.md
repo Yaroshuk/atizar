@@ -731,6 +731,35 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
 >   real board item, not the forced view.
 > - **Then:** resume **sub-step 7c** (packaging tail) below — the original beta roadmap.
 
+### 🆕 ACTIVE TRACK (2026-06-12) — sub-step 7c (packaging tail), on `feat/7c-packaging`
+
+7c was decomposed into **6 independent sub-projects** (each its own spec→build cycle, committed
+onto `feat/7c-packaging`, branched off `feat/gmail-viewer`): **A** cheap cleanups · **B** zero-cred
+`DEMO=1` mode (mock provider + PGlite + SYNTHETIC cassettes + scanCassette CI gate) · **C** bearer
+token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-ups · **E**
+`@platform/*` scope rename (needs the final scope name) · **F** README 10-min script + LICENSE
+(user's call, recommend MIT). Order A→B→C→D→E→F (rename late to avoid churn; docs as capstone).
+
+- **Sub-project A — cheap cleanups: ✅ BUILT & browser-verified** (2026-06-12, commit `d746a68`).
+  - **A1 — dev `.env.local` autoload:** `apps/inbox/server/load-dev-env.ts` (dev-only side-effect,
+    FIRST import in `index.ts`) walks up to the repo-root `.env.local`, parses `KEY=VALUE` via the
+    pure tested `parse-env.ts`, sets only vars not already present (CLI wins), skipped under
+    `NODE_ENV=production`. **The `set -a; . ./.env.local` footgun is GONE** — plain `yarn dev` (and
+    `PROVIDER=mastra yarn dev`) now resolves ATIZAR_* creds/OAuth. (The doc env-note above is
+    superseded for the dev server; the `db:reset`/one-off `tsx -e` scripts still need manual
+    sourcing — they don't import `index.ts`.)
+  - **A2 — quiet `resumeAcquire`:** `WorkerPool.resumeAcquire` now only reserves the slot
+    (`active++`), no longer calls `opts.run` — the resume stream is driven by `runObserver.resume`
+    via `consume()`; the old `run` re-issued `transition('start')` on an already-`running` item,
+    logging a benign `IllegalTransition: cannot "start" from "running"` on every resume.
+  - **Verified:** 392 unit tests + typecheck + lint green; live browser E2E (record mode) —
+    `[dev] loaded 6 var(s)` + health 11/11 ok with plain `yarn dev`, and lead-inbox approve→resume
+    produced **0 IllegalTransition** (ledger `{ok,draftId}`; test draft deleted). Observed but NOT
+    chased (unrelated to A, pre-existing replay artifact): the qualifier `renderVerdict` card does
+    not reconstruct under `DEV_RECORD_REPLAY=1` replay though `renderVerdict` is in the trace — real
+    claude renders it fine; worth a look during the D eval pass.
+- **Sub-projects B–F:** NEXT, in order.
+
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
 **sub-step 7b (`@platform/react`, commits `ea64d0e`…`e61dd1e`)** are ✅ BUILT & browser-verified on
