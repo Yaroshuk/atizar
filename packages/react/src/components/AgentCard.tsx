@@ -1,5 +1,7 @@
 import { STATUS_LABEL, type Status } from '../status'
+import type { AgentHealth } from '../serverTypes'
 import { Icon, type IconName } from './Icon'
+import { Button } from '../primitives/Button'
 
 type AgentCardProps = {
   name: string
@@ -12,6 +14,11 @@ type AgentCardProps = {
   // Whether this agent can be launched directly. Handoff-only agents (e.g. reply,
   // started by the qualifier) are not launchable and show no START button.
   canStart: boolean
+  // Credential health (from the board snapshot). !ok → a warning line + START blocked.
+  health?: AgentHealth
+  // START is disabled (e.g. a singleton already running) with this reason as the title.
+  startDisabled?: boolean
+  startDisabledReason?: string
   onStart: () => void
   onOpen: () => void
 }
@@ -23,6 +30,9 @@ export const AgentCard = ({
   status,
   aggregateLabel,
   canStart,
+  health,
+  startDisabled = false,
+  startDisabledReason,
   onStart,
   onOpen,
 }: AgentCardProps) => {
@@ -30,6 +40,11 @@ export const AgentCard = ({
     e.stopPropagation()
     onStart()
   }
+
+  const unhealthy = health && !health.ok
+  // A missing credential blocks a launch; surface the hint and disable START.
+  const blocked = startDisabled || !!unhealthy
+  const blockedReason = unhealthy ? health.hint : startDisabledReason
 
   const renderFoot = () => {
     if (aggregateLabel) {
@@ -45,15 +60,23 @@ export const AgentCard = ({
     }
     return (
       <div className='card-foot'>
-        <button className='btn btn-primary' onClick={start}>
+        <Button
+          variant='primary'
+          block
+          icon='play'
+          iconSize={12}
+          disabled={blocked}
+          title={blocked ? blockedReason : undefined}
+          onClick={start}
+        >
           START
-        </button>
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className='agent-card' onClick={onOpen}>
+    <div className={'agent-card' + (unhealthy ? ' is-error' : '')} onClick={onOpen}>
       <div className='card-top'>
         <div className='card-icon'>
           <Icon name={iconName} size={20} />
@@ -67,6 +90,12 @@ export const AgentCard = ({
       <div className='card-headtext'>
         <p className='agent-name'>{name}</p>
         <p className='agent-sub'>{subtitle}</p>
+        {unhealthy && (
+          <p className='card-error-msg'>
+            <Icon name='alert' size={13} />
+            {health.error}
+          </p>
+        )}
       </div>
 
       {renderFoot()}

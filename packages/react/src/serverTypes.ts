@@ -48,3 +48,15 @@ export type Board = {
   lastEventId: number
   agentHealth: Record<string, AgentHealth>
 }
+
+// Client mirror of @platform/server's ActivityEntry — the operator activity feed row.
+// `kind` is an open string (server documents: queued | running | gate | resolved |
+// effect | finished | error | cancelled | delivered).
+export type ActivityEntry = {
+  ts: number
+  workflowId: string
+  agentId: string
+  workItemId: string
+  kind: string
+  summary: string
+}

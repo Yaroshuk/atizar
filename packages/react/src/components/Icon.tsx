@@ -3,6 +3,10 @@ import type { ReactNode } from 'react'
 // One Icon component + an internal name→paths map. Keeps the strict
 // one-component-per-file rule (no icon-component sprawl) while giving us the
 // thin line / Lucide-style glyphs the Smedja design uses.
+//
+// Glyphs are stroked (fill:none, stroke:currentColor) EXCEPT the few filled ones
+// listed in FILLED — those set their own fill on the child path so the single
+// wrapper stays simple. Extending = add a name to IconName + a PATHS entry.
 export type IconName =
   | 'inbox'
   | 'pen'
@@ -15,12 +19,38 @@ export type IconName =
   | 'git'
   | 'bug'
   | 'wrench'
+  // chrome / observability glyphs (Smedja Consumer Desktop v2)
+  | 'leads'
+  | 'analytics'
+  | 'settings'
+  | 'mail'
+  | 'reply'
+  | 'review'
+  | 'play'
+  | 'check'
+  | 'send'
+  | 'shield'
+  | 'chevron'
+  | 'chevron-right'
+  | 'chevrons-left'
+  | 'panel-left'
+  | 'branch'
+  | 'bell'
+  | 'refresh'
+  | 'clock'
+  | 'gear'
+  | 'activity'
+  | 'filter'
 
 type IconProps = {
   name: IconName
   size?: number
   className?: string
+  style?: React.CSSProperties
 }
+
+// Names whose glyph is a filled shape (the child path carries its own fill).
+const FILLED: ReadonlySet<IconName> = new Set<IconName>(['play', 'sparkle'])
 
 const PATHS: Record<IconName, ReactNode> = {
   inbox: (
@@ -63,7 +93,9 @@ const PATHS: Record<IconName, ReactNode> = {
       <line x1='12' y1='17' x2='12.01' y2='17' />
     </>
   ),
-  sparkle: <path d='M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z' />,
+  sparkle: (
+    <path d='M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z' fill='currentColor' />
+  ),
   close: (
     <>
       <line x1='18' y1='6' x2='6' y2='18' />
@@ -87,17 +119,122 @@ const PATHS: Record<IconName, ReactNode> = {
   wrench: (
     <path d='M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z' />
   ),
+  leads: (
+    <>
+      <path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' />
+      <circle cx='9' cy='7' r='4' />
+      <path d='M22 21v-2a4 4 0 0 0-3-3.87' />
+      <path d='M16 3.13a4 4 0 0 1 0 7.75' />
+    </>
+  ),
+  analytics: (
+    <>
+      <path d='M3 3v18h18' />
+      <path d='M7 15l3.5-4 3 2.5L20 7' />
+    </>
+  ),
+  settings: (
+    <>
+      <circle cx='12' cy='12' r='3' />
+      <path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z' />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x='3' y='5' width='18' height='14' rx='2' />
+      <path d='m3 7 9 6 9-6' />
+    </>
+  ),
+  reply: (
+    <>
+      <path d='M9 17l-5-5 5-5' />
+      <path d='M4 12h11a5 5 0 0 1 5 5v2' />
+    </>
+  ),
+  review: (
+    <>
+      <path d='M14 3v4a1 1 0 0 0 1 1h4' />
+      <path d='M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z' />
+      <path d='m9 14 2 2 4-4' />
+    </>
+  ),
+  play: (
+    <path
+      d='M7 4.5v15a1 1 0 0 0 1.54.84l11.5-7.5a1 1 0 0 0 0-1.68L8.54 3.66A1 1 0 0 0 7 4.5Z'
+      fill='currentColor'
+    />
+  ),
+  check: <path d='M20 6 9 17l-5-5' />,
+  send: (
+    <path d='M14.5 9.5 21 3m0 0-6.5 18a.5.5 0 0 1-.93.06L10 13l-7.06-3.57a.5.5 0 0 1 .06-.93L21 3Z' />
+  ),
+  shield: (
+    <>
+      <path d='M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z' />
+      <path d='m9.5 12 1.7 1.7L15 10' />
+    </>
+  ),
+  chevron: <path d='m6 9 6 6 6-6' />,
+  'chevron-right': <path d='m9 18 6-6-6-6' />,
+  'chevrons-left': (
+    <>
+      <path d='m11 17-5-5 5-5' />
+      <path d='m18 17-5-5 5-5' />
+    </>
+  ),
+  'panel-left': (
+    <>
+      <rect x='3' y='4' width='18' height='16' rx='2' />
+      <path d='M9 4v16' />
+    </>
+  ),
+  branch: (
+    <>
+      <circle cx='6' cy='6' r='2.4' />
+      <circle cx='6' cy='18' r='2.4' />
+      <circle cx='18' cy='8' r='2.4' />
+      <path d='M6 8.4v7.2' />
+      <path d='M18 10.4c0 4-3 5.6-6 5.6' />
+    </>
+  ),
+  bell: (
+    <>
+      <path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' />
+      <path d='M10.3 21a1.94 1.94 0 0 0 3.4 0' />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d='M21 12a9 9 0 1 1-3-6.7' />
+      <path d='M21 4v5h-5' />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx='12' cy='12' r='9' />
+      <path d='M12 7v5l3 2' />
+    </>
+  ),
+  gear: (
+    <>
+      <circle cx='12' cy='12' r='3' />
+      <path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z' />
+    </>
+  ),
+  activity: <path d='M22 12h-4l-3 9L9 3l-3 9H2' />,
+  filter: <path d='M3 5h18l-7 8v6l-4 2v-8L3 5Z' />,
 }
 
-export const Icon = ({ name, size = 16, className }: IconProps) => (
+export const Icon = ({ name, size = 16, className, style }: IconProps) => (
   <svg
     className={className}
+    style={style}
     width={size}
     height={size}
     viewBox='0 0 24 24'
     fill='none'
     stroke='currentColor'
-    strokeWidth={2}
+    strokeWidth={FILLED.has(name) ? 0 : 2}
     strokeLinecap='round'
     strokeLinejoin='round'
     aria-hidden='true'

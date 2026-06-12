@@ -617,6 +617,72 @@ updated `write-integration` skill.
     logs `IllegalTransition: cannot "start" from "running"` on resume — harmless (the effect runs via
     `observer.resume`; ledger confirms one execution). Already in the step-5/6 cheap-cleanup list.
 
+### 🆕 ACTIVE TRACK (2026-06-12) — email-inbox Stage 4 UI chrome (Smedja Consumer Desktop v2)
+
+By the user's call (un-parking Stage 4), the operator UI chrome is built from the user's Claude
+Design handoff bundle (project `smedja`, file `Consumer Desktop v2.html` — fetched via the design
+share link, README + 2 chat transcripts read for intent). The brief: a reusable **primitives**
+layer (buttons + containers, extensible via props + className + tokens), **Trace/Activity log**,
+the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tabs**. Built into
+`@platform/react`, wired to REAL server data (not the prototype's Acme mocks).
+
+- **✅ BUILT & browser-verified** on `feat/gmail-viewer` (2026-06-12). 386 unit tests +
+  typecheck/lint/build green; live browser E2E (true replay, lead-inbox cassettes — mtimes
+  unchanged). NOT committed yet.
+  - **Primitives** (`packages/react/src/primitives/`, each spreads native attrs + merges
+    `className`, all visuals via design tokens): `Button` (variants primary/teal/ghost/soft/danger/
+    retry), `StopButton` (scope item/workflow/all + stopping spinner), `IconButton` (+badge+popover
+    slot), `CompHeader` (the shared icon+label column header — Pipeline & Your agents render the SAME
+    primitive so headers match), `Drawer`, `Modal`, `ConfirmDialog`, `Segmented`, `Switch`. Barrel +
+    public exports from the package index.
+  - **Components:** `AppHeader` (logo + menu + Chrome `WorkflowTabs` + Stop-all + Activity +
+    Notifications + account) replaces the bare `WorkflowSwitcher`; `WorkflowTabs` (Chrome/Arc tabs,
+    active fused to panel, attention badge on background workflows); `ActivityPanel` (operator feed +
+    dev `?dev=1` Trace grouped-by-workitem) on a new `useActivity` hook (snapshot `/api/activity` +
+    SSE `/api/activity/stream`, live/reconnecting chip); `NotificationsDropdown` (board-derived:
+    pending approvals + failures); `PipelineColumn` rewritten to `CompHeader`+SVG connector + per-item
+    `StopButton` (hover-reveal) + Stop-workflow in the header; `AgentCard` gained a credential-health
+    line + START-disable (unhealthy or singleton-busy). `useDispatch` gained `cancelAll`. `WorkflowBoard`
+    restructured to the `.app` shell (header + workspace-body + ActivityPanel + bulk-Stop ConfirmDialog).
+  - **CSS:** package `styles.css` = the design's `styles.css` (canon — chrome tabs, stop, activity
+    drawer, topbar, notif, settings, leads, history, mini/branch pipeline) + a retained app-blocks
+    section (pl-* instance tree, picker, intro/run-foot/thread-notes, approval-edit, triage,
+    `awaiting_approval` status) the design lacks. Icon set extended ~20 glyphs (filled play/sparkle).
+  - **Browser E2E (true replay):** board loads pixel-faithful to the design; **workflow tab switch**
+    (Lead inbox ↔ Email inbox swaps agents); **Activity drawer** opens → Live chip → populates with
+    REAL run events (START/running/finished) over SSE; **dev Trace** view groups by work item
+    (monospace #seq/kind/summary); **single run** (replay) → pipeline mini-card "Working" + per-item
+    Stop button appears, thread folds messages (no bubble split), URL persists `open` id; **health
+    badge + START-disable** (email-inbox cards show "gmail: oauth2 credential required" + greyed START
+    because gmail not connected); singleton START-disable re-enables on a done copy.
+  - **NOT exercised live (honest):** the bulk-Stop **ConfirmDialog** + cancelAll/cancelWorkflow (replay
+    finishes too fast to catch an enabled active state) — the wiring targets the verified
+    `/api/cancel-all` + `/api/workflows/:id/cancel` and `ConfirmDialog` is a pure component; gate
+    approve/reject through the new chrome (the replayed spam email didn't hand off → no gate this run,
+    and approve hits real Gmail which wasn't connected) — the gate path (ThreadModal/useGate) is
+    unchanged by this track.
+  - **Deferred from the design (not this track, candidates for follow-up):** the collapsible rail +
+    slide-out menu overlay (Inbox/Leads/Analytics/Settings nav); the **Leads table** + Analytics
+    screens; the **admin Manager/Admin toggle + AgentSettingsModal** prompt editing (no persistence
+    backend yet — config-as-data is future, would be a fake save); run-history inside the thread.
+    Pre-existing pipeline quirk surfaced (not new): a kept input agent shows "Working" in the pipeline
+    even when its board item is `finished`, so its per-item Stop is a no-op on a done item.
+  - **Revision round (user feedback, same day, re-verified in the browser):** stripped prototype-only
+    chrome that maps to no real feature — the **account** ("Anna K."), **notifications** bell, and
+    **menu/sidebar** button are GONE; the brand (logo mark + workspace name) is now a STATIC
+    non-clickable element (no hover). **Gmail Connect moved into the header** (it is shared, not a
+    per-agent concern) and is now a real **Button** from the `.btn` system (`btn-soft`/`btn-sm`), not a
+    bare link. **Fixed the "connected but cards still say not-connected" bug** — the board snapshot's
+    `agentHealth` is a BOOT cache that goes stale on connect/disconnect; new `useHealth` hook fetches
+    `GET /api/health` on mount + window focus (the OAuth redirect lands on focus) and the cards prefer
+    it. **Legend markers** now render (a bare `.dot` was only sized inside `.status`; sized it for the
+    legend). **Per-item Stop is right-aligned always** (name column flexes; the Stop gets
+    `margin-left:auto`) — no longer drifting with name length. **All three Stop scopes now confirm via
+    the modal** (item too, not just bulk) — the `ConfirmDialog` primitive. Re-verified live: header
+    clean + brand static; gmail ✓/Disconnect in header; Email-inbox cards show NO not-connected error
+    (health fresh); legend dots colored; per-item Stop → "Stop this item?" confirm modal. `useHealth`
+    exported; `NotificationsDropdown` deleted.
+
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
 **sub-step 7b (`@platform/react`, commits `ea64d0e`…`e61dd1e`)** are ✅ BUILT & browser-verified on

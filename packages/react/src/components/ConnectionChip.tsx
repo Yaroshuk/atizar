@@ -1,3 +1,4 @@
+import { Button } from '../primitives/Button.js'
 import type { ConnectionStatus } from '../hooks/useConnections.js'
 
 type ConnectionChipProps = {
@@ -5,32 +6,31 @@ type ConnectionChipProps = {
   onDisconnect: () => void
 }
 
-// Presentational: a not-connected (or failed/expired) integration shows a Connect/Reconnect
-// link — a FULL navigation (not fetch) so the OAuth redirect can happen. A connected one
-// shows its label (+ detail when present) and a Disconnect button.
+// ONE cohesive pill (Smedja style: surface, border, pill radius): a status dot + the
+// integration name + a real action button inside, so it reads as a single control — not
+// loose labels. Connected → green dot + Disconnect; not connected → grey dot + Connect
+// (an <a>, since the OAuth redirect must be a full navigation, styled with the shared
+// `.btn` system so it matches the Button primitive).
 export const ConnectionChip = ({ connection: c, onDisconnect }: ConnectionChipProps) => {
-  if (!c.connected) {
-    const href = `/api/connect/${c.provider}?integration=${encodeURIComponent(
-      c.integration
-    )}&connection=${encodeURIComponent(c.connection)}`
-    return (
-      <span className='workflow-tab'>
-        <span>{c.integration}</span>
-        <a href={href} className='btn btn-ghost'>
+  const href = `/api/connect/${c.provider}?integration=${encodeURIComponent(
+    c.integration
+  )}&connection=${encodeURIComponent(c.connection)}`
+  return (
+    <span className={'conn-chip' + (c.connected ? ' conn-ok' : '')}>
+      <span className='conn-dot' />
+      <span className='conn-name'>
+        {c.integration}
+        {c.connected && c.detail ? ` · ${c.detail}` : ''}
+      </span>
+      {c.connected ? (
+        <Button variant='soft' className='btn-sm' onClick={onDisconnect}>
+          Disconnect
+        </Button>
+      ) : (
+        <a href={href} className='btn btn-soft btn-sm'>
           Connect
         </a>
-      </span>
-    )
-  }
-
-  return (
-    <span className='workflow-tab'>
-      <span>
-        {c.integration} ✓{c.detail ? ` ${c.detail}` : ''}
-      </span>
-      <button type='button' className='btn btn-ghost' onClick={onDisconnect}>
-        Disconnect
-      </button>
+      )}
     </span>
   )
 }

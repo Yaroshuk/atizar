@@ -40,5 +40,10 @@ export const useDispatch = () => {
     await fetch(`/api/workflows/${id}/cancel`, { method: 'POST' })
   }, [])
 
-  return { start, deliver, cancel, cancelWorkflow }
+  // Emergency brake: halt every active item across ALL workflows.
+  const cancelAll = useCallback(async (): Promise<void> => {
+    await fetch('/api/cancel-all', { method: 'POST' })
+  }, [])
+
+  return { start, deliver, cancel, cancelWorkflow, cancelAll }
 }
