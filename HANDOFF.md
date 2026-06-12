@@ -758,7 +758,40 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
     chased (unrelated to A, pre-existing replay artifact): the qualifier `renderVerdict` card does
     not reconstruct under `DEV_RECORD_REPLAY=1` replay though `renderVerdict` is in the trace — real
     claude renders it fine; worth a look during the D eval pass.
-- **Sub-projects B–F:** NEXT, in order.
+- **Sub-project B — zero-cred `DEMO=1` mode (email-inbox only): ✅ BUILT & browser-verified**
+  (2026-06-12, commits `8b8993a`…`<head>`; spec `docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md`,
+  plan `docs/superpowers/plans/2026-06-12-demo-mode-zero-cred.md`). Built subagent-driven (impl +
+  spec-review + quality-review per task + a final holistic review). 400 unit tests + typecheck +
+  lint + build green.
+  - **As-built:** `isDemo()` (standalone, unprefixed `DEMO`, sibling of `DEV_RECORD_REPLAY`, in
+    `@platform/server` env.ts) gates everything. **DB:** `client.ts`/`migrate.ts` select an
+    in-memory **PGlite** (`drizzle-orm/pglite`, lazy optional peer `@electric-sql/pglite`) vs
+    postgres-js at module load; same dialect → migrations unchanged; `Db` stays the single
+    postgres-js type (pglite cast). **Provider:** new strict `'demo'` mode in `record-replay.ts`
+    reads COMMITTED synthetic cassettes from `apps/inbox/demo-cassettes/` and throws
+    `DemoCassetteMissing` on a miss (never calls the real provider); `build-agent.ts` selects it.
+    **Effects:** email-inbox `saveDraft`/`applyActions` return demo fake-success (no Gmail);
+    `applyActions` reads `form.items` (the real key). **Server:** `apps/inbox/server/index.ts`
+    filters registration to email-inbox in demo (`activeWorkflowServers`), adds `GET /api/config`
+    `{demo,workflows}`, and short-circuits `computeAgentHealth` to all-ok in demo (so START isn't
+    disabled by the no-cred/no-binary probes). **Client:** `App.tsx` fetches `/api/config`, filters
+    tabs, passes `demo` → `WorkflowBoard`/`AppHeader` hide the Connect chip. **Safety:**
+    `demo:scan-cassettes` runs `scanCassette` over `demo-cassettes/` (reserved-TLD `.example` emails
+    exempt; real PII still caught) — wire into CI when CI lands (none exists yet). **Scripts:**
+    `yarn workspace inbox demo` (= `DEMO=1` server+client); `predev` skips Postgres in demo.
+  - **Browser E2E (DEMO=1, Postgres STOPPED, zero creds):** only the Email-inbox tab + no Connect
+    chip + START enabled; START sorter → 4-child machine-dispatch fan-out; approve a batch gate
+    (SPAM trash) → fake success → finished + narration; approve reply gate → finished + demo
+    draftId narration; reject (READER) → finished/rejected; Stop workflow → ConfirmDialog → all
+    cancelled (0 active). PGlite migrate-on-boot, no Docker.
+  - **Final-review bug fixed (the test-masked one):** `demoApplyActions` read `form.actions` (always
+    `applied:0`); now reads `form.items` and the test asserts the real shape + `byAction`.
+  - **Carry-overs for later sub-projects:** the demo `demo` script lives in the `inbox` workspace —
+    add a ROOT `yarn demo` alias in the README pass (sub-project F); wire `demo:scan-cassettes` into
+    CI when CI is set up (F); `App.tsx`'s `/api/config`-failure fallback shows all workflows
+    (non-fail-safe but unreachable in a live demo) — tidy in F if desired.
+- **Sub-projects C–F:** NEXT, in order (C bearer token · D golden-set eval + step-6 follow-ups ·
+  E `@platform/*` scope rename · F README/LICENSE/root-demo-alias/CI).
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
