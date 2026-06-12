@@ -42,7 +42,7 @@ export const getLatestEmailTool = createTool({
   inputSchema: z.object({}),
   execute: async () => {
     const cred = await resolveGmail()
-    if (!cred) return { error: 'Gmail not connected' }
+    if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
     return getLatestEmail({}, { credential: cred })
   },
 })
@@ -57,7 +57,7 @@ export const listUnreadTool = createTool({
   inputSchema: z.object({ sinceHours: z.number().int().positive().optional() }),
   execute: async (inputData: { sinceHours?: number }) => {
     const cred = await resolveGmail()
-    if (!cred) return { error: 'Gmail not connected' }
+    if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
     return listUnread(inputData ?? {}, { credential: cred })
   },
 })
@@ -68,7 +68,7 @@ export const getEmailTool = createTool({
   inputSchema: z.object({ messageId: z.string() }),
   execute: async (inputData: { messageId: string }) => {
     const cred = await resolveGmail()
-    if (!cred) return { error: 'Gmail not connected' }
+    if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
     return getEmail(inputData, { credential: cred })
   },
 })

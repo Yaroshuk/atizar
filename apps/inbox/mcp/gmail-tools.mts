@@ -27,7 +27,7 @@ const notConnected = {
   content: [
     {
       type: 'text' as const,
-      text: JSON.stringify({ error: 'Gmail not connected — click Connect in the app header.' }),
+      text: JSON.stringify({ error: 'Gmail not connected — click Connect in the header' }),
     },
   ],
 }

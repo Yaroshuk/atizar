@@ -6,6 +6,11 @@ import { createDraft } from '@platform/integrations/gmail/create-draft'
 import { resolveCredential, atizarEnv } from '@platform/server'
 import { auth as gmailAuth } from '@platform/integrations/gmail/auth'
 
+// Resolve the live Gmail credential for the single beta connection ('default'). A null result =
+// not connected (the effect returns a clear "Connect" message).
+const resolveGmail = () =>
+  resolveCredential({ integration: 'gmail', connectionId: atizarEnv.connection(), auth: gmailAuth })
+
 export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
     agentId: qualifierAgent.id,
@@ -21,11 +26,7 @@ export const leadInboxServer = (origin: string): ServerBinding[] => [
       // The approved/edited form { threadId, body } IS the createDraft args, byte-verbatim.
       // Resolve the live Gmail credential first; a null credential = not connected.
       saveDraft: async (form) => {
-        const cred = await resolveCredential({
-          integration: 'gmail',
-          connectionId: atizarEnv.connection(),
-          auth: gmailAuth,
-        })
+        const cred = await resolveGmail()
         if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
         return createDraft(
           { threadId: String(form.threadId ?? ''), body: String(form.body ?? '') },
