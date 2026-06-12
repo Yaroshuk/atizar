@@ -13,14 +13,23 @@ import {
   createPipelineRoutes,
   makeCredentialStore,
   createConnectRoutes,
+  isDemo,
   type AgentRuntime,
 } from '@platform/server'
 import { assertAgentClassification } from './agent-checks.js'
 import { scopesFor, connectionList } from './connections.js'
 import { aggregateHealth, providerHealth } from './health.js'
 
+// In demo mode only the flagship email-inbox workflow is enabled (zero-cred showcase); otherwise
+// all workflows are active. `activeWorkflowServers` is the single filtered source used by the
+// handoff check, agent registration, the pipeline descriptors, and GET /api/config.
+const ENABLED_WORKFLOWS: string[] | null = isDemo() ? ['email-inbox'] : null // null = all
+const activeWorkflowServers = ENABLED_WORKFLOWS
+  ? workflowServers.filter((w) => ENABLED_WORKFLOWS.includes(w.descriptor.id))
+  : workflowServers
+
 // Wiring-time check: a passport must not hand off to an agent absent from its own workflow.
-for (const { descriptor } of workflowServers) {
+for (const { descriptor } of activeWorkflowServers) {
   const ids = new Set(descriptor.agents.map((a) => a.agent.id))
   for (const { agent } of descriptor.agents) {
     for (const target of agent.handoffs ?? []) {
@@ -44,7 +53,7 @@ const runtimes: Record<string, AgentRuntime> = {}
 const healthInputs: Record<string, { provider: string; checks: (() => Promise<HealthCheck>)[] }> =
   {}
 
-for (const { descriptor, bindings } of workflowServers) {
+for (const { descriptor, bindings } of activeWorkflowServers) {
   const byId = new Map(descriptor.agents.map((a) => [a.agent.id, a.agent]))
   for (const b of bindings(descriptor.id)) {
     const def = byId.get(b.agentId)
@@ -104,7 +113,7 @@ async function refreshHealth(): Promise<Record<string, HealthCheck>> {
 const pipeline = makePipelineService({
   db,
   resolveAgent: (id) => runtimes[id],
-  descriptors: workflowServers.map((w) => w.descriptor),
+  descriptors: activeWorkflowServers.map((w) => w.descriptor),
   getAgentHealth: () => agentHealthCache,
   refreshHealth,
 })
@@ -112,6 +121,13 @@ const pipeline = makePipelineService({
 // Server-authoritative pipeline spine — the ONLY transport (CopilotKit dropped at step 6):
 // board + per-WorkItem trace/SSE + dispatch/deliver/resolve/cancel, all on Postgres.
 const app = new Hono()
+
+// Tells the client which workflows are enabled + whether this is the zero-cred demo, so it can
+// filter the workflow tabs and hide the Connect chip. Read-only, no auth.
+app.get('/api/config', (c) =>
+  c.json({ demo: isDemo(), workflows: activeWorkflowServers.map((w) => w.descriptor.id) })
+)
+
 app.route('/', createPipelineRoutes(pipeline))
 
 // OAuth connect flow + connection-status reporting (auth sub-stage 3). The app supplies its
