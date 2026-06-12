@@ -11,6 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx -e \"import('@platform/server').then(m=>m.runMigrations()).then(()=>process.exit(0))\"",
     "db:reset": "tsx -e \"import('@platform/server').then(m=>m.resetDb()).then(()=>process.exit(0))\"",
+    "db:reset:creds": "tsx -e \"import('@platform/server').then(m=>m.resetCredentials()).then(()=>process.exit(0))\"",
+    "db:reset:all": "tsx -e \"import('@platform/server').then(m=>m.resetAll()).then(()=>process.exit(0))\"",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run -c ../../vitest.config.ts",
