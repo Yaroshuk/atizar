@@ -44,13 +44,15 @@ const gmailHealth = [
 let demoDraftSeq = 0
 const demoSaveDraft = () => ({ ok: true as const, draftId: `demo-${++demoDraftSeq}` })
 const demoApplyActions = (form: Record<string, unknown>) => {
-  const actions = Array.isArray(form.actions) ? form.actions : []
+  // The approved batch form is `{ items: Row[] }` (the EmailBatchCard emits it, applyEmailActions
+  // reads it) — each row carries an `action`. Count by action so the demo result matches reality.
+  const items = Array.isArray(form.items) ? form.items : []
   const byAction: Record<string, number> = {}
-  for (const a of actions as Array<{ action?: string }>) {
+  for (const a of items as Array<{ action?: string }>) {
     const k = String(a?.action ?? 'unknown')
     byAction[k] = (byAction[k] ?? 0) + 1
   }
-  return { applied: actions.length, failed: [] as unknown[], byAction }
+  return { applied: items.length, failed: [] as unknown[], byAction }
 }
 
 // The aggregator's binding signature is `(origin) => ServerBinding[]`; email-inbox routes children
