@@ -9,6 +9,9 @@ export type WorkflowsConfig = {
   meta: Record<string, AgentMeta>
   renders: RenderSpec[]
   hitl: HitlSpec[]
+  // Optional shared bearer token; merged into every mutation fetch. Unset in dev/demo. The
+  // demo app sources it from VITE_ATIZAR_AUTH_TOKEN — the package stays env-agnostic.
+  authToken?: string
 }
 
 const WorkflowsContext = createContext<WorkflowsConfig | null>(null)
