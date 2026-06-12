@@ -8,6 +8,7 @@ export type { WorkflowsConfig } from './workflowsContext.js'
 export type { AgentMeta, DeliverFn, RenderSpec, HitlSpec } from './renderSpecs.js'
 export { buildRenderToolCall } from './buildRenderToolCall.js'
 export { ThreadResultsContext, useThreadResult } from './threadResults.js'
+export { authHeaders } from './authHeaders.js'
 export { Icon } from './components/Icon.js'
 export type { IconName } from './components/Icon.js'
 // UI primitives (token-driven, extensible — spread native attrs + merge className).
