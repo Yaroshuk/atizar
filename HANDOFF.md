@@ -606,6 +606,13 @@ updated `write-integration` skill.
     email (known stage-3b, not a credential bug; createDraft effect is provider-agnostic, proven on
     claude-cli). All real Gmail mutations were UNDONE; the test token was disconnected at the end.
   - **`~/.gmail-mcp/` files are now UNUSED** by the framework (gmail reads the Connect-stored token).
+  - **Dev reset commands (run from repo root; `resetCredentials`/`resetAll` added to `@platform/server`):**
+    `yarn workspace inbox db:reset` clears ONLY pipeline state (`work_items`/`gates`/`trace`/`action_ledger`)
+    and **keeps the Gmail connection** — a state reset never logs you out (the encrypted `credentials`
+    row survives every restart/hot-reload; tokens auto-refresh, so you reconnect only after one of these
+    resets, an explicit Disconnect, a revoked token, or a changed `ATIZAR_SECRET_KEY`).
+    `yarn workspace inbox db:reset:creds` truncates ONLY `credentials` (= Disconnect-all from the CLI).
+    `yarn workspace inbox db:reset:all` wipes both (full data reset). None touches schema/migrations.
   - **Carried-over benign noise (pre-existing, not introduced here):** `WorkerPool.resumeAcquire`
     logs `IllegalTransition: cannot "start" from "running"` on resume — harmless (the effect runs via
     `observer.resume`; ledger confirms one execution). Already in the step-5/6 cheap-cleanup list.
