@@ -1,5 +1,6 @@
 import type { AgentDefinition, ProviderRegistry, PromptStrategy, Provider } from '@platform/core'
-import { withRecordReplay, recordReplayMode, cassettesDir } from './record-replay.js'
+import { withRecordReplay, recordReplayMode, cassettesDir, demoCassettesDir } from './record-replay.js'
+import { isDemo } from '@platform/server'
 
 // Resolves the provider FACTORY for an agent passport and constructs the provider from
 // the passport (approvals/tools) + this agent's prompt strategy, then wraps it in the
@@ -27,12 +28,12 @@ export function buildProvider(
     agentId: instanceKey,
   })
 
-  const mode = recordReplayMode()
+  const mode = isDemo() ? 'demo' : recordReplayMode()
   if (mode) {
     provider = withRecordReplay(provider, {
       key: instanceKey,
       approvalNames: def.approvals,
-      dir: cassettesDir(),
+      dir: mode === 'demo' ? demoCassettesDir() : cassettesDir(),
       mode,
     })
   }

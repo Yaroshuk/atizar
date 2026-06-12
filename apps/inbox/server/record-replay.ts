@@ -137,7 +137,7 @@ export class CassetteStore {
   }
 }
 
-export type RecordReplayMode = 'replay' | 'record'
+export type RecordReplayMode = 'replay' | 'record' | 'demo'
 
 // Reads the dev toggle. unset → null (no wrapping, pure production path).
 // "record" → force-overwrite; anything else truthy ("1"/"replay") → auto
@@ -154,6 +154,11 @@ export function cassettesDir(): string {
   return fileURLToPath(new URL('../.cassettes/', import.meta.url))
 }
 
+// apps/inbox/demo-cassettes/ — committed SYNTHETIC cassettes for DEMO=1 (never real data).
+export function demoCassettesDir(): string {
+  return fileURLToPath(new URL('../demo-cassettes/', import.meta.url))
+}
+
 // Wraps a real provider. Per run: step = resolved-approval count. In "replay"
 // mode a recorded step is yielded without touching the real provider; a miss (or
 // "record" mode) calls the real provider, passes every event through unchanged,
@@ -168,11 +173,14 @@ export function withRecordReplay(
       const step = resolvedApprovalCount(messages, opts.approvalNames)
       const store = new CassetteStore(opts.dir, opts.key)
 
-      if (opts.mode === 'replay') {
+      if (opts.mode === 'replay' || opts.mode === 'demo') {
         const recorded = await store.readStep(step)
         if (recorded) {
           yield* recorded
           return
+        }
+        if (opts.mode === 'demo') {
+          throw new Error(`DemoCassetteMissing: ${opts.key} step ${step} (demo-cassettes/${opts.key}.jsonl)`)
         }
       }
 
@@ -198,11 +206,14 @@ export function withRecordReplay(
       const step = resolvedApprovalCount(messages, opts.approvalNames) + 1
       const store = new CassetteStore(opts.dir, opts.key)
 
-      if (opts.mode === 'replay') {
+      if (opts.mode === 'replay' || opts.mode === 'demo') {
         const recorded = await store.readStep(step)
         if (recorded) {
           yield* recorded
           return
+        }
+        if (opts.mode === 'demo') {
+          throw new Error(`DemoCassetteMissing: ${opts.key} step ${step} (demo-cassettes/${opts.key}.jsonl)`)
         }
       }
 
