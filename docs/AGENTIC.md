@@ -180,7 +180,10 @@ pointer once the skill owns the procedure — CLAUDE.md stays the map, skills ow
    (2026-06-11) the `write-integration` skill ENFORCES the integration auth contract —
    declare-not-self-read (the integration exports `auth: AuthSpec` and receives `deps.credential`,
    never reads secrets itself), a mandatory stop-and-ask auth interview, `ATIZAR_` env naming, and
-   seeding the repo-root `.env.example`. **Roadmap
+   seeding the repo-root `.env.example`. As of sub-stage 5 (2026-06-12) the auth contract is proven
+   end-to-end — the `write-integration` skill's worked exemplar is now the unified
+   `@platform/integrations/gmail` integration (declare `auth` + `deps.credential`, validated by a
+   live browser E2E on both the claude-cli and Mastra providers). **Roadmap
    reconciliation:** this is the L1 dev twin of the planned post-step-7 `add-integration` (L2,
    below) — the L1 skill exists now because the dev task recurred; the L2 consumer twin (lighter,
    for userland with no repo context) is still Phase 2.

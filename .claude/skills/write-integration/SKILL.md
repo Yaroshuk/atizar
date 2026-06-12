@@ -7,10 +7,11 @@ description: Author a new integration module in @platform/integrations — pure 
 
 Task skill — owns the run end-to-end: from "we need an integration that does X" to a
 tested, documented module in `@platform/integrations` that agents and the server can
-consume. The worked exemplar for STRUCTURE is `packages/integrations/src/gmail-viewer/`
-(built by this skill's first run); `gmail-basic` is the original pattern source. The
-worked exemplar for the AUTH CONTRACT is the rewritten `gmail` integration once auth
-sub-stage 5 lands; until then, follow the spec
+consume. The worked exemplar (STRUCTURE **and** the AUTH CONTRACT) is now the unified
+`packages/integrations/src/gmail/` + its embedded consumer skill
+`packages/integrations/skills/gmail/SKILL.md` (auth sub-stage 5 landed, 2026-06-12: it merged
+the old gmail-basic + gmail-viewer into ONE pure integration that declares `auth` and receives
+`deps.credential` — see Stage 8). For the contract details follow the spec
 `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md` (§1 the contract,
 §5 the resolver surface).
 
@@ -54,7 +55,15 @@ sub-stage 5 lands; until then, follow the spec
 - **MCP wrapper exposes READ tools only.** Mutations are server-executed effects behind
   approval gates; the model NEVER sees a mutating tool (the boot-time classification kernel
   enforces this — an unclassified tool refuses to boot). The wrapper is a thin stdio
-  `McpServer` whose tools delegate to the pure functions.
+  `McpServer` whose tools delegate to the pure functions. **If the read tools need a resolved
+  credential, the credential-resolving MCP wrapper belongs in the consuming APP (it may import
+  `@platform/server`'s `resolveCredential`), NOT in the pure integration package — the package
+  never imports `@platform/server` (it declares `auth` + receives `deps.credential`). Such an
+  app-side wrapper that imports `.ts` (`@platform/server`) MUST run via the tsx loader (`node
+  --import tsx <file>.mts`), because a plain `node *.mjs` MCP child cannot import `.ts` source.**
+  (Sub-stage 5 gmail: the MCP child resolving the credential had to live in the app as a `.mts`
+  under `node --import tsx`, since `@platform/server` is `.ts` and the integration package stays
+  pure.)
 - **`checkCredentials()` is mandatory.** Returns the `HealthCheck` type from `@platform/core`
   (`{ ok:true; detail? } | { ok:false; error; hint }`). Health now means: does
   `resolveCredential` yield a USABLE credential for this `(integration, connection)`? A null
@@ -157,3 +166,10 @@ After commits land: did the user correct the same thing twice? Did a stage not m
 work? If nothing systemic surfaced, write one sentence ("Run went smoothly, nothing
 systemic surfaced.") and exit. Otherwise propose 1–2 systemic changes to THIS skill (or to
 a Procedure/Rule this run used), each quoting the motivating incident verbatim.
+
+**Exemplar of record (auth sub-stage 5 landed, 2026-06-12):** the worked example this skill
+points at is now `packages/integrations/src/gmail/` + `packages/integrations/skills/gmail/SKILL.md`
+— one pure integration declaring `auth` + receiving `deps.credential`. That run folded one fact
+back into the FACTS block: the credential-resolving READ MCP wrapper had to live in the consuming
+app as a `.mts` under `node --import tsx` (it imports `@platform/server`, which is `.ts`), keeping
+the integration package free of any `@platform/server` dependency.

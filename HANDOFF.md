@@ -582,6 +582,33 @@ updated `write-integration` skill.
   - **Next = sub-stage 5** (gmail rewrite via the updated skill = the end-to-end validation: delete
     the file-reading path, declare `auth`, consume `resolveCredential`, browser-E2E that gmail runs
     off the Connect-stored token).
+- **Sub-stage 5 — gmail rewrite on the auth contract: ✅ BUILT & browser-verified (LIVE, both
+  providers)** on `feat/gmail-viewer` (2026-06-12), commits `2443c2f`…`9245efe` (+ deletion `ba4d8a4`).
+  Plan → `docs/superpowers/plans/2026-06-11-integration-auth-substage5-gmail-rewrite.md`.
+  `check-foundation` = CLEAR. **The integration-auth track is COMPLETE** — end users connect Gmail via
+  a button, tokens are stored encrypted, no hand-placed files.
+  - **As-built:** ONE pure `@platform/integrations/gmail` (merged basic+viewer) declaring
+    `auth: oauth2/google/gmail.modify`, functions taking `deps.credential` (`ResolvedCredential`),
+    NO file/env/`@platform/server` reads (grep-proven). lead-inbox + email-inbox re-pointed: server
+    effects + health resolve the credential server-side (`resolveCredential` + `atizarEnv.connection()`);
+    Mastra read tools resolve in-process; `connections.ts` scopes derive from the integration's `auth.scopes`.
+    Old gmail-basic/gmail-viewer DELETED; the consumer skill moved to `skills/gmail/`.
+  - **Architectural decision (honoring "integration imports core only, never the store"):** the
+    credential-resolving READ-ONLY MCP server lives in the APP (`apps/inbox/mcp/gmail-tools.mts`), NOT
+    the integration package — it imports `@platform/server` (resolveCredential/atizarEnv) and runs via
+    the tsx loader (`node --import tsx`, since `@platform/server` is `.ts`); it exposes ONLY the 3 read
+    tools (no write tool — I2/I9). The integration package stays pure (no `@platform/server` dep).
+  - **Live browser E2E (real Google OAuth + real Gmail, both providers):** claude-cli — connect→chip✓;
+    email-inbox sort+dispatch+batch-approve→REAL read/trash (verified, undone); lead-inbox qualifier
+    read→handoff→reply→approve→REAL draft (verified by id, deleted); disconnect→agents "not connected".
+    Mastra (in-process resolve) — connect; sorter read-in-process+dispatch+batch-approve→REAL star
+    (verified, undone); qualifier read in-process. The Mastra reply→saveDraft is model-flaky on a spam
+    email (known stage-3b, not a credential bug; createDraft effect is provider-agnostic, proven on
+    claude-cli). All real Gmail mutations were UNDONE; the test token was disconnected at the end.
+  - **`~/.gmail-mcp/` files are now UNUSED** by the framework (gmail reads the Connect-stored token).
+  - **Carried-over benign noise (pre-existing, not introduced here):** `WorkerPool.resumeAcquire`
+    logs `IllegalTransition: cannot "start" from "running"` on resume — harmless (the effect runs via
+    `observer.resume`; ledger confirms one execution). Already in the step-5/6 cheap-cleanup list.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
