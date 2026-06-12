@@ -1,7 +1,7 @@
 import { composeInstructions } from '@platform/core'
 import { createDraft } from '@platform/integrations/gmail/create-draft'
 import { checkCredentials } from '@platform/integrations/gmail/check-credentials'
-import { resolveCredential, atizarEnv } from '@platform/server'
+import { resolveCredential, atizarEnv, isDemo } from '@platform/server'
 import { auth as gmailAuth } from '@platform/integrations/gmail/auth'
 import type { ServerBinding } from '../server-binding.js'
 import {
@@ -38,6 +38,21 @@ const gmailHealth = [
   },
 ]
 
+// In demo mode there is no Gmail credential; effects return a believable fake-success shape so the
+// full approve→executed→finished path renders without touching Gmail. The counter makes draftIds
+// look distinct across approvals within a session.
+let demoDraftSeq = 0
+const demoSaveDraft = () => ({ ok: true as const, draftId: `demo-${++demoDraftSeq}` })
+const demoApplyActions = (form: Record<string, unknown>) => {
+  const actions = Array.isArray(form.actions) ? form.actions : []
+  const byAction: Record<string, number> = {}
+  for (const a of actions as Array<{ action?: string }>) {
+    const k = String(a?.action ?? 'unknown')
+    byAction[k] = (byAction[k] ?? 0) + 1
+  }
+  return { applied: actions.length, failed: [] as unknown[], byAction }
+}
+
 // The aggregator's binding signature is `(origin) => ServerBinding[]`; email-inbox routes children
 // via the route_emails dispatch tool (server-side), not via origin-tagged render handoffs, so no
 // agent here needs `origin` — the param is omitted (a 0-arg fn satisfies the aggregator type).
@@ -58,6 +73,7 @@ export const emailInboxServer = (): ServerBinding[] => [
       // The approved/edited form { threadId, body } IS the createDraft args, byte-verbatim.
       // Resolve the live Gmail credential first; a null credential = not connected.
       saveDraft: async (form) => {
+        if (isDemo()) return demoSaveDraft()
         const cred = await resolveGmail()
         if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
         return createDraft(
@@ -78,6 +94,7 @@ export const emailInboxServer = (): ServerBinding[] => [
     allowedTools: ['mcp__inbox__applyActions'],
     effects: {
       applyActions: async (form: Record<string, unknown>) => {
+        if (isDemo()) return demoApplyActions(form)
         const cred = await resolveGmail()
         if (!cred)
           return {
