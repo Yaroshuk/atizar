@@ -39,6 +39,10 @@ Autonomous agents are easy to start and hard to trust. The moment one touches yo
 
 The name is the Spanish verb *atizar* — to stoke a fire that's already burning. That's the whole idea: the agent is the fire, you're the one tending it.
 
+### Built for developers — agentic-first.
+
+You don't hand-write pipelines. The agent **plans, writes, and tests** — guided by **skills baked into the framework**. Your job is to point it at the right one and stay in control. Need an integration? Ask, and it's written in ~10 minutes. No 400-node marketplace.
+
 ### Two views of one pipeline.
 
 Developers want code. The people who run it want a UI. So atizar gives each its own:
@@ -46,13 +50,14 @@ Developers want code. The people who run it want a UI. So atizar gives each its 
 - **Developer → code.** Real TypeScript, no node canvas.
 - **Consumer → a clean UI.** Cards and buttons, never your codebase.
 
-### Agentic-first — coated in skills.
+### Safe by design — you're always in control.
 
-No 400-node marketplace. Ask, and your coding agent writes the integration in ~10 minutes. You describe, it builds.
+No 24/7 agents running loose. Every consequential step is **proposed by the agent, approved by a human, executed by the server** — never the model — and fully audited.
 
-### The model never acts.
+- **Trace & activity log** — every step the agent took, visible.
+- **Stop, instantly** — Stop agent · Stop workflow · Stop all.
 
-The agent proposes, the human approves, the server executes — every action audited.
+Safety isn't bolted on. It's the foundation.
 
 ## See it work
 
