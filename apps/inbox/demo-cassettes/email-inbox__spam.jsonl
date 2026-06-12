@@ -1,0 +1,9 @@
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-spam-text-0","delta":"This looks like a promotional gift-card scam — proposing to trash it."}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_spam_apply","toolCallName":"applyActions","parentMessageId":"demo-spam-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_spam_apply","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_spam_apply","delta":"{\"items\": [\n  { \"messageId\": \"demo-thread-2\", \"from\": \"Deals Blast <promo@deals-blast.example>\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_spam_apply","delta":" \"subject\": \"🎁 You won a $500 gift card\", \"action\": \"trash\" }\n]}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_spam_apply"}}
+{"step":0,"event":{"type":"CUSTOM","name":"GATE_OPENED","value":{"gateKind":"approval","toolName":"applyActions","toolCallId":"demo_spam_apply","proposedArtifact":{"items":[{"messageId":"demo-thread-2","from":"Deals Blast <promo@deals-blast.example>","subject":"🎁 You won a $500 gift card","action":"trash"}]}}}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-spam-text-1","delta":"The"}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-spam-text-1","delta":" actions were applied successfully — 1 done, 0 failed."}}

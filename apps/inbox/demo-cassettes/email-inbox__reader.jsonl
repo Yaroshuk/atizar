@@ -1,0 +1,9 @@
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reader-text-0","delta":"This newsletter is informational — proposing to mark it read."}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_reader_apply","toolCallName":"applyActions","parentMessageId":"demo-reader-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reader_apply","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reader_apply","delta":"{\"items\": [\n  { \"messageId\": \"demo-thread-1\", \"from\": \"BrightLoop News <news@brightloop.example>\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reader_apply","delta":" \"subject\": \"Weekly product digest\", \"action\": \"read\" }\n]}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_reader_apply"}}
+{"step":0,"event":{"type":"CUSTOM","name":"GATE_OPENED","value":{"gateKind":"approval","toolName":"applyActions","toolCallId":"demo_reader_apply","proposedArtifact":{"items":[{"messageId":"demo-thread-1","from":"BrightLoop News <news@brightloop.example>","subject":"Weekly product digest","action":"read"}]}}}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reader-text-1","delta":"The"}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reader-text-1","delta":" actions were applied successfully — 1 done, 0 failed."}}

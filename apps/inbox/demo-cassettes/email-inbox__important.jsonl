@@ -1,0 +1,9 @@
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-important-text-0","delta":"A time-sensitive contract review — proposing to star it so it stays visible."}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_important_apply","toolCallName":"applyActions","parentMessageId":"demo-important-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_important_apply","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_important_apply","delta":"{\"items\": [\n  { \"messageId\": \"demo-thread-3\", \"from\": \"Dana Reed <dana@northwind-legal.example>\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_important_apply","delta":" \"subject\": \"Contract review before Friday\", \"action\": \"star\" }\n]}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_important_apply"}}
+{"step":0,"event":{"type":"CUSTOM","name":"GATE_OPENED","value":{"gateKind":"approval","toolName":"applyActions","toolCallId":"demo_important_apply","proposedArtifact":{"items":[{"messageId":"demo-thread-3","from":"Dana Reed <dana@northwind-legal.example>","subject":"Contract review before Friday","action":"star"}]}}}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-important-text-1","delta":"The"}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-important-text-1","delta":" actions were applied successfully — 1 done, 0 failed."}}

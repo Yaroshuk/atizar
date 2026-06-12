@@ -1,0 +1,39 @@
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_route_reader","toolCallName":"route_emails","parentMessageId":"demo-sorter-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reader","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reader","delta":"{\"to\": \"reader\", \"emails\": [{\"messageId\":\"demo-thread-1\",\"threadId\":\"demo-thread-1\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reader","delta":"\"from\":\"BrightLoop News <news@brightloop.example>\",\"subject\":\"Weekly product digest\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reader","delta":"\"date\":\"Thu, 11 Jun 2026 09:00:00 +0000\",\"snippet\":\"This week at BrightLoop: three new dashboards and a faster export.\"}]}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_route_reader"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-1","toolCallId":"demo_sorter_route_reader","content":"Routed.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_route_spam","toolCallName":"route_emails","parentMessageId":"demo-sorter-msg-2"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_spam","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_spam","delta":"{\"to\": \"spam\", \"emails\": [{\"messageId\":\"demo-thread-2\",\"threadId\":\"demo-thread-2\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_spam","delta":"\"from\":\"Deals Blast <promo@deals-blast.example>\",\"subject\":\"🎁 You won a $500 gift card\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_spam","delta":"\"date\":\"Thu, 11 Jun 2026 10:15:00 +0000\",\"snippet\":\"Claim your $500 gift card now — limited time offer, click here!\"}]}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_route_spam"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-2","toolCallId":"demo_sorter_route_spam","content":"Routed.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_route_important","toolCallName":"route_emails","parentMessageId":"demo-sorter-msg-3"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_important","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_important","delta":"{\"to\": \"important\", \"emails\": [{\"messageId\":\"demo-thread-3\",\"threadId\":\"demo-thread-3\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_important","delta":"\"from\":\"Dana Reed <dana@northwind-legal.example>\",\"subject\":\"Contract review before Friday\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_important","delta":"\"date\":\"Thu, 11 Jun 2026 11:30:00 +0000\",\"snippet\":\"Can you review the redlined contract before our Friday call? Flagging two clauses.\"}]}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_route_important"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-3","toolCallId":"demo_sorter_route_important","content":"Routed.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_route_reply","toolCallName":"route_emails","parentMessageId":"demo-sorter-msg-4"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply","delta":"{\"to\": \"reply\", \"email\": {\"messageId\":\"demo-thread-4\",\"threadId\":\"demo-thread-4\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply","delta":"\"from\":\"Sam Carter <sam@harborfreight.example>\",\"subject\":\"Question about your pricing tiers\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply","delta":"\"date\":\"Thu, 11 Jun 2026 12:45:00 +0000\",\"snippet\":\"Could you clarify what the Growth tier includes versus Starter? Comparing options.\"}}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_route_reply"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-4","toolCallId":"demo_sorter_route_reply","content":"Routed.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_render","toolCallName":"renderSort","parentMessageId":"demo-sorter-msg-5"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":"{\"summary\": \"4 unread emails sorted: a BrightLoop product digest (informational), a"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" gift-card promo (spam), a contract-review request from Dana Reed (important), and a"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" pricing question from Sam Carter (needs a reply).\", \"counts\": {\"reply\": 1, \"reader\": 1,"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" \"spam\": 1, \"important\": 1}}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_render"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-5","toolCallId":"demo_sorter_render","content":"Sort summary surfaced to the user.","role":"tool"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":"4"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":" unread emails sorted — one each to the reader, spam, important, and reply"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":" workers. Each will propose its action for your approval."}}
