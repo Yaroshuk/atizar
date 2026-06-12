@@ -15,6 +15,8 @@ export async function runMigrations(): Promise<void> {
   const { migrate } = isDemo()
     ? await import('drizzle-orm/pglite/migrator')
     : await import('drizzle-orm/postgres-js/migrator')
+  // `db as never`: the two migrators have different nominal db-param types, but both accept our
+  // db + the same migrations folder at runtime (same Postgres dialect) — TS can't prove the union.
   await migrate(db as never, { migrationsFolder: MIGRATIONS_FOLDER })
   await db
     .insert(schemaMeta)
