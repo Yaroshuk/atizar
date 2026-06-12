@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { defineAgent, defineWorkflow } from '@platform/core'
 
 // The dispatch payload shapes (= the route_emails tool args minus `to`). EmailRef mirrors the
-// gmail-viewer EmailRef; defined here as the workflow's own contract (userland), not imported
+// email metadata shape; defined here as the workflow's own contract (userland), not imported
 // from the integration's .d.ts (that is a type, not a runtime zod schema).
 // messageId/threadId/from/subject are the fields the reply + batch prompts and cards actually
 // consume, so they are REQUIRED and the route_emails MCP schema requires them too (a thin dispatch
