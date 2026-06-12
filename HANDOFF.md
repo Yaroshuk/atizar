@@ -790,8 +790,40 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
     add a ROOT `yarn demo` alias in the README pass (sub-project F); wire `demo:scan-cassettes` into
     CI when CI is set up (F); `App.tsx`'s `/api/config`-failure fallback shows all workflows
     (non-fail-safe but unreachable in a live demo) — tidy in F if desired.
-- **Sub-projects C–F:** NEXT, in order (C bearer token · D golden-set eval + step-6 follow-ups ·
-  E `@platform/*` scope rename · F README/LICENSE/root-demo-alias/CI).
+- **Sub-project C — bearer token on mutating routes: ✅ BUILT & browser-verified** (2026-06-12,
+  commits `6012271`…`4877ff9`; spec `docs/superpowers/specs/2026-06-12-bearer-token-mutating-routes-design.md`,
+  plan `docs/superpowers/plans/2026-06-12-bearer-token-mutating-routes.md`). Built subagent-driven
+  (server slice + client slice, each with spec-review + quality-review). 417 unit tests + typecheck
+  + lint + build green.
+  - **As-built — server:** `atizarEnv.authToken()` reads the official `ATIZAR_AUTH_TOKEN`. New
+    `packages/server/src/auth.ts` `createAuthMiddleware({ token, demo })` — gates by HTTP METHOD
+    (all non-GET = mutation), active ONLY when `!demo && token set`, else fail-open; mismatch/missing
+    `Authorization: Bearer <token>` → 401. Method-based (not a path list) so all 7 mutating routes
+    (dispatch/deliver/resolve/cancel×3/cancel-all + `DELETE /api/connections`) AND any future one are
+    covered; GET/SSE stay open. Mounted in `apps/inbox/server/index.ts` via `app.use('*', …)` BEFORE
+    both route factories; `boot()` logs `[auth] disabled — set ATIZAR_AUTH_TOKEN …` when `!demo && no
+    token`. Demo mode → middleware inactive (one-command demo preserved).
+  - **As-built — client:** package stays env-agnostic — `WorkflowsConfig.authToken?` carries the
+    token; new `authHeaders(token?)` helper merges `Authorization: Bearer …` into every mutation
+    fetch (`useDispatch` ×5, `useGate.resolve`, `Connections` disconnect); reads via
+    `useWorkflowsConfig()`. **`WorkflowBoard` split** into a thin provider wrapper + `BoardInner` so
+    the body hooks (`useDispatch`/`useBoard`/…) sit INSIDE the provider (fixed a latent
+    out-of-context call). `useGate.resolve` now throws on non-409 failure (a 401 is no longer a silent
+    false-success). Demo app sources the token from `VITE_ATIZAR_AUTH_TOKEN` (vite/client ref lives in
+    `vite-env.d.ts`).
+  - **`resolved_by` stays null** (shared token = no per-user identity; per-identity = post-beta;
+    `runObserver.ts` comment corrected).
+  - **Browser E2E (all verified):** (1) plain `yarn dev`, no token → board renders (the split didn't
+    break the provider/context), `[auth] disabled` logged, START → fail-open 200 → run to Done, lead
+    text one bubble; (2) `ATIZAR_AUTH_TOKEN=sek`+`VITE_ATIZAR_AUTH_TOKEN=sek` → no warning, server gate
+    matrix (curl) 401 no-header / 401 wrong / 200 right / 200 GET, real-UI START carries the token &
+    succeeds, in-browser fetch matrix 200/401/401; (3) `yarn workspace inbox demo` → email-inbox only,
+    cancel-all no-token → 200 (middleware inactive), sorter machine-dispatch fan-out, **approve** SPAM
+    batch gate → `finished` + "applied successfully" narration, **reject** READER → `finished`/`rejected`
+    (both `useGate.resolve` paths through the real gate UI, fake effect, no Gmail). NOT browser-driven:
+    a real wrong-token client rebuild (covered by the in-browser fetch 401 matrix + the unit suite).
+- **Sub-projects D–F:** NEXT, in order (D golden-set eval + step-6 follow-ups · E `@platform/*` scope
+  rename · F README/LICENSE/root-demo-alias/CI).
 
 > **CONTINUATION NOTE (2026-06-12, after 7c-A + 7c-B) — read me first, next agent.**
 > The 7c track is being built on **`feat/7c-packaging`** (branched off `feat/gmail-viewer`; NOT
