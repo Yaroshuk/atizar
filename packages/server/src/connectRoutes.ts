@@ -85,6 +85,9 @@ export function createConnectRoutes(deps: ConnectRoutesDeps): Hono {
       return c.json({ error: `OAuth client for "${provider}" is not configured` }, 500)
     const publicUrl = atizarEnv.publicUrl()
 
+    if (!code)
+      return c.redirect(`${publicUrl}/?connect_error=${encodeURIComponent(state.integration)}`)
+
     const res = await fetchFn(endpoint.tokenUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },

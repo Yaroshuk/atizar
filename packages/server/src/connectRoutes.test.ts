@@ -122,6 +122,24 @@ describe('createConnectRoutes', () => {
       expect(res.headers.get('location')).toBe('http://localhost:5173/?connect_error=gmail')
       expect(upserted).toBeUndefined()
     })
+
+    it('302s to ?connect_error without calling the token endpoint when code is missing (e.g. user denied consent)', async () => {
+      let fetchCalled = false
+      const fetchFn = (async () => {
+        fetchCalled = true
+        return new Response('{}', { status: 200 })
+      }) as unknown as typeof fetch
+      const d = deps(fetchFn)
+      const app = createConnectRoutes(d)
+      const state = signState({ integration: 'gmail', connection: 'default' }, 'test-secret')
+      const res = await app.request(
+        '/api/connect/google/callback?state=' + encodeURIComponent(state)
+      )
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('http://localhost:5173/?connect_error=gmail')
+      expect(fetchCalled).toBe(false)
+      expect(upserted).toBeUndefined()
+    })
   })
 
   describe('GET /api/connections', () => {

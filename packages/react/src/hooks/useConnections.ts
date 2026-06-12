@@ -19,8 +19,12 @@ export const useConnections = (): { connections: ConnectionStatus[]; refetch: ()
   // fires-and-forgets without an unmount guard. It shares the same endpoint as the mount fetch.
   const refetch = useCallback((): void => {
     void (async () => {
-      const r = (await (await fetch('/api/connections')).json()) as ConnectionStatus[]
-      setConnections(r)
+      try {
+        const r = (await (await fetch('/api/connections')).json()) as ConnectionStatus[]
+        setConnections(r)
+      } catch {
+        // Network failure — leave existing connections unchanged.
+      }
     })()
   }, [])
 
@@ -30,8 +34,12 @@ export const useConnections = (): { connections: ConnectionStatus[]; refetch: ()
     // torn-down component (matches the useBoard pattern).
     const load = (): void => {
       void (async () => {
-        const r = (await (await fetch('/api/connections')).json()) as ConnectionStatus[]
-        if (!cancelled) setConnections(r)
+        try {
+          const r = (await (await fetch('/api/connections')).json()) as ConnectionStatus[]
+          if (!cancelled) setConnections(r)
+        } catch {
+          // Network failure — leave existing connections unchanged.
+        }
       })()
     }
     load()
