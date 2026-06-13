@@ -1,0 +1,9 @@
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_q_verdict","toolCallName":"renderVerdict","parentMessageId":"demo-q-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_q_verdict","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_q_verdict","delta":"{\"category\": \"sales\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_q_verdict","delta":" \"priority\": \"high\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_q_verdict","delta":" \"reason\": \"Sam is actively comparing pricing tiers — a warm inbound lead.\"}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_q_verdict"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-q-res-1","toolCallId":"demo_q_verdict","content":"Verdict surfaced to the user.","role":"tool"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-q-text-1","delta":"Qualified"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-q-text-1","delta":" as a high-priority sales lead."}}
