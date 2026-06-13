@@ -1,7 +1,7 @@
 <!--
   DRAFT — do not publish/merge to a public default branch until:
   (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
-  (2) the @atizar/* → @atizar/* rename is done,
+  (2) the @platform/* → @atizar/* rename is done,
   (3) the approval-gate demo GIF is recorded.
   Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
 -->
