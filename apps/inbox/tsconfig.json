@@ -5,6 +5,6 @@
     "types": ["node"],
     "noEmit": false
   },
-  "include": ["client/src", "server", "agents", "workflows"],
+  "include": ["client/src", "server", "agents", "workflows", "eval"],
   "references": []
 }
