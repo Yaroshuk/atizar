@@ -10,8 +10,9 @@ export default defineConfig({
     globals: true,
     env: { DEMO: '1' },
     include: ['apps/inbox/eval/**/*.eval.ts'],
-    // Eval scenarios share one in-memory PGlite per worker; keep a file's tests in-process
-    // and serial (resetDb between them). Cross-file isolation is automatic (one PGlite per worker).
+    // fileParallelism:false → all eval files run sequentially in ONE worker, sharing the same
+    // in-memory PGlite (the module-load singleton). Isolation comes from resetDb() in each file's
+    // beforeEach — NOT from worker separation; do not drop those resets.
     fileParallelism: false,
     testTimeout: 60_000,
   },

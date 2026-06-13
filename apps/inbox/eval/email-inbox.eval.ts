@@ -15,7 +15,9 @@ describe('email-inbox golden set', () => {
     it(scenario.name, async () => {
       const facts = await runGolden(scenario)
 
-      // CONTAINS (not equals) — the fan-out opens one gate per batch agent.
+      // CONTAINS (not equals) — the fan-out opens one gate per batch agent. Assert at least the
+      // expected number opened first, so a "no gate at all" regression can't pass vacuously.
+      expect(facts.gates.length).toBeGreaterThanOrEqual(scenario.expect.gates?.length ?? 0)
       for (const exp of scenario.expect.gates ?? []) {
         const g = facts.gates.find((x) => x.toolName === exp.toolName)
         expect(g, `gate ${exp.toolName}`).toBeDefined()

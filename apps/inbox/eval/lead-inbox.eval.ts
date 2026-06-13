@@ -38,6 +38,7 @@ describe('lead-inbox golden set', () => {
       }
       for (const [agentId, resolution] of Object.entries(scenario.expect.resolutions ?? {})) {
         const item = facts.items.find((i) => i.agentId === agentId)
+        expect(item, `item for ${agentId}`).toBeDefined()
         expect(item!.resolution).toBe(resolution)
       }
     })

@@ -1,4 +1,3 @@
-import type { Provider } from '@platform/core'
 import { instanceId, composeInstructions } from '@platform/core'
 import { db, makePipelineService, type AgentRuntime } from '@platform/server'
 import { providerRegistry } from '../server/providers.js'
@@ -159,5 +158,3 @@ export async function runGolden(scenario: GoldenScenario): Promise<RunFacts> {
     await sleep(15)
   }
 }
-
-export type { Provider, AgentRuntime }
