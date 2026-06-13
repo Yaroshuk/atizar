@@ -4,7 +4,7 @@
 
 **Goal:** Add a production Mastra provider beside dev-only claude-cli, behind the unchanged `Provider` contract, that resumes gates natively (`run.resumeStream`), and prove it with the step-1 conformance suite + a live browser E2E (approve/reject/cancel).
 
-**Architecture:** A PURE `createMastraProvider` in `@platform/providers` maps an injected `MastraRunner`'s chunk stream → AG-UI events and synthesizes `GATE_OPENED` from the approval tool-call it observes when the run suspends. The real Mastra Agent + 2-step workflow (agentStep → gateStep) + Postgres snapshot storage lives server-side in `apps/inbox/server/mastra/` and adapts to `MastraRunner`. Selected by `PROVIDER=mastra`; claude-cli stays the local default.
+**Architecture:** A PURE `createMastraProvider` in `@atizar/providers` maps an injected `MastraRunner`'s chunk stream → AG-UI events and synthesizes `GATE_OPENED` from the approval tool-call it observes when the run suspends. The real Mastra Agent + 2-step workflow (agentStep → gateStep) + Postgres snapshot storage lives server-side in `apps/inbox/server/mastra/` and adapts to `MastraRunner`. Selected by `PROVIDER=mastra`; claude-cli stays the local default.
 
 **Tech Stack:** TypeScript, `@mastra/core` (Agent + workflows), `@ai-sdk/anthropic` (or Mastra model-router string `"anthropic/…"`), `@mastra/pg` (PostgresStore), `@ag-ui/client` (event vocabulary), zod, vitest.
 
@@ -39,7 +39,7 @@
 - [ ] **Step 1: Write the types**
 
 ```ts
-import type { GateResolution } from '@platform/core'
+import type { GateResolution } from '@atizar/core'
 
 // One Mastra fullStream chunk we read. Structural (NOT @mastra/core's type) so the package
 // has zero Mastra dependency — same discipline as claude-stream reading NDJSON. Fields are
@@ -292,7 +292,7 @@ git commit -m "feat(providers): Mastra chunk → AG-UI mapper"
 ```ts
 import { describe, it, expect, vi } from 'vitest'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { readGateOpened } from '@platform/core'
+import { readGateOpened } from '@atizar/core'
 import { createMastraProvider } from './mastra-provider.js'
 import type { MastraChunk, MastraRunner, MastraRun, MastraRunResult } from './mastra-types.js'
 
@@ -420,7 +420,7 @@ Expected: FAIL — `createMastraProvider` is not defined.
 
 ```ts
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@platform/core'
+import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@atizar/core'
 import { mapMastraStream } from './mastra-stream.js'
 import type { MastraRunner, MastraRun } from './mastra-types.js'
 
@@ -538,7 +538,7 @@ git commit -m "feat(providers): Mastra provider run() with GATE_OPENED synthesis
 - [ ] **Step 1: Add failing resume tests**
 
 ```ts
-import type { ResumeHandle } from '@platform/core'
+import type { ResumeHandle } from '@atizar/core'
 
 const handle = { runId: 'r1', input } as ResumeHandle
 
@@ -628,7 +628,7 @@ git commit -m "feat(providers): Mastra provider resume() via native runner.resum
 - [ ] **Step 1: Add the conformance block**
 
 ```ts
-import { providerConformanceChecks, type ConformanceScenario } from '@platform/core'
+import { providerConformanceChecks, type ConformanceScenario } from '@atizar/core'
 
 // A fake runner that satisfies the conformance scenario: turn1 → suspend at saveDraft;
 // resume(approved) → completed text; resume(rejected) → completed text, no tool call.
@@ -761,14 +761,14 @@ git commit -m "chore(inbox): add @mastra/core, @mastra/pg, @ai-sdk/anthropic"
 **Files:**
 - Create: `apps/inbox/server/mastra/tools.ts`
 
-Context: read the existing Gmail read path before writing this — `mcp/gmail-tools.mjs` (the `get_latest_email` impl) and `@platform/integrations/gmail-basic` exports. The read tool must call the SAME underlying Gmail read as the MCP tool.
+Context: read the existing Gmail read path before writing this — `mcp/gmail-tools.mjs` (the `get_latest_email` impl) and `@atizar/integrations/gmail-basic` exports. The read tool must call the SAME underlying Gmail read as the MCP tool.
 
 - [ ] **Step 1: Implement the tools**
 
 ```ts
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { getLatestEmail } from '@platform/integrations/gmail-basic'
+import { getLatestEmail } from '@atizar/integrations/gmail-basic'
 
 // Render/propose tools are NO-OPs whose args = the artifact. They appear as tool-calls (the
 // mapper surfaces them) but perform no side effect — the SERVER executes effects (step 4) and
@@ -806,7 +806,7 @@ export const getLatestEmailTool = createTool({
 })
 ```
 
-Note: confirm the exact `@platform/integrations/gmail-basic` read export name (`getLatestEmail` vs other) by grepping the package before implementing; adjust the import to match. Also confirm `createTool`'s execute receives `{ context }` (current Mastra) vs `{ inputData }` — pin via the installed version's types.
+Note: confirm the exact `@atizar/integrations/gmail-basic` read export name (`getLatestEmail` vs other) by grepping the package before implementing; adjust the import to match. Also confirm `createTool`'s execute receives `{ context }` (current Mastra) vs `{ inputData }` — pin via the installed version's types.
 
 - [ ] **Step 2: Typecheck**
 
@@ -837,9 +837,9 @@ import { Agent } from '@mastra/core/agent'
 import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { PostgresStore } from '@mastra/pg'
 import { z } from 'zod'
-import { decodeHandoff, HandoffPayloadSchema, type GateResolution } from '@platform/core'
-import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@platform/providers'
-import type { Message } from '@platform/core'
+import { decodeHandoff, HandoffPayloadSchema, type GateResolution } from '@atizar/core'
+import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@atizar/providers'
+import type { Message } from '@atizar/core'
 import { getLatestEmailTool, renderLeadTool, renderVerdictTool, saveDraftTool } from './tools.js'
 
 // Build the prompt the agent works from, from the run's messages (the handoff payload). Mirrors
@@ -1045,8 +1045,8 @@ git commit -m "feat(inbox/mastra): Agent + 2-step workflow runner adapter (Postg
 - [ ] **Step 1: Add the mastra factory + PROVIDER alias**
 
 ```ts
-import { defineProviders, type ProviderRegistry, type ProviderFactory } from '@platform/core'
-import { createMockInboxProvider, createClaudeCliProvider, createMastraProvider } from '@platform/providers'
+import { defineProviders, type ProviderRegistry, type ProviderFactory } from '@atizar/core'
+import { createMockInboxProvider, createClaudeCliProvider, createMastraProvider } from '@atizar/providers'
 import { claudeSpawn } from './claude-spawn.js'
 import { makeMastraRunner } from './mastra/runner.js'
 
@@ -1096,7 +1096,7 @@ export const providerRegistry: ProviderRegistry = defineProviders({
 })
 ```
 
-**Problem to fix in this step:** the Mastra runner needs each agent's `instructions`, which `ProviderConfig` does NOT carry. Resolve by adding `instructions` to `ProviderConfig` (in `@platform/core` `providers.ts`) and threading it from `buildProvider` (it has `def.instructions`). This is a small additive contract change.
+**Problem to fix in this step:** the Mastra runner needs each agent's `instructions`, which `ProviderConfig` does NOT carry. Resolve by adding `instructions` to `ProviderConfig` (in `@atizar/core` `providers.ts`) and threading it from `buildProvider` (it has `def.instructions`). This is a small additive contract change.
 
 - [ ] **Step 2: Add `instructions` to ProviderConfig + thread it**
 
@@ -1141,7 +1141,7 @@ git commit -m "feat(inbox): PROVIDER=mastra env-switch; thread instructions thro
 **Files:**
 - Modify: `apps/inbox/server/record-replay.ts`
 
-Context: read `record-replay.ts` first. Today the cassette step = `resolvedApprovalCount(input)` (a message scan in `@platform/core`). With the server spine, the authoritative count is the store's resolved-gate count for the WorkItem. The decorator must key on that instead.
+Context: read `record-replay.ts` first. Today the cassette step = `resolvedApprovalCount(input)` (a message scan in `@atizar/core`). With the server spine, the authoritative count is the store's resolved-gate count for the WorkItem. The decorator must key on that instead.
 
 - [ ] **Step 1: Change the step key source**
 

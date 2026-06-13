@@ -14,8 +14,8 @@
 
 ### What exists today (the thing you are replacing)
 
-- `@platform/integrations/gmail-basic` — `getLatestEmail`, `createDraft`, `checkCredentials` (+ `gmail-client.mjs` that READS `~/.gmail-mcp/*.json` / `GMAIL_OAUTH_*` env).
-- `@platform/integrations/gmail-viewer` — `listUnread`, `getEmail`, `markRead`/`trash`/`star` (`modify`), `checkCredentials` (re-export). Read-only MCP wrapper. Also reads files via the shared `gmail-client.mjs`.
+- `@atizar/integrations/gmail-basic` — `getLatestEmail`, `createDraft`, `checkCredentials` (+ `gmail-client.mjs` that READS `~/.gmail-mcp/*.json` / `GMAIL_OAUTH_*` env).
+- `@atizar/integrations/gmail-viewer` — `listUnread`, `getEmail`, `markRead`/`trash`/`star` (`modify`), `checkCredentials` (re-export). Read-only MCP wrapper. Also reads files via the shared `gmail-client.mjs`.
 - Consumers: **lead-inbox** (qualifier reads via `get_latest_email`; reply effect `createDraft`) and **email-inbox** (sorter `list_unread`; reply `get_email` + `createDraft`; reader/spam/important `markRead`/`trash`/`star` via the `applyEmailActions` effect). Both wired in their `server.ts` bindings + `claude-spawn.ts` MCP config + `mastra/tools.ts`.
 
 ### The target
@@ -25,7 +25,7 @@ ONE `gmail` integration (merge basic + viewer) built via the updated skill, decl
 ### Invariants
 
 - **I2/I9** — mutations stay server-executed effects (the model never sees a write tool); the MCP wrapper exposes reads only.
-- **I3/I5** — the integration declares `auth` + receives `deps.credential`; it imports `@platform/core` types only, never the store/Postgres.
+- **I3/I5** — the integration declares `auth` + receives `deps.credential`; it imports `@atizar/core` types only, never the store/Postgres.
 - The `write-integration` skill (sub-stage 4) is the procedure — **run the integration build THROUGH the skill** (this IS the skill's validation; if the skill is unclear at any step, that is a skill bug to fix, per its self-improvement stage).
 
 ### Conventions
@@ -36,7 +36,7 @@ English; Prettier; never `git add -A`; commit trailer; TDD for the pure function
 
 ## TASK 1: build the new `gmail` integration via the skill (TDD)
 
-**Files:** Create `packages/integrations/src/gmail/*` (+ tests); modify `packages/integrations/package.json` (exports) + add `@platform/core` dep already present.
+**Files:** Create `packages/integrations/src/gmail/*` (+ tests); modify `packages/integrations/package.json` (exports) + add `@atizar/core` dep already present.
 
 - [ ] **Step 1: Invoke the `write-integration` skill** and follow it. Auth interview answer: `kind: oauth2`, provider `google`, scopes `['https://www.googleapis.com/auth/gmail.modify']`, consumed by lead-inbox + email-inbox. The skill will have you scaffold `auth` + the functions taking `deps.credential`.
 
@@ -66,7 +66,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Server effects** — the effect functions now resolve the credential server-side and call the new gmail functions with `deps.credential`. E.g. `saveDraft: async (form, ctx) => { const cred = await resolveCredential({ integration:'gmail', connectionId: ctx.connectionId ?? 'default', auth }); if (!cred) return { error: 'Gmail not connected' }; return createDraft({ threadId, body }, { credential: cred }) }`. Same for `applyEmailActions` (it calls `markRead`/`trash`/`star` with the resolved credential). **Thread `connectionId` into the effect ctx** (the gate/effect ctx — add it if not present; default `'default'`).
 
-- [ ] **Step 2: MCP config** — `claude-spawn.ts`: replace `gmail`/`gmail-viewer` MCP server entries with the single `require.resolve('@platform/integrations/gmail')`; the allow-lists in the workflow `server.ts` change `mcp__gmail__*`/`mcp__gmail-viewer__*` → `mcp__gmail__*` (read tools). Ensure `ATIZAR_CONNECTION` is set per agent (default `'default'`).
+- [ ] **Step 2: MCP config** — `claude-spawn.ts`: replace `gmail`/`gmail-viewer` MCP server entries with the single `require.resolve('@atizar/integrations/gmail')`; the allow-lists in the workflow `server.ts` change `mcp__gmail__*`/`mcp__gmail-viewer__*` → `mcp__gmail__*` (read tools). Ensure `ATIZAR_CONNECTION` is set per agent (default `'default'`).
 
 - [ ] **Step 3: Mastra tools** — `mastra/tools.ts`: the read tools (`list_unread`/`get_email`/`get_latest_email`) resolve the credential in-process (`resolveCredential(...)`) and call the new gmail functions. (Effects are server-side, not Mastra tools.)
 

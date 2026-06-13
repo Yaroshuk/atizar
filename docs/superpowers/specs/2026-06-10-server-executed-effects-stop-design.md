@@ -38,7 +38,7 @@ classification** (below).
 
 ### 1. Contract — `defineAgent` + `ServerBinding` + boot checks
 
-`@platform/core` `defineAgent` gains two optional string-array fields:
+`@atizar/core` `defineAgent` gains two optional string-array fields:
 
 - `effects: string[]` (default `[]`) — which **approval** tools trigger a server-executed effect.
   Validation (zod `superRefine`): `effects ⊆ approvals`. (NOT the older `approvals ∩ effects = ∅`:

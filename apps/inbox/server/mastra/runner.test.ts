@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { MastraChunk } from '@platform/providers'
+import type { MastraChunk } from '@atizar/providers'
 import { unwrapStepOutput, makeMastraRunner } from './runner.js'
 
 const baseConfig = {

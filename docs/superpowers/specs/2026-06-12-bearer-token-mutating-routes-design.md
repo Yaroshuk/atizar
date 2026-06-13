@@ -50,7 +50,7 @@ contract (`env.ts` header rule).
 
 ### 2. Auth middleware — new file `packages/server/src/auth.ts`
 
-A pure Hono-middleware factory, framework-side (the routes it guards live in `@platform/server`,
+A pure Hono-middleware factory, framework-side (the routes it guards live in `@atizar/server`,
 and "mutations require a token" is a *framework* guarantee):
 
 ```ts
@@ -105,7 +105,7 @@ if (!isDemo() && !authToken) {
 }
 ```
 
-### 4. Client token plumbing — `@platform/react` + demo app
+### 4. Client token plumbing — `@atizar/react` + demo app
 
 **Framework stays env-agnostic.** The package never reads `import.meta.env`; it receives the
 token through the existing config object.

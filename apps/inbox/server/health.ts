@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import type { HealthCheck } from '@platform/core'
+import type { HealthCheck } from '@atizar/core'
 
 // Aggregate a set of credential/provider checks for ONE agent into a single HealthCheck:
 // the first failing check (so an agent with any unhealthy dependency is unhealthy), else ok.

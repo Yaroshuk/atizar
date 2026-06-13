@@ -42,7 +42,7 @@ and the invariant. Common conflicts to watch for:
 
 - A consequential action the **model** executes directly instead of the **server** → I2 / I9.
 - A schedule or auto-trigger that fires an action without a human start → I1.
-- An engine import inside `@platform/core`, or the core gaining engine features (memory / RAG /
+- An engine import inside `@atizar/core`, or the core gaining engine features (memory / RAG /
   tool-execution) → I3.
 - Userland importing internals, or a path that bypasses the public SDK → I5.
 - Skills / knowledge moved into a database; or a tool left unclassified so it ships ungated → I6 /
@@ -73,7 +73,7 @@ This Procedure ends at its verdict — no self-improvement stage (the calling Ta
 
 | Thought | Reality |
 |---|---|
-| "It's a small change, skip the check." | A small change can route around a gate or import an engine into the core. Run the check whenever a change touches actions, providers, `@platform/core`, the framework/userland boundary, or the foundation docs. |
+| "It's a small change, skip the check." | A small change can route around a gate or import an engine into the core. Run the check whenever a change touches actions, providers, `@atizar/core`, the framework/userland boundary, or the foundation docs. |
 | "I'll just edit the invariant to match my change." | That IS the foundation changing — warn + explicit confirmation, never silent. |
 | "The model can execute this directly, it's simpler." | I2 / I9 — the server executes, the model proposes. Simplicity is not a waiver. |
 | "The developer's busy, I'll note it and move on." | A foundation conflict is a STOP, not a footnote. Get the explicit confirmation. |

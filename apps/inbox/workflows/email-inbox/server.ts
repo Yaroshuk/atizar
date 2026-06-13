@@ -1,8 +1,8 @@
-import { composeInstructions } from '@platform/core'
-import { createDraft } from '@platform/integrations/gmail/create-draft'
-import { checkCredentials } from '@platform/integrations/gmail/check-credentials'
-import { resolveCredential, atizarEnv, isDemo } from '@platform/server'
-import { auth as gmailAuth } from '@platform/integrations/gmail/auth'
+import { composeInstructions } from '@atizar/core'
+import { createDraft } from '@atizar/integrations/gmail/create-draft'
+import { checkCredentials } from '@atizar/integrations/gmail/check-credentials'
+import { resolveCredential, atizarEnv, isDemo } from '@atizar/server'
+import { auth as gmailAuth } from '@atizar/integrations/gmail/auth'
 import type { ServerBinding } from '../server-binding.js'
 import {
   emailInbox,

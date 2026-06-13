@@ -1,5 +1,5 @@
 // Type declaration for get-latest-email.mjs (JS module — no TS source).
-import type { ResolvedCredential } from '@platform/core'
+import type { ResolvedCredential } from '@atizar/core'
 
 export declare function getLatestEmail(
   args?: unknown,

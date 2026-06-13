@@ -4,7 +4,7 @@ import {
   HandoffPayloadSchema,
   type PromptStrategy,
   type HandoffPayload,
-} from '@platform/core'
+} from '@atizar/core'
 
 // Launched manually with no handoff. The reply agent is a WRITER only — it cannot
 // read the inbox (no get_latest_email in its allow-list). There is one entry point

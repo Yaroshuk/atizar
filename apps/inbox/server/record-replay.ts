@@ -8,7 +8,7 @@ import {
   type Message,
   type ResumeHandle,
   type GateResolution,
-} from '@platform/core'
+} from '@atizar/core'
 
 // A cassette file is JSONL: one recorded AG-UI event per line, tagged with its
 // step. Step = how many human approvals are already behind us (see

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { z } from 'zod'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import type { IconName } from './components/Icon'
 
 export type AgentMeta = { subtitle: string; iconName: IconName; intro: string }
@@ -8,7 +8,7 @@ export type DeliverFn = (origin: string, dest: Destination, payload: unknown) =>
 
 // A pure render tool (generative UI). `render` may call `deliver` for handoff cards. The
 // render closure references its card component DIRECTLY (userland) — the package never holds a
-// name→component registry (collapsed at the @platform/react extraction, mirrors the `effects`
+// name→component registry (collapsed at the @atizar/react extraction, mirrors the `effects`
 // pattern: names in core for I15, implementations bound outside).
 export type RenderSpec = {
   toolName: string

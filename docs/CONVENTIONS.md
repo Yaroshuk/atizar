@@ -84,7 +84,7 @@ inline lambdas like `onClick={() => setOpen(true)}` are fine).
   siblings).
 - **Relative imports are kept** (no path alias). Rationale: `core/` lives *outside*
   `client/src/` (it's shared by client + server), so a single `src`-rooted alias
-  wouldn't cover it cleanly. Revisit if/when the `@platform/*` package split lands.
+  wouldn't cover it cleanly. Revisit if/when the `@atizar/*` package split lands.
 
 ## Not adopted from Magma (different stack)
 

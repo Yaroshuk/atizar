@@ -4,7 +4,7 @@
 
 **Goal:** Ship a hook-in-10-seconds, honest, accurate `README.md` plus the supporting repo files (`LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `assets/`) for atizar's open-source launch.
 
-**Architecture:** Pure documentation work. The README is one file assembled section by section per the approved skeleton; each task writes a concrete markdown block then verifies it (render + link + an "honesty grep" that fails if a forbidden false claim slips in). Parts that depend on unbuilt work (the `DEMO=1` quick-start command, the `@platform/*→@atizar/*` rename, the demo GIF) are written as honest placeholders, gated behind `[Status]`. A draft-guard HTML comment at the top of the README prevents premature publish.
+**Architecture:** Pure documentation work. The README is one file assembled section by section per the approved skeleton; each task writes a concrete markdown block then verifies it (render + link + an "honesty grep" that fails if a forbidden false claim slips in). Parts that depend on unbuilt work (the `DEMO=1` quick-start command, the `@atizar/*→@atizar/*` rename, the demo GIF) are written as honest placeholders, gated behind `[Status]`. A draft-guard HTML comment at the top of the README prevents premature publish.
 
 **Tech Stack:** Markdown, GitHub-flavored. Optional verification tools: `grep`, `npx markdownlint-cli2` (if present), GitHub preview.
 
@@ -82,7 +82,7 @@ SOFTWARE.
 <!--
   DRAFT — do not publish/merge to a public default branch until:
   (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
-  (2) the @platform/* → @atizar/* rename is done,
+  (2) the @atizar/* → @atizar/* rename is done,
   (3) the approval-gate demo GIF is recorded.
   Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
 -->
@@ -328,7 +328,7 @@ git commit -m "docs(readme): how-it-works diagram + core concepts (accurate to i
 
 - [ ] **Step 1: Append the flagship example and the package table**
 
-Package names use `@atizar/*` (final), valid only behind the draft-guard until the rename. Descriptions match the real `@platform/*` split.
+Package names use `@atizar/*` (final), valid only behind the draft-guard until the rename. Descriptions match the real `@atizar/*` split.
 
 ````markdown
 
@@ -350,7 +350,7 @@ The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come 
 - [ ] **Step 2: Verify package descriptions against CLAUDE.md**
 
 ```bash
-grep -nE '@platform/(core|providers|integrations|server|react)' CLAUDE.md HANDOFF.md | head
+grep -nE '@atizar/(core|providers|integrations|server|react)' CLAUDE.md HANDOFF.md | head
 ```
 
 Expected: matches confirming the five packages and their roles exist as described.
@@ -387,7 +387,7 @@ git commit -m "docs(readme): flagship inbox example + package map"
 
 **Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
 
-Not done yet: the zero-credential demo mode, the `@platform/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
+Not done yet: the zero-credential demo mode, the `@atizar/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
 
 ## Roadmap
 
@@ -606,6 +606,6 @@ git commit -m "docs: final verification pass on README + repo presentation"
 These are the spec's sequencing dependencies; each is its own piece of work:
 
 1. **DEMO=1** lands (separate spec `2026-06-12-demo-mode-zero-cred-design.md`) → replace the gated quick-start placeholder with the real one-command path.
-2. **`@platform/* → @atizar/*` rename** → the `@atizar/*` names become real; remove draft-guard line (2).
+2. **`@atizar/* → @atizar/*` rename** → the `@atizar/*` names become real; remove draft-guard line (2).
 3. **Record the approval-gate GIF + the two-views screenshot** from the DEMO=1 build (synthetic data only — never real cassette data) → replace the `<!-- TODO -->` media placeholders; remove draft-guard line (3).
 4. When all three are done, remove the draft-guard comment entirely and the README is publish-ready.

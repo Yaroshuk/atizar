@@ -4,9 +4,9 @@
 
 **Goal:** Gate every mutating HTTP route (POST/DELETE) behind a single shared bearer token, while reads (GET/SSE) stay open and both `yarn dev` and `yarn demo` remain one-command.
 
-**Architecture:** A method-based Hono middleware in `@platform/server` checks `Authorization: Bearer <token>` on non-GET requests, active only when a token is configured and not in demo mode (fail-open otherwise, with a startup warning). The token reaches the browser via a build-time `VITE_ATIZAR_AUTH_TOKEN`, is threaded into `@platform/react` through the existing `WorkflowsConfig` context, and merged into every mutation `fetch`.
+**Architecture:** A method-based Hono middleware in `@atizar/server` checks `Authorization: Bearer <token>` on non-GET requests, active only when a token is configured and not in demo mode (fail-open otherwise, with a startup warning). The token reaches the browser via a build-time `VITE_ATIZAR_AUTH_TOKEN`, is threaded into `@atizar/react` through the existing `WorkflowsConfig` context, and merged into every mutation `fetch`.
 
-**Tech Stack:** TypeScript, Hono (server), React (`@platform/react`), Vite, Vitest, yarn-classic workspace.
+**Tech Stack:** TypeScript, Hono (server), React (`@atizar/react`), Vite, Vitest, yarn-classic workspace.
 
 **Spec:** `docs/superpowers/specs/2026-06-12-bearer-token-mutating-routes-design.md`
 
@@ -16,7 +16,7 @@
 
 ## File Structure
 
-**Server (`@platform/server`):**
+**Server (`@atizar/server`):**
 - `packages/server/src/env.ts` — add `authToken()` accessor (MODIFY).
 - `packages/server/src/auth.ts` — `createAuthMiddleware` (CREATE).
 - `packages/server/src/auth.test.ts` — behaviour matrix (CREATE).
@@ -25,7 +25,7 @@
 **App server:**
 - `apps/inbox/server/index.ts` — mount middleware + startup warning (MODIFY).
 
-**Client (`@platform/react`):**
+**Client (`@atizar/react`):**
 - `packages/react/src/authHeaders.ts` — `authHeaders` helper (CREATE).
 - `packages/react/src/authHeaders.test.ts` — helper test (CREATE).
 - `packages/react/src/workflowsContext.tsx` — `authToken?` on `WorkflowsConfig` (MODIFY).
@@ -230,7 +230,7 @@ This task has no unit test (it's composition-root wiring; covered by the Task 8 
 
 - [ ] **Step 1: Import the middleware + env accessor**
 
-In `apps/inbox/server/index.ts`, the `@platform/server` import block currently lists named imports. Add `createAuthMiddleware` and `atizarEnv` to it:
+In `apps/inbox/server/index.ts`, the `@atizar/server` import block currently lists named imports. Add `createAuthMiddleware` and `atizarEnv` to it:
 
 ```ts
 import {
@@ -245,7 +245,7 @@ import {
   atizarEnv,
   isDemo,
   type AgentRuntime,
-} from '@platform/server'
+} from '@atizar/server'
 ```
 
 - [ ] **Step 2: Mount the middleware before the route factories**
@@ -363,7 +363,7 @@ export { authHeaders } from './authHeaders.js'
 ```bash
 yarn lint
 git add packages/react/src/authHeaders.ts packages/react/src/authHeaders.test.ts packages/react/src/index.ts
-git commit -m "feat(7c-C): authHeaders helper in @platform/react"
+git commit -m "feat(7c-C): authHeaders helper in @atizar/react"
 ```
 
 ---
@@ -409,7 +409,7 @@ git commit -m "feat(7c-C): authToken? on WorkflowsConfig"
 
 **Why:** `useDispatch()` (and `useBoard`/`useHealth`/`useActivity`) are called in `WorkflowBoard`'s body, while `<WorkflowsProvider>` currently wraps only the returned JSX — so those hooks run OUTSIDE the context and `useWorkflowsConfig()` would throw there. Splitting into a thin provider wrapper + `BoardInner` puts every hook inside the provider. Mechanical move, no logic change.
 
-No unit test (structural; the existing `@platform/react` tests + Task 8 browser E2E cover it). Typecheck + the existing test suite are the gate.
+No unit test (structural; the existing `@atizar/react` tests + Task 8 browser E2E cover it). Typecheck + the existing test suite are the gate.
 
 - [ ] **Step 1: Rename the component to `BoardInner` and add the wrapper**
 
@@ -467,7 +467,7 @@ Rewrite `packages/react/src/hooks/useDispatch.ts` to:
 
 ```ts
 import { useCallback } from 'react'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import { useWorkflowsConfig } from '../workflowsContext'
 import { authHeaders } from '../authHeaders'
 
@@ -720,7 +720,7 @@ Stop. Run `yarn workspace inbox demo` (DEMO=1, PGlite, no Postgres). Expected: E
 
 - [ ] **Step 7: Update HANDOFF**
 
-In `HANDOFF.md`, flip the 7c-C line under "Sub-projects C–F" to ✅ BUILT with a concise as-built note (env accessor; method-based middleware in `@platform/server`; client token via `WorkflowsConfig`/`VITE_ATIZAR_AUTH_TOKEN`; `WorkflowBoard` split; `resolvedBy` stays null; the four E2E scenarios verified). Note that D is next.
+In `HANDOFF.md`, flip the 7c-C line under "Sub-projects C–F" to ✅ BUILT with a concise as-built note (env accessor; method-based middleware in `@atizar/server`; client token via `WorkflowsConfig`/`VITE_ATIZAR_AUTH_TOKEN`; `WorkflowBoard` split; `resolvedBy` stays null; the four E2E scenarios verified). Note that D is next.
 
 ```bash
 git add HANDOFF.md

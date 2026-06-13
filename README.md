@@ -1,7 +1,7 @@
 <!--
   DRAFT — do not publish/merge to a public default branch until:
   (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
-  (2) the @platform/* → @atizar/* rename is done,
+  (2) the @atizar/* → @atizar/* rename is done,
   (3) the approval-gate demo GIF is recorded.
   Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
 -->
@@ -138,7 +138,7 @@ The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come 
 
 **Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
 
-Not done yet: the zero-credential demo mode, the `@platform/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
+Not done yet: the zero-credential demo mode, the `@atizar/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
 
 ## Roadmap
 

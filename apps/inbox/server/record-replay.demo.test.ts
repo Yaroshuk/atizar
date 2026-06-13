@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { withRecordReplay } from './record-replay.js'
-import type { Provider } from '@platform/core'
+import type { Provider } from '@atizar/core'
 
 // A provider that MUST NOT be called in demo mode (a real claude stand-in). It has a `resume`
 // too so withRecordReplay wraps the resume branch (it only wraps resume when the provider has one).

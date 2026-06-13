@@ -14,7 +14,7 @@ stops being a phrase and becomes a build list.
 | Layer | Who | What they need | Status |
 |---|---|---|---|
 | **L1 — dev** | Agents developing the framework itself (this repo) | `CLAUDE.md` gotchas, `HANDOFF.md` state, **repo-specific recurring-task skills** | Docs ✅ strong; skills ❌ none yet (only `rules/`) |
-| **L2 — consumer** | Agents in client projects that depend on `@platform/*` | Skills **shipped inside the packages** that teach each thin contract | ❌ Deliberately deferred (contracts still moving) |
+| **L2 — consumer** | Agents in client projects that depend on `@atizar/*` | Skills **shipped inside the packages** that teach each thin contract | ❌ Deliberately deferred (contracts still moving) |
 
 ## Ecosystem anchors (verified June 2026 — don't re-research)
 
@@ -174,7 +174,7 @@ pointer once the skill owns the procedure — CLAUDE.md stays the map, skills ow
    gmail-viewer the second) once the **email-inbox workflow track** was inserted before the
    packaging tail (`docs/superpowers/specs/2026-06-11-email-inbox-workflow-design.md`), so A4's
    recurrence bar is met now rather than post-beta. Validated by its first real run:
-   `@platform/integrations/gmail-viewer` (listUnread/getEmail reads, markRead/trash/star
+   `@atizar/integrations/gmail-viewer` (listUnread/getEmail reads, markRead/trash/star
    best-effort batch mutations, a shared `checkCredentials` health ping in gmail-basic, a
    read-only stdio MCP wrapper). Registered in `.claude/skills/README.md`. As of sub-stage 4
    (2026-06-11) the `write-integration` skill ENFORCES the integration auth contract —
@@ -182,7 +182,7 @@ pointer once the skill owns the procedure — CLAUDE.md stays the map, skills ow
    never reads secrets itself), a mandatory stop-and-ask auth interview, `ATIZAR_` env naming, and
    seeding the repo-root `.env.example`. As of sub-stage 5 (2026-06-12) the auth contract is proven
    end-to-end — the `write-integration` skill's worked exemplar is now the unified
-   `@platform/integrations/gmail` integration (declare `auth` + `deps.credential`, validated by a
+   `@atizar/integrations/gmail` integration (declare `auth` + `deps.credential`, validated by a
    live browser E2E on both the claude-cli and Mastra providers). **Roadmap
    reconciliation:** this is the L1 dev twin of the planned post-step-7 `add-integration` (L2,
    below) — the L1 skill exists now because the dev task recurred; the L2 consumer twin (lighter,
@@ -196,19 +196,19 @@ The following were considered for L1 but are **CONSUMER skills (L2 → Phase 2)*
 public SDK, not framework internals, so a userland developer runs them on top of the framework:
 
 - ❌ **`add-workflow`** — scaffold a workflow + tool classification + register cards. "Add a
-  workflow" is THE core consumer action; it belongs in `@platform/core`/`@platform/server` (L2).
+  workflow" is THE core consumer action; it belongs in `@atizar/core`/`@atizar/server` (L2).
 - ❌ **`add-render-card`** — render-spec registration, `ThreadResultsContext` for data tools,
   browser-verify. A consumer surfaces a custom card on top of the framework → L2.
 
 Post-beta first drafts of their L2 twins (gated on beta progress, NOT now):
 
-- ❌ **`add-provider` / `write-provider`** (in `@platform/providers`) — parked for later by the user
+- ❌ **`add-provider` / `write-provider`** (in `@atizar/providers`) — parked for later by the user
   (2026-06-11), explicitly AFTER the beta demo. Teaches the `AgentRuntime`/provider seam (the
   injected-runner pattern, the AG-UI chunk→event mapping, `GATE_OPENED` synthesis, native vs
   re-prime resume); the **provider conformance suite is the definition-of-done**. The first real
   exercise is adding a non-Mastra, non-CLI provider — the Anthropic SDK directly — gated on demand
   (the two shipped providers, claude-cli + Mastra, already satisfy I4 for the beta).
-- ❌ **`add-integration`** — after beta step 7 (extraction); the `@platform/integrations` contract +
+- ❌ **`add-integration`** — after beta step 7 (extraction); the `@atizar/integrations` contract +
   the `ServerBinding` effects seam, with `gmail-basic` as the worked example. The flagship L2 skill.
 
 ### Phase 2 — consumer skills (L2), after beta step 7
@@ -221,20 +221,20 @@ shipped inside its package:
   server-effect mutations) + credentials setup + a `checkCredentials` failure-diagnosis table.
   It ships INSIDE the package, versioned with the code (A7), and the email-inbox spec's
   credential-health `hint` points at it. A3's "after the contracts stabilize" bar is met for the
-  `@platform/integrations` contract (it's stable; only the workflow/react contracts are still
+  `@atizar/integrations` contract (it's stable; only the workflow/react contracts are still
   moving). This is the first concrete instance of the `add-integration` flagship below.
 - ✅ **Thin integration contract landed (email-inbox stage 2):** `HealthCheck` /
-  `ReadResult<T>` / `BatchActionResult` — types only in `@platform/core`, no
+  `ReadResult<T>` / `BatchActionResult` — types only in `@atizar/core`, no
   `defineIntegration()`, no base class (belief #3). The `write-integration` skill and the
   gmail-viewer consumer skill now reference these types; integrations import them from
-  `@platform/core` instead of re-declaring result shapes.
-- ❌ `add-integration` (in `@platform/integrations`) — the flagship; proves "Claude writes your
+  `@atizar/core` instead of re-declaring result shapes.
+- ❌ `add-integration` (in `@atizar/integrations`) — the flagship; proves "Claude writes your
   integration in a minute, guided by the skill". (Its L1 dev twin `write-integration` is BUILT —
   see Phase 1 #3; this L2 twin is the lighter userland-facing rewrite.)
-- ❌ `add-workflow` / `add-agent` (in `@platform/core` or `@platform/server` post-extraction).
-- ❌ `add-render-card` (in `@platform/react` post-extraction) — register a custom card on the
+- ❌ `add-workflow` / `add-agent` (in `@atizar/core` or `@atizar/server` post-extraction).
+- ❌ `add-render-card` (in `@atizar/react` post-extraction) — register a custom card on the
   render registry; `ThreadResultsContext`/`useThreadResult` for data tools.
-- ❌ `add-provider` (in `@platform/providers`) — conformance suite as the contract.
+- ❌ `add-provider` (in `@atizar/providers`) — conformance suite as the contract.
 - ❌ Consumer-project `AGENTS.md` template — what a client repo's context file should say about
   the framework (possibly emitted by a future `init`, but a copy-paste template ships first).
 

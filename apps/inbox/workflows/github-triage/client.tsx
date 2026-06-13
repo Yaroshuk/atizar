@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import type { RenderSpec, AgentMeta, DeliverFn } from '@platform/react'
-import { useThreadResult } from '@platform/react'
+import type { RenderSpec, AgentMeta, DeliverFn } from '@atizar/react'
+import { useThreadResult } from '@atizar/react'
 import type { TriageTicket } from '../../client/src/buckets'
 import { TriageCard } from '../../client/src/components/TriageCard'
 import { TicketResultCard } from '../../client/src/components/TicketResultCard'
 import { ReplyDraftCard } from '../../client/src/components/ReplyDraftCard'
-import type { TicketHandoffPayload } from '@platform/core'
+import type { TicketHandoffPayload } from '@atizar/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
 
 export const githubTriageMeta: Record<string, AgentMeta> = {

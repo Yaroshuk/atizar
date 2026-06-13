@@ -6,7 +6,7 @@
 
 **Architecture:** A `Provider → Provider` decorator (`withRecordReplay`) toggled by the `DEV_RECORD_REPLAY` env var, wrapped around the real provider in `build-agent.ts`. Recordings are keyed by `wf__agent` + step (= number of resolved approvals). One JSONL file per agent holds all steps, each line `{step, event}`. On each run: replay the step if recorded, else call the real provider, pass events through, and append them. Cassettes are gitignored; a `scanCassette` helper backs a mandatory agent safety-scan before any cassette is shared.
 
-**Tech Stack:** TypeScript, yarn-classic workspace, `@platform/core` (isomorphic), Node `fs/promises` (server-only), vitest, AG-UI `BaseEvent`/`Message` types.
+**Tech Stack:** TypeScript, yarn-classic workspace, `@atizar/core` (isomorphic), Node `fs/promises` (server-only), vitest, AG-UI `BaseEvent`/`Message` types.
 
 **Spec:** `docs/superpowers/specs/2026-06-08-dev-record-replay-design.md`
 
@@ -27,7 +27,7 @@ Commands (repo root): `yarn test`, `yarn typecheck`, `yarn lint`, `yarn format`.
 
 ---
 
-## Task 1: `resolvedApprovalCount` in `@platform/core`
+## Task 1: `resolvedApprovalCount` in `@atizar/core`
 
 **Files:**
 - Modify: `packages/core/src/messages.ts`
@@ -465,7 +465,7 @@ git commit -m "feat(server): CassetteStore — per-agent JSONL step read/write o
 Add to `apps/inbox/server/record-replay.test.ts` — extend the import to include `withRecordReplay`, add the core/provider imports at the top:
 
 ```ts
-import type { Provider } from '@platform/core'
+import type { Provider } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
 ```
 
@@ -559,7 +559,7 @@ Add to the top imports of `apps/inbox/server/record-replay.ts`:
 
 ```ts
 import { fileURLToPath } from 'node:url'
-import { resolvedApprovalCount, type Provider, type Message } from '@platform/core'
+import { resolvedApprovalCount, type Provider, type Message } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
 ```
 
@@ -648,7 +648,7 @@ Replace the body of `apps/inbox/server/build-agent.ts` with:
 
 ```ts
 import { BuiltInAgent } from '@copilotkit/runtime/v2'
-import type { AgentDefinition, ProviderRegistry, PromptStrategy } from '@platform/core'
+import type { AgentDefinition, ProviderRegistry, PromptStrategy } from '@atizar/core'
 import { withRecordReplay, recordReplayMode, cassettesDir } from './record-replay.js'
 
 // Builds the CopilotKit BuiltInAgent for an agent passport: resolves the provider

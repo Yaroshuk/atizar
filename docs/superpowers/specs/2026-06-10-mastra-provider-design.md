@@ -5,7 +5,7 @@
 ## Goal
 
 Add a **production** provider — Mastra — beside the dev-only `claude-cli`, behind the
-unchanged `Provider` contract (`@platform/core` `providers.ts`). Mastra resumes a gate
+unchanged `Provider` contract (`@atizar/core` `providers.ts`). Mastra resumes a gate
 **natively** (`run.resume({ step, resumeData })`, no kill-and-re-prime), which is exactly the
 property that makes it the "second unlike provider". **Definition of done = the step-1
 conformance suite (`providerConformanceChecks`) passes against the Mastra provider**, plus a live
@@ -28,12 +28,12 @@ env switch (`PROVIDER=mastra`); `claude-cli` stays the local default.
 
 ## Architecture — the injected `MastraRunner` seam (fork 1)
 
-`@platform/providers` is imported **only by the server** today, but it must stay isomorphic and
+`@atizar/providers` is imported **only by the server** today, but it must stay isomorphic and
 fake-testable (the claude-cli pattern: `spawn` is injected, conformance runs on a fake). So
 **Mastra is injected**, not imported by the package.
 
 ```
-@platform/providers/src/mastra-provider.ts   ← PURE: maps Mastra chunks → AG-UI BaseEvent,
+@atizar/providers/src/mastra-provider.ts   ← PURE: maps Mastra chunks → AG-UI BaseEvent,
                                                  synthesizes GATE_OPENED from a suspend, drives
                                                  the injected MastraRunner. NO @mastra/* import.
 apps/inbox/server/mastra/                     ← NODE: builds the real Mastra Agent + workflow
@@ -44,7 +44,7 @@ apps/inbox/server/mastra/                     ← NODE: builds the real Mastra A
 
 ### `MastraRunner` interface (the injected seam)
 
-Lives in `@platform/providers` (the package owns the contract; the server implements it). Shaped
+Lives in `@atizar/providers` (the package owns the contract; the server implements it). Shaped
 so a **fake** can model suspend/resume deterministically with no API key.
 
 ```ts
@@ -95,7 +95,7 @@ suspends — same shape, caution (b) handles it):
 
 1. **agentStep** — runs the Mastra `Agent` (instructions from the descriptor). The agent's tools:
    - **read tools** (qualifier: `get_latest_email`) = native Mastra tools wired to
-     `@platform/integrations/gmail-basic` read fns (no MCP).
+     `@atizar/integrations/gmail-basic` read fns (no MCP).
    - **render tools** (`renderVerdict`, `renderLead`) = no-op capture tools (`execute` returns its
      args) so they appear as tool-calls → the RunObserver fills the card from `TOOL_CALL_END`.
    - **propose tool** (`saveDraft`, the approval name) = a no-op capture tool; its args are the

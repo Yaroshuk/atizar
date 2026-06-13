@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an explicit `resume?()` capability and a provider-agnostic `GATE_OPENED` signal to the `Provider` contract, plus a conformance suite, in `@platform/core` + `@platform/providers` — additively, without disturbing the live `@copilotkit` client.
+**Goal:** Add an explicit `resume?()` capability and a provider-agnostic `GATE_OPENED` signal to the `Provider` contract, plus a conformance suite, in `@atizar/core` + `@atizar/providers` — additively, without disturbing the live `@copilotkit` client.
 
 **Architecture:** `run(input)` stays back-compatible (still detects resume from message history). We add (1) `resume?(handle, resolution)` to the `Provider` interface; (2) a `GATE_OPENED` AG-UI `CUSTOM` event emitted by `claude-stream` at the approval suspend point; (3) a `runProviderConformance` check-set in core, exercised against the mock and `claude-cli` (fake spawn). `resume()` has no production caller yet — the conformance suite is its contract test (this is beta build order step 1, intentionally ahead of the server spine). Record/replay, the server, the client, and Mastra are untouched.
 
@@ -403,7 +403,7 @@ git commit -m "feat(core): provider conformance check-set (GATE_OPENED + resume 
 
 Add to `packages/providers/src/claude-stream.test.ts` a new `describe` block (keep existing tests). First check the top of the file for the existing line helpers (`textDelta`, `toolStart`, `toolArgs`, `stop`, and how `mapClaudeStream` is driven); reuse them. If the file lacks a streaming-args helper, the inline lines below are self-contained:
 ```ts
-import { readGateOpened } from '@platform/core'
+import { readGateOpened } from '@atizar/core'
 
 describe('mapClaudeStream — GATE_OPENED', () => {
   async function drain(it: AsyncIterable<any>) {
@@ -491,7 +491,7 @@ In `packages/providers/src/claude-stream.ts`:
 
 (a) Add the import at the top (after the existing `@ag-ui/client` import):
 ```ts
-import { gateOpened, type GateOpenedValue } from '@platform/core'
+import { gateOpened, type GateOpenedValue } from '@atizar/core'
 ```
 
 (b) Extend `ToolBlock` to accumulate args (line 36):
@@ -588,7 +588,7 @@ git commit -m "feat(providers): claude-stream emits GATE_OPENED at the approval 
 
 Add to `packages/providers/src/mock-provider.test.ts`:
 ```ts
-import { providerConformanceChecks, type ConformanceScenario } from '@platform/core'
+import { providerConformanceChecks, type ConformanceScenario } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
 
 const resolvedMessages = [
@@ -640,7 +640,7 @@ import {
   type Provider,
   type ResumeHandle,
   type Message,
-} from '@platform/core'
+} from '@atizar/core'
 
 const LEAD = {
   from: 'ivan@acme.ru',
@@ -735,7 +735,7 @@ git commit -m "feat(providers): mock emits GATE_OPENED + implements resume(); pa
 
 Add to `packages/providers/src/claude-cli-provider.test.ts` (reuse the file's existing `createReplyPrompts`, `fakeSpawn`, `textDelta`, `toolStart`, `toolArgs`, `stop`, `runInput`, `drain` helpers):
 ```ts
-import { providerConformanceChecks, type ConformanceScenario, type ResumeHandle, type GateResolution } from '@platform/core'
+import { providerConformanceChecks, type ConformanceScenario, type ResumeHandle, type GateResolution } from '@atizar/core'
 
 describe('createClaudeCliProvider — resume()', () => {
   const baseOpts = {
@@ -853,7 +853,7 @@ import {
   type PromptStrategy,
   type ResumeHandle,
   type Message,
-} from '@platform/core'
+} from '@atizar/core'
 import { mapClaudeStream } from './claude-stream.js'
 
 export type ClaudeSpawn = (
@@ -1016,7 +1016,7 @@ git add -A && git commit -m "chore: format provider-contract-v2 files" || echo "
 
 - [ ] **Step 1: Update HANDOFF.md**
 
-Mark beta build order **step 1 as BUILT** in `HANDOFF.md` (the "Build order (beta)" list and the "Starting point" paragraph): note `resume?()` + `GATE_OPENED` + conformance suite landed in `@platform/core` + `@platform/providers`, additive (live client untouched), record/replay/server/Mastra deferred as planned. Point the next step at build order **step 2** (Week-0 spike: RunObserver + browser attach).
+Mark beta build order **step 1 as BUILT** in `HANDOFF.md` (the "Build order (beta)" list and the "Starting point" paragraph): note `resume?()` + `GATE_OPENED` + conformance suite landed in `@atizar/core` + `@atizar/providers`, additive (live client untouched), record/replay/server/Mastra deferred as planned. Point the next step at build order **step 2** (Week-0 spike: RunObserver + browser attach).
 
 - [ ] **Step 2: Commit the handoff update**
 
@@ -1037,5 +1037,5 @@ Invoke the `superpowers:finishing-a-development-branch` skill to choose how to i
 - **Additive, not a rewrite:** `run()` keeps its exact current behavior. If an existing test changes meaning, stop — that is a regression, not an expected edit.
 - **Core stays React-free and Node-free.** `gate.ts`/`conformance.ts` import only `@ag-ui/client` + `zod` + sibling core modules. No `node:*`, no React.
 - **One component per file, named const exports, `type {Name}Props`** etc. per `docs/CONVENTIONS.md` — though these are plain modules (no React components here).
-- **`@platform/core` must be built/resolvable from `@platform/providers`.** The packages resolve each other as raw TS source (no build step) — if an import of a new core export fails to resolve, re-run `yarn typecheck` from the root; do not add a build step.
+- **`@atizar/core` must be built/resolvable from `@atizar/providers`.** The packages resolve each other as raw TS source (no build step) — if an import of a new core export fails to resolve, re-run `yarn typecheck` from the root; do not add a build step.
 - **Resume prompt is a SEAM, not a hardcode (forward-compat with step 4).** In `claude-cli`'s `resume()` the approved-path prompt comes from `PromptStrategy.buildResume(args)` — keep it that way. At step 4 (server-executed effects) the semantics change from "the human approved, now perform it" to "the server already executed it with <artifact> — narrate only," and `GateResolution` will gain an optional `executedResult?` field. Do NOT bake "human approved → you perform the action" into `primeAndStream` or the contract; the prompt text stays the strategy's concern so step 4 changes one prompt builder, not this seam. (Recorded in HANDOFF step-1 answer (3)(b).)

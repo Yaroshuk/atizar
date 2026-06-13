@@ -1,4 +1,4 @@
-import type { PromptStrategy, EffectFn, HealthCheck } from '@platform/core'
+import type { PromptStrategy, EffectFn, HealthCheck } from '@atizar/core'
 
 export type { EffectFn }
 

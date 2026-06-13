@@ -4,7 +4,7 @@
 
 **Goal:** Turn each workflow into a self-contained, isolated module — its own agents (reusable as independent copies), a published typed input contract for safe cross-workflow delivery, and all agents mounted idle so delivery runs in the background without ever auto-switching the view.
 
-**Architecture:** A new `@platform/core` `defineWorkflow` validates a pure-data `WorkflowDescriptor` (agent placements with `input`/`worker` roles + a published `inputs` contract). The client shell mounts every workflow × agent as an invisible `AgentRuntime` keyed by `instanceId(workflowId, agentId)`, keeps a global handle map, and exposes one `deliver(origin, dest, payload)` seam (intra-workflow by agent id, cross-workflow by contract). Handoff-emitting render cards carry an `origin` param (injected by the per-instance prompt) so a single shared render registration routes the handoff to the correct copy. The server registers each placement under its instance id.
+**Architecture:** A new `@atizar/core` `defineWorkflow` validates a pure-data `WorkflowDescriptor` (agent placements with `input`/`worker` roles + a published `inputs` contract). The client shell mounts every workflow × agent as an invisible `AgentRuntime` keyed by `instanceId(workflowId, agentId)`, keeps a global handle map, and exposes one `deliver(origin, dest, payload)` seam (intra-workflow by agent id, cross-workflow by contract). Handoff-emitting render cards carry an `origin` param (injected by the per-instance prompt) so a single shared render registration routes the handoff to the correct copy. The server registers each placement under its instance id.
 
 **Tech Stack:** TypeScript, zod v3, React + CopilotKit v2 (`@copilotkit/react-core/v2`), Hono + `@copilotkit/runtime/v2`, Vitest, yarn-classic workspace. Run everything from the repo root (`yarn test`, `yarn typecheck`, `yarn lint`).
 
@@ -235,7 +235,7 @@ contract (bound to the qualifier — it becomes the receptionist for a handed-of
 
 ```ts
 // apps/inbox/workflows/lead-inbox/descriptor.ts
-import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@platform/core'
+import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@atizar/core'
 
 export const replyAgent = defineAgent({
   id: 'reply',
@@ -281,7 +281,7 @@ export const leadInboxAgents = [qualifierAgent, replyAgent]
 
 ```ts
 // apps/inbox/workflows/lead-inbox/server.ts
-import type { PromptStrategy } from '@platform/core'
+import type { PromptStrategy } from '@atizar/core'
 import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
@@ -404,7 +404,7 @@ git commit -m "feat(lead-inbox): workflow module — descriptor, server bindings
 
 ```ts
 // apps/inbox/workflows/github-triage/descriptor.ts
-import { defineAgent, defineWorkflow } from '@platform/core'
+import { defineAgent, defineWorkflow } from '@atizar/core'
 
 export const triageAgent = defineAgent({
   id: 'triage', name: 'TRIAGE', provider: 'claude-cli',
@@ -484,7 +484,7 @@ export const githubTriageServer = (origin: string): ServerBinding[] => [
 import { z } from 'zod'
 import type { RenderSpec, AgentMeta } from '../../client/src/renderSpecs'
 import type { TriageTicket } from '../../client/src/buckets'
-import type { TicketHandoffPayload } from '@platform/core'
+import type { TicketHandoffPayload } from '@atizar/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
 
 export const githubTriageMeta: Record<string, AgentMeta> = {
@@ -571,7 +571,7 @@ that aggregate the workflow modules.
 // apps/inbox/client/src/renderSpecs.ts
 import type { ReactElement } from 'react'
 import type { z } from 'zod'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import type { IconName } from './components/Icon'
 import { renderRegistry } from './renderRegistry'
 
@@ -603,7 +603,7 @@ export type HitlSpec = {
 
 ```ts
 // apps/inbox/workflows/index.ts
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 import { leadInbox } from './lead-inbox/descriptor.js'
 import { githubTriage } from './github-triage/descriptor.js'
 
@@ -616,7 +616,7 @@ export const workflowDescriptors: WorkflowDescriptor[] = [leadInbox, githubTriag
 ```ts
 // apps/inbox/client/src/workflows.ts
 import type { ComponentType } from 'react'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 import { workflowDescriptors } from '../../workflows'
 import type { AgentMeta, RenderSpec, HitlSpec } from './renderSpecs'
 import { leadInboxMeta, leadInboxRenders, leadInboxHitl } from '../../workflows/lead-inbox/client'
@@ -727,7 +727,7 @@ export function createTriagePrompts(instructions: string, origin: string): Promp
 ```ts
 // apps/inbox/agents/qualifier.prompts.ts
 import type { RunAgentInput } from '@ag-ui/client'
-import { decodeHandoff, HandoffPayloadSchema, type PromptStrategy } from '@platform/core'
+import { decodeHandoff, HandoffPayloadSchema, type PromptStrategy } from '@atizar/core'
 
 function fromInbox(instructions: string, origin: string): string {
   return [
@@ -809,7 +809,7 @@ import { githubTriage } from '../workflows/github-triage/descriptor.js'
 import { leadInboxServer } from '../workflows/lead-inbox/server.js'
 import { githubTriageServer } from '../workflows/github-triage/server.js'
 import type { ServerBinding } from '../workflows/lead-inbox/server.js'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 
 export type WorkflowServer = { descriptor: WorkflowDescriptor; bindings: (origin: string) => ServerBinding[] }
 
@@ -827,7 +827,7 @@ export const workflowServers: WorkflowServer[] = [
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { CopilotRuntime, createCopilotEndpoint, InMemoryAgentRunner } from '@copilotkit/runtime/v2'
-import { instanceId } from '@platform/core'
+import { instanceId } from '@atizar/core'
 import { providerRegistry } from './providers.js'
 import { buildAgent } from './build-agent.js'
 import { workflowServers } from './workflows.js'
@@ -907,7 +907,7 @@ cross-workflow contracts. The shell (Task 9) wraps this with the seed+run side e
 // apps/inbox/client/src/deliver.test.ts
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
-import { defineAgent, defineWorkflow } from '@platform/core'
+import { defineAgent, defineWorkflow } from '@atizar/core'
 import { resolveDelivery } from './deliver'
 
 const mk = (id: string, role: 'input' | 'worker', handoffs: string[] = []) => ({
@@ -954,8 +954,8 @@ Expected: FAIL — `resolveDelivery` is not exported.
 
 ```ts
 // apps/inbox/client/src/deliver.ts
-import type { Destination, WorkflowDescriptor } from '@platform/core'
-import { instanceId } from '@platform/core'
+import type { Destination, WorkflowDescriptor } from '@atizar/core'
+import { instanceId } from '@atizar/core'
 
 export type DeliveryResult =
   | { ok: true; instanceId: string; targetWorkflow?: string }
@@ -1098,7 +1098,7 @@ Add an `onOpenWorkflow?: (id: string) => void` prop to `AgentModal`. In the note
 // apps/inbox/client/src/InboxView.tsx
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useCopilotKit, useRenderToolCall } from '@copilotkit/react-core/v2'
-import { instanceId, encodeHandoff, type Destination, type Message } from '@platform/core'
+import { instanceId, encodeHandoff, type Destination, type Message } from '@atizar/core'
 import { useWorkflowRenders } from './useWorkflowRenders'
 import { resolveDelivery } from './deliver'
 import { AgentCard } from './components/AgentCard'
@@ -1293,7 +1293,7 @@ instance id — this is what makes a reused agent two independent CopilotKit ins
 ```tsx
 // apps/inbox/client/src/App.tsx
 import { CopilotKit } from '@copilotkit/react-core/v2'
-import { instanceId } from '@platform/core'
+import { instanceId } from '@atizar/core'
 import { InboxView } from './InboxView'
 import { workflows } from './workflows'
 
@@ -1334,7 +1334,7 @@ git commit -m "feat(client): shell — all agents mounted idle, global handles, 
 ```tsx
 // apps/inbox/client/src/components/WorkflowSwitcher.tsx
 import { Icon } from './Icon'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 
 type WorkflowSwitcherProps = {
   workflows: WorkflowDescriptor[]
@@ -1397,7 +1397,7 @@ In `github-triage/client.tsx`, extend the `render_triage` render so the card can
 lead contract. Add a mapper and pass a second handler:
 
 ```tsx
-import { HandoffPayloadSchema } from '@platform/core'
+import { HandoffPayloadSchema } from '@atizar/core'
 
 const toLead = (t: TriageTicket) => ({
   threadId: t.url,

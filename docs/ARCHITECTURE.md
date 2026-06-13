@@ -33,12 +33,12 @@ _Philosophy-derived:_
   action — the model only proposes.
 - **I3 — Thin layer, not an engine.** One minimal contract `AgentRuntime: run(input) →
   AsyncIterable<AGUIEvent>` (+ optional `resume` + `GATE_OPENED`). AG-UI is the only outward
-  language. The core knows no concrete engine (no engine import in `@platform/core`). We do not
+  language. The core knows no concrete engine (no engine import in `@atizar/core`). We do not
   duplicate engine features (memory / RAG / tool-execution live in the provider layer).
 - **I4 — Swappability proven, not declared.** ≥2 unlike providers out of the box (Mastra +
   claude-cli); the provider conformance suite is the proof the contract didn't leak.
 - **I5 — Framework / userland boundary is physical.** Userland imports only the public SDK
-  (`@platform/core`: `defineAgent` / `defineTool` / `defineProvider`), never internals. No
+  (`@atizar/core`: `defineAgent` / `defineTool` / `defineProvider`), never internals. No
   fork-and-hack; the core is a versioned dependency.
 - **I6 — Skills / knowledge ride inside packages,** versioned with the code they describe
   (discovery from `node_modules`), never in a DB.
@@ -95,7 +95,7 @@ fields so the merge stays trivial. This backs consumer-view editing — not arbi
 ## 3. The `defineAgent` contract
 
 A single object describes an agent; the UI, the pauses, and the rendering all *derive* from it.
-It lives in `@platform/core` (Zod-validated):
+It lives in `@atizar/core` (Zod-validated):
 
 ```ts
 defineAgent({
@@ -126,8 +126,8 @@ defineAgent({
 ## 4. Provider registry & the `AgentRuntime` contract
 
 Models are not hardcoded in the agent. A separate registry defines providers; agents reference one
-by name. The `Provider` interface lives in `@platform/core`; concrete providers live in
-`@platform/providers`; the runtime registry that wires them lives **server-side** (the real
+by name. The `Provider` interface lives in `@atizar/core`; concrete providers live in
+`@atizar/providers`; the runtime registry that wires them lives **server-side** (the real
 providers need Node, and `core` is client-imported — so `spawn` is injected to keep the provider
 package Node-free).
 
@@ -161,7 +161,7 @@ Two polarities, with a deliberate default:
 the open thread are two renderings of the same run. **Human-in-the-loop** is the core product
 moment — the agent pauses at an approval, the human edits/approves, the server executes, audited.
 
-**Packaging:** `@platform/react` ships the chrome (board, switcher, pipeline tree, thread,
+**Packaging:** `@atizar/react` ships the chrome (board, switcher, pipeline tree, thread,
 GateForm, Stop, TraceLog, ConnectionStatus) + the card construction kit (CardShell, primitives,
 `registerCard`, `useThreadResult`); the hooks are the headless layer; **workflow-specific cards
 stay in userland** (demo-app exemplars). Styling is plain CSS over `--atz-*` design tokens
@@ -194,10 +194,10 @@ integrations, trust / self-host / audit, and last-mile UX.
 
 ## 8. Packaging strategy
 
-**One batteries package per axis** (one `@platform/integrations`, one `@platform/providers`) with
+**One batteries package per axis** (one `@atizar/integrations`, one `@atizar/providers`) with
 **subpath entrypoints + optional peer dependencies**, rather than a package per integration or
 provider. Promote an integration or provider to its own package only when its **dependencies
 diverge** (weight or conflict) or its **release cadence diverges** — not for tidiness. The contract
-package (`@platform/core`) is what enables third-party extension. `@platform/*` is a placeholder
+package (`@atizar/core`) is what enables third-party extension. `@atizar/*` is a placeholder
 scope; the framework is named **atizar**, so the locked rename target is **`@atizar/*`** — flip the
 code (package names + imports) and the docs together in one pass before any npm publish.

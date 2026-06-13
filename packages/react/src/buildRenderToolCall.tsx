@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ToolCall, ToolMessage } from '@platform/core'
+import type { ToolCall, ToolMessage } from '@atizar/core'
 import type { DeliverFn, RenderSpec } from './renderSpecs'
 
 // Local replacement for CopilotKit's useRenderToolCall: given a folded assistant tool call,

@@ -7,7 +7,7 @@ import {
   type PromptStrategy,
   type ResumeHandle,
   type Message,
-} from '@platform/core'
+} from '@atizar/core'
 import { mapClaudeStream } from './claude-stream.js'
 
 // Spawns a `claude` run for a prompt and exposes stdout as NDJSON lines + kill().

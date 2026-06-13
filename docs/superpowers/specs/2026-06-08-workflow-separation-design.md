@@ -172,7 +172,7 @@ copy, the emitting workflow id travels **in the tool parameters** as an `origin`
 A workflow becomes a folder `apps/inbox/workflows/<id>/` with three files, one per bundle boundary
 (core/server/client cannot share one import graph — server is Node, client is React):
 
-- **`descriptor.ts`** (imports `@platform/core` only — pure data): `id`, `label`, `iconName`, agent
+- **`descriptor.ts`** (imports `@atizar/core` only — pure data): `id`, `label`, `iconName`, agent
   placements `{ agent, role }[]`, `entryAgentId`, and the published `inputs` contract
   `{ name, schema, agentId }[]`. Validated by `defineWorkflow` (§7).
 - **`server.ts`** (Node): per-agent `prompts` factory + `allowedTools` (the `mcp__…` allow-lists,

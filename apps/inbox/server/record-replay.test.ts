@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent } from '@ag-ui/client'
-import type { Provider, ResumeHandle, GateResolution } from '@platform/core'
+import type { Provider, ResumeHandle, GateResolution } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
 import {
   encodeLine,

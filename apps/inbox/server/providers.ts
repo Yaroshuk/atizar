@@ -1,12 +1,12 @@
-import { defineProviders, type ProviderRegistry, type ProviderFactory } from '@platform/core'
+import { defineProviders, type ProviderRegistry, type ProviderFactory } from '@atizar/core'
 import {
   createMockInboxProvider,
   createClaudeCliProvider,
   createMastraProvider,
-} from '@platform/providers'
+} from '@atizar/providers'
 import { claudeSpawn } from './claude-spawn.js'
 import { makeMastraRunner } from './mastra/runner.js'
-import { databaseUrl } from '@platform/server'
+import { databaseUrl } from '@atizar/server'
 
 const MASTRA_MODEL = process.env.MASTRA_MODEL ?? 'claude-sonnet-4-6'
 

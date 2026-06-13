@@ -6,7 +6,7 @@
 
 **Architecture:** Two changes, both in `apps/inbox/server/mastra/`. (1) **Unify the prompt source:** thread each agent's `PromptStrategy` (already built in the workflow `server.ts`) into the runner, so claude-cli and Mastra build the system prompt from the SAME `buildFirst`/`buildResume` — deleting the runner's hardcoded lead-inbox `buildPrompt`. (2) **Generalize the tool registry:** add the email-inbox tools (`list_unread`, `get_email` reads; `route_emails`, `renderSort`, `applyActions` capture tools) to the Mastra tool map. The runner's gate logic (suspend on the approval-named tool) is already generic and needs no change; machine dispatch works for free once `route_emails` surfaces as a tool-call (the mastra-stream maps it to AG-UI `TOOL_CALL_*`, and the Stage-2 RunObserver dispatches the child — exactly as it does for claude-cli).
 
-**Tech Stack:** Mastra (`@mastra/core`, `@mastra/pg`), `@ai-sdk/anthropic`, the existing `@platform/providers` Mastra seam, Postgres, vitest, Playwright-MCP. `PROVIDER=mastra` + `ANTHROPIC_API_KEY` for the live path; the conformance suite runs on a fake runner (no key).
+**Tech Stack:** Mastra (`@mastra/core`, `@mastra/pg`), `@ai-sdk/anthropic`, the existing `@atizar/providers` Mastra seam, Postgres, vitest, Playwright-MCP. `PROVIDER=mastra` + `ANTHROPIC_API_KEY` for the live path; the conformance suite runs on a fake runner (no key).
 
 **Branch:** continue on `feat/gmail-viewer`. Verify `git rev-parse --abbrev-ref HEAD`.
 
@@ -36,7 +36,7 @@ Read these three files fully before starting:
 ### What is generic already (do NOT touch)
 
 - The gate suspend/resume (keys on `approvalNames` — `saveDraft` for reply, `applyActions` for batch both work).
-- `createMastraProvider` + `mastra-stream.ts` (the chunk→AG-UI mapper) in `@platform/providers` — a `route_emails` tool call surfaces as `TOOL_CALL_START/ARGS/END` automatically, which the Stage-2 RunObserver turns into a child dispatch. Machine dispatch needs NO Mastra-specific code beyond registering `route_emails` as a (capture) tool so the agent can call it.
+- `createMastraProvider` + `mastra-stream.ts` (the chunk→AG-UI mapper) in `@atizar/providers` — a `route_emails` tool call surfaces as `TOOL_CALL_START/ARGS/END` automatically, which the Stage-2 RunObserver turns into a child dispatch. Machine dispatch needs NO Mastra-specific code beyond registering `route_emails` as a (capture) tool so the agent can call it.
 - The shared `PostgresStore` (one bounded pool, `max 8`) — keep it.
 - The provider conformance suite — it runs on a fake runner; your changes must keep it green.
 
@@ -66,7 +66,7 @@ This is the keystone: instead of the runner rebuilding a lead-inbox prompt, it u
 - [ ] **Step 2: Add `prompts` to `MastraRunnerConfig`** and use it. Replace the hardcoded `buildPrompt` with a call to `cfg.prompts.buildFirst(input)` / `cfg.prompts.buildResume(args, executedResult)`:
 
 ```ts
-import type { PromptStrategy } from '@platform/core'
+import type { PromptStrategy } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
 
 export interface MastraRunnerConfig {
@@ -125,8 +125,8 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - [ ] **Step 1: Add the tools to `tools.ts`:**
 
 ```ts
-import { listUnread } from '@platform/integrations/gmail-viewer/list-unread'
-import { getEmail } from '@platform/integrations/gmail-viewer/get-email'
+import { listUnread } from '@atizar/integrations/gmail-viewer/list-unread'
+import { getEmail } from '@atizar/integrations/gmail-viewer/get-email'
 
 // Read tools — call the gmail-viewer functions (the SAME functions the stdio MCP wrapper delegates
 // to). Reads only; no mutation tool is ever a Mastra tool (effects are server-side).
@@ -273,11 +273,11 @@ The conformance suite + unit tests prove structure; the live run proves the emai
 
 ### Task D1: foundation check + docs
 
-- [ ] **check-foundation** — assert I4 (now TWO unlike providers run the SAME flagship workflow — swappability proven, not declared), I2/I9 (Mastra path: the model proposes via `route_emails`/`applyActions`/`saveDraft` capture tools; the SERVER executes the effect after approval — no Gmail mutation is a Mastra tool), I3 (no engine import leaked into `@platform/core`; the Mastra assembly stays in `apps/inbox/server/mastra/`). WARN → STOP.
+- [ ] **check-foundation** — assert I4 (now TWO unlike providers run the SAME flagship workflow — swappability proven, not declared), I2/I9 (Mastra path: the model proposes via `route_emails`/`applyActions`/`saveDraft` capture tools; the SERVER executes the effect after approval — no Gmail mutation is a Mastra tool), I3 (no engine import leaked into `@atizar/core`; the Mastra assembly stays in `apps/inbox/server/mastra/`). WARN → STOP.
 
 - [ ] **HANDOFF.md** — mark Stage 3b ✅ BUILT: the Mastra runner now uses the agent `PromptStrategy` (one prompt source for both providers; hardcoded reply prompt deleted); the email-inbox tools are registered; machine dispatch + batch gate + reply draft verified live on `PROVIDER=mastra`; the cancel-mid-run guard holds. Note that the public demo can now run on Mastra. Next = Stage 4 (UI chrome).
 
-- [ ] **`docs/AGENTIC.md`** — add the parked future item the user requested (2026-06-11): a Phase-2 **`add-provider` / `write-provider` consumer skill** (in `@platform/providers`), with the conformance suite as the definition-of-done; the first real exercise will be adding a non-Mastra, non-CLI provider (e.g. the Anthropic SDK directly) — explicitly LATER, after the beta demo. Match the existing roadmap bullet style; mark it ❌ (not built), gated on demand.
+- [ ] **`docs/AGENTIC.md`** — add the parked future item the user requested (2026-06-11): a Phase-2 **`add-provider` / `write-provider` consumer skill** (in `@atizar/providers`), with the conformance suite as the definition-of-done; the first real exercise will be adding a non-Mastra, non-CLI provider (e.g. the Anthropic SDK directly) — explicitly LATER, after the beta demo. Match the existing roadmap bullet style; mark it ❌ (not built), gated on demand.
 
 - [ ] **Commit docs** (exact paths).
 
@@ -307,4 +307,4 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 - **Stage 4 — React/UI chrome:** primitives, header (Chrome tabs + Stop-all + activity toggle), F3 health badge, F6 START-disable, F7 pipeline states, ActivityLog panel. Browser-verify every flow.
 - **Stage 5 — polish + full-scenario E2E**; reword the HANDOFF draft-only line.
-- **Packaging tail (7c):** bearer-token auth; `DEMO=1` (PGlite + mock + synthetic cassettes; note the public demo's Mastra path is separate from the key-less DEMO path — clarify the two at packaging time); golden-set eval; README; LICENSE + `@platform/*` scope rename (ASK THE USER for both); the `write-provider` skill + a new provider (Anthropic SDK) when demand lands.
+- **Packaging tail (7c):** bearer-token auth; `DEMO=1` (PGlite + mock + synthetic cassettes; note the public demo's Mastra path is separate from the key-less DEMO path — clarify the two at packaging time); golden-set eval; README; LICENSE + `@atizar/*` scope rename (ASK THE USER for both); the `write-provider` skill + a new provider (Anthropic SDK) when demand lands.

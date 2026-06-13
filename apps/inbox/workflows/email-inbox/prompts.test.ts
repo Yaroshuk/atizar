@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import type { RunAgentInput } from '@ag-ui/client'
-import { encodeHandoff } from '@platform/core'
+import { encodeHandoff } from '@atizar/core'
 import { createSorterPrompts, createReplyPrompts, createBatchPrompts } from './prompts.js'
 
 const inputWith = (payload: unknown): RunAgentInput =>

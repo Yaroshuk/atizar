@@ -28,7 +28,7 @@ export type ResolvedCredential =
 // Resolve a live credential for a (integration, connection) pair. `connectionId` is a
 // developer-chosen connection LABEL ('default' | 'home' | 'work' | …) — NOT a user account; it
 // lets two workflows reuse one integration under two credentials (e.g. home vs work mailbox).
-// Built-in resolvers (apiKey/oauth2) ship in @platform/server; a custom-kind integration registers
+// Built-in resolvers (apiKey/oauth2) ship in @atizar/server; a custom-kind integration registers
 // its own — core only defines this interface.
 export type CredentialResolver = (ctx: {
   integration: string

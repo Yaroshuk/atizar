@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { instanceId, type AgentDefinition } from '@platform/core'
+import { instanceId, type AgentDefinition } from '@atizar/core'
 import { useBoard } from './hooks/useBoard'
 import { useDispatch } from './hooks/useDispatch'
 import { useActivity } from './hooks/useActivity'

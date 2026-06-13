@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@platform/core'
+import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@atizar/core'
 import { STATUS_LABEL, type Status } from '../status'
 import { isDevMode } from '../devMode'
 import { ThreadResultsContext } from '../threadResults'

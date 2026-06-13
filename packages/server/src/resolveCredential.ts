@@ -1,5 +1,5 @@
-import type { AuthSpec, CredentialResolver, ResolvedCredential } from '@platform/core'
-import { isOAuth2 } from '@platform/core'
+import type { AuthSpec, CredentialResolver, ResolvedCredential } from '@atizar/core'
+import { isOAuth2 } from '@atizar/core'
 import { db } from './db/client.js'
 import { atizarEnv } from './env.js'
 import { makeCredentialStore, type CredentialStore } from './credentialStore.js'

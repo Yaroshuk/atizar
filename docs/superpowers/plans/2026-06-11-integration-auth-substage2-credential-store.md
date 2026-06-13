@@ -4,13 +4,13 @@
 
 **Goal:** Build the credential store + the single resolution path (spec: `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md`, §3): an AES-encrypted `credentials` Postgres table (PK `(connection_id, integration)`), a `crypto.ts` (encrypt/decrypt with the key from `atizarEnv.secretKey()`), a `credentialStore` (encrypt-on-write / decrypt-on-read CRUD), and `resolveCredential` with built-in `apiKey` + `oauth2` resolvers (incl. token refresh) plus a registry seam for custom-kind resolvers. NO OAuth connect routes/UI, NO skill changes, NO gmail rewrite — those are sub-stages 3–5. Also seed `.env.example`.
 
-**Architecture:** All in `@platform/server`, additive. `crypto.ts` is pure (Node `crypto`, no dep). `credentialStore.ts` wraps the new drizzle table, encrypting the secret blob at the boundary so plaintext never hits the DB. `resolveCredential.ts` dispatches by `auth.kind` to a resolver: `apiKey` reads `atizarEnv.apiKey(integration)` (never stored), `oauth2` loads+decrypts the row and refreshes via the provider token endpoint if expired, a custom kind calls a registered resolver. A tiny `oauthProviders.ts` map supplies the `google` token endpoint (shared with sub-stage 3's connect flow). Returns `ResolvedCredential | null` (null = not connected → the F3 health surface shows the agent as needing a connection).
+**Architecture:** All in `@atizar/server`, additive. `crypto.ts` is pure (Node `crypto`, no dep). `credentialStore.ts` wraps the new drizzle table, encrypting the secret blob at the boundary so plaintext never hits the DB. `resolveCredential.ts` dispatches by `auth.kind` to a resolver: `apiKey` reads `atizarEnv.apiKey(integration)` (never stored), `oauth2` loads+decrypts the row and refreshes via the provider token endpoint if expired, a custom kind calls a registered resolver. A tiny `oauthProviders.ts` map supplies the `google` token endpoint (shared with sub-stage 3's connect flow). Returns `ResolvedCredential | null` (null = not connected → the F3 health surface shows the agent as needing a connection).
 
 **Tech Stack:** TypeScript (strict), drizzle + Postgres (already wired), Node `crypto` (AES-256-GCM), `fetch` (token refresh, injectable for tests), vitest (unit + real-PG), yarn-classic, NO build step.
 
 **Branch:** `feat/gmail-viewer`. Verify `git rev-parse --abbrev-ref HEAD`; STOP if not on it.
 
-**PREREQUISITE:** Sub-stage 1 (the contract types + `atizarEnv`) is BUILT. This plan imports `AuthSpec`/`ResolvedCredential`/`CredentialResolver` from `@platform/core` and `atizarEnv` from `@platform/server`. If sub-stage 1 is not done, STOP — build it first.
+**PREREQUISITE:** Sub-stage 1 (the contract types + `atizarEnv`) is BUILT. This plan imports `AuthSpec`/`ResolvedCredential`/`CredentialResolver` from `@atizar/core` and `atizarEnv` from `@atizar/server`. If sub-stage 1 is not done, STOP — build it first.
 
 ---
 
@@ -22,7 +22,7 @@ The integration authentication feature (full design in the spec). Sub-stage 1 sh
 
 ### The locked foundation (relevant invariants)
 
-- **I3** — `@platform/core` stays engine-free; all of THIS sub-stage is in `@platform/server` (Node + Postgres live here legitimately). Do not put the store or crypto in core.
+- **I3** — `@atizar/core` stays engine-free; all of THIS sub-stage is in `@atizar/server` (Node + Postgres live here legitimately). Do not put the store or crypto in core.
 - **I5** — the resolver registry is the boundary seam: built-in `apiKey`/`oauth2` resolvers ship here; a custom-kind integration registers its OWN resolver (userland) WITHOUT editing core or this file. Build the registry so `registerResolver(kind, fn)` works from outside.
 
 ### Conventions (same as every sub-stage)
@@ -40,7 +40,7 @@ The integration authentication feature (full design in the spec). Sub-stage 1 sh
 - **`packages/server/src/db/client.ts`** — `db` (drizzle instance) + `databaseUrl` (now via `atizarEnv`, from sub-stage 1). Import `db` for the store.
 - **`atizarEnv`** (`packages/server/src/env.ts`, sub-stage 1) — `secretKey()`, `apiKey(integration)`, `oauthClient(provider)`, `connection()`, `databaseUrl()`. Use these — never read `process.env` directly.
 - **`packages/server/src/index.ts`** — the barrel (named exports). Export the new public surface (`resolveCredential`, `registerResolver`, `credentialStore`, the types).
-- **`@platform/core`** — import `AuthSpec`, `ResolvedCredential`, `CredentialResolver`, `isOAuth2` (sub-stage 1).
+- **`@atizar/core`** — import `AuthSpec`, `ResolvedCredential`, `CredentialResolver`, `isOAuth2` (sub-stage 1).
 
 ### Encryption model (spec §3)
 
@@ -433,7 +433,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest'
 import { resolveCredential, registerResolver } from './resolveCredential.js'
-import type { AuthSpec } from '@platform/core'
+import type { AuthSpec } from '@atizar/core'
 
 const fakeStore = (initial: Record<string, { kind: string; secret: string; expiresAt: Date | null }>) => {
   const m = new Map(Object.entries(initial))
@@ -616,7 +616,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 **Files:** Modify `HANDOFF.md`
 
-- [ ] **Step 1: Foundation check** — `check-foundation` on the sub-stage diff. Assert: no engine import entered `@platform/core` (all here is `@platform/server`); the resolver registry is the I5 seam (a custom kind plugs in without editing core or `resolveCredential.ts`); secrets are encrypted at rest (plaintext never in the DB). WARN → STOP.
+- [ ] **Step 1: Foundation check** — `check-foundation` on the sub-stage diff. Assert: no engine import entered `@atizar/core` (all here is `@atizar/server`); the resolver registry is the I5 seam (a custom kind plugs in without editing core or `resolveCredential.ts`); secrets are encrypted at rest (plaintext never in the DB). WARN → STOP.
 
 - [ ] **Step 2: HANDOFF** — under the integration-auth track: "Sub-stage 2 ✅ BUILT — `credentials` table (encrypted, PK `(connection_id, integration)`) + `crypto.ts` (AES-256-GCM) + `credentialStore` + `resolveCredential` (built-in apiKey/oauth2 + token refresh + custom-kind registry) + `oauthProviders` (google) + `.env.example`. Next = sub-stage 3 (OAuth connect routes + Connections UI + claude-spawn env pass-through)."
 

@@ -43,23 +43,24 @@ can't enforce (arrow-const named-export components, `type {Name}Props`, strict
 one-component-per-file, naming, import grouping), distilled from the Magma house
 style and filtered to this stack. Read it before writing client code.
 
-## Packages (`@platform/*` split — BUILT)
+## Packages (`@atizar/*` split — BUILT)
 
 Yarn-classic (1.22) workspace. Quick map (full detail → `docs/BUILD-LOG.md` §5):
 
-- `@platform/core` — isomorphic contract: `messages`, `defineAgent`, `providers` (contract),
+- `@atizar/core` — isomorphic contract: `messages`, `defineAgent`, `providers` (contract),
   `handoff`. Depends on nothing concrete (just `@ag-ui/client` + `zod`).
-- `@platform/providers` — isomorphic; `claude-stream`, `claude-cli-provider`, `mock-provider`.
+- `@atizar/providers` — isomorphic; `claude-stream`, `claude-cli-provider`, `mock-provider`.
   The `spawn` is **INJECTED**, so it stays Node-free.
-- `@platform/integrations` — node-only batteries; subpath exports `./gmail-basic` +
+- `@atizar/integrations` — node-only batteries; subpath exports `./gmail-basic` +
   `./gmail-basic/format`; `googleapis` is an **optional peer** (lazy-loaded, fail-fast).
 - `apps/inbox` — depends on the three by name; concrete agents in `apps/inbox/agents/`; `server/`,
   `client/`, `mcp/inbox-tools.mjs`.
 
 **No build step** — each package's `exports` points at `./src/index.ts`; Vite/tsx/vitest
-transpile workspace deps directly; typecheck = `tsc --build`. `@platform/*` is a **placeholder
-scope — rename before any npm publish**. `@platform/react` + `@platform/server` are deferred
-(client + server layers still live in `apps/inbox/`).
+transpile workspace deps directly; typecheck = `tsc --build`. `@atizar/*` is the **final npm
+scope** (renamed from the `@platform/*` placeholder at sub-step 7c-E). All five packages —
+`core`, `providers`, `integrations`, `server`, `react` — are extracted (`@atizar/server` at 7a,
+`@atizar/react` at 7b); the demo app `apps/inbox/` consumes them by name.
 
 ## Stack
 
@@ -89,7 +90,7 @@ scope — rename before any npm publish**. `@platform/react` + `@platform/server
   beliefs + conscious "no"s) and `docs/ARCHITECTURE.md` section 0 (invariants I1–I15) define what
   the framework IS. A change that violates or erodes a belief/invariant requires an **explicit
   warning that it's dangerous + the developer's direct confirmation** before proceeding. Run the
-  `check-foundation` skill when a change touches actions, providers, `@platform/core`, the
+  `check-foundation` skill when a change touches actions, providers, `@atizar/core`, the
   framework/userland boundary, or those docs. Backstop: the `guard-foundation-edits` hook prompts
   ("ask") on any edit to those two docs. (The temporary build spec `pipeline-updated-3.md` is NOT
   protected — it changes as the beta is built; the clean `docs/pipeline.md` joins the protected set
@@ -233,8 +234,8 @@ wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, 
   `N active · M awaiting approval`). On teardown a transient `Agent <localId> not found` console warning is
   benign (an unregister/pending-probe race, same class as the startup warnings).
 - **Per-package `outDir`/`tsBuildInfoFile`:** under `tsc --build`, the base's relative `outDir`
-  made two packages collide on `dist-types/index.d.ts` (TS5055). `@platform/providers` +
-  `@platform/integrations` set a package-local `outDir`+`tsBuildInfoFile`; `@platform/core` relies
+  made two packages collide on `dist-types/index.d.ts` (TS5055). `@atizar/providers` +
+  `@atizar/integrations` set a package-local `outDir`+`tsBuildInfoFile`; `@atizar/core` relies
   on the base and "owns" the root dist-types (a known minor asymmetry — do NOT fix now).
 - **vitest from the app dir** needs `-c ../../vitest.config.ts` (its `test` script has this) —
   vitest stops at `apps/inbox/vite.config.ts` (no test block) and won't walk up. Root `yarn test`
@@ -242,7 +243,7 @@ wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, 
 - **Dev record/replay loop:** `DEV_RECORD_REPLAY=1` wraps every agent's provider in a record/replay
   decorator (`apps/inbox/server/record-replay.ts`); cassettes are one JSONL per `wf__agent` under
   `apps/inbox/.cassettes/` (gitignored), keyed by step (= resolved-approval count from
-  `resolvedApprovalCount` in `@platform/core`). First run of each scenario hits real `claude` and
+  `resolvedApprovalCount` in `@atizar/core`). First run of each scenario hits real `claude` and
   writes the cassette; every subsequent run replays instantly. Delete a file or set
   `DEV_RECORD_REPLAY=record` to force-refresh after a prompt change. Unset = pure production path
   (no wrapper, byte-identical). Detail → `docs/dev-record-replay.md`; build narrative →
@@ -270,13 +271,13 @@ wf__agent })` (localId = `wf__agent#<seq>`), seeds the handoff, `runAgent`s it, 
   approval expiry never auto-resolves (stale badge); thread UI = Trace render + per-WorkItem SSE
   tail — `@copilotkit/*` transport is dropped, AG-UI stays as the event vocabulary (assistant-ui =
   named fallback renderer). Provider contract v2 (optional `resume?` + `GATE_OPENED` signal) lands
-  in `@platform/core` BEFORE any PipelineService code.
+  in `@atizar/core` BEFORE any PipelineService code.
 - Server = Hono (Web-Standards / fetch; mounts CopilotKit endpoint without adapters). Swappable behind a thin layer.
 - Slice verified by manual click-through; TDD + review loop starts with the reusable core layer.
 - Config split (later): structure in files, manager-editable text fields in DB; secrets in env only.
 - Models accessed via a separate provider registry (CLI / API); agents reference a provider by name.
 - First real provider = **`claude-cli`** (subprocess), not `claude-api` (no API key; binary uses the Claude Code subscription). HITL = **detect the approval tool call in the stream-json and kill the process** (we do NOT hold the CLI open awaiting a human — that would fight CopilotKit's client-held two-request pause). Resume = **stateless re-prime** (fresh run, "human approved"), no server-side session. The runtime **registry lives in `server/`** (not `core/`) because the real provider needs Node and `core/` is imported by the client; the injected `spawn` keeps the provider Node-free. Custom tools are exposed to the CLI via a **stdio MCP server**; tool names arrive prefixed `mcp__inbox__…` and are stripped to the bare names the client registered.
-- Core layer is the **`@platform/core`** package (shared by client+server, no React/Node imports). The split happened once the 2nd-consumer precondition was met. `@platform/react`/`@platform/server` remain deferred.
+- Core layer is the **`@atizar/core`** package (shared by client+server, no React/Node imports). The split happened once the 2nd-consumer precondition was met. `@atizar/react`/`@atizar/server` remain deferred.
 - Message layer reuses `@ag-ui` types IN FULL (import `Message`/`ToolCall` from `@ag-ui/client`; derive per-role types via `Extract<Message,{role}>` — `@ag-ui/client` doesn't export `AssistantMessage`/`ToolMessage` by name). We add behavior (pure functions), not a parallel domain model. Approval tool names are a PARAMETER (from `def.approvals`), never hardcoded.
 - `defineAgent.renders` is keyed BY TOOL NAME (`{ renderLead: "LeadCard", saveDraft: "ApprovalDialog" }`); values are component _names_; the client `renderRegistry` maps name→React component (keeps `core/` React-free).
 - `defineAgent` validates STRUCTURE only (`approvals ⊆ tools`, `renders` keys ⊆ `tools`). Provider-existence is enforced by `registry.resolve(def.provider)` at wiring time. `defineAgent(def)` param is typed as `AgentDefinition` (compile-time field checks); switch to `unknown` + `.strict()` when config is loaded from file/DB (deferred). zod v3 API.

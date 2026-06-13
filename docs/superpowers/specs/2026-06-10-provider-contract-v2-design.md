@@ -1,7 +1,7 @@
 # Provider contract v2 — design
 
-> **Status: design (approved).** Beta build order **step 1** — lands in `@platform/core` +
-> `@platform/providers` BEFORE any PipelineService code. Source of truth for the locked
+> **Status: design (approved).** Beta build order **step 1** — lands in `@atizar/core` +
+> `@atizar/providers` BEFORE any PipelineService code. Source of truth for the locked
 > decisions: `docs/pipeline-updated-3.md` §1.4 + the HANDOFF build order. This spec only
 > consolidates those into a buildable step-1 surface; it introduces no new architectural
 > decisions.
@@ -36,7 +36,7 @@ and prove them with a provider-agnostic conformance suite — without disturbing
 stream; the old client does not consume it and ignores it. No forced cassette wipe: old cassettes
 replay as before (they simply lack the new event); new recordings include it.
 
-## 3. `@platform/core` additions
+## 3. `@atizar/core` additions
 
 ### 3.1 `resume?` on `Provider`
 
@@ -111,7 +111,7 @@ without reaching for the runId/input it never sees.
 ### 3.3 Conformance suite
 
 `runProviderConformance(makeProvider, opts)` — a function that, given a way to construct a
-provider for a fixed scenario, asserts the v2 invariants. Lives in `@platform/core` (so any
+provider for a fixed scenario, asserts the v2 invariants. Lives in `@atizar/core` (so any
 provider package can import it) and is *invoked* from each provider's own test file.
 
 Invariants asserted:
@@ -130,7 +130,7 @@ Invariants asserted:
 mock directly and `claude-cli` over a fake spawn. The Mastra row is a reserved, `.skip`-ed (or
 conditionally-registered) case until step 5.
 
-## 4. `@platform/providers` changes
+## 4. `@atizar/providers` changes
 
 ### 4.1 `claude-stream`
 

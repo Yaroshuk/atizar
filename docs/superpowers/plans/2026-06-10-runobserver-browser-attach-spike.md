@@ -4,7 +4,7 @@
 
 **Goal:** Prove the post-CopilotKit thread design — a browser attaches to a server-side agent run, sees history + a live SSE tail, and approves via a plain HTTP POST that resumes the SAME trace — before building the Postgres spine.
 
-**Architecture:** A durable pure `foldEventsToMessages` (in `@platform/core`) reduces AG-UI events to `Message[]` (what CopilotKit did internally). A throwaway in-memory RunObserver consumes `provider.run()` / `provider.resume()`, appends each event to a per-WorkItem `trace[]` with a monotonic `seq`, and re-publishes on an EventEmitter. Two READ endpoints (`/api/workitems/:id/trace` JSON snapshot, `/api/workitems/:id/stream` SSE) — these shapes survive into steps 3/6. The record/replay decorator is extended to also wrap `resume()` (Variant A) so the whole flow replays from the `lead-inbox__reply` cassette.
+**Architecture:** A durable pure `foldEventsToMessages` (in `@atizar/core`) reduces AG-UI events to `Message[]` (what CopilotKit did internally). A throwaway in-memory RunObserver consumes `provider.run()` / `provider.resume()`, appends each event to a per-WorkItem `trace[]` with a monotonic `seq`, and re-publishes on an EventEmitter. Two READ endpoints (`/api/workitems/:id/trace` JSON snapshot, `/api/workitems/:id/stream` SSE) — these shapes survive into steps 3/6. The record/replay decorator is extended to also wrap `resume()` (Variant A) so the whole flow replays from the `lead-inbox__reply` cassette.
 
 **Tech Stack:** TypeScript, `@ag-ui/client` events, Hono + `hono/streaming` (SSE), React (Vite), vitest. Spike driven by `DEV_RECORD_REPLAY=1`.
 
@@ -386,7 +386,7 @@ import {
   type Message,
   type ResumeHandle,
   type GateResolution,
-} from '@platform/core'
+} from '@atizar/core'
 ```
 
 Replace the `withRecordReplay` function body with (run() unchanged; resume() added conditionally):
@@ -482,7 +482,7 @@ import type {
   ProviderRegistry,
   PromptStrategy,
   Provider,
-} from '@platform/core'
+} from '@atizar/core'
 import { withRecordReplay, recordReplayMode, cassettesDir } from './record-replay.js'
 
 // Resolves the provider FACTORY for an agent passport and constructs the provider from
@@ -574,7 +574,7 @@ import {
   type GateResolution,
   type Provider,
   type ResumeHandle,
-} from '@platform/core'
+} from '@atizar/core'
 
 // ───────────────────────────────────────────────────────────────────────────
 // STEP-2 SPIKE — THROWAWAY. Replaced at step 3 by Postgres-backed Trace + the
@@ -786,7 +786,7 @@ In `apps/inbox/server/index.ts`:
 (a) Update imports — add `buildProvider` and the dev routes + a `Provider` type:
 
 ```ts
-import { instanceId, type Provider } from '@platform/core'
+import { instanceId, type Provider } from '@atizar/core'
 import { providerRegistry } from './providers.js'
 import { buildAgent, buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
@@ -875,7 +875,7 @@ import {
   readGateOpened,
   type GateOpenedValue,
   type Message,
-} from '@platform/core'
+} from '@atizar/core'
 
 // THROWAWAY step-2 spike page. Proves: attach to a server-side run without CopilotKit,
 // fold the trace, follow the live SSE tail, approve via plain POST (same tail continues).
@@ -1126,7 +1126,7 @@ git commit -m "docs(handoff): step 2 (RunObserver + browser attach) BUILT & brow
 
 **Placeholder scan:** no TBD/TODO; every code step shows full code; commands have expected output.
 
-**Type consistency:** `buildProvider` signature matches its call in Task 5; `WorkItemRun`/`TraceEntry`/`RunStatus` consistent across Task 4; `foldEventsToMessages`/`pairToolResults`/`readGateOpened`/`GateOpenedValue` are real `@platform/core` exports used consistently; `ResumeHandle`/`GateResolution` shapes match `providers.ts`; SSE `id`=seq / `event: status` consistent between server (Task 4) and client (Task 6).
+**Type consistency:** `buildProvider` signature matches its call in Task 5; `WorkItemRun`/`TraceEntry`/`RunStatus` consistent across Task 4; `foldEventsToMessages`/`pairToolResults`/`readGateOpened`/`GateOpenedValue` are real `@atizar/core` exports used consistently; `ResumeHandle`/`GateResolution` shapes match `providers.ts`; SSE `id`=seq / `event: status` consistent between server (Task 4) and client (Task 6).
 
 **PASS 2 demonstrated genuinely:** the WorkItem id rides in the URL (`?spike=1&id=…`), so a browser reload re-attaches to the same still-alive in-memory server run (snapshot from 0 + SSE re-tail). The only loss boundary is a SERVER restart (in-memory store) — which is exactly what step 3's Postgres-backed Trace removes; note that boundary in the HANDOFF but don't build durability now (out of scope, 2-day timebox).
 ```

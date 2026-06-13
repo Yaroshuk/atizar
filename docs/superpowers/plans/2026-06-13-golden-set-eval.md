@@ -6,7 +6,7 @@
 
 **Architecture:** An in-process eval harness builds a real `PipelineService` exactly as `apps/inbox/server/index.ts` does — but with `DEMO=1` (→ in-memory PGlite + the `demo` record-replay provider reading `apps/inbox/demo-cassettes/`) and with each agent's server effects replaced by credential-free fakes that LOG every call. Scenarios dispatch one entry agent, the harness drives the gate loop to quiescence, and tests assert on collected structural facts. The cap follow-up uses an injected blocking provider; the cross-workflow follow-up is a browser E2E.
 
-**Tech Stack:** TypeScript, vitest, drizzle + PGlite (in-memory Postgres-in-WASM), `@platform/server`, `@platform/core`, the existing `record-replay.ts` `demo` mode.
+**Tech Stack:** TypeScript, vitest, drizzle + PGlite (in-memory Postgres-in-WASM), `@atizar/server`, `@atizar/core`, the existing `record-replay.ts` `demo` mode.
 
 ---
 
@@ -172,7 +172,7 @@ export const leadInboxScenarios: GoldenScenario[] = [
 
 ```ts
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { runMigrations, resetDb } from '@platform/server'
+import { runMigrations, resetDb } from '@atizar/server'
 import { runGolden } from './runner.js'
 import { leadInboxScenarios } from './scenarios/lead-inbox.js'
 
@@ -229,9 +229,9 @@ Expected: FAIL — `Cannot find module './runner.js'` (or a type error). This co
 - [ ] **Step 4: Implement `apps/inbox/eval/runner.ts`**
 
 ```ts
-import type { Provider } from '@platform/core'
-import { instanceId, composeInstructions } from '@platform/core'
-import { db, makePipelineService, type AgentRuntime } from '@platform/server'
+import type { Provider } from '@atizar/core'
+import { instanceId, composeInstructions } from '@atizar/core'
+import { db, makePipelineService, type AgentRuntime } from '@atizar/server'
 import { providerRegistry } from '../server/providers.js'
 import { buildProvider } from '../server/build-agent.js'
 import { workflowServers } from '../server/workflows.js'
@@ -517,7 +517,7 @@ The single-gate `expect.gates` shape in `runner.ts` asserts an exact length. The
 
 ```ts
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { runMigrations, resetDb } from '@platform/server'
+import { runMigrations, resetDb } from '@atizar/server'
 import { runGolden } from './runner.js'
 import { emailInboxScenarios } from './scenarios/email-inbox.js'
 
@@ -581,8 +581,8 @@ A self-contained eval test: build a `PipelineService` with a custom `resolveAgen
 ```ts
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import type { BaseEvent } from '@ag-ui/client'
-import type { Provider } from '@platform/core'
-import { runMigrations, resetDb, db, makePipelineService, type AgentRuntime } from '@platform/server'
+import type { Provider } from '@atizar/core'
+import { runMigrations, resetDb, db, makePipelineService, type AgentRuntime } from '@atizar/server'
 
 beforeAll(async () => {
   await runMigrations()
@@ -707,7 +707,7 @@ If the triage flow replays cleanly through the harness (the triage agent reads t
 
 - [ ] **Step 2: Run the `check-foundation` skill**
 
-The harness touches providers (injected fake/blocking provider) and the framework/userland boundary (eval lives in `apps/inbox`, imports only `@platform/*` + the app's own server modules). Expected verdict: CLEAR (no new engine import into `@platform/core`; no userland reach into package internals).
+The harness touches providers (injected fake/blocking provider) and the framework/userland boundary (eval lives in `apps/inbox`, imports only `@atizar/*` + the app's own server modules). Expected verdict: CLEAR (no new engine import into `@atizar/core`; no userland reach into package internals).
 
 - [ ] **Step 3: Full green gate**
 

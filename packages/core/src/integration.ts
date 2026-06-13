@@ -2,7 +2,7 @@
 // defineIntegration() wrapper, no runtime registration. An integration is still a set of pure
 // functions (the `write-integration` skill's shape); these types only name the recurring RESULT
 // shapes so integrations and the server health/effect seams are uniform. Pure: no fs, no Node,
-// no engine import (invariant I3 — this lives in @platform/core, which the client imports).
+// no engine import (invariant I3 — this lives in @atizar/core, which the client imports).
 
 // The result of an integration's credentials/health probe (the F3 health surface consumes it).
 // `ok:false` MUST carry an actionable `hint` (where creds live + which skill explains setup).

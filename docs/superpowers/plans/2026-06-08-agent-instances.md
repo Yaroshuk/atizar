@@ -6,7 +6,7 @@
 
 **Architecture:** The server is unchanged (one agent per `wf__agent`). The client creates a temporary **proxied agent** per live instance on demand via CopilotKit's `registerProxiedAgent({ agentId, runtimeAgentId })`, runs it immediately, and `unregister`s it when done. A per-agent cap (`maxInstances`, default 2) bounds concurrency; overflow waits in a per-agent queue and auto-starts when a copy finishes. The pipeline is rebuilt from the live instance list as repeated depth-2 `parent → [children container]` blocks.
 
-**Tech Stack:** TypeScript, React, Vite, Vitest, `@copilotkit/react-core/v2` + `@copilotkit/core`, `@platform/core` (zod), yarn-classic workspace.
+**Tech Stack:** TypeScript, React, Vite, Vitest, `@copilotkit/react-core/v2` + `@copilotkit/core`, `@atizar/core` (zod), yarn-classic workspace.
 
 **Spec:** `docs/superpowers/specs/2026-06-08-agent-instances-design.md`
 
@@ -182,7 +182,7 @@ The manager (Task 7) needs to derive status for an imperatively-created agent, w
 ```ts
 import { describe, it, expect } from 'vitest'
 import { statusFrom } from './statusFrom'
-import type { Message } from '@platform/core'
+import type { Message } from '@atizar/core'
 
 const approvalMsg: Message = {
   id: '1',
@@ -213,7 +213,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Implement `statusFrom.ts`**
 
 ```ts
-import { hasPendingApproval, type Message } from '@platform/core'
+import { hasPendingApproval, type Message } from '@atizar/core'
 import type { Status, Lifecycle } from './status'
 
 // Pure status derivation shared by the useAgentStatus hook and the instance manager.
@@ -255,7 +255,7 @@ Add the import and drop the now-unused `hasPendingApproval` import:
 
 ```ts
 import { statusFrom } from './statusFrom'
-import { type Message } from '@platform/core'
+import { type Message } from '@atizar/core'
 ```
 
 - [ ] **Step 6: Run the existing hook test + typecheck**
@@ -660,7 +660,7 @@ This is the integration core. It is React + CopilotKit bound, so it is verified 
 ```ts
 import { useCallback, useRef, useState } from 'react'
 import { useCopilotKit } from '@copilotkit/react-core/v2'
-import { encodeHandoff, type Message } from '@platform/core'
+import { encodeHandoff, type Message } from '@atizar/core'
 import type { Status } from './status'
 import { statusFrom } from './statusFrom'
 import { canSpawn, type Routable } from './instancesCore'

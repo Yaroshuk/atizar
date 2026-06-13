@@ -1,4 +1,4 @@
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 
 type SortCounts = { reply?: number; reader?: number; spam?: number; important?: number }
 type SortSummaryCardProps = { summary: string; counts?: SortCounts }

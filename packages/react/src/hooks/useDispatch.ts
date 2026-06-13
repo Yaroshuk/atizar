@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import { useWorkflowsConfig } from '../workflowsContext'
 import { authHeaders } from '../authHeaders'
 

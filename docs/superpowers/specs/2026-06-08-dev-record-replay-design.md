@@ -161,7 +161,7 @@ but step 1 is recorded live — the file fills in incrementally across the natur
 
 | Unit | Where | Purpose | Pure? |
 |------|-------|---------|-------|
-| `resolvedApprovalCount(messages, approvalNames)` | `@platform/core` (messages.ts) | count resolved approvals → the step index | pure, isomorphic |
+| `resolvedApprovalCount(messages, approvalNames)` | `@atizar/core` (messages.ts) | count resolved approvals → the step index | pure, isomorphic |
 | event (de)serialization + step tagging | server (record-replay.ts) | `{step, event}` line encode/decode | pure |
 | cassette store | server (record-replay.ts) | read step events / append step events to a `.jsonl` file under `.cassettes/` | node fs |
 | `withRecordReplay(provider, {key, approvalNames, dir, mode})` | server (record-replay.ts) | the `Provider → Provider` decorator | node (composes the above) |
@@ -169,7 +169,7 @@ but step 1 is recorded live — the file fills in incrementally across the natur
 | `scanCassette(text)` → `{file, line, kind, snippet}[]` | server (record-replay.ts) | regex/keyword pass flagging emails, names, addresses, phones, token/secret-looking strings — backs the mandatory share-safety scan so it's deterministic + unit-testable | pure |
 
 Node-only pieces live in `apps/inbox/server/` for now (same staging as the deferred
-`@platform/server` extraction); the pure step-count helper lives in `@platform/core` beside
+`@atizar/server` extraction); the pure step-count helper lives in `@atizar/core` beside
 `approvalResolved`. Promote to a package when the server layer is extracted.
 
 ## Data flow
@@ -235,4 +235,4 @@ own step, but the prose it needs is authored here as part of the feature.
 - Committed scrubbed fixtures for shareable demos.
 - Stale-recording prompt-hash warning (may land in v1 if cheap).
 - Artificial streaming delays for realistic feel.
-- Promotion of the node pieces into `@platform/server` when that extraction happens.
+- Promotion of the node pieces into `@atizar/server` when that extraction happens.

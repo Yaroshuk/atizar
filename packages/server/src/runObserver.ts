@@ -6,7 +6,7 @@ import {
   type EffectFn,
   type GateResolution,
   type Provider,
-} from '@platform/core'
+} from '@atizar/core'
 import type { Db } from './db/client.js'
 import type { StateStore } from './stateStore.js'
 import type { WorkerPool } from './workerPool.js'

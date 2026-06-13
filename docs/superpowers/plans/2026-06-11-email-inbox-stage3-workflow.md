@@ -6,7 +6,7 @@
 
 **Architecture:** A new self-contained workflow module `apps/inbox/workflows/email-inbox/{descriptor.ts, server.ts, client.tsx}` + one line in each of the three aggregators. Agent definitions use `defineAgent` (incl. the Stage-2 `dispatches` class); the sorter dispatches children via the Stage-2 RunObserver machine-dispatch path; the batch gate reuses the existing gate machinery (the approval-tool args ARE the editable form); the batch effect groups rows and calls `gmail-viewer/modify`; reply reuses `gmail-basic/create-draft`. Cards (SortSummaryCard, EmailBatchCard, plus a small reply card) are USERLAND, built in this workflow's `client.tsx` on the existing render/HITL spec mechanism.
 
-**Tech Stack:** TypeScript (strict), zod v3, the claude-cli provider (dev), the existing pipeline spine (`@platform/server`), Hono, vitest, Playwright-MCP for browser E2E, `DEV_RECORD_REPLAY` cassettes. yarn-classic, NO build step.
+**Tech Stack:** TypeScript (strict), zod v3, the claude-cli provider (dev), the existing pipeline spine (`@atizar/server`), Hono, vitest, Playwright-MCP for browser E2E, `DEV_RECORD_REPLAY` cassettes. yarn-classic, NO build step.
 
 **Branch:** continue on `feat/gmail-viewer` (the whole email-inbox track shares it; Stages 1–2 are here, unmerged). Verify `git rev-parse --abbrev-ref HEAD` → `feat/gmail-viewer` before starting.
 
@@ -50,7 +50,7 @@ Machine dispatch is allowed (the sorter creates child work items autonomously, v
 
 ### The seams you build ON (Stage 1 + 2 as-built — all confirmed present)
 
-**`gmail-viewer` integration** (`@platform/integrations/gmail-viewer/*`):
+**`gmail-viewer` integration** (`@atizar/integrations/gmail-viewer/*`):
 - `listUnread({ sinceHours? })` → `ReadResult<{ emails: EmailRef[] }>`, `EmailRef = { messageId, threadId, from, subject, date, snippet }` (capped 25, metadata only, no bodies).
 - `getEmail({ messageId })` → `ReadResult<{ messageId, threadId, from, subject, body }>`.
 - `markRead({ messageIds }) / trash({...}) / star({...})` (`modify.mjs`) → `BatchActionResult` (`{ done, failed:[{messageId,error}] } | { error }`), best-effort.
@@ -71,7 +71,7 @@ Machine dispatch is allowed (the sorter creates child work items autonomously, v
 - **`apps/inbox/workflows/lead-inbox/server.ts`** — `export const leadInboxServer = (origin: string): ServerBinding[] => [ { agentId, prompts: createXPrompts(agent.instructions, origin), allowedTools: ['mcp__inbox__renderVerdict', 'mcp__gmail__get_latest_email'], effects?: { saveDraft: (form) => createDraft(...) } }, ... ]`. The `allowedTools` are the FULLY-QUALIFIED MCP names (`mcp__<server>__<tool>`). The `effects` map is keyed by the approval tool's BARE name; the function receives the approved/edited `form` and returns the `executedResult`.
 - **`apps/inbox/workflows/lead-inbox/client.tsx`** — `export const leadInboxMeta: Record<string, AgentMeta>`, `leadInboxRenders: RenderSpec[]` (one per render tool: `{ toolName, parameters: zodSchema, render: ({parameters}, deliver) => <Card/> }`), `leadInboxHitl: HitlSpec[]` (one per approval tool: `{ toolName, parameters, render: ({form, approve, reject}) => <ApprovalDialog .../> }`). Cards are imported from `apps/inbox/client/src/components/`.
 - **Prompts** (`apps/inbox/agents/*.prompts.ts`) — a factory returning a `PromptStrategy`: `{ buildFirst(input): string, buildResume?(args, executedResult?): string | null }`. `buildFirst` decodes the handoff payload from `input` via `decodeHandoff(input, Schema)` and returns the system prompt text; `buildResume` builds the post-approval prompt (it reads `executedResult` — e.g. `draftId`). Look at `reply.prompts.ts` for the canonical shape.
-- **MCP servers** are wired in `apps/inbox/server/claude-spawn.ts` (`mcpServers: { inbox, gmail, github }`; the gmail one is `require.resolve('@platform/integrations/gmail-basic')`). The per-agent allow-list (`allowedTools`) is the hard boundary.
+- **MCP servers** are wired in `apps/inbox/server/claude-spawn.ts` (`mcpServers: { inbox, gmail, github }`; the gmail one is `require.resolve('@atizar/integrations/gmail-basic')`). The per-agent allow-list (`allowedTools`) is the hard boundary.
 - **Three aggregators** (add ONE line each): `apps/inbox/workflows/index.ts` (`workflowDescriptors`), `apps/inbox/server/workflows.ts` (`workflowServers`), `apps/inbox/client/src/workflows.ts` (`workflowsConfig` — merges meta/renders/hitl).
 - **Inbox MCP** (`apps/inbox/mcp/inbox-tools.mjs`) — the stdio server exposing our render/propose tools (`renderVerdict`, `renderLead`, `saveDraft`, …) to claude. New render/propose/dispatch tools the model must CALL (renderSort, route_emails, applyActions) are added HERE so claude can call them.
 
@@ -131,7 +131,7 @@ describe('email-inbox descriptor', () => {
 
 ```ts
 import { z } from 'zod'
-import { defineAgent, defineWorkflow } from '@platform/core'
+import { defineAgent, defineWorkflow } from '@atizar/core'
 
 // The dispatch payload shapes (= the route_emails tool args minus `to`). EmailRef mirrors the
 // gmail-viewer EmailRef; defined here as the workflow's own contract (userland), not imported
@@ -354,7 +354,7 @@ describe('applyEmailActions', () => {
 - [ ] **Step 3: Implement `apply-actions.ts`**
 
 ```ts
-import { markRead as realMarkRead, trash as realTrash, star as realStar } from '@platform/integrations/gmail-viewer/modify'
+import { markRead as realMarkRead, trash as realTrash, star as realStar } from '@atizar/integrations/gmail-viewer/modify'
 
 type Action = 'read' | 'trash' | 'star' | 'keep'
 type Row = { messageId: string; action: Action }
@@ -452,7 +452,7 @@ Three prompt builders returning `PromptStrategy` (`{ buildFirst, buildResume? }`
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import type { RunAgentInput } from '@ag-ui/client'
-import { encodeHandoff } from '@platform/core'
+import { encodeHandoff } from '@atizar/core'
 import { createSorterPrompts, createReplyPrompts, createBatchPrompts } from './prompts.js'
 
 const inputWith = (payload: unknown): RunAgentInput =>
@@ -511,9 +511,9 @@ This is where **F1's claude-cli path is finally wired**: build each PromptStrate
 - [ ] **Step 1: Write `server.ts`**
 
 ```ts
-import { composeInstructions } from '@platform/core'
-import { createDraft } from '@platform/integrations/gmail-basic/create-draft'
-import { checkCredentials } from '@platform/integrations/gmail-viewer/check-credentials'
+import { composeInstructions } from '@atizar/core'
+import { createDraft } from '@atizar/integrations/gmail-basic/create-draft'
+import { checkCredentials } from '@atizar/integrations/gmail-viewer/check-credentials'
 import type { ServerBinding } from '../server-binding.js'
 import {
   emailInbox,
@@ -611,7 +611,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 > IMPORTANT: these MCP tools must NOT perform any Gmail action — they are surfaces. The mutation happens ONLY in the server effect (`applyEmailActions`) after approval. `route_emails` performs no action either (RunObserver dispatches a child from the observed call). Keep the handlers pure echoes, like the existing render tools.
 
-- [ ] **Step 2: Wire the gmail-viewer MCP server** in `claude-spawn.ts`: add `const GMAIL_VIEWER_SERVER = require.resolve('@platform/integrations/gmail-viewer')` and add `'gmail-viewer': { type: 'stdio', command: 'node', args: [GMAIL_VIEWER_SERVER] }` to the `mcpServers` map. (This exposes `list_unread` + `get_email` to claude under the `mcp__gmail-viewer__` prefix — matching the allow-list in C2.)
+- [ ] **Step 2: Wire the gmail-viewer MCP server** in `claude-spawn.ts`: add `const GMAIL_VIEWER_SERVER = require.resolve('@atizar/integrations/gmail-viewer')` and add `'gmail-viewer': { type: 'stdio', command: 'node', args: [GMAIL_VIEWER_SERVER] }` to the `mcpServers` map. (This exposes `list_unread` + `get_email` to claude under the `mcp__gmail-viewer__` prefix — matching the allow-list in C2.)
 
 - [ ] **Step 3:** `yarn typecheck && yarn lint`. (The `.mjs` MCP files are not in the TS graph — eyeball them against the existing tool registrations.) Add/extend the inbox-tools unit test if one exists (`apps/inbox/mcp/*.test.mjs`) for the new tools' echo behavior; otherwise a manual check in Task F covers it.
 
@@ -628,7 +628,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ## TASK GROUP E — cards (userland) + client wiring
 
-Cards are USERLAND (built here, NOT in `@platform/react`). They follow the existing `RenderSpec`/`HitlSpec` pattern (see `lead-inbox/client.tsx`). The generic chrome/primitives are Stage 4 — for now the cards reuse the existing Smedja card classes like the lead-inbox cards do.
+Cards are USERLAND (built here, NOT in `@atizar/react`). They follow the existing `RenderSpec`/`HitlSpec` pattern (see `lead-inbox/client.tsx`). The generic chrome/primitives are Stage 4 — for now the cards reuse the existing Smedja card classes like the lead-inbox cards do.
 
 ### Task E1: SortSummaryCard + EmailBatchCard components
 
@@ -788,4 +788,4 @@ The current Mastra runner (`apps/inbox/server/mastra/runner.ts`) is hardcoded to
 
 - **Stage 4 — React/UI chrome:** primitives kit, global header (Chrome-style tabs + Stop-all + activity toggle), the F3 health badge (greyed-out agent + disabled START reading `board.agentHealth`), F6 START-disable, F7 pipeline "Delegating"/"Done" states, the ActivityLog panel (reads `/api/activity` + SSE). Browser-verify every flow through the new chrome.
 - **Stage 5 — polish + full-scenario E2E:** fresh cassette set; HANDOFF/AGENTIC/CLAUDE.md gotchas; reword the HANDOFF "draft-only is a product law" line (the `draft-only-is-integration-scoped` decision).
-- **Packaging tail (7c):** bearer-token auth; `DEMO=1` (PGlite + mock provider + SYNTHETIC cassettes + scanCassette CI gate); golden-set eval; README; LICENSE + `@platform/*` scope rename (ASK THE USER for both). Plus the two carried cleanups (`WorkerPool.resumeAcquire` log; `.env.local` auto-load).
+- **Packaging tail (7c):** bearer-token auth; `DEMO=1` (PGlite + mock provider + SYNTHETIC cassettes + scanCassette CI gate); golden-set eval; README; LICENSE + `@atizar/*` scope rename (ASK THE USER for both). Plus the two carried cleanups (`WorkerPool.resumeAcquire` log; `.env.local` auto-load).

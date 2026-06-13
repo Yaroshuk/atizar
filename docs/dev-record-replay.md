@@ -88,7 +88,7 @@ A recording is keyed by two things:
    the same step.
 
 2. **step** — the number of human approvals already resolved in the run input
-   (`resolvedApprovalCount` in `@platform/core`). Because the `claude-cli` provider kills
+   (`resolvedApprovalCount` in `@atizar/core`). Because the `claude-cli` provider kills
    the process at each approval and resumes with a fresh stateless re-prime, one logical
    agent run is split into multiple provider requests. The step index tracks where in the
    approval sequence this request sits: step 0 = the first run (no approvals answered

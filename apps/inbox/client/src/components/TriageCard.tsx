@@ -1,4 +1,4 @@
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 import { groupByStatus, type TriageTicket } from '../buckets'
 
 type Route = 'feature' | 'bugfix' | 'reply-draft'

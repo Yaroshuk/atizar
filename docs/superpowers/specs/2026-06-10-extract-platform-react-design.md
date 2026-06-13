@@ -1,12 +1,12 @@
-# `@platform/react` Extraction — Design
+# `@atizar/react` Extraction — Design
 
 **Status:** design locked (2026-06-10). Sub-step 7b of the beta build order (HANDOFF). Follows 7a
-(`@platform/server` extracted). `check-foundation` verdict on the injection API = CLEAR (recorded
+(`@atizar/server` extracted). `check-foundation` verdict on the injection API = CLEAR (recorded
 in HANDOFF 7b note).
 
 ## Goal
 
-Extract the board/thread UI from `apps/inbox/client/src/` into a public package `@platform/react`,
+Extract the board/thread UI from `apps/inbox/client/src/` into a public package `@atizar/react`,
 realizing belief #3's physical boundary for the client half: **machinery in the package, cards in
 userland.** The demo app keeps only its vertical-specific cards + the workflow client bundle and
 composes the package's board.
@@ -23,12 +23,12 @@ reference their card components DIRECTLY (userland closures), so the package nev
 `Record<name, Component>`. This mirrors the `effects` pattern — names in core (classification,
 I15), implementations bound outside (server: effect fns; client: spec render closures).
 
-### Types (live in `@platform/react`)
+### Types (live in `@atizar/react`)
 
 ```ts
 import type { ReactElement } from 'react'
 import type { z } from 'zod'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 
 export type AgentMeta = { subtitle: string; iconName: IconName; intro: string }
 export type DeliverFn = (origin: string, dest: Destination, payload: unknown) => void
@@ -59,7 +59,7 @@ export type HitlSpec = {
 ### Config + context
 
 ```ts
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 
 export type WorkflowsConfig = {
   workflows: WorkflowDescriptor[]
@@ -69,20 +69,20 @@ export type WorkflowsConfig = {
 }
 ```
 
-`@platform/react` exports `<WorkflowBoard config={WorkflowsConfig} />` (the renamed `InboxView`).
+`@atizar/react` exports `<WorkflowBoard config={WorkflowsConfig} />` (the renamed `InboxView`).
 Internally it wraps its subtree in a single `WorkflowsProvider` that puts `config` on context;
 `ThreadModal` and `buildRenderToolCall` read it via `useWorkflowsConfig()` — no prop threading
 through `AgentModal`/`PipelineColumn`/etc. The demo's `App` becomes:
 
 ```tsx
-import { WorkflowBoard } from '@platform/react'
+import { WorkflowBoard } from '@atizar/react'
 import { workflowsConfig } from './workflows' // userland aggregator builds the bundle
 export const App = () => <WorkflowBoard config={workflowsConfig} />
 ```
 
 ## What moves vs stays
 
-**Into `@platform/react` (machinery):**
+**Into `@atizar/react` (machinery):**
 - Hooks: `useBoard`, `useDispatch`, `useGate`, `useWorkItemThread`.
 - Models/helpers: `boardModel`, `pipelineModel`, `aggregate`, `status`, `statusDisplay`,
   `serverTypes`, `devMode`, `threadResults` (generic thread-results context).
@@ -107,16 +107,16 @@ export const App = () => <WorkflowBoard config={workflowsConfig} />
 - **DELETED:** `renderRegistry.tsx` (the name→component map; the indirection is collapsed).
 
 **Userland workflow client modules** (`apps/inbox/workflows/{lead-inbox,github-triage}/client.tsx`):
-- Import `RenderSpec`/`HitlSpec`/`AgentMeta`/`DeliverFn` from `@platform/react` (was
+- Import `RenderSpec`/`HitlSpec`/`AgentMeta`/`DeliverFn` from `@atizar/react` (was
   `../../client/src/renderSpecs`).
-- Import `useThreadResult` from `@platform/react` (was `../../client/src/threadResults`).
+- Import `useThreadResult` from `@atizar/react` (was `../../client/src/threadResults`).
 - `TriageTicket` still from `../../client/src/buckets` (stays userland).
 - Render closures reference card components DIRECTLY (e.g. `return <LeadCard lead={…} />`) instead
   of `registry['LeadCard']`; drop the `registry` parameter from every render fn.
 
 ## Foundation conditions (locked)
 
-- `@platform/core` stays React-free — the spec TYPES live in `@platform/react`, never core.
+- `@atizar/core` stays React-free — the spec TYPES live in `@atizar/react`, never core.
 - `defineAgent.renders` in core is **NOT touched** this step. Its keys still feed I15
   classification + server card-filling; the component-name VALUES become vestigial labels. A
   possible `Record → array` tidy is a separate, explicit `check-foundation`-gated change at the
@@ -125,16 +125,16 @@ export const App = () => <WorkflowBoard config={workflowsConfig} />
 
 ## Package mechanics
 
-- No build step (the `@platform/*` pattern): `exports` → `./src/index.ts` for the JS surface, plus
-  a CSS export `"./styles.css": "./src/styles.css"` so the demo does `import '@platform/react/styles.css'`.
-- `package.json` deps: `@platform/core`, `@ag-ui/client` (BaseEvent in `useWorkItemThread`), `zod`
+- No build step (the `@atizar/*` pattern): `exports` → `./src/index.ts` for the JS surface, plus
+  a CSS export `"./styles.css": "./src/styles.css"` so the demo does `import '@atizar/react/styles.css'`.
+- `package.json` deps: `@atizar/core`, `@ag-ui/client` (BaseEvent in `useWorkItemThread`), `zod`
   (spec param schemas — peer/runtime), `react` as a **peerDependency** (the app owns the React
   singleton). `tsconfig.json` follows the providers pattern (package-local `outDir`/`tsBuildInfoFile`,
   `references: [{ path: '../core' }]`); root `tsconfig.json` gains the project ref. vitest `include`
   already globs `packages/*/src/**` so moved client tests (renderLead/renderVerdict/aggregate/
   boardModel/buckets/pipelineModel/status) run — EXCEPT `buckets.test.ts` stays in the app with
   `buckets.ts`.
-- `apps/inbox` adds `@platform/react: "*"` to deps.
+- `apps/inbox` adds `@atizar/react: "*"` to deps.
 
 ## Risks / what only the browser catches
 
@@ -148,6 +148,6 @@ export const App = () => <WorkflowBoard config={workflowsConfig} />
 ## Definition of done
 
 Typecheck + 277 tests + lint + build + format(my files) green; `check-foundation` CLEAR; browser
-E2E of the lead-inbox flow through `@platform/react` (board, single run, render cards, approve WITH
+E2E of the lead-inbox flow through `@atizar/react` (board, single run, render cards, approve WITH
 edit → real Gmail draft, reject, cancel, reload re-attach); `@copilotkit` still absent; HANDOFF 7b
 marked ✅ with an As-built note; next = 7c (slim demo + packaging tail).

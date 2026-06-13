@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import type { ToolCall } from '@platform/core'
-import { buildRenderToolCall } from '@platform/react'
+import type { ToolCall } from '@atizar/core'
+import { buildRenderToolCall } from '@atizar/react'
 import { leadInboxRenders } from '../../workflows/lead-inbox/client'
 
 // renderLead is a pure display card (no handoff) — buildRenderToolCall parses the folded

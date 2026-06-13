@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import type { ToolCall } from '@platform/core'
-import { buildRenderToolCall } from '@platform/react'
+import type { ToolCall } from '@atizar/core'
+import { buildRenderToolCall } from '@atizar/react'
 import { leadInboxRenders } from '../../workflows/lead-inbox/client'
 
 // The new (CopilotKit-free) render path: buildRenderToolCall(deliver) parses a folded tool

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 
 type BatchAction = 'read' | 'trash' | 'star' | 'keep'
 type BatchRow = { messageId: string; from?: string; subject?: string; action: BatchAction }

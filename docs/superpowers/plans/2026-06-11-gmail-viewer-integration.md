@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stage 1 of the email-inbox workflow spec (`docs/superpowers/specs/2026-06-11-email-inbox-workflow-design.md` §3): the `write-integration` dev skill, the `gmail-viewer` integration in `@platform/integrations`, the embedded `gmail-viewer` consumer skill, and `checkCredentials` on both gmail integrations.
+**Goal:** Stage 1 of the email-inbox workflow spec (`docs/superpowers/specs/2026-06-11-email-inbox-workflow-design.md` §3): the `write-integration` dev skill, the `gmail-viewer` integration in `@atizar/integrations`, the embedded `gmail-viewer` consumer skill, and `checkCredentials` on both gmail integrations.
 
 **Architecture:** gmail-viewer mirrors gmail-basic exactly — pure injectable `.mjs` functions + hand-written `.d.ts` for TS consumers, a stdio MCP wrapper exposing READ tools only (mutations are server-executed effects, never model-visible), shared OAuth client reused from `gmail-basic/gmail-client.mjs`. The `write-integration` skill is authored FIRST and this build is its first validation run. No framework (`core`/`server`/`react`) change in this stage.
 
@@ -33,13 +33,13 @@ This is a **Task** skill (owns a run end-to-end) per `.claude/skills/CONVENTIONS
 ```markdown
 ---
 name: write-integration
-description: Author a new integration module in @platform/integrations — pure injectable functions, an MCP wrapper for read tools, credentials health check, and an embedded consumer skill. Use when the user asks to add, write, or build an integration, connect an external service (Gmail, Slack, a CRM, an API), or extend an existing integration with new capabilities.
+description: Author a new integration module in @atizar/integrations — pure injectable functions, an MCP wrapper for read tools, credentials health check, and an embedded consumer skill. Use when the user asks to add, write, or build an integration, connect an external service (Gmail, Slack, a CRM, an API), or extend an existing integration with new capabilities.
 ---
 
 # Write an integration
 
 Task skill — owns the run end-to-end: from "we need an integration that does X" to a
-tested, documented module in `@platform/integrations` that agents and the server can
+tested, documented module in `@atizar/integrations` that agents and the server can
 consume. The worked exemplar is `packages/integrations/src/gmail-viewer/` (built by this
 skill's first run); `gmail-basic` is the original pattern source.
 
@@ -118,7 +118,7 @@ is a library, not running-app behavior).
 ## Stage 7 — Foundation check
 
 Run the `check-foundation` procedure on the result (new package surface; verify no engine
-import leaked into `@platform/core`, no mutation became model-visible). A conflict is a
+import leaked into `@atizar/core`, no mutation became model-visible). A conflict is a
 STOP: warn the developer and get direct confirmation.
 
 ## Stage 8 — Self-improvement (last, silent skip is the default)
@@ -136,7 +136,7 @@ Replace the placeholder row in the Tasks table:
 ```markdown
 | Skill        | When to use                                         | SKILL.md |
 | ------------ | --------------------------------------------------- | -------- |
-| `write-integration` | Adding/writing/building an integration in `@platform/integrations`, connecting an external service, or extending an existing integration with new capabilities. | [write-integration/SKILL.md](write-integration/SKILL.md) |
+| `write-integration` | Adding/writing/building an integration in `@atizar/integrations`, connecting an external service, or extending an existing integration with new capabilities. | [write-integration/SKILL.md](write-integration/SKILL.md) |
 ```
 
 (Keep the note that `add-workflow` is next in `docs/AGENTIC.md` Phase 1 — move it into the prose above the table if the placeholder row is gone.)
@@ -952,7 +952,7 @@ The FIRST consumer skill (docs/AGENTIC.md A7 — ships in the package whose cont
 ```markdown
 ---
 name: gmail-viewer
-description: How to use the @platform/integrations gmail-viewer integration — wiring its read tools into an agent, executing its mutations as server effects, setting up Gmail OAuth credentials, and diagnosing checkCredentials failures. Use when importing gmail-viewer, adding Gmail capabilities to a workflow, or when an agent shows "missing credentials" for Gmail.
+description: How to use the @atizar/integrations gmail-viewer integration — wiring its read tools into an agent, executing its mutations as server effects, setting up Gmail OAuth credentials, and diagnosing checkCredentials failures. Use when importing gmail-viewer, adding Gmail capabilities to a workflow, or when an agent shows "missing credentials" for Gmail.
 ---
 
 # gmail-viewer — how to use
@@ -965,11 +965,11 @@ behind approval gates — never expose them to a model.
 
 | import | function | kind |
 |---|---|---|
-| `@platform/integrations/gmail-viewer/list-unread` | `listUnread({ sinceHours? })` → `{ emails: EmailRef[] } \| { error }` | read |
-| `@platform/integrations/gmail-viewer/get-email` | `getEmail({ messageId })` → parsed email incl. `body` | read |
-| `@platform/integrations/gmail-viewer/modify` | `markRead\|trash\|star({ messageIds })` → `{ done, failed } \| { error }` | mutation |
-| `@platform/integrations/gmail-viewer/check-credentials` | `checkCredentials()` → `{ ok, email } \| { ok:false, error, hint }` | health |
-| `@platform/integrations/gmail-viewer` | stdio MCP server: `list_unread`, `get_email` (READ ONLY) | model tools |
+| `@atizar/integrations/gmail-viewer/list-unread` | `listUnread({ sinceHours? })` → `{ emails: EmailRef[] } \| { error }` | read |
+| `@atizar/integrations/gmail-viewer/get-email` | `getEmail({ messageId })` → parsed email incl. `body` | read |
+| `@atizar/integrations/gmail-viewer/modify` | `markRead\|trash\|star({ messageIds })` → `{ done, failed } \| { error }` | mutation |
+| `@atizar/integrations/gmail-viewer/check-credentials` | `checkCredentials()` → `{ ok, email } \| { ok:false, error, hint }` | health |
+| `@atizar/integrations/gmail-viewer` | stdio MCP server: `list_unread`, `get_email` (READ ONLY) | model tools |
 
 `EmailRef = { messageId, threadId, from, subject, date, snippet }`. Mutations are
 best-effort per message: `failed` lists per-id errors; `{ error }` means the client
@@ -1029,7 +1029,7 @@ Real-credentials proof that the integration works against the live API. READ-ONL
 - [ ] **Step 1: Run the health check live**
 
 ```bash
-yarn tsx -e "const m = await import('@platform/integrations/gmail-viewer/check-credentials'); console.log(JSON.stringify(await m.checkCredentials(), null, 2))"
+yarn tsx -e "const m = await import('@atizar/integrations/gmail-viewer/check-credentials'); console.log(JSON.stringify(await m.checkCredentials(), null, 2))"
 ```
 
 Expected: `{ "ok": true, "email": "<the account>" }`. If `ok:false` with an ENOENT hint and this machine genuinely has no `~/.gmail-mcp/` — record the smoke as SKIPPED (honestly) and move on; the unit suite still covers the logic. On this dev machine credentials exist (CLAUDE.md), so expect ok.
@@ -1038,12 +1038,12 @@ Expected: `{ "ok": true, "email": "<the account>" }`. If `ok:false` with an ENOE
 
 ```bash
 yarn tsx -e "
-const { listUnread } = await import('@platform/integrations/gmail-viewer/list-unread')
+const { listUnread } = await import('@atizar/integrations/gmail-viewer/list-unread')
 const res = await listUnread({ sinceHours: 168 })
 if (res.error) throw new Error(res.error)
 console.log('unread last 7d:', res.emails.length)
 if (res.emails[0]) {
-  const { getEmail } = await import('@platform/integrations/gmail-viewer/get-email')
+  const { getEmail } = await import('@atizar/integrations/gmail-viewer/get-email')
   const full = await getEmail({ messageId: res.emails[0].messageId })
   console.log('first email body length:', full.error ?? full.body.length)
 }
@@ -1091,7 +1091,7 @@ AFTER this track, with email-inbox as the demo. Build stages → spec §6.
 
 - **Stage 1 — gmail-viewer + write-integration skill: ✅ BUILT** on `feat/gmail-viewer`
   (2026-06-11). Plan → `docs/superpowers/plans/2026-06-11-gmail-viewer-integration.md`.
-  As-built: `@platform/integrations/gmail-viewer/*` (listUnread/getEmail/modify/
+  As-built: `@atizar/integrations/gmail-viewer/*` (listUnread/getEmail/modify/
   check-credentials subpaths + read-only MCP `index.mjs`); `checkCredentials` lives in
   gmail-basic (shared OAuth client), re-exported by gmail-viewer; `write-integration`
   Task skill + first A7 consumer skill (`packages/integrations/skills/gmail-viewer/`).
@@ -1106,7 +1106,7 @@ AFTER this track, with email-inbox as the demo. Build stages → spec §6.
 
 - [ ] **Step 3: Foundation check**
 
-Invoke the `check-foundation` skill on the stage's diff. Expected verdict: CLEAR — this stage adds a batteries package + skills; it must NOT have touched `@platform/core`/`providers`/`server`/`react` or made a mutation model-visible (the MCP wrapper exposes reads only). Any WARN → stop and surface to the user before merging.
+Invoke the `check-foundation` skill on the stage's diff. Expected verdict: CLEAR — this stage adds a batteries package + skills; it must NOT have touched `@atizar/core`/`providers`/`server`/`react` or made a mutation model-visible (the MCP wrapper exposes reads only). Any WARN → stop and surface to the user before merging.
 
 - [ ] **Step 4: Final validation + commit docs**
 

@@ -1,4 +1,4 @@
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 
 type Lead = { from: string; subject: string; summary: string }
 

@@ -214,7 +214,7 @@ generic `WorkflowView` with Gmail as one registry entry.
 - Agent-initiated routing (TRIAGE auto-routes without a human) — manual now; the seam
   already supports it later.
 - A real GitHub *write* MCP, Projects v2 mutations, status changes.
-- Extracting `@platform/react` / `@platform/server` (still deferred).
+- Extracting `@atizar/react` / `@atizar/server` (still deferred).
 - Server-side board pagination/caching beyond the single scoped `list_my_tickets` call
   (27 items is small; if `list_my_tickets` ever broadens, log any cap).
 

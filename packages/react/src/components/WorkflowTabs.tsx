@@ -1,5 +1,5 @@
 import { Icon } from './Icon'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 
 // Chrome/Arc-style workflow tabs: the active tab is white, raised, and visually
 // fused to the panel below it; inactive tabs are recessed and muted. A badge on a

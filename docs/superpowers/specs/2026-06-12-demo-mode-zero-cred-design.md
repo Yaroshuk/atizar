@@ -19,7 +19,7 @@ only the public packages).
   a `scanCassette` CI gate over the committed demo cassettes.
 - **Out (non-goals):** lead-inbox and github-triage in demo (hidden — email-inbox is the
   showcase, by the user's call); real OAuth/Connect in demo; the bearer token (sub-project C);
-  README/LICENSE (sub-project F); the `@platform/*` scope rename (sub-project E). PGlite as a
+  README/LICENSE (sub-project F); the `@atizar/*` scope rename (sub-project E). PGlite as a
   production option (DEMO-only).
 
 ## Decisions (resolved during brainstorming — do not re-litigate)
@@ -38,7 +38,7 @@ only the public packages).
 
 ### B1 — `DEMO` flag plumbing
 
-`DEMO=1` is read via a single standalone helper `isDemo()` exported from `@platform/server`
+`DEMO=1` is read via a single standalone helper `isDemo()` exported from `@atizar/server`
 `env.ts` — NOT on `atizarEnv` (that object is the documented "ONE place ATIZAR_* vars are read";
 `DEMO` is an unprefixed dev/demo tooling flag, the same class as `DEV_RECORD_REPLAY`, so it stays
 unprefixed). Both the server package's DB layer and the app's registration/wiring import `isDemo()`
@@ -65,7 +65,7 @@ the env var. `predev` still frees ports; PGlite needs no Postgres container, so 
 
 ### B3 — DB: PGlite (in-memory)
 
-- `@platform/server` DB client (`db/client.ts`) selects the driver by mode: real Postgres via
+- `@atizar/server` DB client (`db/client.ts`) selects the driver by mode: real Postgres via
   `drizzle-orm/postgres-js` (default) vs **PGlite** via `drizzle-orm/pglite` (`@electric-sql/pglite`,
   in-memory `new PGlite()`), chosen when `DEMO` is set (or a `pglite`/memory `DATABASE_URL`).
 - `db/migrate.ts` selects the matching migrator (`drizzle-orm/pglite/migrator` for PGlite). Same
@@ -135,7 +135,7 @@ fake success → ledger records it → `resume()` replays the closing narration 
 
 ## File touch points (for the plan)
 
-- `packages/@platform/server`: `db/client.ts`, `db/migrate.ts` (driver/migrator selection), `env.ts`
+- `packages/@atizar/server`: `db/client.ts`, `db/migrate.ts` (driver/migrator selection), `env.ts`
   (`demo()` helper), new `GET /api/config` in `routes.ts`, package `@electric-sql/pglite` optional dep.
 - `apps/inbox/server`: `build-agent.ts` (strict-replay mode), `record-replay.ts` (cassette base-dir
   param + strict mode + `DemoCassetteMissing`), `providers.ts`/`index.ts` (demo wiring + filtered

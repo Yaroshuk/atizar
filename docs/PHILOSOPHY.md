@@ -63,7 +63,7 @@ Requires:
 
 Forbids:
 
-- The core knowing any concrete engine (no engine import inside `@platform/core`).
+- The core knowing any concrete engine (no engine import inside `@atizar/core`).
 - Becoming an engine — we orchestrate and display, we do not execute ourselves.
 - Duplicating engine features; memory, RAG, and tool execution live in the provider layer.
 

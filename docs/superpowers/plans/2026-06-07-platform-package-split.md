@@ -1,17 +1,17 @@
-# @platform/* Package Split Implementation Plan
+# @atizar/* Package Split Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up a yarn-classic workspace and split `apps/inbox/core/` into three packages — `@platform/core` (contract), `@platform/providers` (claude-cli + mock), `@platform/integrations` (node-only batteries with a `./gmail-basic` subpath, `googleapis` as an optional peer) — with no behavior change.
+**Goal:** Stand up a yarn-classic workspace and split `apps/inbox/core/` into three packages — `@atizar/core` (contract), `@atizar/providers` (claude-cli + mock), `@atizar/integrations` (node-only batteries with a `./gmail-basic` subpath, `googleapis` as an optional peer) — with no behavior change.
 
-**Architecture:** A root npm/yarn workspace holds `packages/*` and `apps/*`. `@platform/core` is the isomorphic contract everyone depends on (it depends on nothing concrete). `@platform/providers` is isomorphic with the Node `spawn` injected from the app. `@platform/integrations` is node-only; heavy SDKs are optional peers loaded lazily with a fail-fast message. The app (`apps/inbox`) consumes the three packages by name; concrete agents/prompts/UI-tools stay in the app. Internal packages are consumed as raw TS source (no build step) — Vite and tsx transpile workspace deps directly.
+**Architecture:** A root npm/yarn workspace holds `packages/*` and `apps/*`. `@atizar/core` is the isomorphic contract everyone depends on (it depends on nothing concrete). `@atizar/providers` is isomorphic with the Node `spawn` injected from the app. `@atizar/integrations` is node-only; heavy SDKs are optional peers loaded lazily with a fail-fast message. The app (`apps/inbox`) consumes the three packages by name; concrete agents/prompts/UI-tools stay in the app. Internal packages are consumed as raw TS source (no build step) — Vite and tsx transpile workspace deps directly.
 
 **Tech Stack:** yarn classic 1.22 workspaces, TypeScript 6 (moduleResolution `bundler`, ESM with `.js` import specifiers), Vitest, ESLint flat config, Vite, Hono, CopilotKit v2 / AG-UI, `@modelcontextprotocol/sdk`, `googleapis`.
 
 > **Spec:** `docs/superpowers/specs/2026-06-07-platform-package-split-design.md`
 > **Branch:** `feat/platform-package-split` (already created; the spec is committed there).
-> **Scope reminder:** `@platform/react` and `@platform/server` are NOT extracted in this plan.
-> `@platform/*` is a placeholder scope — do not rename it here.
+> **Scope reminder:** `@atizar/react` and `@atizar/server` are NOT extracted in this plan.
+> `@atizar/*` is a placeholder scope — do not rename it here.
 
 ---
 
@@ -43,7 +43,7 @@
 - `src/gmail-basic/format.mjs` (+ `format.test.ts`) — moved from `apps/inbox/mcp/gmail-format.mjs`
 
 **Modified (`apps/inbox/`):**
-- `package.json` — drop dev tooling moved to root; add `@platform/*` deps; keep `googleapis` as a real dep
+- `package.json` — drop dev tooling moved to root; add `@atizar/*` deps; keep `googleapis` as a real dep
 - `tsconfig.json`, `vite.config.ts` — adjust includes/paths
 - `agents/inbox.agent.ts`, `agents/qualifier.prompts.ts`, `agents/reply.prompts.ts` — relocated from `core/`
 - `server/index.ts`, `server/providers.ts`, `server/build-agent.ts`, `server/claude-spawn.ts` — import rewrites
@@ -194,7 +194,7 @@ Edit `apps/inbox/package.json`: keep `name: "inbox"`, keep `scripts`, keep runti
 }
 ```
 
-(The `@platform/*` deps are added in later tasks as each package is created.)
+(The `@atizar/*` deps are added in later tasks as each package is created.)
 
 - [ ] **Step 5: Install with yarn**
 
@@ -323,7 +323,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 3: Extract `@platform/core`
+## Task 3: Extract `@atizar/core`
 
 **Files:**
 - Create: `packages/core/package.json`, `packages/core/tsconfig.json`, `packages/core/src/index.ts`
@@ -334,7 +334,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ```json
 {
-  "name": "@platform/core",
+  "name": "@atizar/core",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -391,10 +391,10 @@ export * from './handoff.js'
 Add to `apps/inbox/package.json` `dependencies`:
 
 ```json
-"@platform/core": "*"
+"@atizar/core": "*"
 ```
 
-- [ ] **Step 6: Rewrite app imports of the four modules to `@platform/core`**
+- [ ] **Step 6: Rewrite app imports of the four modules to `@atizar/core`**
 
 Apply these exact edits:
 
@@ -403,46 +403,46 @@ Apply these exact edits:
 // was:
 // import type { AgentDefinition } from '../core/defineAgent.js'
 // import type { ProviderRegistry, PromptStrategy } from '../core/providers.js'
-import type { AgentDefinition, ProviderRegistry, PromptStrategy } from '@platform/core'
+import type { AgentDefinition, ProviderRegistry, PromptStrategy } from '@atizar/core'
 ```
 
 `apps/inbox/server/providers.ts` — change only the contract import (provider impls handled in Task 5):
 ```ts
 // was: import { defineProviders, type ProviderRegistry } from '../core/providers.js'
-import { defineProviders, type ProviderRegistry } from '@platform/core'
+import { defineProviders, type ProviderRegistry } from '@atizar/core'
 ```
 
 `apps/inbox/core/inbox.agent.ts`:
 ```ts
 // was: import { defineAgent } from './defineAgent.js'
-import { defineAgent } from '@platform/core'
+import { defineAgent } from '@atizar/core'
 ```
 
 `apps/inbox/core/agents/qualifier.prompts.ts` and `apps/inbox/core/agents/reply.prompts.ts`:
 ```ts
 // was: import type { PromptStrategy } from '../providers.js'
-import type { PromptStrategy } from '@platform/core'
+import type { PromptStrategy } from '@atizar/core'
 ```
 
 `apps/inbox/client/src/useAgentStatus.ts`:
 ```ts
 // was: import { hasPendingApproval, type Message } from '../../core/messages'
-import { hasPendingApproval, type Message } from '@platform/core'
+import { hasPendingApproval, type Message } from '@atizar/core'
 ```
 
-`apps/inbox/client/src/components/AgentModal.tsx` (multi-line import from `../../../core/messages`): change the module specifier to `@platform/core`, keep the named imports.
+`apps/inbox/client/src/components/AgentModal.tsx` (multi-line import from `../../../core/messages`): change the module specifier to `@atizar/core`, keep the named imports.
 
 `apps/inbox/client/src/InboxView.tsx`:
 ```ts
 // was: import { encodeHandoff, type HandoffPayload } from '../../core/handoff'
 // was: import type { Message } from '../../core/messages'
-import { encodeHandoff, type HandoffPayload, type Message } from '@platform/core'
+import { encodeHandoff, type HandoffPayload, type Message } from '@atizar/core'
 ```
 
 `apps/inbox/client/src/actions.tsx`:
 ```ts
 // was: import type { HandoffPayload } from '../../core/handoff'
-import type { HandoffPayload } from '@platform/core'
+import type { HandoffPayload } from '@atizar/core'
 ```
 
 (`actions.tsx`, `App.tsx`, `InboxView.tsx` also import `qualifierAgent`/`replyAgent` from `../../core/inbox.agent` — leave those as-is for now; the relocation is Task 4.)
@@ -455,7 +455,7 @@ Uncomment `{ "path": "./packages/core" }` in `/Users/yaroshuk/Development/AiWork
 
 ```bash
 cd /Users/yaroshuk/Development/AiWorkflow
-yarn install        # link @platform/core into node_modules
+yarn install        # link @atizar/core into node_modules
 yarn test
 yarn typecheck
 yarn lint
@@ -470,12 +470,12 @@ cd /Users/yaroshuk/Development/AiWorkflow
 yarn build
 ```
 
-Expected: Vite build succeeds. If Vite fails to resolve `@platform/core` raw TS, add to `apps/inbox/vite.config.ts`:
+Expected: Vite build succeeds. If Vite fails to resolve `@atizar/core` raw TS, add to `apps/inbox/vite.config.ts`:
 ```ts
 export default defineConfig({
   plugins: [react()],
   root: '.',
-  optimizeDeps: { exclude: ['@platform/core'] },
+  optimizeDeps: { exclude: ['@atizar/core'] },
   server: { port: 5173, proxy: { '/api': 'http://localhost:4000' } },
 })
 ```
@@ -485,14 +485,14 @@ Re-run `yarn build` until green.
 
 ```bash
 git add -A
-git commit -m "refactor: extract @platform/core (messages, defineAgent, providers, handoff)
+git commit -m "refactor: extract @atizar/core (messages, defineAgent, providers, handoff)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 4: Extract `@platform/providers`
+## Task 4: Extract `@atizar/providers`
 
 **Files:**
 - Create: `packages/providers/package.json`, `packages/providers/tsconfig.json`, `packages/providers/src/index.ts`
@@ -508,7 +508,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ```json
 {
-  "name": "@platform/providers",
+  "name": "@atizar/providers",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -517,7 +517,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@platform/core": "*"
+    "@atizar/core": "*"
   }
 }
 ```
@@ -548,15 +548,15 @@ git mv apps/inbox/core/mock-provider.ts            packages/providers/src/mock-p
 git mv apps/inbox/core/mock-provider.test.ts       packages/providers/src/mock-provider.test.ts
 ```
 
-- [ ] **Step 4: Rewrite the moved files' contract imports to `@platform/core`**
+- [ ] **Step 4: Rewrite the moved files' contract imports to `@atizar/core`**
 
 `packages/providers/src/claude-cli-provider.ts`:
 ```ts
 // was:
 // import type { Provider, PromptStrategy } from './providers.js'
 // import { approvalResolved, lastApprovalArgs, type Message } from './messages.js'
-import type { Provider, PromptStrategy } from '@platform/core'
-import { approvalResolved, lastApprovalArgs, type Message } from '@platform/core'
+import type { Provider, PromptStrategy } from '@atizar/core'
+import { approvalResolved, lastApprovalArgs, type Message } from '@atizar/core'
 // keep: import { mapClaudeStream } from './claude-stream.js'
 ```
 
@@ -565,11 +565,11 @@ import { approvalResolved, lastApprovalArgs, type Message } from '@platform/core
 // was:
 // import type { Provider } from './providers.js'
 // import { approvalResolved, type Message } from './messages.js'
-import type { Provider } from '@platform/core'
-import { approvalResolved, type Message } from '@platform/core'
+import type { Provider } from '@atizar/core'
+import { approvalResolved, type Message } from '@atizar/core'
 ```
 
-Check the `.test.ts` files for `./providers.js` / `./messages.js` imports and rewrite those to `@platform/core` as well (e.g. `claude-cli-provider.test.ts`, `mock-provider.test.ts`).
+Check the `.test.ts` files for `./providers.js` / `./messages.js` imports and rewrite those to `@atizar/core` as well (e.g. `claude-cli-provider.test.ts`, `mock-provider.test.ts`).
 
 - [ ] **Step 5: Create the barrel `packages/providers/src/index.ts`**
 
@@ -588,20 +588,20 @@ This exports the factories `createClaudeCliProvider`, `createMockInboxProvider`,
 // was:
 // import { createMockInboxProvider } from '../core/mock-provider.js'
 // import { createClaudeCliProvider } from '../core/claude-cli-provider.js'
-import { createMockInboxProvider, createClaudeCliProvider } from '@platform/providers'
+import { createMockInboxProvider, createClaudeCliProvider } from '@atizar/providers'
 // keep: import { claudeSpawn } from './claude-spawn.js'
-// (defineProviders/ProviderRegistry already from '@platform/core' since Task 3)
+// (defineProviders/ProviderRegistry already from '@atizar/core' since Task 3)
 ```
 
 `apps/inbox/server/claude-spawn.ts`:
 ```ts
 // was: import type { ClaudeSpawn } from '../core/claude-cli-provider.js'
-import type { ClaudeSpawn } from '@platform/providers'
+import type { ClaudeSpawn } from '@atizar/providers'
 ```
 
 - [ ] **Step 7: Add the dep + re-enable the reference**
 
-Add to `apps/inbox/package.json` `dependencies`: `"@platform/providers": "*"`.
+Add to `apps/inbox/package.json` `dependencies`: `"@atizar/providers": "*"`.
 Uncomment `{ "path": "./packages/providers" }` in the root `tsconfig.json`.
 
 - [ ] **Step 8: Verify + commit**
@@ -616,7 +616,7 @@ Expected: all green (provider tests now run from `packages/providers/src`).
 
 ```bash
 git add -A
-git commit -m "refactor: extract @platform/providers (claude-cli + mock; spawn injected)
+git commit -m "refactor: extract @atizar/providers (claude-cli + mock; spawn injected)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -647,7 +647,7 @@ git mv apps/inbox/core/agents/reply.prompts.test.ts     apps/inbox/agents/reply.
 rmdir apps/inbox/core/agents apps/inbox/core
 ```
 
-(The prompt files' internal import of `../providers.js` was already changed to `@platform/core` in Task 3 Step 6, so they need no further edits.)
+(The prompt files' internal import of `../providers.js` was already changed to `@atizar/core` in Task 3 Step 6, so they need no further edits.)
 
 - [ ] **Step 2: Rewrite imports of `inbox.agent`**
 
@@ -703,7 +703,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 6: Extract `@platform/integrations` with the optional-peer fail-fast helper
+## Task 6: Extract `@atizar/integrations` with the optional-peer fail-fast helper
 
 **Files:**
 - Create: `packages/integrations/package.json`, `packages/integrations/tsconfig.json`
@@ -715,7 +715,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ```json
 {
-  "name": "@platform/integrations",
+  "name": "@atizar/integrations",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -795,7 +795,7 @@ Expected: FAIL — `optional-peer.mjs` / `optionalPeerError` does not exist.
 export function optionalPeerError(err, { name, install }) {
   if (err?.code === 'ERR_MODULE_NOT_FOUND') {
     return new Error(
-      `@platform/integrations requires the optional peer '${name}'. Install it in your app:  ${install}`
+      `@atizar/integrations requires the optional peer '${name}'. Install it in your app:  ${install}`
     )
   }
   return null
@@ -874,7 +874,7 @@ Both tool handlers already `await getGmail()` inside a `try/catch` that wraps th
 
 - [ ] **Step 10: Add the dep + re-enable the reference**
 
-Add to `apps/inbox/package.json` `dependencies`: `"@platform/integrations": "*"` (and keep `googleapis` — the app uses the gmail entrypoint, so it installs the optional peer).
+Add to `apps/inbox/package.json` `dependencies`: `"@atizar/integrations": "*"` (and keep `googleapis` — the app uses the gmail entrypoint, so it installs the optional peer).
 Uncomment `{ "path": "./packages/integrations" }` in the root `tsconfig.json`.
 
 - [ ] **Step 11: Point `claude-spawn.ts` at the package entrypoint**
@@ -887,7 +887,7 @@ const require = createRequire(import.meta.url)
 Replace:
 ```ts
 // was: const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mjs', import.meta.url))
-const GMAIL_SERVER = require.resolve('@platform/integrations/gmail-basic')
+const GMAIL_SERVER = require.resolve('@atizar/integrations/gmail-basic')
 ```
 Leave `MCP_SERVER` (the app's `inbox-tools.mjs`) unchanged.
 
@@ -905,7 +905,7 @@ Expected: all green; `optional-peer` + `format` tests run from `packages/integra
 
 ```bash
 git add -A
-git commit -m "refactor: extract @platform/integrations with ./gmail-basic (googleapis optional peer + fail-fast)
+git commit -m "refactor: extract @atizar/integrations with ./gmail-basic (googleapis optional peer + fail-fast)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -969,12 +969,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 - Change the "Run from `apps/inbox/`" command block to root yarn commands: `yarn dev`, `yarn test`, `yarn lint`, `yarn typecheck`, `yarn build`, `yarn format` (run from repo root).
 - Add a "Packages" section describing the new layout (`packages/core`, `packages/providers`, `packages/integrations`, `apps/inbox`) and the dependency direction (arrows → core).
-- Add gotchas: (a) `@platform/*` is a placeholder scope — rename before first npm publish; (b) yarn classic workspace, internal deps via `"*"`; (c) packages are consumed as raw TS source (no build) — Vite excludes `@platform/core` from pre-bundle if needed; (d) `googleapis` is an OPTIONAL peer of `@platform/integrations` — the app installs it; (e) the gmail MCP path is resolved via `require.resolve('@platform/integrations/gmail-basic')`.
-- Update the Handoff section: mark "the library (`@platform/*` split)" as STARTED — core/providers/integrations extracted; react/server still deferred.
+- Add gotchas: (a) `@atizar/*` is a placeholder scope — rename before first npm publish; (b) yarn classic workspace, internal deps via `"*"`; (c) packages are consumed as raw TS source (no build) — Vite excludes `@atizar/core` from pre-bundle if needed; (d) `googleapis` is an OPTIONAL peer of `@atizar/integrations` — the app installs it; (e) the gmail MCP path is resolved via `require.resolve('@atizar/integrations/gmail-basic')`.
+- Update the Handoff section: mark "the library (`@atizar/*` split)" as STARTED — core/providers/integrations extracted; react/server still deferred.
 
 - [ ] **Step 2: Update `docs/ARCHITECTURE.md`**
 
-- In §9 Roadmap and §11, mark the `@platform/*` package split as ✅ BUILT for core/providers/integrations (react/server still 💤).
+- In §9 Roadmap and §11, mark the `@atizar/*` package split as ✅ BUILT for core/providers/integrations (react/server still 💤).
 - Note the packaging strategy decision (one batteries package per axis + subpath entrypoints + optional peers; promote to standalone only on dependency-weight divergence).
 
 - [ ] **Step 3: Commit**
@@ -982,7 +982,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```bash
 cd /Users/yaroshuk/Development/AiWorkflow
 git add CLAUDE.md docs/ARCHITECTURE.md
-git commit -m "docs: @platform/* split built (core+providers+integrations); yarn workspace
+git commit -m "docs: @atizar/* split built (core+providers+integrations); yarn workspace
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -992,6 +992,6 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Notes for the executor
 
 - **Task order empties `core/` safely:** Task 3 moves the contract files out of `core/`, Task 4 moves the provider files out, Task 5 moves the agents out and only then `rmdir apps/inbox/core`. Do not run Task 5's `rmdir` before Tasks 3 and 4 have moved their files. Execute strictly Task 1 → 8 in order.
-- **`@platform/*` is a placeholder** — do not invent a real scope name; that is a separate branding decision.
+- **`@atizar/*` is a placeholder** — do not invent a real scope name; that is a separate branding decision.
 - After every task: `yarn test && yarn typecheck && yarn lint` must be green before committing. The browser E2E (Task 7 Step 3) is the final gate and is non-negotiable.
 - If Vite cannot resolve raw-TS workspace packages, the fix is `optimizeDeps.exclude` (shown in Task 3 Step 9), not a build step.

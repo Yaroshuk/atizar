@@ -1,4 +1,4 @@
-// @platform/server — the server-authoritative pipeline engine (StateStore, dispatch,
+// @atizar/server — the server-authoritative pipeline engine (StateStore, dispatch,
 // transition, WorkerPool, RunObserver, gate-keyed resolve, board/thread HTTP+SSE).
 // Public surface consumed by the app's composition root.
 export { db, databaseUrl, closeDb } from './db/client.js'

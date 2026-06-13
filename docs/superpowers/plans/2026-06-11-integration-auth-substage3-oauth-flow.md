@@ -4,9 +4,9 @@
 
 **Goal:** The in-app "Connect" mechanism (spec `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md` §4): OAuth connect/callback routes that write an encrypted token into the sub-stage-2 store, a Connections UI (the global-header Connect chip + a small Connections view), and the `claude-spawn` env pass-through so claude-cli's MCP children can `resolveCredential`. After this, an end user CONNECTS Gmail via a button instead of hand-placing files. NO skill change, NO gmail rewrite (sub-stages 4–5).
 
-**Architecture:** Routes in `@platform/server` (`connectRoutes.ts`, mounted by the app) build the provider auth URL from `oauthProvider(provider)` + `atizarEnv.oauthClient(provider)` + a signed `state`, redirect to the provider, and on callback exchange the code for tokens and `store.upsert`. The UI is in `@platform/react` (a `Connections` surface + a header `ConnectionChip`) reading a new `GET /api/connections` status endpoint. `apps/inbox/server/claude-spawn.ts` passes `ATIZAR_SECRET_KEY`/`ATIZAR_DATABASE_URL`/`ATIZAR_CONNECTION` + the provider client envs to each spawned MCP child so it resolves the same credential.
+**Architecture:** Routes in `@atizar/server` (`connectRoutes.ts`, mounted by the app) build the provider auth URL from `oauthProvider(provider)` + `atizarEnv.oauthClient(provider)` + a signed `state`, redirect to the provider, and on callback exchange the code for tokens and `store.upsert`. The UI is in `@atizar/react` (a `Connections` surface + a header `ConnectionChip`) reading a new `GET /api/connections` status endpoint. `apps/inbox/server/claude-spawn.ts` passes `ATIZAR_SECRET_KEY`/`ATIZAR_DATABASE_URL`/`ATIZAR_CONNECTION` + the provider client envs to each spawned MCP child so it resolves the same credential.
 
-**Tech Stack:** Hono routes + redirects, `fetch` (token exchange), Node `crypto` (HMAC state signing), React (the existing `@platform/react` chrome), vitest, Playwright-MCP for browser E2E. yarn-classic, NO build step.
+**Tech Stack:** Hono routes + redirects, `fetch` (token exchange), Node `crypto` (HMAC state signing), React (the existing `@atizar/react` chrome), vitest, Playwright-MCP for browser E2E. yarn-classic, NO build step.
 
 **Branch:** `feat/gmail-viewer`. Verify the branch; STOP if wrong.
 
@@ -23,7 +23,7 @@ Integration auth feature, sub-stage 3 — the user-facing "Connect" flow that ma
 ### Invariants
 
 - **I1/I2** — connecting is a HUMAN gesture (a button), never automatic. No machine action.
-- **I3/I5** — routes/UI live outside core; `@platform/server` owns the flow, `@platform/react` the chrome. The connect flow is generic over `oauthProvider` (adding a provider = a descriptor entry, no flow change).
+- **I3/I5** — routes/UI live outside core; `@atizar/server` owns the flow, `@atizar/react` the chrome. The connect flow is generic over `oauthProvider` (adding a provider = a descriptor entry, no flow change).
 
 ### Conventions (same as prior sub-stages)
 
@@ -31,10 +31,10 @@ English only; Prettier (`semi:false`/single quotes/`printWidth:100`); never `git
 
 ### The seams you touch (confirmed as-built)
 
-- **`@platform/server`:** `resolveCredential`/`registerResolver`, `makeCredentialStore(db)`, `oauthProvider(provider)` (→ `{ authUrl, tokenUrl }`), `atizarEnv` (`secretKey`/`oauthClient`/`connection`/`databaseUrl`), `db`. Routes are built in `createPipelineRoutes` style (Hono) — add a sibling `createConnectRoutes(deps)` and mount it in `apps/inbox/server/index.ts` alongside `createPipelineRoutes`.
+- **`@atizar/server`:** `resolveCredential`/`registerResolver`, `makeCredentialStore(db)`, `oauthProvider(provider)` (→ `{ authUrl, tokenUrl }`), `atizarEnv` (`secretKey`/`oauthClient`/`connection`/`databaseUrl`), `db`. Routes are built in `createPipelineRoutes` style (Hono) — add a sibling `createConnectRoutes(deps)` and mount it in `apps/inbox/server/index.ts` alongside `createPipelineRoutes`.
 - **`apps/inbox/server/index.ts`** — mounts routes (`app.route('/', createPipelineRoutes(pipeline))`). Add the connect routes + a `makeCredentialStore(db)` instance.
 - **`apps/inbox/server/claude-spawn.ts`** — builds the spawn `env` (`const env = { ...process.env }; delete env.ANTHROPIC_API_KEY`). The child already inherits `process.env`, so `ATIZAR_*` flow through automatically — BUT verify, and if the spawn ever filters env, explicitly pass `ATIZAR_SECRET_KEY`/`ATIZAR_DATABASE_URL`/`ATIZAR_CONNECTION`/`ATIZAR_GOOGLE_CLIENT_*`. (The MCP child resolves credentials itself — sub-stage 5 makes gmail use it; this sub-stage just guarantees the env reaches the child.)
-- **`@platform/react`:** `WorkflowBoard` (the root), the header area (the F3 health work + Stage-4 chrome live here). Add a `Connections` view + a header `ConnectionChip`. The board snapshot already carries `agentHealth` (F3) — connection status can reuse that OR a dedicated `/api/connections` endpoint (this plan adds the endpoint for a clean per-integration status).
+- **`@atizar/react`:** `WorkflowBoard` (the root), the header area (the F3 health work + Stage-4 chrome live here). Add a `Connections` view + a header `ConnectionChip`. The board snapshot already carries `agentHealth` (F3) — connection status can reuse that OR a dedicated `/api/connections` endpoint (this plan adds the endpoint for a clean per-integration status).
 - **Vite proxy:** `/api` → `:4000` (in `apps/inbox/vite.config.ts`), so a browser hitting `http://localhost:5173/api/connect/...` reaches the server. The OAuth `redirect_uri` is built from `ATIZAR_PUBLIC_URL` (new, default `http://localhost:5173`).
 
 ### What sub-stage 3 does NOT do
@@ -136,7 +136,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ---
 
-## TASK 4: Connections UI — header chip + Connections view (`@platform/react`)
+## TASK 4: Connections UI — header chip + Connections view (`@atizar/react`)
 
 **Files:**
 - Create: `packages/react/src/hooks/useConnections.ts`

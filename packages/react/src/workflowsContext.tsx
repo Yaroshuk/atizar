@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 import type { AgentMeta, RenderSpec, HitlSpec } from './renderSpecs'
 
 // The userland-supplied bundle: descriptors + per-agent chrome meta + render/HITL specs.

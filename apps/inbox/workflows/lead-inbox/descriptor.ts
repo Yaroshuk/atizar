@@ -1,4 +1,4 @@
-import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@platform/core'
+import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@atizar/core'
 
 export const replyAgent = defineAgent({
   id: 'reply',

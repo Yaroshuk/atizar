@@ -1,4 +1,4 @@
-import type { GateResolution } from '@platform/core'
+import type { GateResolution } from '@atizar/core'
 
 // One Mastra fullStream chunk we read. Structural (NOT @mastra/core's type) so the package
 // has zero Mastra dependency — same discipline as claude-stream reading NDJSON. Fields are

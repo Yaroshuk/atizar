@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineAgent, defineWorkflow } from '@platform/core'
+import { defineAgent, defineWorkflow } from '@atizar/core'
 
 // The dispatch payload shapes (= the route_emails tool args minus `to`). EmailRef mirrors the
 // email metadata shape; defined here as the workflow's own contract (userland), not imported

@@ -1,15 +1,15 @@
-# Extract `@platform/react` Implementation Plan
+# Extract `@atizar/react` Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (inline, green-gate
 > checkpoints). This is a code-MOVE + a small dependency-inversion (collapse the render registry,
 > inject specs via context). The existing 277-test suite + typecheck + lint + build + a browser E2E
 > ARE the verification. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Move the board/thread UI machinery from `apps/inbox/client/src/` into `@platform/react`,
+**Goal:** Move the board/thread UI machinery from `apps/inbox/client/src/` into `@atizar/react`,
 leaving vertical cards + the workflow client bundle in the demo (userland). Realizes belief #3 /
 I5 for the client half.
 
-**Architecture:** No build step (`@platform/*` pattern — `exports` → `./src/index.ts`). Machinery
+**Architecture:** No build step (`@atizar/*` pattern — `exports` → `./src/index.ts`). Machinery
 files `git mv` as a group (preserving their mutual relative imports). Three inversions: (1) the
 string-name `renderRegistry` is deleted — `RenderSpec`/`HitlSpec` render closures reference cards
 directly; (2) `buildRenderToolCall` + `ThreadModal` read specs from a package context instead of a
@@ -19,8 +19,8 @@ composes `<WorkflowBoard config={workflowsConfig} />`.
 **Tech Stack:** Vite + React 19 + TS, yarn-classic workspace, vitest. Spec → `docs/superpowers/
 specs/2026-06-10-extract-platform-react-design.md`.
 
-**Foundation note (run `check-foundation` before the final commit):** realizes I5; `@platform/core`
-stays React-free (spec types live in `@platform/react`); `defineAgent.renders` in core UNTOUCHED
+**Foundation note (run `check-foundation` before the final commit):** realizes I5; `@atizar/core`
+stays React-free (spec types live in `@atizar/react`); `defineAgent.renders` in core UNTOUCHED
 (I15 keys intact; component-name values become vestigial labels — tidy later, gated). No invariant
 weakened.
 
@@ -30,7 +30,7 @@ weakened.
 
 ```
 packages/react/
-  package.json            # new: @platform/react; exports . + ./styles.css; react = peerDep
+  package.json            # new: @atizar/react; exports . + ./styles.css; react = peerDep
   tsconfig.json           # new: providers pattern, ref ../core
   src/
     index.ts              # new barrel: hooks, components, WorkflowBoard, types, context, buildRenderToolCall
@@ -50,15 +50,15 @@ Userland after (`apps/inbox/client/src/`): `App.tsx` (edited), `main.tsx` (edite
 `deliver.ts` (stays if used, else delete), `renderLead.test.tsx` + `renderVerdict.test.tsx`
 (stay, edited), `test/setup.ts` (stays — vitest setupFiles), `vite-env.d.ts` (stays),
 `components/{LeadCard,TriageCard,ReplyDraftCard,VerdictCard,TicketResultCard,ApprovalDialog}.tsx`
-(stay, edited: `Icon` from `@platform/react`). **DELETED:** `renderRegistry.tsx`,
+(stay, edited: `Icon` from `@atizar/react`). **DELETED:** `renderRegistry.tsx`,
 `InboxView.tsx` (renamed into the package).
 
 Userland workflow modules (`apps/inbox/workflows/{lead-inbox,github-triage}/client.tsx`): edited —
-types + `useThreadResult` from `@platform/react`; cards referenced directly; drop `registry` param.
+types + `useThreadResult` from `@atizar/react`; cards referenced directly; drop `registry` param.
 
 ---
 
-## Task 1: Scaffold `@platform/react`
+## Task 1: Scaffold `@atizar/react`
 
 **Files:** create `packages/react/package.json`, `packages/react/tsconfig.json`,
 `packages/react/src/index.ts` (placeholder); modify root `tsconfig.json`.
@@ -67,7 +67,7 @@ types + `useThreadResult` from `@platform/react`; cards referenced directly; dro
 
 ```json
 {
-  "name": "@platform/react",
+  "name": "@atizar/react",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -77,7 +77,7 @@ types + `useThreadResult` from `@platform/react`; cards referenced directly; dro
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@platform/core": "*",
+    "@atizar/core": "*",
     "zod": "^3.25.76"
   },
   "peerDependencies": {
@@ -109,7 +109,7 @@ types + `useThreadResult` from `@platform/react`; cards referenced directly; dro
 
 - [ ] **Step 5:** `yarn install --ignore-engines && yarn typecheck` → clean (nothing imports it yet).
 
-- [ ] **Step 6: commit** `chore(react): scaffold empty @platform/react package`.
+- [ ] **Step 6: commit** `chore(react): scaffold empty @atizar/react package`.
 
 ---
 
@@ -154,7 +154,7 @@ Run: `find apps/inbox/client/src -type f | sort` and verify against that list.
   reach back into `apps/inbox`:
 
 Run: `grep -rn "client/src\|apps/inbox" packages/react/src` → expect NO results (the only outward
-imports should be `@platform/core`, `@ag-ui/client`, `react`, `zod`).
+imports should be `@atizar/core`, `@ag-ui/client`, `react`, `zod`).
 
 (Do NOT green-gate yet — `renderSpecs.ts`/`buildRenderToolCall.tsx`/`WorkflowBoard.tsx` still import
 the now-absent `renderRegistry`/`workflows`; fixed in Task 3. Commit happens after Task 3.)
@@ -173,7 +173,7 @@ new `.../index.ts`.
 ```ts
 import type { ReactElement } from 'react'
 import type { z } from 'zod'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import type { IconName } from './components/Icon'
 
 export type AgentMeta = { subtitle: string; iconName: IconName; intro: string }
@@ -203,7 +203,7 @@ export type HitlSpec = {
 
 ```tsx
 import { createContext, useContext, type ReactNode } from 'react'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 import type { AgentMeta, RenderSpec, HitlSpec } from './renderSpecs'
 
 // The userland-supplied bundle: descriptors + per-agent chrome meta + render/HITL specs.
@@ -237,7 +237,7 @@ export const useWorkflowsConfig = (): WorkflowsConfig => {
 
 ```tsx
 import type { ReactNode } from 'react'
-import type { ToolCall, ToolMessage } from '@platform/core'
+import type { ToolCall, ToolMessage } from '@atizar/core'
 import type { DeliverFn, RenderSpec } from './renderSpecs'
 
 // Given a folded assistant tool call, parse its args and dispatch to the matching pure render
@@ -325,33 +325,33 @@ confirm `threadResults.tsx` exports `useThreadResult` + `ThreadResultsContext`, 
 **Files:** the 6 cards, `workflows.ts`, `App.tsx`, `main.tsx`, both workflow `client.tsx`,
 `renderLead.test.tsx`, `renderVerdict.test.tsx`, delete `renderRegistry.tsx`; `apps/inbox/package.json`.
 
-- [ ] **Step 1: add the dep** — `apps/inbox/package.json` deps gain `"@platform/react": "*"`; then
+- [ ] **Step 1: add the dep** — `apps/inbox/package.json` deps gain `"@atizar/react": "*"`; then
   `yarn install --ignore-engines`.
 
 - [ ] **Step 2: cards — `Icon` import** — in each of `LeadCard`, `TriageCard`, `ReplyDraftCard`,
   `VerdictCard`, `TicketResultCard`, `ApprovalDialog`: change `import { Icon } from './Icon'` →
-  `import { Icon } from '@platform/react'`. (TriageCard keeps `import { groupByStatus, type TriageTicket } from '../buckets'`.)
+  `import { Icon } from '@atizar/react'`. (TriageCard keeps `import { groupByStatus, type TriageTicket } from '../buckets'`.)
 
 - [ ] **Step 3: workflow client modules** (`apps/inbox/workflows/lead-inbox/client.tsx`,
   `.../github-triage/client.tsx`):
-  - Types: `import type { RenderSpec, HitlSpec, AgentMeta, DeliverFn } from '@platform/react'`
+  - Types: `import type { RenderSpec, HitlSpec, AgentMeta, DeliverFn } from '@atizar/react'`
     (was `../../client/src/renderSpecs`).
-  - `useThreadResult`: `import { useThreadResult } from '@platform/react'` (was `../../client/src/threadResults`).
+  - `useThreadResult`: `import { useThreadResult } from '@atizar/react'` (was `../../client/src/threadResults`).
   - Drop the `Registry` import. Import the card components directly, e.g.
     `import { LeadCard } from '../../client/src/components/LeadCard'` etc.
   - In every render closure: drop the `registry` parameter; replace `const X = registry['XCard']`
     + `<X .../>` with the directly-imported component `<XCard .../>`. (TriageCardConnected drops its
     `registry` prop too and references `TriageCard` directly.)
 
-- [ ] **Step 4: `apps/inbox/client/src/workflows.ts`** — import spec TYPES from `@platform/react`;
+- [ ] **Step 4: `apps/inbox/client/src/workflows.ts`** — import spec TYPES from `@atizar/react`;
   build and export a `workflowsConfig: WorkflowsConfig` bundle (keep the dedupe-by-toolName):
 
 ```ts
-import type { WorkflowsConfig } from '@platform/react'
+import type { WorkflowsConfig } from '@atizar/react'
 import { workflowDescriptors } from '../../workflows'
 import { leadInboxMeta, leadInboxRenders, leadInboxHitl } from '../../workflows/lead-inbox/client'
 import { githubTriageMeta, githubTriageRenders } from '../../workflows/github-triage/client'
-import type { AgentMeta, RenderSpec, HitlSpec } from '@platform/react'
+import type { AgentMeta, RenderSpec, HitlSpec } from '@atizar/react'
 
 export type { AgentMeta }
 const byName = <T extends { toolName: string }>(specs: T[]): T[] => {
@@ -376,7 +376,7 @@ something imports them — grep first; if `workflowViews` is unused, remove it.)
 - [ ] **Step 5: `apps/inbox/client/src/App.tsx`:**
 
 ```tsx
-import { WorkflowBoard } from '@platform/react'
+import { WorkflowBoard } from '@atizar/react'
 import { workflowsConfig } from './workflows'
 
 export const App = () => <WorkflowBoard config={workflowsConfig} />
@@ -384,13 +384,13 @@ export const App = () => <WorkflowBoard config={workflowsConfig} />
 
 - [ ] **Step 6: `apps/inbox/client/src/main.tsx`** — CSS now comes from the package:
 
-  Change `import './styles.css'` → `import '@platform/react/styles.css'`.
+  Change `import './styles.css'` → `import '@atizar/react/styles.css'`.
 
 - [ ] **Step 7: delete `apps/inbox/client/src/renderRegistry.tsx`:** `git rm apps/inbox/client/src/renderRegistry.tsx`.
 
 - [ ] **Step 8: update `renderLead.test.tsx` + `renderVerdict.test.tsx`** — they exercise the
   lead-inbox render specs. Update for the new signature: specs are called `spec.render({ parameters }, deliver)`
-  with NO registry arg; import `RenderSpec` type from `@platform/react` if referenced; assert the
+  with NO registry arg; import `RenderSpec` type from `@atizar/react` if referenced; assert the
   card renders directly. (Read each test; adjust the call sites + any `renderRegistry` import. Keep
   them in `apps/inbox/client/src/` — userland tests of userland specs.)
 
@@ -406,7 +406,7 @@ via the package export); prettier clean on changed files. Fix mismatches (the mo
 import-site still pointing at a moved `./client/src/...` path — grep `apps/inbox` for stragglers).
 
 - [ ] **Step 11: commit** the move + inversion + rewire (one commit, files overlap):
-  `refactor(react): extract board/thread UI into @platform/react (typed-spec context injection)`.
+  `refactor(react): extract board/thread UI into @atizar/react (typed-spec context injection)`.
 
 ---
 
@@ -419,7 +419,7 @@ import-site still pointing at a moved `./client/src/...` path — grep `apps/inb
   `DEV_RECORD_REPLAY=1 yarn dev`. Confirm ONE `:4000` + `0` EADDRINUSE; confirm the app is STYLED
   (CSS export resolved).
 
-- [ ] **Step 3: drive the lead-inbox flow through `@platform/react`** (`http://localhost:5173/?dev=1`):
+- [ ] **Step 3: drive the lead-inbox flow through `@atizar/react`** (`http://localhost:5173/?dev=1`):
   board loads + styled; START → qualifier Working→Done; reply gate opens; **approve WITH an edited
   body → fetch the real Gmail draft by id → the edit is present** (then delete the test draft);
   reject → `finished`/`rejected`, 0 ledger; cancel → `finished`/`cancelled`, gate 404; reload
@@ -434,7 +434,7 @@ import-site still pointing at a moved `./client/src/...` path — grep `apps/inb
 
 - [ ] **Step 6: update `HANDOFF.md`** — 7b ✅ BUILT & browser-verified, As-built note (commits, the
   registry collapse, the context API, buckets-stays-userland correction); next = 7c (slim demo +
-  packaging tail). **Commit** `docs(handoff): @platform/react extracted & browser-verified (7b); next = 7c`.
+  packaging tail). **Commit** `docs(handoff): @atizar/react extracted & browser-verified (7b); next = 7c`.
 
 ---
 

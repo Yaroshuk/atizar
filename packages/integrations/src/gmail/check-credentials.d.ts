@@ -1,5 +1,5 @@
 // Type declaration for check-credentials.mjs (JS module — no TS source).
-import type { HealthCheck, ResolvedCredential } from '@platform/core'
+import type { HealthCheck, ResolvedCredential } from '@atizar/core'
 
 export declare function checkCredentials(deps?: {
   credential?: ResolvedCredential

@@ -1,12 +1,12 @@
 ---
 name: write-integration
-description: Author a new integration module in @platform/integrations — pure injectable functions, an MCP wrapper for read tools, credentials health check, and an embedded consumer skill. Use when the user asks to add, write, or build an integration, connect an external service (Gmail, Slack, a CRM, an API), or extend an existing integration with new capabilities.
+description: Author a new integration module in @atizar/integrations — pure injectable functions, an MCP wrapper for read tools, credentials health check, and an embedded consumer skill. Use when the user asks to add, write, or build an integration, connect an external service (Gmail, Slack, a CRM, an API), or extend an existing integration with new capabilities.
 ---
 
 # Write an integration
 
 Task skill — owns the run end-to-end: from "we need an integration that does X" to a
-tested, documented module in `@platform/integrations` that agents and the server can
+tested, documented module in `@atizar/integrations` that agents and the server can
 consume. The worked exemplar (STRUCTURE **and** the AUTH CONTRACT) is now the unified
 `packages/integrations/src/gmail/` + its embedded consumer skill
 `packages/integrations/skills/gmail/SKILL.md` (auth sub-stage 5 landed, 2026-06-12: it merged
@@ -19,18 +19,18 @@ the old gmail-basic + gmail-viewer into ONE pure integration that declares `auth
 
 - **Pure functions, injected credential.** Every function is a plain ESM `.mjs` export that
   takes `(args, deps = {})`. The framework injects the resolved credential as
-  `deps.credential` (a `ResolvedCredential` from `@platform/core`) — and/or a client built
+  `deps.credential` (a `ResolvedCredential` from `@atizar/core`) — and/or a client built
   from it. Tests pass a fake; the server imports the function directly (no MCP child).
 - **Auth is DECLARED, never self-read.** The integration exports an `auth: AuthSpec` (from
-  `@platform/core`); its functions receive the live credential via `deps.credential`. The
+  `@atizar/core`); its functions receive the live credential via `deps.credential`. The
   integration MUST NOT read `process.env` or files for secrets — resolving credentials is
-  the framework's job (`resolveCredential` in `@platform/server`).
+  the framework's job (`resolveCredential` in `@atizar/server`).
 - **`AuthSpec.kind` is OPEN.** `none` / `apiKey` / `oauth2` are built-in (framework
-  resolvers); a CUSTOM kind ships its OWN `CredentialResolver` (from `@platform/core`),
-  registered via `registerResolver(kind, fn)` (from `@platform/server`) in USERLAND — never
-  edit `@platform/core` to add an auth method (invariant I5).
+  resolvers); a CUSTOM kind ships its OWN `CredentialResolver` (from `@atizar/core`),
+  registered via `registerResolver(kind, fn)` (from `@atizar/server`) in USERLAND — never
+  edit `@atizar/core` to add an auth method (invariant I5).
 - **Env naming.** Official secrets are `ATIZAR_`-prefixed and reached via `atizarEnv` (from
-  `@platform/server`) — `ATIZAR_<INTEGRATION>_API_KEY` for `apiKey`;
+  `@atizar/server`) — `ATIZAR_<INTEGRATION>_API_KEY` for `apiKey`;
   `ATIZAR_<PROVIDER>_CLIENT_ID` / `ATIZAR_<PROVIDER>_CLIENT_SECRET` for the `oauth2` app
   registration (e.g. `ATIZAR_GOOGLE_CLIENT_ID`). Vendor vars (e.g. `ANTHROPIC_API_KEY`,
   `DATABASE_URL`) are NOT namespaced. The integration never reads these directly — it
@@ -42,13 +42,13 @@ the old gmail-basic + gmail-viewer into ONE pure integration that declares `auth
   in-app Connect flow, not the env.
 - **Never throw — return `{ error }`.** Callers (server effects, MCP wrappers) branch on
   `res.error`. Use a shared `errText(err)` helper for messages — reads return `ReadResult<T>`
-  (`T | { error }`) from `@platform/core`.
+  (`T | { error }`) from `@atizar/core`.
 - **Parsing is pure and separate.** Data-in/data-out helpers live in a `format.mjs` with no
   fs/env/network so they unit-test trivially.
 - **Batch mutations are best-effort.** A multi-id action returns
   `{ done: string[], failed: { messageId, error }[] }` — one bad row must not abort the rest.
   A wholesale failure (client unavailable) returns `{ error }` — this shape IS the exported
-  `BatchActionResult` type in `@platform/core`; import it, don't redefine it.
+  `BatchActionResult` type in `@atizar/core`; import it, don't redefine it.
 - **`.d.ts` beside `.mjs`** for every module a TypeScript consumer imports; the package
   `exports` map points `types` at it. The package tsconfig has `allowJs:true, checkJs:false`
   — tests in `.test.ts` import `.mjs` directly.
@@ -57,22 +57,22 @@ the old gmail-basic + gmail-viewer into ONE pure integration that declares `auth
   enforces this — an unclassified tool refuses to boot). The wrapper is a thin stdio
   `McpServer` whose tools delegate to the pure functions. **If the read tools need a resolved
   credential, the credential-resolving MCP wrapper belongs in the consuming APP (it may import
-  `@platform/server`'s `resolveCredential`), NOT in the pure integration package — the package
-  never imports `@platform/server` (it declares `auth` + receives `deps.credential`). Such an
-  app-side wrapper that imports `.ts` (`@platform/server`) MUST run via the tsx loader (`node
+  `@atizar/server`'s `resolveCredential`), NOT in the pure integration package — the package
+  never imports `@atizar/server` (it declares `auth` + receives `deps.credential`). Such an
+  app-side wrapper that imports `.ts` (`@atizar/server`) MUST run via the tsx loader (`node
   --import tsx <file>.mts`), because a plain `node *.mjs` MCP child cannot import `.ts` source.**
   (Sub-stage 5 gmail: the MCP child resolving the credential had to live in the app as a `.mts`
-  under `node --import tsx`, since `@platform/server` is `.ts` and the integration package stays
+  under `node --import tsx`, since `@atizar/server` is `.ts` and the integration package stays
   pure.)
-- **`checkCredentials()` is mandatory.** Returns the `HealthCheck` type from `@platform/core`
+- **`checkCredentials()` is mandatory.** Returns the `HealthCheck` type from `@atizar/core`
   (`{ ok:true; detail? } | { ok:false; error; hint }`). Health now means: does
   `resolveCredential` yield a USABLE credential for this `(integration, connection)`? A null
   (not connected) or a throw → `{ ok:false, error, hint }`, where the `hint` points the
   developer at the in-app **Connect** flow (for `oauth2`) or names the env var to set
   (`ATIZAR_<INTEGRATION>_API_KEY` for `apiKey`). The server's health surface (spec F3)
   consumes this.
-- **Type the `.d.ts` against `@platform/core`** — import `HealthCheck` / `ReadResult` /
-  `BatchActionResult` rather than re-declaring result shapes; add `@platform/core` to the
+- **Type the `.d.ts` against `@atizar/core`** — import `HealthCheck` / `ReadResult` /
+  `BatchActionResult` rather than re-declaring result shapes; add `@atizar/core` to the
   package deps. The contract is types only — there is no `defineIntegration()` and no base
   class (belief #3).
 - **Optional heavy peers.** A large SDK (`googleapis`) is an optional peerDependency,
@@ -148,16 +148,16 @@ is a library, not running-app behavior).
 **Run the smoke as a temp `.mts` file INSIDE the repo, not `yarn tsx -e "…"`.** Past-run
 incident (gmail-viewer, 2026-06-11): `tsx -e` failed twice — first `Top-level await is not
 supported with the "cjs" output format` (the `-e` eval is CJS), then, after moving to a file
-in `/tmp`, `ERR_MODULE_NOT_FOUND: Cannot find package '@platform/integrations'` (Node
+in `/tmp`, `ERR_MODULE_NOT_FOUND: Cannot find package '@atizar/integrations'` (Node
 resolves the workspace symlink only from within the repo tree). Both vanish with a throwaway
-`./smoke.mts` at the repo root (`import {...} from '@platform/integrations/<name>/<fn>'`;
+`./smoke.mts` at the repo root (`import {...} from '@atizar/integrations/<name>/<fn>'`;
 top-level `await`), run via `yarn tsx smoke.mts`, then `rm` it. Print only counts/lengths —
 never real fetched content into logs.
 
 ## Stage 7 — Foundation check
 
 Run the `check-foundation` procedure on the result (new package surface; verify no engine
-import leaked into `@platform/core`, no mutation became model-visible). A conflict is a
+import leaked into `@atizar/core`, no mutation became model-visible). A conflict is a
 STOP: warn the developer and get direct confirmation.
 
 ## Stage 8 — Self-improvement (last, silent skip is the default)
@@ -171,5 +171,5 @@ a Procedure/Rule this run used), each quoting the motivating incident verbatim.
 points at is now `packages/integrations/src/gmail/` + `packages/integrations/skills/gmail/SKILL.md`
 — one pure integration declaring `auth` + receiving `deps.credential`. That run folded one fact
 back into the FACTS block: the credential-resolving READ MCP wrapper had to live in the consuming
-app as a `.mts` under `node --import tsx` (it imports `@platform/server`, which is `.ts`), keeping
-the integration package free of any `@platform/server` dependency.
+app as a `.mts` under `node --import tsx` (it imports `@atizar/server`, which is `.ts`), keeping
+the integration package free of any `@atizar/server` dependency.

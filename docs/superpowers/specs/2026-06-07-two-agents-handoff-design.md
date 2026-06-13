@@ -9,7 +9,7 @@
 Add a **second agent** (a lead **qualifier**) alongside the existing reply agent, and
 let work pass between them via a **manual handoff** (the manager clicks). This is the
 deliberate "second consumer" test the architecture says must exist before the
-`@platform/*` package split — it proves the `core/` contract is genuinely reusable and
+`@atizar/*` package split — it proves the `core/` contract is genuinely reusable and
 surfaces the inter-agent seam that will become the framework.
 
 Two cross-cutting decisions shaped this design (both from the brainstorm):
@@ -30,7 +30,7 @@ prompt strategies; multi-agent server registration; multi-agent client desktop; 
 
 **Out (YAGNI / deferred):** server-side orchestration or sessions; auto/agent-initiated
 handoff trigger (only the seam is built, ready for it); `defineWorkspace`; the
-`@platform/*` split; a real Mastra provider; new Gmail tools; the polish backlog
+`@atizar/*` split; a real Mastra provider; new Gmail tools; the polish backlog
 (ToolSearch narration, Gmail scope tightening).
 
 ## 3. The two agents (passports, `core/`)
@@ -185,5 +185,5 @@ violate.
 ## 12. Deferred (explicitly not now)
 
 Server-side orchestration/session; auto/agent-initiated handoff trigger; `defineWorkspace`;
-`@platform/*` split; real Mastra provider; new Gmail tools; qualifier approval pause; the
+`@atizar/*` split; real Mastra provider; new Gmail tools; qualifier approval pause; the
 polish backlog. These follow once the contract is validated on two agents.

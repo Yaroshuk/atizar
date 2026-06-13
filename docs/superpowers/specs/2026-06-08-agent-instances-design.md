@@ -50,7 +50,7 @@ the live instances; the right-hand "type" card aggregates them.
 
 ## Architecture
 
-### `@platform/core` — config
+### `@atizar/core` — config
 
 `AgentDefinitionSchema` gains:
 

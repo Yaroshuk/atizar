@@ -4,9 +4,9 @@
 
 **Goal:** Make the server (not the model) execute approved side effects, and make Stop/cancel first-class — for beta build order step 4.
 
-**Architecture:** The model calls the *approval* tool (`saveDraft`) with a proposed artifact; on approve the *server* executes the *effect* (`createDraft`) from the gate form (the edited artifact IS the args), guarded by an `action_ledger` claim (one resolved gate ⇒ one execution) and optimistic `formRev` (mismatch → 409). Effect functions live in the workflow `ServerBinding` (names in `@platform/core`, functions in the server layer — the `renders` pattern); a boot-time check enforces effect-binding exhaustiveness and that every allow-listed tool is classified `readonly | approvals | renders`. Stop interrupts a live `provider.run()` stream via `iterator.return()` → the claude-cli generator's `finally` kills the subprocess.
+**Architecture:** The model calls the *approval* tool (`saveDraft`) with a proposed artifact; on approve the *server* executes the *effect* (`createDraft`) from the gate form (the edited artifact IS the args), guarded by an `action_ledger` claim (one resolved gate ⇒ one execution) and optimistic `formRev` (mismatch → 409). Effect functions live in the workflow `ServerBinding` (names in `@atizar/core`, functions in the server layer — the `renders` pattern); a boot-time check enforces effect-binding exhaustiveness and that every allow-listed tool is classified `readonly | approvals | renders`. Stop interrupts a live `provider.run()` stream via `iterator.return()` → the claude-cli generator's `finally` kills the subprocess.
 
-**Tech Stack:** TypeScript, zod, Hono, drizzle-orm + Postgres, vitest, `@platform/{core,providers,integrations}`, `apps/inbox`.
+**Tech Stack:** TypeScript, zod, Hono, drizzle-orm + Postgres, vitest, `@atizar/{core,providers,integrations}`, `apps/inbox`.
 
 **Spec:** `docs/superpowers/specs/2026-06-10-server-executed-effects-stop-design.md`
 
@@ -428,7 +428,7 @@ git commit -m "refactor(integrations): extract createDraft into a pure exported 
 In `apps/inbox/workflows/server-binding.ts`:
 
 ```ts
-import type { PromptStrategy } from '@platform/core'
+import type { PromptStrategy } from '@atizar/core'
 
 // A server-executed effect: keyed by APPROVAL tool name, called by the server on approve
 // with the gate form (the edited artifact = the args) + context. Returns the result that
@@ -452,7 +452,7 @@ Create `apps/inbox/server/agent-checks.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest'
-import { defineAgent } from '@platform/core'
+import { defineAgent } from '@atizar/core'
 import { assertAgentClassification } from './agent-checks.js'
 
 const reply = defineAgent({
@@ -515,7 +515,7 @@ Expected: FAIL — `agent-checks.ts` does not exist.
 Create `apps/inbox/server/agent-checks.ts`:
 
 ```ts
-import type { AgentDefinition } from '@platform/core'
+import type { AgentDefinition } from '@atizar/core'
 import type { EffectFn } from '../workflows/server-binding.js'
 
 // Strip the `mcp__<server>__` prefix to the bare tool name the passport declares.
@@ -583,7 +583,7 @@ import type { ServerBinding } from '../server-binding.js'
 import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
-import { createDraft } from '@platform/integrations/gmail-basic/create-draft'
+import { createDraft } from '@atizar/integrations/gmail-basic/create-draft'
 
 export const leadInboxServer = (origin: string): ServerBinding[] => [
   {
@@ -1489,7 +1489,7 @@ Then switch to `DEV_RECORD_REPLAY=1 yarn dev` and confirm the replay of flows 2�
 
 - [ ] **Step 5: Flip HANDOFF to ✅ BUILT with an As-built note**
 
-In `HANDOFF.md`, change the step-4 line (`75: 4. **Server-executed effects + Stop**`) to `✅ BUILT & browser-verified` and add an "As-built" sub-bullet block (follow the steps 1–3 As-built pattern) summarizing: `defineAgent.effects (⊆ approvals) + readonly`; `ServerBinding.effects` (functions in server, names in core); boot checks in `agent-checks.ts`; `createDraft` extracted to `@platform/integrations/gmail-basic/create-draft`; `transition` cancel/reject edges; RunObserver explicit-iterator `cancel` + terminal-tolerant finish; `resolveGate` (formRev/ledger/execute/resume) + `cancel`/`cancelWorkflow`; routes `/api/gates/:id/resolve` + cancel + gate read (dev resolve removed); reply resume = propose-don't-execute; spike page edit/reject/Stop. Note the effect-outside-record/replay nuance. Update the "Starting point for the next session" to **step 5 (Mastra provider)** and remind: ask for `ANTHROPIC_API_KEY` at the start of step 5.
+In `HANDOFF.md`, change the step-4 line (`75: 4. **Server-executed effects + Stop**`) to `✅ BUILT & browser-verified` and add an "As-built" sub-bullet block (follow the steps 1–3 As-built pattern) summarizing: `defineAgent.effects (⊆ approvals) + readonly`; `ServerBinding.effects` (functions in server, names in core); boot checks in `agent-checks.ts`; `createDraft` extracted to `@atizar/integrations/gmail-basic/create-draft`; `transition` cancel/reject edges; RunObserver explicit-iterator `cancel` + terminal-tolerant finish; `resolveGate` (formRev/ledger/execute/resume) + `cancel`/`cancelWorkflow`; routes `/api/gates/:id/resolve` + cancel + gate read (dev resolve removed); reply resume = propose-don't-execute; spike page edit/reject/Stop. Note the effect-outside-record/replay nuance. Update the "Starting point for the next session" to **step 5 (Mastra provider)** and remind: ask for `ANTHROPIC_API_KEY` at the start of step 5.
 
 - [ ] **Step 6: Commit**
 

@@ -6,7 +6,7 @@ import {
   type Provider,
   type ResumeHandle,
   type Message,
-} from '@platform/core'
+} from '@atizar/core'
 
 const LEAD = {
   from: 'ivan@acme.ru',

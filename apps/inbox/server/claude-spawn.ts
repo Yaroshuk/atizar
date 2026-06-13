@@ -5,11 +5,11 @@ import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ClaudeSpawn } from '@platform/providers'
+import type { ClaudeSpawn } from '@atizar/providers'
 
 // Absolute path to the stdio MCP server scripts.
 const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.url))
-// The gmail MCP server is a `.mts` file (it imports `@platform/server` for resolveCredential,
+// The gmail MCP server is a `.mts` file (it imports `@atizar/server` for resolveCredential,
 // which is `.ts` source) → spawned via the tsx loader: `node --import tsx <path>`.
 const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mts', import.meta.url))
 const GITHUB_SERVER = fileURLToPath(new URL('../mcp/github-tools.mjs', import.meta.url))

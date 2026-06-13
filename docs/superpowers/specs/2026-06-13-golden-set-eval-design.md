@@ -82,7 +82,7 @@ export async function runGolden(scenario: GoldenScenario): Promise<RunFacts>
 Wiring (reused, not rebuilt):
 
 - **DB:** a fresh PGlite in-memory instance per scenario (`isDemo()`-style selection already exists
-  in `@platform/server` `client.ts`/`migrate.ts`). Migrate-on-create; no Docker, no shared state
+  in `@atizar/server` `client.ts`/`migrate.ts`). Migrate-on-create; no Docker, no shared state
   → scenarios are parallel-safe.
 - **Provider:** the `demo` record-replay mode (`record-replay.ts`, `mode:'demo'`) reading
   `demoCassettesDir()`. A `DemoCassetteMissing` throw is a hard scenario failure (the fixture must
@@ -159,7 +159,7 @@ A browser E2E, not a replay assertion (the follow-up explicitly wants the full U
 - **C3:** browser flow verified per the `browser-verify` skill (stale-stack kill + ports free
   first); screenshot/snapshot evidence of the nested lead-inbox child.
 - **Foundation:** run `check-foundation` — the harness touches providers (injected fake) and the
-  framework/userland boundary (eval lives in `apps/inbox`, imports only `@platform/*` + workflows).
+  framework/userland boundary (eval lives in `apps/inbox`, imports only `@atizar/*` + workflows).
 
 ## Build order
 

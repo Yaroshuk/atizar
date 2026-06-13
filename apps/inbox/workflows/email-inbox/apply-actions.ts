@@ -1,9 +1,9 @@
-import type { ResolvedCredential } from '@platform/core'
+import type { ResolvedCredential } from '@atizar/core'
 import {
   markRead as realMarkRead,
   trash as realTrash,
   star as realStar,
-} from '@platform/integrations/gmail/modify'
+} from '@atizar/integrations/gmail/modify'
 
 type Action = 'read' | 'trash' | 'star' | 'keep'
 type Row = { messageId: string; action: Action }

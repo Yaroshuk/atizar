@@ -4,9 +4,9 @@ import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { PostgresStore } from '@mastra/pg'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
-import { type GateResolution, type Message, type PromptStrategy } from '@platform/core'
+import { type GateResolution, type Message, type PromptStrategy } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
-import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@platform/providers'
+import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@atizar/providers'
 import {
   getLatestEmailTool,
   renderLeadTool,

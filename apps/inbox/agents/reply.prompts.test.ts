@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createReplyPrompts } from './reply.prompts.js'
-import { encodeHandoff, type HandoffPayload } from '@platform/core'
+import { encodeHandoff, type HandoffPayload } from '@atizar/core'
 
 const input = (messages: unknown[]) => ({ messages }) as never
 const payload: HandoffPayload = {

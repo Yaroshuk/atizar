@@ -1,5 +1,5 @@
 {
-  "name": "@platform/core",
+  "name": "@atizar/core",
   "version": "1.0.0",
   "private": true,
   "type": "module",

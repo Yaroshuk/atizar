@@ -1,4 +1,4 @@
-// @platform/react — the server-driven board/thread UI machinery (chrome, hooks, render
+// @atizar/react — the server-driven board/thread UI machinery (chrome, hooks, render
 // dispatch, theme). Vertical CARDS live in userland; this package never imports one — it
 // receives them via the injected WorkflowsConfig (typed render/HITL specs that reference
 // their card components directly).

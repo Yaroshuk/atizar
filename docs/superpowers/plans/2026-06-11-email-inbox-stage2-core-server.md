@@ -4,7 +4,7 @@
 
 **Goal:** Build the framework capabilities the email-inbox workflow needs, server-side only (NO React this stage): F9 thin integration contract, F1 workflow-level prompt, F2 machine-dispatch tool class, F3 credential-health surface, F4 activity feed, F6 singleton START guard, and a global `POST /api/cancel-all`.
 
-**Architecture:** All changes are additive to existing seams. New shared types go in `@platform/core` (engine-free, React-free). Server logic goes in `@platform/server` (the pipeline spine) + thin app wiring in `apps/inbox/server`. The data shapes the UI will later read (board `agentHealth`, activity entries) are added to `@platform/react/src/serverTypes.ts` as plain types — but NO components are built this stage (that is Stage 4). Both providers (claude-cli + Mastra) must satisfy the extended conformance suite.
+**Architecture:** All changes are additive to existing seams. New shared types go in `@atizar/core` (engine-free, React-free). Server logic goes in `@atizar/server` (the pipeline spine) + thin app wiring in `apps/inbox/server`. The data shapes the UI will later read (board `agentHealth`, activity entries) are added to `@atizar/react/src/serverTypes.ts` as plain types — but NO components are built this stage (that is Stage 4). Both providers (claude-cli + Mastra) must satisfy the extended conformance suite.
 
 **Tech Stack:** TypeScript (strict), zod v3, drizzle (Postgres, already wired), Hono routes, vitest. yarn-classic workspace, NO build step (packages export `./src/index.ts`). Run everything from the repo root.
 
@@ -25,8 +25,8 @@ An open-source framework for agent automations: code for the engineer, a polishe
 `docs/PHILOSOPHY.md` (three beliefs) + `docs/ARCHITECTURE.md` §0 (invariants I1–I15). The ones this stage touches:
 
 - **I2 — machine dispatch allowed, a machine action never.** F2 lets the sorter agent dispatch CHILD work items autonomously (allowed, visible in the pipeline). It must NEVER let the model execute a Gmail mutation — those stay server-executed effects behind gates. A dispatch tool produces a work item, nothing else.
-- **I3 — thin layer, no engine in `@platform/core`.** F9 types are pure TS (no `googleapis`, no fs, no Node). The composition helper (F1) is pure.
-- **I5 — framework/userland boundary is physical.** New contract types live in the public SDK (`@platform/core`); implementations live in `@platform/server` / `@platform/integrations` / `apps/inbox`.
+- **I3 — thin layer, no engine in `@atizar/core`.** F9 types are pure TS (no `googleapis`, no fs, no Node). The composition helper (F1) is pure.
+- **I5 — framework/userland boundary is physical.** New contract types live in the public SDK (`@atizar/core`); implementations live in `@atizar/server` / `@atizar/integrations` / `apps/inbox`.
 - **I15 — boot-time tool classification.** Every allow-listed tool is `readonly | approvals | renders | effects` (an unclassified tool → the framework refuses to boot, enforced by `apps/inbox/server/agent-checks.ts`). **F2 adds a FOURTH class `dispatches`** — extend the classifier so a dispatch tool is a legal classification, and an unclassified tool still refuses to boot.
 
 ### Conventions that bind every task
@@ -36,19 +36,19 @@ An open-source framework for agent automations: code for the engineer, a polishe
 - **Never `git add -A` / `git add .`** — stage EXACT paths. The user edits docs in parallel.
 - Commit messages end with: `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
 - **TDD:** write the failing test, RUN it and confirm it fails for the predicted reason, implement minimally, confirm green, commit. One logical change per commit.
-- **No build step:** `@platform/*` packages point `exports` at `./src/index.ts`; `yarn typecheck` = `tsc --build` (composite refs). `.mjs` integration files have hand-written `.d.ts` (allowJs in that package only).
+- **No build step:** `@atizar/*` packages point `exports` at `./src/index.ts`; `yarn typecheck` = `tsc --build` (composite refs). `.mjs` integration files have hand-written `.d.ts` (allowJs in that package only).
 - **Validation sweep** (run from repo root): `yarn typecheck && yarn test && yarn lint`. `yarn format:check` is red on two pre-existing docs the user maintains (`.claude/skills/README.md`, `.claude/skills/check-foundation/SKILL.md`) — leave them; just keep YOUR files Prettier-clean (`npx prettier --check <your files>`).
 - **Postgres tests** run against a SEPARATE `aiworkflow_test` DB (vitest `globalSetup`). If you add a DB-backed test, keep it there and DO NOT truncate in `beforeEach` (use unique uuids/sources + membership asserts) — truncation clobbers parallel test files and the startup sweep can re-spawn real `claude`.
 
 ### The key files and seams you will touch
 
-**`@platform/core`** (`packages/core/src/`, barrel `index.ts`):
+**`@atizar/core`** (`packages/core/src/`, barrel `index.ts`):
 - `defineAgent.ts` — `AgentDefinitionSchema` (zod). Currently classifies `readonly | approvals | renders | effects`. F2 adds `dispatches`.
 - `defineWorkflow.ts` — `WorkflowDescriptor` type + `defineWorkflow()` validator. F1 adds `prompt?`.
 - NEW `integration.ts` (F9) — `HealthCheck`, `ReadResult<T>`, `BatchActionResult` types. NEW `prompt.ts` (F1) — `composeInstructions()`.
 - `index.ts` — re-exports everything; add the new modules.
 
-**`@platform/server`** (`packages/server/src/`, barrel `index.ts`):
+**`@atizar/server`** (`packages/server/src/`, barrel `index.ts`):
 - `runObserver.ts` — consumes a provider stream. `AgentRuntime` interface (provider, renderToolNames, maxInstances, effects). `consume()` accumulates tool-call args in `openCalls` and on `TOOL_CALL_END` fills the card if the tool is a render tool. **F2 hooks in HERE** (dispatch tool → call deliver). `RunObserverDeps` will gain a `deliver` callback.
 - `pipelineService.ts` — the façade. Has `dispatch`, `deliver` (resolve Destination + dispatch child), `resolveGate`, `cancel`/`cancelWorkflow`, `getBoard`, `subscribeBoard`, `stats`, `knows`. **F3** adds health to the board; **F4** publishes activity at its seams; **F6** rejects a duplicate input-agent dispatch; **cancel-all** adds a method.
 - `dispatch.ts` — the chokepoint (`dispatch()`): dedup-by-`source`, depth cap, insert `queued`, enqueue. F6's guard can live here or in the façade.
@@ -65,7 +65,7 @@ An open-source framework for agent automations: code for the engineer, a polishe
 - `workflows.ts` — aggregates the workflow modules into `workflowServers: { descriptor, bindings }[]`.
 - `workflows/<id>/server.ts` — per-workflow `ServerBinding[]` (prompts + allowedTools + effects). `server-binding.ts` defines the `ServerBinding` type. **F3** adds optional `health` to it.
 
-**`@platform/react`** (`packages/react/src/`):
+**`@atizar/react`** (`packages/react/src/`):
 - `serverTypes.ts` — hand-written mirror of the server data shapes the client reads. **F3** adds `agentHealth` to `Board`; **F4** adds an `ActivityEntry` type. NO components this stage.
 
 ### How the two providers differ (matters for F1 + F2 conformance)
@@ -76,7 +76,7 @@ An open-source framework for agent automations: code for the engineer, a polishe
 
 ### Stage-1 as-built you can rely on
 
-`@platform/integrations/gmail-viewer/*` exists with `listUnread`, `getEmail`, `markRead`/`trash`/`star` (in `modify.mjs`, returning `{ done, failed } | { error }`), and `checkCredentials` (in gmail-basic, re-exported by gmail-viewer, returning `{ ok: true, email } | { ok: false, error, hint }`). The read-only MCP wrapper exposes only `list_unread` + `get_email`.
+`@atizar/integrations/gmail-viewer/*` exists with `listUnread`, `getEmail`, `markRead`/`trash`/`star` (in `modify.mjs`, returning `{ done, failed } | { error }`), and `checkCredentials` (in gmail-basic, re-exported by gmail-viewer, returning `{ ok: true, email } | { ok: false, error, hint }`). The read-only MCP wrapper exposes only `list_unread` + `get_email`.
 
 ---
 
@@ -125,7 +125,7 @@ describe('integration contract', () => {
 // defineIntegration() wrapper, no runtime registration. An integration is still a set of pure
 // functions (the `write-integration` skill's shape); these types only name the recurring RESULT
 // shapes so integrations and the server health/effect seams are uniform. Pure: no fs, no Node,
-// no engine import (invariant I3 — this lives in @platform/core, which the client imports).
+// no engine import (invariant I3 — this lives in @atizar/core, which the client imports).
 
 // The result of an integration's credentials/health probe (the F3 health surface consumes it).
 // `ok:false` MUST carry an actionable `hint` (where creds live + which skill explains setup).
@@ -174,15 +174,15 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Modify: `packages/integrations/src/gmail-viewer/list-unread.d.ts`
 - Modify: `packages/integrations/src/gmail-viewer/get-email.d.ts`
 
-> Note: `@platform/integrations` does NOT currently depend on `@platform/core` (it has no package.json dep on it). Adding a TYPE-ONLY import is allowed (core is engine-free and a workspace package), but you MUST add `"@platform/core": "1.0.0"` to `packages/integrations/package.json` `dependencies` so the import resolves and typecheck's project refs are correct. Verify `packages/integrations/tsconfig.json` references core (it may need a `references` entry — check `tsconfig.base.json` composite setup; if typecheck complains about a missing project reference, add `{ "path": "../core" }` to the integrations tsconfig `references`).
+> Note: `@atizar/integrations` does NOT currently depend on `@atizar/core` (it has no package.json dep on it). Adding a TYPE-ONLY import is allowed (core is engine-free and a workspace package), but you MUST add `"@atizar/core": "1.0.0"` to `packages/integrations/package.json` `dependencies` so the import resolves and typecheck's project refs are correct. Verify `packages/integrations/tsconfig.json` references core (it may need a `references` entry — check `tsconfig.base.json` composite setup; if typecheck complains about a missing project reference, add `{ "path": "../core" }` to the integrations tsconfig `references`).
 
-- [ ] **Step 1: Add the core dependency** — edit `packages/integrations/package.json`, add `"@platform/core": "1.0.0"` to `dependencies`. Run `yarn install --ignore-engines` if resolution needs it.
+- [ ] **Step 1: Add the core dependency** — edit `packages/integrations/package.json`, add `"@atizar/core": "1.0.0"` to `dependencies`. Run `yarn install --ignore-engines` if resolution needs it.
 
 - [ ] **Step 2: Retype `check-credentials.d.ts` (gmail-basic)** to use the contract:
 
 ```ts
 // Type declaration for check-credentials.mjs (JS module — no TS source).
-import type { HealthCheck } from '@platform/core'
+import type { HealthCheck } from '@atizar/core'
 export declare function checkCredentials(deps?: {
   getGmail?: () => Promise<unknown>
 }): Promise<HealthCheck>
@@ -196,7 +196,7 @@ export declare function checkCredentials(deps?: {
 
 `gmail-viewer/check-credentials.d.ts`:
 ```ts
-import type { HealthCheck } from '@platform/core'
+import type { HealthCheck } from '@atizar/core'
 export declare function checkCredentials(deps?: {
   getGmail?: () => Promise<unknown>
 }): Promise<HealthCheck>
@@ -205,7 +205,7 @@ export declare function checkCredentials(deps?: {
 `gmail-viewer/modify.d.ts` — replace the local `BatchActionResult` definition with the imported one:
 ```ts
 // Type declarations for modify.mjs (JS module — no TS source).
-import type { BatchActionResult } from '@platform/core'
+import type { BatchActionResult } from '@atizar/core'
 
 export declare function markRead(
   args: { messageIds: string[] },
@@ -226,7 +226,7 @@ export declare function star(
 `gmail-viewer/list-unread.d.ts` — keep `EmailRef` (vertical-specific, stays local), wrap the return in `ReadResult`:
 ```ts
 // Type declaration for list-unread.mjs (JS module — no TS source).
-import type { ReadResult } from '@platform/core'
+import type { ReadResult } from '@atizar/core'
 
 export type EmailRef = {
   messageId: string
@@ -246,7 +246,7 @@ export declare function listUnread(
 `gmail-viewer/get-email.d.ts`:
 ```ts
 // Type declaration for get-email.mjs (JS module — no TS source).
-import type { ReadResult } from '@platform/core'
+import type { ReadResult } from '@atizar/core'
 
 export declare function getEmail(
   args: { messageId: string },
@@ -262,7 +262,7 @@ export declare function getEmail(
 
 ```bash
 git add packages/integrations/package.json packages/integrations/src/gmail-basic/check-credentials.mjs packages/integrations/src/gmail-basic/check-credentials.d.ts packages/integrations/src/gmail-basic/check-credentials.test.ts packages/integrations/src/gmail-viewer/check-credentials.d.ts packages/integrations/src/gmail-viewer/modify.d.ts packages/integrations/src/gmail-viewer/list-unread.d.ts packages/integrations/src/gmail-viewer/get-email.d.ts
-git commit -m "refactor(integrations): retype gmail .d.ts against the @platform/core integration contract
+git commit -m "refactor(integrations): retype gmail .d.ts against the @atizar/core integration contract
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
@@ -275,20 +275,20 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Modify: `docs/AGENTIC.md`
 
 - [ ] **Step 1: `write-integration/SKILL.md`** — in the "integration contract (FACTS)" block, replace the prose describing the result shapes with references to the typed contract. Edit the bullets:
-  - The "Never throw — return `{ error }`" bullet: append "— reads return `ReadResult<T>` (`T | { error }`) from `@platform/core`."
-  - The "Batch mutations are best-effort" bullet: append "— this shape IS the exported `BatchActionResult` type in `@platform/core`; import it, don't redefine it."
-  - The "`checkCredentials()` is mandatory" bullet: change its return shape to "returns the `HealthCheck` type from `@platform/core` (`{ ok:true; detail? } | { ok:false; error; hint }`)."
-  - Add one new bullet: "**Type the `.d.ts` against `@platform/core`** — import `HealthCheck` / `ReadResult` / `BatchActionResult` rather than re-declaring result shapes; add `@platform/core` to the package deps. The contract is types only — there is no `defineIntegration()` and no base class (belief #3)."
+  - The "Never throw — return `{ error }`" bullet: append "— reads return `ReadResult<T>` (`T | { error }`) from `@atizar/core`."
+  - The "Batch mutations are best-effort" bullet: append "— this shape IS the exported `BatchActionResult` type in `@atizar/core`; import it, don't redefine it."
+  - The "`checkCredentials()` is mandatory" bullet: change its return shape to "returns the `HealthCheck` type from `@atizar/core` (`{ ok:true; detail? } | { ok:false; error; hint }`)."
+  - Add one new bullet: "**Type the `.d.ts` against `@atizar/core`** — import `HealthCheck` / `ReadResult` / `BatchActionResult` rather than re-declaring result shapes; add `@atizar/core` to the package deps. The contract is types only — there is no `defineIntegration()` and no base class (belief #3)."
 
-- [ ] **Step 2: `gmail-viewer/SKILL.md`** — in the Surface table, change the `checkCredentials` row's return to `HealthCheck` and the read rows to `ReadResult<…>` / mutation rows to `BatchActionResult`, and add a one-line note under the table: "Result shapes (`HealthCheck` / `ReadResult` / `BatchActionResult`) are the shared `@platform/core` integration contract — import them, they are not gmail-specific."
+- [ ] **Step 2: `gmail-viewer/SKILL.md`** — in the Surface table, change the `checkCredentials` row's return to `HealthCheck` and the read rows to `ReadResult<…>` / mutation rows to `BatchActionResult`, and add a one-line note under the table: "Result shapes (`HealthCheck` / `ReadResult` / `BatchActionResult`) are the shared `@atizar/core` integration contract — import them, they are not gmail-specific."
 
-- [ ] **Step 3: `docs/AGENTIC.md`** — under the integration track (near the Phase-2 `add-integration` / consumer-skill area updated in Stage 1), add a `✅` note: the thin integration contract (`HealthCheck`/`ReadResult`/`BatchActionResult`, types only in `@platform/core`, no base class) shipped at email-inbox stage 2; the `write-integration` skill + the gmail-viewer consumer skill now reference it. Match the existing bullet style.
+- [ ] **Step 3: `docs/AGENTIC.md`** — under the integration track (near the Phase-2 `add-integration` / consumer-skill area updated in Stage 1), add a `✅` note: the thin integration contract (`HealthCheck`/`ReadResult`/`BatchActionResult`, types only in `@atizar/core`, no base class) shipped at email-inbox stage 2; the `write-integration` skill + the gmail-viewer consumer skill now reference it. Match the existing bullet style.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add .claude/skills/write-integration/SKILL.md packages/integrations/skills/gmail-viewer/SKILL.md docs/AGENTIC.md
-git commit -m "docs: reference the @platform/core integration contract in the integration skills + AGENTIC
+git commit -m "docs: reference the @atizar/core integration contract in the integration skills + AGENTIC
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
@@ -396,7 +396,7 @@ export function buildProvider(
 - [ ] **Step 2: `index.ts`** — when building each runtime, compose and thread. The descriptor carries `prompt`; the binding `b` carries the `prompts` strategy (already built in the workflow `server.ts`). Compose `def.instructions` for the Mastra path:
 
 ```ts
-import { instanceId, composeInstructions } from '@platform/core'
+import { instanceId, composeInstructions } from '@atizar/core'
 // …
 for (const b of bindings(descriptor.id)) {
   const def = byId.get(b.agentId)
@@ -630,7 +630,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Create: `apps/inbox/server/health.ts`
 - Test: `apps/inbox/server/health.test.ts`
 
-- [ ] **Step 1: Extend `ServerBinding`** — add `health?: { name: string; check: () => Promise<HealthCheck> }[]` (import `HealthCheck` from `@platform/core`). A binding lists the credential checks its agent depends on (e.g. the reply agent depends on Gmail → `[{ name: 'gmail', check: checkCredentials }]`).
+- [ ] **Step 1: Extend `ServerBinding`** — add `health?: { name: string; check: () => Promise<HealthCheck> }[]` (import `HealthCheck` from `@atizar/core`). A binding lists the credential checks its agent depends on (e.g. the reply agent depends on Gmail → `[{ name: 'gmail', check: checkCredentials }]`).
 
 - [ ] **Step 2: Write `health.ts` with a failing test first** — a pure aggregator `aggregateHealth(checks: HealthCheck[]): HealthCheck` that returns the first `ok:false` (so an agent with any failing dependency is unhealthy) or `{ ok: true }`. Plus `providerHealth(provider: string): HealthCheck` — `claude-cli` → check the `claude` binary is on PATH (use `which`/`execSync('command -v claude')` guarded in try/catch); `mastra` → `process.env.ANTHROPIC_API_KEY ? ok : { ok:false, error:'ANTHROPIC_API_KEY not set', hint:'export ANTHROPIC_API_KEY (see HANDOFF provider knobs)' }`; `mock` → always ok.
 
@@ -933,14 +933,14 @@ We write the detailed, code-level plan for each stage immediately before buildin
 - **Workflow prompt** (F1): the shared email-pipeline context + "never narrate tool plumbing." Author the `server.ts` prompt strategies from `composeInstructions(descriptor.prompt, agent.instructions)` — this is where F1's claude-cli path is finally wired (Stage 2 only shipped the mechanism).
 - **Batch gate (spec §4):** the `applyActions` approval tool's form is `{ items: [{ messageId, from, subject, action }] }`, `action ∈ 'read'|'trash'|'star'|'keep'`. ONE server effect `applyEmailActions(form)` groups the rows into `markRead`/`trash`/`star` batch calls (gmail-viewer's `modify`), best-effort, returns `{ applied, failed }`. Bind it in the workflow `server.ts` `effects`. The model proposes the default (reader→all read, spam→all trash, important→all star).
 - **Machine dispatch (F2):** the sorter's prompt instructs it to call `route_emails({ to, emails })` once per destination group (reply = one email each; reader/spam/important = the batch). RunObserver (Stage 2) turns each call into a child.
-- **MCP wiring:** add `gmail-viewer` to `claude-spawn.ts`'s mcp-config (`require.resolve('@platform/integrations/gmail-viewer')`) + native Mastra read-tool registrations in `apps/inbox/server/mastra/tools.ts` (reads only; effects never reach the model).
-- **Effect MCP/create-draft:** reply's `saveDraft` reuses the existing `@platform/integrations/gmail-basic/create-draft` effect.
+- **MCP wiring:** add `gmail-viewer` to `claude-spawn.ts`'s mcp-config (`require.resolve('@atizar/integrations/gmail-viewer')`) + native Mastra read-tool registrations in `apps/inbox/server/mastra/tools.ts` (reads only; effects never reach the model).
+- **Effect MCP/create-draft:** reply's `saveDraft` reuses the existing `@atizar/integrations/gmail-basic/create-draft` effect.
 - **Verification (the real proof):** record cassettes (`DEV_RECORD_REPLAY=record` once, then `=1`), then **browser E2E** via the `browser-verify` skill: START sorter → 4-way machine dispatch visible in the pipeline → batch approve with edited per-row actions → real Gmail markRead/trash/star (verify via the API, then undo) → reply approve → real draft → re-route a row to REPLY → reject → Stop. This is the stage where mutations get their FIRST live verification (Stage 1 was read-only).
-- **Cards** are USERLAND (`EmailBatchCard`, `renderSort` summary card) — built in the workflow's `client.tsx` on the existing render-spec mechanism, NOT in `@platform/react`.
+- **Cards** are USERLAND (`EmailBatchCard`, `renderSort` summary card) — built in the workflow's `client.tsx` on the existing render-spec mechanism, NOT in `@atizar/react`.
 
 ### Stage 4 — React/UI chrome (spec F5 + F7)
 
-**Goal:** the UI for everything Stages 2–3 made server-true. All in `@platform/react` (the package) + demo cards in userland.
+**Goal:** the UI for everything Stages 2–3 made server-true. All in `@atizar/react` (the package) + demo cards in userland.
 
 - **Primitives kit** (`Button`, `Card`/`CardShell`, `Badge`, `Tabs`, `Field`, `List`) — port the existing Smedja CSS into reusable components; rewrite demo cards on top.
 - **Global header**: workflow tabs (Chrome-tab styling — restyle the existing `WorkflowSwitcher`), a **Stop all** button (`POST /api/cancel-all`), an activity-log toggle.
@@ -960,7 +960,7 @@ We write the detailed, code-level plan for each stage immediately before buildin
 1. **Bearer-token auth** on every mutating route (`AUTH_TOKEN` env, middleware; demo mode may default it) — honest `resolvedBy`.
 2. **`DEMO=1` zero-cred mode**: PGlite (Postgres-in-WASM, no Docker) + the mock provider + SYNTHETIC cassettes authored from scratch with invented names/emails (NEVER scrub real recordings; `scanCassette` CI gate).
 3. **Golden-set eval** per workflow; the two step-6 follow-ups (3-at-once cap via a slow fixture; cross-workflow "Treat as lead" with a recorded github-triage cassette).
-4. **README** 10-minute "try it" script; **LICENSE** (ASK THE USER — recommend MIT); **`@platform/*` scope rename** (placeholder → the real npm scope, also ASK THE USER for the name).
+4. **README** 10-minute "try it" script; **LICENSE** (ASK THE USER — recommend MIT); **`@atizar/*` scope rename** (placeholder → the real npm scope, also ASK THE USER for the name).
 5. Carried-over cleanups: `WorkerPool.resumeAcquire` benign `IllegalTransition` log; `.env.local` auto-load for `PROVIDER=mastra`.
 
 The two questions that REQUIRE the user (everything else: decide-and-go): **the npm scope name** and **the LICENSE**. Ask both at the start of the packaging tail.

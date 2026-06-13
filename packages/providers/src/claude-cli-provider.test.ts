@@ -9,7 +9,7 @@ import {
   type ResumeHandle,
   type GateResolution,
   type PromptStrategy,
-} from '@platform/core'
+} from '@atizar/core'
 import { createClaudeCliProvider, type ClaudeSpawn } from './claude-cli-provider.js'
 
 // Local PromptStrategy fixture. The real reply-agent prompts live in the app

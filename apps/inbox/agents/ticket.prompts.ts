@@ -4,7 +4,7 @@ import {
   TicketHandoffPayloadSchema,
   type PromptStrategy,
   type TicketHandoffPayload,
-} from '@platform/core'
+} from '@atizar/core'
 
 type TicketPromptConfig = {
   renderTool: 'render_ticket_result' | 'render_reply_draft'

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BaseEvent } from '@ag-ui/client'
-import { foldEventsToMessages, pairToolResults } from '@platform/core'
+import { foldEventsToMessages, pairToolResults } from '@atizar/core'
 import type { ServerStatus } from '../serverTypes'
 
 // Attach to a server-side run WITHOUT CopilotKit: snapshot the trace from 0 (so a reload

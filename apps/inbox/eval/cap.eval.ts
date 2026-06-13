@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import type { BaseEvent } from '@ag-ui/client'
-import type { Provider } from '@platform/core'
-import { runMigrations, resetDb, db, makePipelineService, type AgentRuntime } from '@platform/server'
+import type { Provider } from '@atizar/core'
+import { runMigrations, resetDb, db, makePipelineService, type AgentRuntime } from '@atizar/server'
 
 beforeAll(async () => {
   await runMigrations()

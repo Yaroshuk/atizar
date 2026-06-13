@@ -4,7 +4,7 @@
 
 **Goal:** `git clone … && yarn install && DEMO=1 yarn dev` drives the flagship **email-inbox** workflow end-to-end in the browser with zero credentials and no Docker.
 
-**Architecture:** One unprefixed `DEMO` env flag (sibling of `DEV_RECORD_REPLAY`) read via `isDemo()` in `@platform/server`. It selects: PGlite in-memory DB (vs Docker Postgres), strict synthetic-cassette replay from a committed `demo-cassettes/` dir (vs real claude), demo fake-success effect stubs (vs real Gmail), and email-inbox-only workflow registration surfaced through a new `GET /api/config` the client reads to filter tabs + hide the Connect chip.
+**Architecture:** One unprefixed `DEMO` env flag (sibling of `DEV_RECORD_REPLAY`) read via `isDemo()` in `@atizar/server`. It selects: PGlite in-memory DB (vs Docker Postgres), strict synthetic-cassette replay from a committed `demo-cassettes/` dir (vs real claude), demo fake-success effect stubs (vs real Gmail), and email-inbox-only workflow registration surfaced through a new `GET /api/config` the client reads to filter tabs + hide the Connect chip.
 
 **Tech Stack:** TypeScript, Hono, drizzle-orm (`postgres-js` + `pglite` drivers), `@electric-sql/pglite`, Vitest, React/Vite.
 
@@ -268,7 +268,7 @@ Create `apps/inbox/server/record-replay.demo.test.ts`:
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { withRecordReplay } from './record-replay.js'
-import type { Provider } from '@platform/core'
+import type { Provider } from '@atizar/core'
 
 // A provider that MUST NOT be called in demo mode (a real claude stand-in).
 const exploding: Provider = {
@@ -345,7 +345,7 @@ Change the import line to:
 
 ```typescript
 import { withRecordReplay, recordReplayMode, cassettesDir, demoCassettesDir } from './record-replay.js'
-import { isDemo } from '@platform/server'
+import { isDemo } from '@atizar/server'
 ```
 
 Replace the `const mode = recordReplayMode()` block with:
@@ -429,7 +429,7 @@ Expected: FAIL — without the stub, `saveDraft` calls `resolveGmail()` → retu
 
 In `apps/inbox/workflows/email-inbox/server.ts`:
 
-Add to the imports: `import { resolveCredential, atizarEnv, isDemo } from '@platform/server'` (add `isDemo` to the existing line).
+Add to the imports: `import { resolveCredential, atizarEnv, isDemo } from '@atizar/server'` (add `isDemo` to the existing line).
 
 Add a module-level counter + helpers above `emailInboxServer`:
 
@@ -495,7 +495,7 @@ Read `apps/inbox/server/index.ts` fully and `apps/inbox/server/workflows.ts`. Id
 
 - [ ] **Step 2: Filter registration to email-inbox in demo**
 
-In `apps/inbox/server/index.ts`, add `isDemo` to the `@platform/server` import. Where the workflow-server list is iterated, derive the enabled set:
+In `apps/inbox/server/index.ts`, add `isDemo` to the `@atizar/server` import. Where the workflow-server list is iterated, derive the enabled set:
 
 ```typescript
 const ENABLED_WORKFLOWS = isDemo() ? ['email-inbox'] : null // null = all
@@ -552,7 +552,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Read first: `packages/react/src/components/AppHeader.tsx`, the `WorkflowBoard` component, `apps/inbox/client/src/App.tsx`
 
 **Context:** Tabs render from `config.workflows`. The Connect chip lives in `AppHeader`. The demo app
-owns the fetch + filtering (userland decides what to show); `@platform/react` only gains a `demo` prop
+owns the fetch + filtering (userland decides what to show); `@atizar/react` only gains a `demo` prop
 to hide the chip.
 
 - [ ] **Step 1: Read the three files** to learn the exact prop names (`WorkflowBoard` config prop, `AppHeader` props, where `ConnectionChip` is rendered).
@@ -571,7 +571,7 @@ Replace `apps/inbox/client/src/App.tsx` with a version that fetches `/api/config
 
 ```typescript
 import { useEffect, useState } from 'react'
-import { WorkflowBoard } from '@platform/react'
+import { WorkflowBoard } from '@atizar/react'
 import { workflowsConfig } from './workflows'
 
 type Config = { demo: boolean; workflows: string[] }

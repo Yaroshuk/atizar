@@ -21,7 +21,7 @@ stage). See [`CONVENTIONS.md`](CONVENTIONS.md) Part 1. The build order for the r
 
 | Skill | When to use | SKILL.md |
 | ----- | ----------- | -------- |
-| `write-integration` | Adding/writing/building an integration in `@platform/integrations`, connecting an external service, or extending an existing integration with new capabilities. | [write-integration/SKILL.md](write-integration/SKILL.md) |
+| `write-integration` | Adding/writing/building an integration in `@atizar/integrations`, connecting an external service, or extending an existing integration with new capabilities. | [write-integration/SKILL.md](write-integration/SKILL.md) |
 
 ### Procedures (genre 2a — building blocks)
 

@@ -38,7 +38,7 @@ agent itself is fake (a scripted event stream, no real model).
 - Real integrations (Gmail, etc.), MCP.
 - A database, settings storage, the file/DB split.
 - Authentication, roles, RBAC, audit log.
-- A `@platform/*` package split (extracted later, once the loop works).
+- A `@atizar/*` package split (extracted later, once the loop works).
 - A provider registry, the `defineAgent` contract, a visual editor, mode 2/3 in
   full, auto-generating forms from Zod.
 

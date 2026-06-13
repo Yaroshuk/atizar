@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { readGateOpened, providerConformanceChecks, type ConformanceScenario } from '@platform/core'
-import type { ResumeHandle } from '@platform/core'
+import { readGateOpened, providerConformanceChecks, type ConformanceScenario } from '@atizar/core'
+import type { ResumeHandle } from '@atizar/core'
 import { createMastraProvider } from './mastra-provider.js'
 import type { MastraChunk, MastraRunner, MastraRun, MastraRunResult } from './mastra-types.js'
 

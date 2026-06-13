@@ -6,7 +6,7 @@ import {
   type GateResolution,
   type WorkflowDescriptor,
   type HealthCheck,
-} from '@platform/core'
+} from '@atizar/core'
 import type { Db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
 import { makeEventBus } from './eventBus.js'

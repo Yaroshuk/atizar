@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WorkflowBoard } from '@platform/react'
+import { WorkflowBoard } from '@atizar/react'
 import { workflowsConfig } from './workflows'
 
 type Config = { demo: boolean; workflows: string[] }

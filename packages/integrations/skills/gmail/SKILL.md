@@ -1,6 +1,6 @@
 ---
 name: gmail
-description: How to use the @platform/integrations gmail integration — wiring its read tools into an agent, executing its mutations as server effects, setting up Gmail OAuth credentials, and diagnosing checkCredentials failures. Use when importing from @platform/integrations/gmail/*, adding Gmail capabilities to a workflow, or when an agent shows "missing credentials" for Gmail.
+description: How to use the @atizar/integrations gmail integration — wiring its read tools into an agent, executing its mutations as server effects, setting up Gmail OAuth credentials, and diagnosing checkCredentials failures. Use when importing from @atizar/integrations/gmail/*, adding Gmail capabilities to a workflow, or when an agent shows "missing credentials" for Gmail.
 ---
 
 # gmail — how to use
@@ -13,18 +13,18 @@ mutations are SERVER-EXECUTED effects behind approval gates — never expose the
 
 | import | function | kind |
 |---|---|---|
-| `@platform/integrations/gmail/list-unread` | `listUnread({ sinceHours? }, deps)` → `ReadResult<{ emails: EmailRef[] }>` | read |
-| `@platform/integrations/gmail/get-email` | `getEmail({ messageId }, deps)` → `ReadResult<ParsedEmail>` incl. `body` | read |
-| `@platform/integrations/gmail/get-latest-email` | `getLatestEmail(args, deps)` → `ReadResult<ParsedEmail>` | read |
-| `@platform/integrations/gmail/create-draft` | `createDraft({ threadId, body }, deps)` → `{ ok: true, draftId } \| { error }` | mutation/effect |
-| `@platform/integrations/gmail/modify` | `markRead\|trash\|star({ messageIds }, deps)` → `BatchActionResult` | mutation/effect |
-| `@platform/integrations/gmail/check-credentials` | `checkCredentials(deps)` → `HealthCheck` | health |
+| `@atizar/integrations/gmail/list-unread` | `listUnread({ sinceHours? }, deps)` → `ReadResult<{ emails: EmailRef[] }>` | read |
+| `@atizar/integrations/gmail/get-email` | `getEmail({ messageId }, deps)` → `ReadResult<ParsedEmail>` incl. `body` | read |
+| `@atizar/integrations/gmail/get-latest-email` | `getLatestEmail(args, deps)` → `ReadResult<ParsedEmail>` | read |
+| `@atizar/integrations/gmail/create-draft` | `createDraft({ threadId, body }, deps)` → `{ ok: true, draftId } \| { error }` | mutation/effect |
+| `@atizar/integrations/gmail/modify` | `markRead\|trash\|star({ messageIds }, deps)` → `BatchActionResult` | mutation/effect |
+| `@atizar/integrations/gmail/check-credentials` | `checkCredentials(deps)` → `HealthCheck` | health |
 
 All functions receive a `deps` object containing `deps.credential` (a `ResolvedCredential`
 from `resolveCredential`) — the integration never reads env vars or files directly.
 
 Result shapes (`HealthCheck` / `ReadResult` / `BatchActionResult`) are the shared
-`@platform/core` integration contract — import them, they are not gmail-specific.
+`@atizar/core` integration contract — import them, they are not gmail-specific.
 
 `EmailRef = { messageId, threadId, from, subject, date, snippet }`. Mutations are
 best-effort per message: `failed` lists per-id errors; `{ error }` means the client
@@ -33,8 +33,8 @@ permanently deletes.
 
 **MCP server (app-owned, not shipped in the package):** `apps/inbox/mcp/gmail-tools.mts`,
 run via `node --import tsx`. It exposes `get_latest_email`, `list_unread`, `get_email`
-(READ ONLY). The server resolves the credential via `@platform/server` — it is
-app-scoped, not part of the `@platform/integrations` package itself.
+(READ ONLY). The server resolves the credential via `@atizar/server` — it is
+app-scoped, not part of the `@atizar/integrations` package itself.
 
 ## Wiring rules
 

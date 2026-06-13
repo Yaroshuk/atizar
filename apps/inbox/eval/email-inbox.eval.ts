@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { runMigrations, resetDb } from '@platform/server'
+import { runMigrations, resetDb } from '@atizar/server'
 import { runGolden } from './runner.js'
 import { emailInboxScenarios } from './scenarios/email-inbox.js'
 

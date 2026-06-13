@@ -1,4 +1,4 @@
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 
 type Verdict = {
   threadId: string

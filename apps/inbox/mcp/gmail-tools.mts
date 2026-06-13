@@ -4,18 +4,18 @@
 // effects behind approval gates and are NEVER exposed to the model (I2/I9).
 //
 // This is a `.mts` file run via the tsx loader (`node --import tsx`) because it imports
-// `@platform/server` (resolveCredential) which is `.ts` source with no build step —
+// `@atizar/server` (resolveCredential) which is `.ts` source with no build step —
 // plain `node` cannot load `.ts`. The MCP child inherits the repo-root cwd + ATIZAR_*
 // env, so `resolveCredential` reads the same encrypted credential store.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
-import { resolveCredential, atizarEnv } from '@platform/server'
-import { auth } from '@platform/integrations/gmail/auth'
-import { getLatestEmail } from '@platform/integrations/gmail/get-latest-email'
-import { listUnread } from '@platform/integrations/gmail/list-unread'
-import { getEmail } from '@platform/integrations/gmail/get-email'
+import { resolveCredential, atizarEnv } from '@atizar/server'
+import { auth } from '@atizar/integrations/gmail/auth'
+import { getLatestEmail } from '@atizar/integrations/gmail/get-latest-email'
+import { listUnread } from '@atizar/integrations/gmail/list-unread'
+import { getEmail } from '@atizar/integrations/gmail/get-email'
 
 const server = new McpServer({ name: 'gmail', version: '1.0.0' })
 

@@ -24,8 +24,8 @@
    fold Trace events). Named fallback renderer: assistant-ui (ExternalStoreRuntime + AG-UI
    adapter).
 7. **The beta IS the framework packages + a thin demo app.** The deliverable is the monorepo of
-   libraries — `@platform/core|providers|integrations` plus `@platform/server` (pipeline engine)
-   and `@platform/react` (board/thread UI) extracted as the LAST build step — and a small demo
+   libraries — `@atizar/core|providers|integrations` plus `@atizar/server` (pipeline engine)
+   and `@atizar/react` (board/thread UI) extracted as the LAST build step — and a small demo
    app with the basic workflows that consumes ONLY the public packages (the living proof of
    belief #3: userland never imports internals). NOT a clone-template app with incidental
    libraries. Extraction still happens once, at the end (after the API stops churning in steps
@@ -195,7 +195,7 @@ philosophy is clarified rather than violated: machine **dispatch** (visible on t
 gated, never acting by itself) is a legitimate origin; machine **action** is forbidden,
 always.
 
-### 1.10 The `@platform/react` surface (decision #7 detail, 2026-06-10)
+### 1.10 The `@atizar/react` surface (decision #7 detail, 2026-06-10)
 
 **Litmus rule:** a component that renders from the generic model
 (Workflow/Agent/WorkItem/Gate/status) belongs to the package; a component that knows the
@@ -237,14 +237,14 @@ synthetic cassettes; real Gmail = the documented one-hour step 2); the server sp
 (Postgres, StateStore, chokepoint, transition(), WorkerPool, board SSE, RunObserver);
 server Gate HITL with the editable form; server-executed effects; cancel + sweep + guards;
 **Mastra provider as the production path beside claude-cli (dev)**; cost/latency/tokens
-fields on the card; packaging (README with the 10-minute demo, LICENSE, `@platform/*` rename,
+fields on the card; packaging (README with the 10-minute demo, LICENSE, `@atizar/*` rename,
 scanCassette CI gate, golden-set eval harness per workflow).
 
 **Out (safe deferrals, seams in place):** OTel span export (fields stay); auto-timeout
 sweeper (column + edge stay); accountId/auth/RBAC beyond the bearer token; chat
 `awaiting_input` producer; graph/cycles (depth cap + chokepoint stay); cross-process pub/sub;
 GitHub-triage in the onboarding critical path (stays as a second "bring your own board"
-example). Note (decision #7): package extraction (`@platform/server` + `@platform/react`) is
+example). Note (decision #7): package extraction (`@atizar/server` + `@atizar/react`) is
 IN the beta as step 7; whether the packages also go to npm at launch or ship via the monorepo
 first is a launch-time call — the package BOUNDARY (demo consumes only public packages) is the
 non-negotiable deliverable, the registry is logistics.
@@ -261,7 +261,7 @@ crash window (drafts are reversible; even Stripe can't close it).
 ## 3. Build order
 
 1. **Provider contract v2** (`resume?` + `GATE_OPENED`) + conformance suite in
-   `@platform/core` — before any PipelineService code.
+   `@atizar/core` — before any PipelineService code.
 2. **Week-0 spike:** RunObserver + browser attach to a running WorkItem (trace snapshot +
    SSE tail).
 3. **Server spine on Postgres:** StateStore (drizzle-kit + schema_version), dispatch
@@ -270,11 +270,11 @@ crash window (drafts are reversible; even Stripe can't close it).
    formRev / assignee / comment / both artifact versions).
 5. **Mastra provider** (production path) beside claude-cli (dev); re-key record/replay.
 6. **Re-point the UI** (board + thread from server state); delete `@copilotkit/*` deps.
-7. **Extraction + packaging (decision #7):** move `server/pipeline/` → `@platform/server`
-   and the board/thread UI → `@platform/react` (mechanical if the import discipline held);
+7. **Extraction + packaging (decision #7):** move `server/pipeline/` → `@atizar/server`
+   and the board/thread UI → `@atizar/react` (mechanical if the import discipline held);
    slim the demo app to workflows/config consuming ONLY public packages — the belief-#3
    proof; then zero-cred demo (synthetic cassettes + scanCassette CI gate), README, LICENSE,
-   `@platform/*` rename, golden-set eval, bearer token.
+   `@atizar/*` rename, golden-set eval, bearer token.
 
 ## 4. Market references (delta vs updated-2)
 

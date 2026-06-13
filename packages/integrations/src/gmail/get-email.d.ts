@@ -1,5 +1,5 @@
 // Type declaration for get-email.mjs (JS module — no TS source).
-import type { ReadResult, ResolvedCredential } from '@platform/core'
+import type { ReadResult, ResolvedCredential } from '@atizar/core'
 
 export declare function getEmail(
   args: { messageId: string },

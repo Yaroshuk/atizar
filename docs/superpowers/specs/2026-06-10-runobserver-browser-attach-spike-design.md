@@ -43,7 +43,7 @@ nothing.** The in-memory "gate" is a single flag, not a record.
 
 ## 3. Components
 
-### 3.1 `foldEventsToMessages(events) → Message[]` — DURABLE, `@platform/core`
+### 3.1 `foldEventsToMessages(events) → Message[]` — DURABLE, `@atizar/core`
 
 The reduction CopilotKit's runtime did internally. Pure & isomorphic (no React, no Node).
 A **left fold**: `fold(events)` and `fold(events.slice(0,k))` agree on their common prefix,

@@ -32,7 +32,7 @@ The server spine (steps 3–5) already exposes **every read/act endpoint** the U
 | `POST /api/workitems/:id/cancel` | `{ok}` | Stop a work item (+active descendants) |
 | `POST /api/workflows/:id/cancel` | `{ok}` | Stop a whole workflow |
 
-`foldEventsToMessages` (step 2, `@platform/core`, unit-tested) + `pairToolResults` already turn a
+`foldEventsToMessages` (step 2, `@atizar/core`, unit-tested) + `pairToolResults` already turn a
 trace into `Message[]`; the `?spike=1` page proves the attach → fold → live-tail → approve loop
 without CopilotKit. Pure client logic that survives: `pipelineModel.buildPipeline`, `aggregate`,
 `buckets`, `devMode`, `renderRegistry` + all cards, `threadResults`, the Smedja `styles.css`.
@@ -58,12 +58,12 @@ button click**. The dispatch chokepoint already supports `parentId` + depth cap 
 
 ## Design
 
-### S1 — Lift `resolveDelivery` + `deliveryKey` into `@platform/core` (pure)
+### S1 — Lift `resolveDelivery` + `deliveryKey` into `@atizar/core` (pure)
 
 `apps/inbox/client/src/deliver.ts` is pure and depends only on the workflow **descriptors**
 (isomorphic) + `Destination`/`instanceId`/published `inputs` (already in core). Move
 `resolveDelivery(descriptors, origin, dest, payload)` and `deliveryKey(payload)` to
-`@platform/core` (e.g. `packages/core/src/delivery.ts`). The client keeps importing them; the
+`@atizar/core` (e.g. `packages/core/src/delivery.ts`). The client keeps importing them; the
 server gains access. (Extraction discipline: pure helpers → core immediately — same pattern as
 `gate.ts`/`fold.ts`/`conformance.ts`.) The client `deliver.ts` becomes a thin re-export or is
 deleted with imports re-pointed.
@@ -95,7 +95,7 @@ The `descriptors` registry is available server-side via `workflowServers[].descr
 START button on an input agent card POSTs `{agent: instanceId(wf, agentId)}` (empty payload → the
 input agent reads the inbox itself). Delete `/api/dev/runs` once the client no longer calls it.
 
-### C1 — Data hooks (`@platform/react` candidates; live in `client/src/` for step 6)
+### C1 — Data hooks (`@atizar/react` candidates; live in `client/src/` for step 6)
 
 - `useBoard()` → fetch `GET /api/board`; subscribe `GET /api/board/stream`; on any board message
   **refetch the snapshot** (coarse model — the snapshot is the truth, the SSE is just a poke).
@@ -201,9 +201,9 @@ ReplyDraftCard, ApprovalDialog), `RenderSpec`/`HitlSpec` contracts (HitlSpec ctx
 
 ## Non-goals (post-beta / later steps)
 
-`@platform/react`/`@platform/server` **extraction** is step 7 (step 6 keeps everything in
+`@atizar/react`/`@atizar/server` **extraction** is step 7 (step 6 keeps everything in
 `apps/inbox/`, but new hooks/components obey the extraction import discipline: they import only
-`@platform/*` + each other). DoneDrawer, stale badge UI, ConnectionStatus indicator, batch
+`@atizar/*` + each other). DoneDrawer, stale badge UI, ConnectionStatus indicator, batch
 approve, notifications — post-beta. No new server status edges (the union is already complete).
 
 ## Risks / gotchas (carried from CLAUDE.md + this design)

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Lay the foundation for the integration authentication contract (spec: `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md`, §1 + §2): the pure type contract in `@platform/core` (`AuthSpec`, `ResolvedCredential`, `CredentialResolver`) and the `ATIZAR_`-prefixed env accessor in `@platform/server`. NO storage, NO OAuth flow, NO skill changes, NO gmail rewrite — those are sub-stages 2–5. This sub-stage ships only types + an env helper, fully unit-tested, with zero runtime behavior change to the existing app.
+**Goal:** Lay the foundation for the integration authentication contract (spec: `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md`, §1 + §2): the pure type contract in `@atizar/core` (`AuthSpec`, `ResolvedCredential`, `CredentialResolver`) and the `ATIZAR_`-prefixed env accessor in `@atizar/server`. NO storage, NO OAuth flow, NO skill changes, NO gmail rewrite — those are sub-stages 2–5. This sub-stage ships only types + an env helper, fully unit-tested, with zero runtime behavior change to the existing app.
 
 **Architecture:** Two small, isolated units. (1) `packages/core/src/integration-auth.ts` — pure TypeScript types (no fs, no env, no engine import — mirrors the existing `integration.ts`/`HealthCheck` pattern), exported from the core barrel. (2) `packages/server/src/env.ts` — a typed accessor that reads `ATIZAR_*` variables in ONE place so the prefix is never scattered as raw `process.env.ATIZAR_…` strings; it also defines the precedence for the DB URL (`ATIZAR_DATABASE_URL` → existing `DATABASE_URL` → compose default) without breaking today's `databaseUrl`.
 
@@ -21,7 +21,7 @@ An open-source agent-automation framework. We are building an **integration auth
 ### The locked foundation (relevant invariants)
 
 `docs/PHILOSOPHY.md` + `docs/ARCHITECTURE.md` §0. This sub-stage touches:
-- **I3** — `@platform/core` stays engine-free and Node-free: the auth types are PURE (no `fs`, no `process.env`, no `googleapis`, no Postgres). They are types + maybe a trivial type-guard, exactly like the existing `HealthCheck`/`ReadResult` in `packages/core/src/integration.ts`.
+- **I3** — `@atizar/core` stays engine-free and Node-free: the auth types are PURE (no `fs`, no `process.env`, no `googleapis`, no Postgres). They are types + maybe a trivial type-guard, exactly like the existing `HealthCheck`/`ReadResult` in `packages/core/src/integration.ts`.
 - **I5** — the framework/userland boundary: the SDK ships the THIN type contract; a custom integration adds a new auth `kind` WITHOUT editing core, because `kind` is an OPEN string (not a sealed enum) and the resolver is pluggable. Do NOT make `kind` a closed union — that is the whole point (a developer writing a Telegram integration must not have to edit core).
 
 No foundation-doc edits are expected in this sub-stage.
@@ -145,7 +145,7 @@ export type ResolvedCredential =
 // Resolve a live credential for a (integration, connection) pair. `connectionId` is a
 // developer-chosen connection LABEL ('default' | 'home' | 'work' | …) — NOT a user account; it
 // lets two workflows reuse one integration under two credentials (e.g. home vs work mailbox).
-// Built-in resolvers (apiKey/oauth2) ship in @platform/server; a custom-kind integration registers
+// Built-in resolvers (apiKey/oauth2) ship in @atizar/server; a custom-kind integration registers
 // its own — core only defines this interface.
 export type CredentialResolver = (ctx: {
   integration: string
@@ -180,7 +180,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ---
 
-## TASK 2: the `ATIZAR_` env accessor in `@platform/server` (TDD)
+## TASK 2: the `ATIZAR_` env accessor in `@atizar/server` (TDD)
 
 A single typed reader for `ATIZAR_*` so the prefix lives in ONE place (never scattered as raw `process.env.ATIZAR_…` strings) and the naming scheme (§2 of the spec) is enforced by construction.
 
@@ -368,9 +368,9 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 **Files:**
 - Modify: `HANDOFF.md`
 
-- [ ] **Step 1: Foundation check** — invoke the `check-foundation` skill on the sub-stage diff. Expected CLEAR: the auth types are pure (no engine/Node import in `@platform/core` — I3), the `kind` is open so a new auth method needs no core edit (I5), and no running behavior changed. A WARN is a STOP — surface to the user.
+- [ ] **Step 1: Foundation check** — invoke the `check-foundation` skill on the sub-stage diff. Expected CLEAR: the auth types are pure (no engine/Node import in `@atizar/core` — I3), the `kind` is open so a new auth method needs no core edit (I5), and no running behavior changed. A WARN is a STOP — surface to the user.
 
-- [ ] **Step 2: HANDOFF** — add an entry under a new "Integration auth contract" track (or alongside the email-inbox track): "Sub-stage 1 (contract types + ATIZAR env namespace) ✅ BUILT — `@platform/core` `integration-auth.ts` (`AuthSpec` open-kind / `ResolvedCredential` / `CredentialResolver`); `@platform/server` `atizarEnv` accessor (single ATIZAR_* reader, `databaseUrl` now routed through it). No behavior change. Next = sub-stage 2 (encrypted Postgres credential store + `resolveCredential` + built-in apiKey/oauth2 resolvers)." Spec → `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md`.
+- [ ] **Step 2: HANDOFF** — add an entry under a new "Integration auth contract" track (or alongside the email-inbox track): "Sub-stage 1 (contract types + ATIZAR env namespace) ✅ BUILT — `@atizar/core` `integration-auth.ts` (`AuthSpec` open-kind / `ResolvedCredential` / `CredentialResolver`); `@atizar/server` `atizarEnv` accessor (single ATIZAR_* reader, `databaseUrl` now routed through it). No behavior change. Next = sub-stage 2 (encrypted Postgres credential store + `resolveCredential` + built-in apiKey/oauth2 resolvers)." Spec → `docs/superpowers/specs/2026-06-11-integration-auth-contract-design.md`.
 
 - [ ] **Step 3: Final sweep + commit docs**
 
@@ -391,7 +391,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - **Spec coverage:** §1 (AuthSpec/ResolvedCredential/CredentialResolver, open kind) = Task 1; §2 (ATIZAR_ namespace, the var names, ANTHROPIC_API_KEY left alone, ATIZAR_DATABASE_URL precedence) = Tasks 2–4. Storage/OAuth/skill/gmail (§3–§6) are explicitly OUT (later sub-stages).
 - **Boundary (I5):** the `kind: string` open union + the custom-kind branch in both `AuthSpec` and `ResolvedCredential` are the load-bearing detail — Task 1's first test asserts a custom kind type-checks without a core edit. Do not "tidy" it into a sealed union.
 - **No behavior change:** Task 4 keeps the `databaseUrl` default identical; the env accessor only ADDS the `ATIZAR_*` precedence. The DB-test globalSetup still works via the `DATABASE_URL` middle precedence.
-- **Purity (I3):** `integration-auth.ts` imports nothing; `env.ts` reads only `process.env` and lives in `@platform/server` (not core).
+- **Purity (I3):** `integration-auth.ts` imports nothing; `env.ts` reads only `process.env` and lives in `@atizar/server` (not core).
 - **connectionId** is in the `CredentialResolver` signature + the `atizarEnv.connection()` reader from day one (spec decision 2026-06-11), wired to `'default'`; actually USING it (the store key, the spawn pass-through) is sub-stage 2/3.
 
 ## Subsequent sub-stages (design-level — each gets its own plan)

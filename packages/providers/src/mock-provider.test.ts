@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { providerConformanceChecks, type ConformanceScenario } from '@platform/core'
+import { providerConformanceChecks, type ConformanceScenario } from '@atizar/core'
 import { createMockInboxProvider } from './mock-provider.js'
 
 async function collect(stream: AsyncIterable<BaseEvent>): Promise<BaseEvent[]> {

@@ -3,7 +3,7 @@
 The new flagship demo workflow, built BEFORE the packaging tail (7c) so the framework is
 stress-tested by a real consumer: a new integration, machine dispatch, batch gates, multi-agent
 interactions, and the UI/ops gaps a first external user would hit (credential health, prompt
-hierarchy, primitives). Everything here goes through the public `@platform/*` packages only.
+hierarchy, primitives). Everything here goes through the public `@atizar/*` packages only.
 
 ## 1. The workflow
 
@@ -89,7 +89,7 @@ classification kernel stays exhaustive — an unclassified tool still refuses to
   (summary), item finished/error/cancelled. Shape:
   `{ ts, workflowId, agentId, workItemId, kind, summary }`.
 - Routes: `GET /api/activity` (snapshot) + SSE tail (same pattern as the board stream).
-- Client: `ActivityLog` panel in `@platform/react` (opened from the global header), plain
+- Client: `ActivityLog` panel in `@atizar/react` (opened from the global header), plain
   reverse-chronological list, auto-follow.
 
 ### F5 — global header + UI primitives
@@ -97,7 +97,7 @@ classification kernel stays exhaustive — an unclassified tool still refuses to
 - **Header** (package component): workflow tabs (Chrome-tab styling — the current switcher
   restyled), a **Stop all** button (`POST /api/cancel-all` → `cancelWorkflow` over every
   descriptor), and the activity-log toggle button.
-- **Primitives kit** in `@platform/react` (per the locked beta inventory): `Button`, `Card`
+- **Primitives kit** in `@atizar/react` (per the locked beta inventory): `Button`, `Card`
   (CardShell — head/title/kicker/badge/body/actions), `Badge`, `Tabs`, `Field`, `List`.
   Port of the existing Smedja CSS into reusable components — demo cards are rewritten on top
   of them as the worked example (cards stay userland).
@@ -146,11 +146,11 @@ things genuinely recur and deserve a TYPED contract so integrations stop being p
   would be the base-class the philosophy rejects).
 
 **Placement (decide in the stage-2 plan, lean):** pure TS types → the contract home is
-`@platform/core` (it is engine-free and React-free and already holds the public contracts), OR
-a tiny shared `@platform/integrations` index if we want to keep node-batteries types out of
-core. Recommendation: types in `@platform/core` (a new `integration.ts`, types only — no fs, no
+`@atizar/core` (it is engine-free and React-free and already holds the public contracts), OR
+a tiny shared `@atizar/integrations` index if we want to keep node-batteries types out of
+core. Recommendation: types in `@atizar/core` (a new `integration.ts`, types only — no fs, no
 googleapis), so userland's integration code imports the contract from the SDK like everything
-else; `@platform/integrations` modules implement it. **No base class, no `defineIntegration`,
+else; `@atizar/integrations` modules implement it. **No base class, no `defineIntegration`,
 no runtime coupling — types only.**
 
 **Docs/skills updated in THIS stage (not later):** the `write-integration` skill's "integration
@@ -162,7 +162,7 @@ the thin-contract decision under the integration track.
 
 ## 3. gmail-viewer integration (built VIA the new skill)
 
-New integration `@platform/integrations/gmail-viewer` (gmail-basic stays untouched):
+New integration `@atizar/integrations/gmail-viewer` (gmail-basic stays untouched):
 
 | function | kind | notes |
 |---|---|---|
@@ -237,7 +237,7 @@ deliberate (tests the framework's reuse story).
 1. **`write-integration` skill → `gmail-viewer`** (+ embedded consumer skill +
    `checkCredentials` on both gmail integrations). Pure integration work, no framework change.
 2. **Core + server capabilities:** F9 thin integration contract (typed `HealthCheck` /
-   `ReadResult` / `BatchActionResult` in `@platform/core`; retype the gmail integrations'
+   `ReadResult` / `BatchActionResult` in `@atizar/core`; retype the gmail integrations'
    `.d.ts` against it; update the `write-integration` + gmail-viewer skills + `docs/AGENTIC.md`
    to reference the types) — do this FIRST so F3 builds on the typed `HealthCheck`. Then
    F1 workflow prompt, F2 `dispatches` class + RunObserver dispatch + deliver wiring, F3 health

@@ -1,5 +1,5 @@
 import { EventType, type BaseEvent } from '@ag-ui/client'
-import { gateOpened, type GateOpenedValue } from '@platform/core'
+import { gateOpened, type GateOpenedValue } from '@atizar/core'
 
 // Claude Code MCP tools surface as `mcp__<server>__<tool>`; the client registered
 // the bare names (`renderLead`, `saveDraft`), so strip the prefix.

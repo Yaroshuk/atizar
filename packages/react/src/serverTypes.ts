@@ -1,5 +1,5 @@
 // Client-facing shapes of the server-authoritative state. These mirror the fields the UI
-// consumes from `@platform/server`'s db schema — kept as a hand-written copy so
+// consumes from `@atizar/server`'s db schema — kept as a hand-written copy so
 // the client never imports server/Node code (and stays bundler-clean).
 
 export type ServerStatus =
@@ -49,7 +49,7 @@ export type Board = {
   agentHealth: Record<string, AgentHealth>
 }
 
-// Client mirror of @platform/server's ActivityEntry — the operator activity feed row.
+// Client mirror of @atizar/server's ActivityEntry — the operator activity feed row.
 // `kind` is an open string (server documents: queued | running | gate | resolved |
 // effect | finished | error | cancelled | delivered).
 export type ActivityEntry = {

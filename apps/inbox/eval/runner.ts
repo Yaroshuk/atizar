@@ -1,5 +1,5 @@
-import { instanceId, composeInstructions } from '@platform/core'
-import { db, makePipelineService, type AgentRuntime } from '@platform/server'
+import { instanceId, composeInstructions } from '@atizar/core'
+import { db, makePipelineService, type AgentRuntime } from '@atizar/server'
 import { providerRegistry } from '../server/providers.js'
 import { buildProvider } from '../server/build-agent.js'
 import { workflowServers } from '../server/workflows.js'

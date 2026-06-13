@@ -20,7 +20,7 @@ finalizes status — all observable live (SSE) and after a `tsx watch` restart (
 
 ## 2. Code layout (`apps/inbox/server/pipeline/`)
 
-Package extraction (`@platform/server`) is deferred (HANDOFF). Everything lives under
+Package extraction (`@atizar/server`) is deferred (HANDOFF). Everything lives under
 `apps/inbox/server/pipeline/`:
 
 - `db/schema.ts` — drizzle table definitions (the only place DDL is expressed).

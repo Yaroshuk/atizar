@@ -1,4 +1,4 @@
-import { defineAgent, defineWorkflow } from '@platform/core'
+import { defineAgent, defineWorkflow } from '@atizar/core'
 
 export const triageAgent = defineAgent({
   id: 'triage',

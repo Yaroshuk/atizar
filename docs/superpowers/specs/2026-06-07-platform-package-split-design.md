@@ -1,17 +1,17 @@
-# Platform package split — `@platform/*` (core + providers + integrations)
+# Platform package split — `@atizar/*` (core + providers + integrations)
 
 > **Status:** DESIGN (approved in brainstorming 2026-06-07). Implements the headline
 > goal from the handoff: extract `apps/inbox/core/` into a real package boundary now
 > that the `core/` contract is validated on two agents + a handoff.
 > **Scope of THIS pass:** stand up an npm/yarn **workspace** and split **three** packages
-> — `@platform/core`, `@platform/providers`, `@platform/integrations`. `@platform/react`
-> and `@platform/server` are deliberately **deferred** (documented as target, not built).
+> — `@atizar/core`, `@atizar/providers`, `@atizar/integrations`. `@atizar/react`
+> and `@atizar/server` are deliberately **deferred** (documented as target, not built).
 
 ## 1. Why & positioning
 
 The durable asset is not the framework code (§Business model in `ARCHITECTURE.md`); the
 point of the split is a **clear contract** a developer can target to add any number of
-integrations/providers without editing the framework. `@platform/core` is that contract:
+integrations/providers without editing the framework. `@atizar/core` is that contract:
 interfaces + Zod validation + tiny pure functions that everything depends on and that
 depends on nothing concrete (no provider impl, no integration, no React, no Node).
 
@@ -24,16 +24,16 @@ not in scope.
 ## 2. Target architecture (vision — documented, not all built)
 
 ```
-                @platform/core   ── CONTRACT, root of the DAG, isomorphic
+                @atizar/core   ── CONTRACT, root of the DAG, isomorphic
                   ▲   ▲   ▲   ▲      deps: zod + @ag-ui/client
       ┌───────────┘   │   │   └────────────┐   messages · defineAgent ·
-@platform/providers   │   │      @platform/react   providers(interfaces+defineProviders) · handoff
+@atizar/providers   │   │      @atizar/react   providers(interfaces+defineProviders) · handoff
   import {claudeCli,   │   │      (react-only: hooks, registry mechanism, shells) — DEFERRED
-   mock}; heavy        │   └── @platform/integrations ── node-only batteries pkg
+   mock}; heavy        │   └── @atizar/integrations ── node-only batteries pkg
    (mastra/api) =      │          ./gmail-basic (googleapis = optional peer, lazy import + fail-fast)
    subpath+optional    │          ./<next> ...
       └────────────┐   │   ┌──────┘
-              @platform/server ── node-only "door": build-agent, registry,
+              @atizar/server ── node-only "door": build-agent, registry,
                        ▲          enforce allow-list, spawn glue — DEFERRED
                   apps/inbox ── SINK: concrete agents, prompts, cards, choice of entrypoints, desktop
 ```
@@ -42,26 +42,26 @@ not in scope.
 is acyclic; no framework package may import the app.
 
 **Runtime-environment segregation (hard constraint — breaks builds otherwise):**
-- `@platform/core` — **isomorphic** (no Node, no React). Importable by client and server.
-- `@platform/providers` — **isomorphic**; the Node `spawn` is **injected** (kept out of the package).
-- `@platform/integrations` — **node-only** (`googleapis`, MCP SDK, `fs`).
-- (future) `@platform/react` — react-only; `@platform/server` — node-only.
+- `@atizar/core` — **isomorphic** (no Node, no React). Importable by client and server.
+- `@atizar/providers` — **isomorphic**; the Node `spawn` is **injected** (kept out of the package).
+- `@atizar/integrations` — **node-only** (`googleapis`, MCP SDK, `fs`).
+- (future) `@atizar/react` — react-only; `@atizar/server` — node-only.
 
 ## 3. Packaging strategy — one package, many entrypoints (NOT a package per plugin)
 
 Validated against the ecosystem (LangChain JS, n8n, Vercel AI SDK):
 
-- **Contract package is always separate** (`@langchain/core`, `ai`, `@mastra/core`). → `@platform/core`.
+- **Contract package is always separate** (`@langchain/core`, `ai`, `@mastra/core`). → `@atizar/core`.
 - **The long tail lives in ONE batteries package with subpath entrypoints**, e.g.
   `@langchain/community` holds hundreds of integrations as subpaths; n8n holds ~400 nodes in
-  `n8n-nodes-base`. → `@platform/integrations` with `./gmail-basic`, `./<next>` …
+  `n8n-nodes-base`. → `@atizar/integrations` with `./gmail-basic`, `./<next>` …
 - **Promote to its own package** (à la `@langchain/anthropic`) only when a dependency is
   heavy/divergent or the release cadence diverges. Vercel AI SDK does package-per-provider
   because each provider is a thin, light adapter.
 
 **The governing rule:** split a package when its **dependencies diverge** (weight/conflict)
 or its **release cadence diverges** — not for tidiness. Third-party extensibility comes from
-the **contract** (`@platform/core`), not from the count of first-party packages.
+the **contract** (`@atizar/core`), not from the count of first-party packages.
 
 Two distinct mechanisms (commonly conflated):
 
@@ -77,7 +77,7 @@ long time.
 ## 4. Tooling & on-disk layout
 
 - **Package manager: yarn classic 1.22** (installed). `node_modules` linker, no PnP →
-  no Vite/tsx/spawn surprises. Internal deps declared as `"@platform/core": "*"` (yarn
+  no Vite/tsx/spawn surprises. Internal deps declared as `"@atizar/core": "*"` (yarn
   classic links by name from the workspace). Lockfile becomes `yarn.lock`. Commands move
   from `npm run X` to `yarn X`.
 - **No turbo/pnpm.** 3 packages + 1 app — build orchestration is overhead without payoff
@@ -90,11 +90,11 @@ long time.
 ```
 / (new root package.json: private, "workspaces": ["packages/*","apps/*"])
 ├── packages/
-│   ├── core/            @platform/core         (isomorphic)
-│   ├── providers/       @platform/providers    (isomorphic, spawn injected)
-│   └── integrations/    @platform/integrations (node-only, subpath entrypoints)
+│   ├── core/            @atizar/core         (isomorphic)
+│   ├── providers/       @atizar/providers    (isomorphic, spawn injected)
+│   └── integrations/    @atizar/integrations (node-only, subpath entrypoints)
 ├── apps/
-│   └── inbox/           "inbox" → depends on the three @platform/* by name
+│   └── inbox/           "inbox" → depends on the three @atizar/* by name
 ├── docs/  .claude/  CLAUDE.md
 ```
 
@@ -102,7 +102,7 @@ long time.
 
 Everything below currently lives under `apps/inbox/`.
 
-**`@platform/core`** — isomorphic; deps `zod`, `@ag-ui/client`.
+**`@atizar/core`** — isomorphic; deps `zod`, `@ag-ui/client`.
 ```
 src/messages.ts   src/defineAgent.ts   src/handoff.ts
 src/providers.ts  (Provider, PromptStrategy, ProviderFactory, defineProviders — CONTRACT ONLY)
@@ -110,9 +110,9 @@ src/providers.ts  (Provider, PromptStrategy, ProviderFactory, defineProviders �
 exports: { ".": "./src/index.ts" }   // barrel re-exporting all four
 ```
 `core/providers.ts` today holds only the contract (no concrete provider), so it moves whole
-into core; `@platform/providers` imports the `ProviderFactory` type from core and implements it.
+into core; `@atizar/providers` imports the `ProviderFactory` type from core and implements it.
 
-**`@platform/providers`** — isomorphic; deps `@platform/core`, `@ag-ui/client`.
+**`@atizar/providers`** — isomorphic; deps `@atizar/core`, `@ag-ui/client`.
 ```
 src/claude-stream.ts   src/claude-cli-provider.ts   src/mock-provider.ts   + *.test.ts
 exports: { ".": "./src/index.ts" }   →  export { claudeCli, mock }
@@ -120,7 +120,7 @@ exports: { ".": "./src/index.ts" }   →  export { claudeCli, mock }
 The Node spawn impl (`claude-spawn.ts`) does NOT move here — it stays in the app and is
 injected, keeping the package Node-free.
 
-**`@platform/integrations`** — node-only; deps `@modelcontextprotocol/sdk`, `zod`;
+**`@atizar/integrations`** — node-only; deps `@modelcontextprotocol/sdk`, `zod`;
 `googleapis` = **optional peer**.
 ```
 src/gmail-basic/index.mjs    (MCP server: get_latest_email + create_draft, draft-only)
@@ -137,14 +137,14 @@ peerDependenciesMeta: { "googleapis": { "optional": true } }
 inbox email (read-only) and create a draft reply (never sends). The name signals the limited
 surface; a fuller `./gmail` can be added later as a sibling subpath.
 
-**`apps/inbox`** — sink; depends on the three `@platform/*`.
+**`apps/inbox`** — sink; depends on the three `@atizar/*`.
 ```
 stays:    server/ (incl. claude-spawn.ts), client/ (react),
           mcp/inbox-tools.mjs (the app's generative-UI tools: renderLead/saveDraft/renderVerdict),
           core/inbox.agent.ts + core/agents/*.prompts.ts (concrete agents/prompts/strategies)
-changes:  imports '../../core/...'  → '@platform/core'
-          provider wiring           → '@platform/providers'
-          claude-spawn MCP path     → require.resolve('@platform/integrations/gmail-basic')
+changes:  imports '../../core/...'  → '@atizar/core'
+          provider wiring           → '@atizar/providers'
+          claude-spawn MCP path     → require.resolve('@atizar/integrations/gmail-basic')
 adds:     googleapis to its own dependencies (the app USES the gmail entrypoint, so it
           installs the optional peer — the peer is exercised on a live consumer)
 ```
@@ -174,7 +174,7 @@ async function loadGoogleapis() {
   } catch (err) {
     if (err?.code === 'ERR_MODULE_NOT_FOUND') {
       throw new Error(
-        "@platform/integrations/gmail-basic requires the optional peer 'googleapis'. " +
+        "@atizar/integrations/gmail-basic requires the optional peer 'googleapis'. " +
           'Install it in your app:  yarn add googleapis'
       )
     }
@@ -198,7 +198,7 @@ Two friendly paths, both reusing the integration's existing error handling:
   `get_latest_email`/`create_draft` wraps it as `{ error: "…requires googleapis…" }`. The MCP
   server does not crash; the model/UI see actionable text. No new error plumbing needed —
   only the import moves inside.
-- **The `format` subpath** (`@platform/integrations/gmail-basic/format`) is pure and never
+- **The `format` subpath** (`@atizar/integrations/gmail-basic/format`) is pure and never
   imports `googleapis`, so `parseLatestMessage`/`buildReplyRaw` unit-test **without** the
   heavy SDK installed. That is the point of the second subpath.
 
@@ -210,15 +210,15 @@ neither core nor the app. This is exactly the LangChain-community model.
 1. **Workspace scaffold.** Root `package.json` (private, `workspaces: ["packages/*","apps/*"]`),
    convert to `yarn.lock`, `yarn install`. Nothing extracted yet — `apps/inbox` is just wrapped
    in the workspace. Verify `yarn dev`/`test`/`lint` green.
-2. **Extract `@platform/core`.** Move `messages/defineAgent/providers/handoff` + tests to
+2. **Extract `@atizar/core`.** Move `messages/defineAgent/providers/handoff` + tests to
    `packages/core`; add package.json + `exports` + tsconfig. Rewrite app imports to
-   `'@platform/core'`. tsc+lint+test green. **Build the client here** (earliest point to catch
+   `'@atizar/core'`. tsc+lint+test green. **Build the client here** (earliest point to catch
    Vite + workspace-TS resolution quirks).
-3. **Extract `@platform/providers`.** Move `claude-stream/claude-cli-provider/mock` + tests;
+3. **Extract `@atizar/providers`.** Move `claude-stream/claude-cli-provider/mock` + tests;
    depends on core. Update app/server imports. Green.
-4. **Extract `@platform/integrations`.** Move gmail into `src/gmail-basic/`; refactor to lazy
+4. **Extract `@atizar/integrations`.** Move gmail into `src/gmail-basic/`; refactor to lazy
    import + subpath exports + optional peer (§6). Fix the MCP server path in `claude-spawn.ts`
-   (`require.resolve('@platform/integrations/gmail-basic')`) and the format test import. App
+   (`require.resolve('@atizar/integrations/gmail-basic')`) and the format test import. App
    adds `googleapis` to its deps. Green.
 5. **Full verification.** tsc across the workspace, lint, all unit tests, then **browser E2E on
    the live Gmail account** (qualifier reads a real lead → handoff → reply draft → approve →
@@ -239,14 +239,14 @@ neither core nor the app. This is exactly the LangChain-community model.
 
 - **Vite + raw TS from a workspace package** — may need `optimizeDeps.exclude` (don't pre-bundle
   the linked package) or a `resolve.alias`. → Caught early at step 2.
-- **Duplicate React/CopilotKit** (two React copies → hooks crash). → `@platform/react` is NOT
+- **Duplicate React/CopilotKit** (two React copies → hooks crash). → `@atizar/react` is NOT
   extracted this pass; react/copilotkit remain deps only in the app, so there is a single copy.
   Low risk.
 - **Launching the `.mjs` MCP server from a package** — resolve via `require.resolve(subpath)`,
   not a relative path. → Explicit at step 4.
 - **yarn-classic dedupe** is weaker than npm's — but since React is untouched, the only shared
   heavy graph (`@ag-ui`, `zod`) is safe.
-- **Scope rename later** — `@platform/*` is a placeholder; renaming before first npm publish is
+- **Scope rename later** — `@atizar/*` is a placeholder; renaming before first npm publish is
   a mechanical find/replace across the monorepo. Cheap, but touches many files. Accepted.
 
 ## 10. Decisions (this design)
@@ -259,7 +259,7 @@ neither core nor the app. This is exactly the LangChain-community model.
   release-cadence divergence.
 - gmail integration named **`gmail-basic`** — read-latest + draft-only, name signals the
   limited surface.
-- Scope **`@platform/*`** is an explicit placeholder; rename before first npm publish.
+- Scope **`@atizar/*`** is an explicit placeholder; rename before first npm publish.
 - Node stays out of `core`/`providers` (injected `spawn`); `integrations` is node-only.
 - `inbox.agent.ts`/`*.prompts.ts`/`inbox-tools.mjs` stay in the app (concrete instances /
   app UI-contract, not framework).

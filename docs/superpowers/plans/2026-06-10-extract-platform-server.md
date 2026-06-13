@@ -1,4 +1,4 @@
-# Extract `@platform/server` Implementation Plan
+# Extract `@atizar/server` Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this
 > plan task-by-task (inline, with green-gate checkpoints). This is a code-MOVE migration, not
@@ -6,25 +6,25 @@
 > verification. Steps use checkbox (`- [ ]`) syntax.
 
 **Goal:** Move the server pipeline engine (`apps/inbox/server/pipeline/`) into a new public
-package `@platform/server`, so the demo app consumes the server spine only through a versioned
+package `@atizar/server`, so the demo app consumes the server spine only through a versioned
 package boundary — the first half of belief #3's physical framework/userland boundary (the second
-half, `@platform/react`, is a separate plan).
+half, `@atizar/react`, is a separate plan).
 
-**Architecture:** No build step (the established `@platform/*` pattern — `exports` points at
+**Architecture:** No build step (the established `@atizar/*` pattern — `exports` points at
 `./src/index.ts`; tsx/vitest/Vite transpile raw TS). The pipeline folder moves wholesale; a barrel
-`index.ts` re-exports the public surface; the 7 app-side import sites repoint at `@platform/server`;
+`index.ts` re-exports the public surface; the 7 app-side import sites repoint at `@atizar/server`;
 3 config touchpoints (drizzle config, vitest globalSetup, app db scripts) follow the moved paths.
-The one cross-boundary type (`EffectFn`) relocates to `@platform/core` FIRST so the move is then
+The one cross-boundary type (`EffectFn`) relocates to `@atizar/core` FIRST so the move is then
 violation-free.
 
 **Tech Stack:** yarn-classic workspace, TypeScript composite project refs, drizzle-orm + postgres,
-hono, vitest. New package deps: `@platform/core`, `@ag-ui/client`, `drizzle-orm`, `postgres`,
+hono, vitest. New package deps: `@atizar/core`, `@ag-ui/client`, `drizzle-orm`, `postgres`,
 `hono`, `zod` (runtime); `@mastra/pg` is used ONLY by the test-DB global setup (test infra).
 
 **Foundation note (run `check-foundation` before committing Task 4):** this REALIZES belief #3
-(physical boundary) and does not touch beliefs #1/#2. `@platform/server` depends on infra (db, http)
+(physical boundary) and does not touch beliefs #1/#2. `@atizar/server` depends on infra (db, http)
 but imports NO engine at runtime (`@mastra/pg` appears only in `db/test-global-setup.ts`, test
-infra) — belief #2 ("core knows no engine") is about `@platform/core`, and is intact. No invariant
+infra) — belief #2 ("core knows no engine") is about `@atizar/core`, and is intact. No invariant
 I1–I15 is weakened.
 
 ---
@@ -33,7 +33,7 @@ I1–I15 is weakened.
 
 ```
 packages/server/
-  package.json            # new — name @platform/server, exports ./src/index.ts
+  package.json            # new — name @atizar/server, exports ./src/index.ts
   tsconfig.json           # new — extends base, package-local outDir/tsBuildInfoFile (providers pattern)
   src/
     index.ts              # new — barrel: the public surface (see Task 2)
@@ -41,7 +41,7 @@ packages/server/
     eventBus.ts           # moved
     pipelineService.ts    # moved
     routes.ts             # moved
-    runObserver.ts        # moved (import of EffectFn repoints to @platform/core in Task 0)
+    runObserver.ts        # moved (import of EffectFn repoints to @atizar/core in Task 0)
     stateStore.ts         # moved
     sweep.ts              # moved
     transition.ts         # moved
@@ -53,18 +53,18 @@ packages/server/
 ```
 
 App-side after the move:
-- `apps/inbox/server/index.ts` — imports from `@platform/server` (was `./pipeline/*`)
-- `apps/inbox/server/providers.ts` — imports `databaseUrl` from `@platform/server`
-- `apps/inbox/server/agent-checks.ts` — imports `EffectFn` from `@platform/core` (Task 0)
-- `apps/inbox/workflows/server-binding.ts` — imports `EffectFn` from `@platform/core` (Task 0)
+- `apps/inbox/server/index.ts` — imports from `@atizar/server` (was `./pipeline/*`)
+- `apps/inbox/server/providers.ts` — imports `databaseUrl` from `@atizar/server`
+- `apps/inbox/server/agent-checks.ts` — imports `EffectFn` from `@atizar/core` (Task 0)
+- `apps/inbox/workflows/server-binding.ts` — imports `EffectFn` from `@atizar/core` (Task 0)
 - `apps/inbox/drizzle.config.ts` — schema/out paths point at `packages/server/src/db/*`
-- `apps/inbox/package.json` — `db:migrate`/`db:reset` scripts repoint; add `@platform/server: "*"`
+- `apps/inbox/package.json` — `db:migrate`/`db:reset` scripts repoint; add `@atizar/server: "*"`
 - `vitest.config.ts` — globalSetup path repoints
 - `tsconfig.json` (root) — add `{ "path": "./packages/server" }` reference
 
 ---
 
-## Task 0: Relocate the `EffectFn` contract type to `@platform/core`
+## Task 0: Relocate the `EffectFn` contract type to `@atizar/core`
 
 `EffectFn` is the only thing pipeline imports from outside its folder (`runObserver.ts:10`,
 `pipelineService.test.ts:17` → `../../workflows/server-binding.js`). It is a pure contract type
@@ -106,7 +106,7 @@ whichever is dominant; `export type { … }` is correct for a type-only module.)
   definition, import it from core, keep `ServerBinding`:
 
 ```ts
-import type { PromptStrategy, EffectFn } from '@platform/core'
+import type { PromptStrategy, EffectFn } from '@atizar/core'
 
 export type { EffectFn }
 
@@ -126,9 +126,9 @@ working; the two pipeline files are repointed to core directly in Step 4 so pipe
 out-of-folder imports before the move.)
 
 - [ ] **Step 4: Repoint the three other importers to core directly.**
-  - `apps/inbox/server/agent-checks.ts:2` → `import type { EffectFn } from '@platform/core'`
-  - `apps/inbox/server/pipeline/runObserver.ts:10` → `import type { EffectFn } from '@platform/core'`
-  - `apps/inbox/server/pipeline/pipelineService.test.ts:17` → `import type { EffectFn } from '@platform/core'`
+  - `apps/inbox/server/agent-checks.ts:2` → `import type { EffectFn } from '@atizar/core'`
+  - `apps/inbox/server/pipeline/runObserver.ts:10` → `import type { EffectFn } from '@atizar/core'`
+  - `apps/inbox/server/pipeline/pipelineService.test.ts:17` → `import type { EffectFn } from '@atizar/core'`
 
 - [ ] **Step 5: Green gate.**
 
@@ -141,18 +141,18 @@ Expected: typecheck clean; all 277 tests pass; lint green. (No behavior changed 
 git add packages/core/src/effects.ts packages/core/src/index.ts \
   apps/inbox/workflows/server-binding.ts apps/inbox/server/agent-checks.ts \
   apps/inbox/server/pipeline/runObserver.ts apps/inbox/server/pipeline/pipelineService.test.ts
-git commit -m "refactor(core): relocate EffectFn contract type to @platform/core
+git commit -m "refactor(core): relocate EffectFn contract type to @atizar/core
 
 EffectFn is a pure server-effect signature, not a userland concept; moving it
 out of apps/inbox/workflows removes the only out-of-folder import in server/pipeline/,
-making the @platform/server extraction a clean move.
+making the @atizar/server extraction a clean move.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-## Task 1: Scaffold the empty `@platform/server` package
+## Task 1: Scaffold the empty `@atizar/server` package
 
 **Files:**
 - Create: `packages/server/package.json`
@@ -164,7 +164,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ```json
 {
-  "name": "@platform/server",
+  "name": "@atizar/server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -174,7 +174,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@platform/core": "*",
+    "@atizar/core": "*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.23",
     "postgres": "^3.4.9",
@@ -221,14 +221,14 @@ export {}
 - [ ] **Step 5: Install + green gate.**
 
 Run: `yarn install --ignore-engines && yarn typecheck`
-Expected: install links `@platform/server`; typecheck clean (nothing imports the empty package yet).
+Expected: install links `@atizar/server`; typecheck clean (nothing imports the empty package yet).
 
 - [ ] **Step 6: Commit.**
 
 ```bash
 git add packages/server/package.json packages/server/tsconfig.json \
   packages/server/src/index.ts tsconfig.json package.json yarn.lock
-git commit -m "chore(server): scaffold empty @platform/server package
+git commit -m "chore(server): scaffold empty @atizar/server package
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -273,11 +273,11 @@ disappears). If any `.test.ts` was missed, `git mv` it too.
 
 Run: `grep -rn "from '\.\./\.\." packages/server/src` — Expected: NO results.
 
-- [ ] **Step 3: Confirm the only `@platform/*` imports are core.** The moved code imports
-  `@platform/core` (fine). It must NOT import `@platform/providers`/`integrations`/back into
+- [ ] **Step 3: Confirm the only `@atizar/*` imports are core.** The moved code imports
+  `@atizar/core` (fine). It must NOT import `@atizar/providers`/`integrations`/back into
   `apps/inbox`:
 
-Run: `grep -rn "@platform/" packages/server/src | grep -v "@platform/core"` — Expected: NO results.
+Run: `grep -rn "@atizar/" packages/server/src | grep -v "@atizar/core"` — Expected: NO results.
 
 - [ ] **Step 4: Write the real barrel `packages/server/src/index.ts`** — re-export exactly the
   surface the app consumes (from the consumer audit: `db`, `runMigrations`, `startupSweep`,
@@ -285,7 +285,7 @@ Run: `grep -rn "@platform/" packages/server/src | grep -v "@platform/core"` — 
   `PipelineService` type, `resetDb` for the db:reset script):
 
 ```ts
-// @platform/server — the server-authoritative pipeline engine (StateStore, dispatch,
+// @atizar/server — the server-authoritative pipeline engine (StateStore, dispatch,
 // transition, WorkerPool, RunObserver, gate-keyed resolve, board/thread HTTP+SSE).
 // Public surface consumed by the app's composition root.
 export { db, databaseUrl } from './db/client.js'
@@ -323,8 +323,8 @@ export default defineConfig({
 
 ```json
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx -e \"import('@platform/server').then(m=>m.runMigrations()).then(()=>process.exit(0))\"",
-    "db:reset": "tsx -e \"import('@platform/server').then(m=>m.resetDb()).then(()=>process.exit(0))\"",
+    "db:migrate": "tsx -e \"import('@atizar/server').then(m=>m.runMigrations()).then(()=>process.exit(0))\"",
+    "db:reset": "tsx -e \"import('@atizar/server').then(m=>m.resetDb()).then(()=>process.exit(0))\"",
 ```
 
 (`drizzle-kit generate` reads `drizzle.config.ts` which now points at the package — no change to
@@ -335,14 +335,14 @@ actual code.)
 
 - [ ] **Step 8: Typecheck the package in isolation** (catches barrel name mismatches early):
 
-Run: `yarn workspace @platform/server exec tsc --build` (or `yarn typecheck` for the whole graph)
+Run: `yarn workspace @atizar/server exec tsc --build` (or `yarn typecheck` for the whole graph)
 Expected: clean. Fix any export-name mismatch in the barrel against the real moved code.
 
 - [ ] **Step 9: Commit (WIP — app still references old paths; that's Task 3).**
 
 ```bash
 git add -A packages/server apps/inbox/drizzle.config.ts apps/inbox/package.json vitest.config.ts
-git commit -m "refactor(server): move server/pipeline into @platform/server + barrel
+git commit -m "refactor(server): move server/pipeline into @atizar/server + barrel
 
 Wholesale git-mv of the pipeline engine; barrel re-exports the app-consumed surface;
 drizzle config, vitest globalSetup, and db scripts follow the moved paths. App import
@@ -357,7 +357,7 @@ prefer staging the explicit paths above; verify `git status` shows no stray doc 
 
 ---
 
-## Task 3: Repoint the app's import sites at `@platform/server`
+## Task 3: Repoint the app's import sites at `@atizar/server`
 
 **Files:**
 - Modify: `apps/inbox/server/index.ts:7-12`
@@ -365,10 +365,10 @@ prefer staging the explicit paths above; verify `git status` shows no stray doc 
 - Modify: `apps/inbox/package.json` (add the dep)
 
 - [ ] **Step 1: Add the package dependency.** In `apps/inbox/package.json` dependencies (alongside
-  the other `@platform/*`):
+  the other `@atizar/*`):
 
 ```json
-    "@platform/server": "*",
+    "@atizar/server": "*",
 ```
 
 Run: `yarn install --ignore-engines`
@@ -383,8 +383,8 @@ import {
   startupSweep,
   makePipelineService,
   createPipelineRoutes,
-} from '@platform/server'
-import type { AgentRuntime } from '@platform/server'
+} from '@atizar/server'
+import type { AgentRuntime } from '@atizar/server'
 ```
 
 (Keep the import ordering/grouping the file already uses; match the existing convention.)
@@ -392,7 +392,7 @@ import type { AgentRuntime } from '@platform/server'
 - [ ] **Step 3: Rewrite `apps/inbox/server/providers.ts:9`:**
 
 ```ts
-import { databaseUrl } from '@platform/server'
+import { databaseUrl } from '@atizar/server'
 ```
 
 - [ ] **Step 4: Full green gate.**
@@ -406,7 +406,7 @@ prettier clean. If a moved test file's relative import to a fixture broke, fix i
 
 ```bash
 git add apps/inbox/server/index.ts apps/inbox/server/providers.ts apps/inbox/package.json yarn.lock
-git commit -m "refactor(inbox): consume the pipeline engine via @platform/server
+git commit -m "refactor(inbox): consume the pipeline engine via @atizar/server
 
 The demo server now imports the spine only through the package barrel — the
 framework/userland boundary is physical (belief #3) for the server half.
@@ -429,7 +429,7 @@ DB boot path, the SSE routes, and the db scripts — drive the real app.
 
 - [ ] **Step 3: Verify the full server-driven flow** (the step-6 checklist, now through the
   package) on `http://localhost:5173`:
-  - Board loads (board snapshot + SSE) — confirms `@platform/server` routes mounted + DB migrate-on-boot ran.
+  - Board loads (board snapshot + SSE) — confirms `@atizar/server` routes mounted + DB migrate-on-boot ran.
   - START a single run → qualifier runs → Done.
   - Handoff → reply child nested under the qualifier; parent reopens to Working.
   - Approve WITH an edited gate body → real Gmail draft saved with the edit (the load-bearing path;
@@ -443,10 +443,10 @@ DB boot path, the SSE routes, and the db scripts — drive the real app.
 Run: `yarn workspace inbox db:reset && yarn workspace inbox db:migrate`
 Expected: both succeed against the dev DB (tables dropped + recreated, migrations applied).
 
-- [ ] **Step 5: Update `HANDOFF.md`** — mark step 7's first sub-step (`@platform/server`
+- [ ] **Step 5: Update `HANDOFF.md`** — mark step 7's first sub-step (`@atizar/server`
   extraction) ✅ BUILT & browser-verified with an As-built note (commits, what moved, the
   `EffectFn`→core relocation, the 3 config touchpoints); note the next sub-step is the
-  `@platform/react` extraction, which starts with a brainstorm on the card-injection API
+  `@atizar/react` extraction, which starts with a brainstorm on the card-injection API
   (`registerCard` registry vs props/context) because `ThreadModal` currently couples to the demo's
   `renderRegistry` + `workflows` aggregator.
 
@@ -454,7 +454,7 @@ Expected: both succeed against the dev DB (tables dropped + recreated, migration
 
 ```bash
 git add HANDOFF.md
-git commit -m "docs(handoff): @platform/server extracted & browser-verified; next = @platform/react
+git commit -m "docs(handoff): @atizar/server extracted & browser-verified; next = @atizar/react
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -464,8 +464,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Self-Review checklist (run before declaring the plan done)
 
 - **Spec coverage:** the HANDOFF step-7 line "FIRST extract `apps/inbox/server/pipeline/` →
-  `@platform/server`" + "the import discipline held: `server/pipeline/` imports only `@platform/*`
-  + its own folder" → Tasks 0–3. The `@platform/react` half is explicitly OUT of this plan (its own
+  `@atizar/server`" + "the import discipline held: `server/pipeline/` imports only `@atizar/*`
+  + its own folder" → Tasks 0–3. The `@atizar/react` half is explicitly OUT of this plan (its own
   brainstorm + plan). ✅
 - **Import-discipline micro-decisions honored:** package-local outDir/tsBuildInfoFile (CLAUDE.md
   TS5055 gotcha) — Task 1 Step 2. ✅

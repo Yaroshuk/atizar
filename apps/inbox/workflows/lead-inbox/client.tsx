@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { RenderSpec, HitlSpec, AgentMeta } from '@platform/react'
+import type { RenderSpec, HitlSpec, AgentMeta } from '@atizar/react'
 import { LeadCard } from '../../client/src/components/LeadCard'
 import { VerdictCard } from '../../client/src/components/VerdictCard'
 import { ApprovalDialog } from '../../client/src/components/ApprovalDialog'

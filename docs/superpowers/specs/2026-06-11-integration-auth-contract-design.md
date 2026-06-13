@@ -25,13 +25,13 @@ Belief #3 / invariant I5 hold: the SDK ships a thin **type** contract; implement
 (resolvers, the store, the OAuth routes) live outside core; a custom integration adds auth
 **without editing core**.
 
-## 1. The auth declaration (`@platform/core` — types only, OPEN)
+## 1. The auth declaration (`@atizar/core` — types only, OPEN)
 
 An integration exports an `AuthSpec`. The `kind` is an **open string**, NOT a sealed enum — that is
 the boundary fix (a sealed union would force a core edit for every new auth method):
 
 ```ts
-// @platform/core — pure type, no fs/env/engine (like HealthCheck).
+// @atizar/core — pure type, no fs/env/engine (like HealthCheck).
 export type AuthSpec =
   | { kind: 'none' }
   | { kind: 'apiKey' } // a single secret string, resolved from env
@@ -49,7 +49,7 @@ export type ResolvedCredential =
 // `connectionId` is a developer-chosen connection LABEL (NOT a user account — there is no login
 // system yet): 'default', 'home', 'work', … It decouples multi-account from user identity. Two
 // workflows can reuse the same integration code under two connection labels (home vs work mailbox).
-// Built-in resolvers (apiKey, oauth2) ship in @platform/server; a custom-kind integration ships
+// Built-in resolvers (apiKey, oauth2) ship in @atizar/server; a custom-kind integration ships
 // its OWN resolver in userland — core only defines the interface.
 export type CredentialResolver = (ctx: {
   integration: string
@@ -111,7 +111,7 @@ env:
   `PROVIDER`, `MASTRA_MODEL`, `DEV_RECORD_REPLAY`. The prefix governs ATIZAR-owned config; vendor
   conventions stay as the vendor names them.
 
-A small `env.ts` helper in `@platform/server` reads `ATIZAR_*` by a typed accessor so the prefix is
+A small `env.ts` helper in `@atizar/server` reads `ATIZAR_*` by a typed accessor so the prefix is
 applied in ONE place (no scattered `process.env.ATIZAR_…` strings).
 
 **`.env.example` (the single source of "what keys do I need", decided 2026-06-11).** A committed
@@ -125,7 +125,7 @@ whenever it adds an integration that needs a secret (§5). A developer's first s
 `.env.local` yet (a carried packaging cleanup) — until then, `set -a; . ./.env.local; set +a`
 before `yarn dev`.
 
-## 3. Credential store + resolution (`@platform/server`)
+## 3. Credential store + resolution (`@atizar/server`)
 
 - **Table `credentials`** (drizzle): PK `(connection_id, integration)`; columns `kind`, `secret`
   (the encrypted blob — the oauth2 token JSON or the apiKey), `expires_at` (nullable),
@@ -155,12 +155,12 @@ before `yarn dev`.
   credential ITSELF — `claude-spawn.ts` passes `ATIZAR_SECRET_KEY` + `ATIZAR_DATABASE_URL` +
   `ATIZAR_CONNECTION` (and the provider client envs) through to the child, and the child imports
   the SAME `resolveCredential` + integration `auth`. (Without this, the child process has no token.)
-- A new resolver registry seam: built-ins registered in `@platform/server`; a custom-kind resolver
+- A new resolver registry seam: built-ins registered in `@atizar/server`; a custom-kind resolver
   is registered by the app when it wires the integration (userland), so core stays closed-free.
 
 ## 4. The OAuth "Connect" flow
 
-- **Routes (`@platform/server`):**
+- **Routes (`@atizar/server`):**
   - `GET /api/connect/:provider?integration=<id>&connection=<connId>` → build the provider's auth
     URL (`ATIZAR_<PROVIDER>_CLIENT_ID` + the integration's `auth.scopes` + a signed `state` that
     carries `integration` + `connection`) → 302 to the provider. `access_type=offline` +
@@ -236,7 +236,7 @@ the updated skill**:
 ## 7. Build stages (each its own plan; one branch)
 
 1. **Auth contract + env namespace** — `AuthSpec`/`ResolvedCredential`/`CredentialResolver` types in
-   `@platform/core`; the `ATIZAR_` `env.ts` accessor in `@platform/server`. Pure, unit-tested.
+   `@atizar/core`; the `ATIZAR_` `env.ts` accessor in `@atizar/server`. Pure, unit-tested.
 2. **Credential store + resolution** — the `credentials` table + `crypto.ts` + `resolveCredential`
    + the built-in `apiKey`/`oauth2` resolvers + the resolver registry + token refresh. Real-PG
    tests (encrypt round-trip, refresh-on-expiry, apiKey-from-env, not-connected). **Also create

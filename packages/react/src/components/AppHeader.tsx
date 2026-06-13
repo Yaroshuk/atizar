@@ -2,7 +2,7 @@ import { WorkflowTabs } from './WorkflowTabs'
 import { Connections } from './Connections'
 import { StopButton } from '../primitives/StopButton'
 import { IconButton } from '../primitives/IconButton'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 
 // The thin global header (Chrome tab strip + global controls). Left: a static brand
 // (logo mark + workspace name — NOT a button, no hover; we have no menu/account to open).

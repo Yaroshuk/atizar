@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { BaseEvent } from '@ag-ui/client'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import type { PipelineService } from './pipelineService.js'
 
 // HTTP surface over the PipelineService — the ONLY transport (CopilotKit dropped at step 6).

@@ -6,7 +6,7 @@
 
 **Architecture:** A read-only stdio MCP adapter (`github-tools.mjs`) shells out to `gh` (the model has no Bash — Bash is in the spawn deny-list, so the adapter is the only GitHub path). Only TRIAGE touches GitHub; downstream agents work purely off a self-contained `TicketHandoffPayload` carried through the existing `handoff.ts` seam. The client `InboxView` is generalized into a `WorkflowView` that maps over a `workflows` registry, with each agent owning a child `AgentRuntime` that calls the CopilotKit hooks once (sidestepping rules-of-hooks).
 
-**Tech Stack:** yarn-classic workspace; `@platform/core` (zod, `@ag-ui/client`); MCP via `@modelcontextprotocol/sdk`; `gh` CLI; CopilotKit v2 + AG-UI; Vite/React/TS; Hono server; vitest.
+**Tech Stack:** yarn-classic workspace; `@atizar/core` (zod, `@ag-ui/client`); MCP via `@modelcontextprotocol/sdk`; `gh` CLI; CopilotKit v2 + AG-UI; Vite/React/TS; Hono server; vitest.
 
 **Spec:** `docs/superpowers/specs/2026-06-07-github-triage-workflow-design.md`
 
@@ -173,7 +173,7 @@ import {
   HandoffPayloadSchema,
   type PromptStrategy,
   type HandoffPayload,
-} from '@platform/core'
+} from '@atizar/core'
 ```
 Line 53 (`const h = decodeHandoff(input)`):
 ```ts
@@ -518,7 +518,7 @@ describe('triage prompts', () => {
 `apps/inbox/agents/ticket.prompts.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest'
-import { encodeHandoff, type TicketHandoffPayload } from '@platform/core'
+import { encodeHandoff, type TicketHandoffPayload } from '@atizar/core'
 import { createTicketPrompts } from './ticket.prompts.js'
 
 const ticket: TicketHandoffPayload = {
@@ -553,7 +553,7 @@ Expected: FAIL — modules not found.
 - [ ] **Step 4: Implement `triage.prompts.ts`**
 
 ```ts
-import type { PromptStrategy } from '@platform/core'
+import type { PromptStrategy } from '@atizar/core'
 
 function triageFirst(instructions: string): string {
   return [
@@ -590,7 +590,7 @@ import {
   TicketHandoffPayloadSchema,
   type PromptStrategy,
   type TicketHandoffPayload,
-} from '@platform/core'
+} from '@atizar/core'
 
 type TicketPromptConfig = {
   renderTool: 'render_ticket_result' | 'render_reply_draft'
@@ -704,7 +704,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Implement `github.agent.ts`**
 
 ```ts
-import { defineAgent } from '@platform/core'
+import { defineAgent } from '@atizar/core'
 
 // TRIAGE — the ONLY board reader (single entry point). Reads the user’s open tickets,
 // buckets them, surfaces a routing recommendation per ticket. Read-only.
@@ -1231,7 +1231,7 @@ No unit test (CopilotKit hook; verified in the browser). Mirrors `actions.tsx`, 
 ```tsx
 import { useRenderTool } from '@copilotkit/react-core/v2'
 import { z } from 'zod'
-import type { TicketHandoffPayload } from '@platform/core'
+import type { TicketHandoffPayload } from '@atizar/core'
 import { renderRegistry } from './renderRegistry'
 import type { TriageTicket } from './buckets'
 
@@ -1340,7 +1340,7 @@ git commit -m "feat(client): useGithubActions render tools + ticket handoff forw
 - [ ] **Step 1: Implement the registry**
 
 ```ts
-import type { AgentDefinition } from '@platform/core'
+import type { AgentDefinition } from '@atizar/core'
 import type { IconName } from './components/Icon'
 import { agents as inboxAgents, qualifierAgent, replyAgent } from '../../agents/inbox.agent'
 import {
@@ -1416,7 +1416,7 @@ stable callback. Mounting/unmounting on a workflow switch resets the hooks clean
 ```tsx
 import { useEffect } from 'react'
 import { useAgent, UseAgentUpdate } from '@copilotkit/react-core/v2'
-import type { AgentDefinition } from '@platform/core'
+import type { AgentDefinition } from '@atizar/core'
 import { useAgentStatus } from '../useAgentStatus'
 import type { Status } from '../status'
 
@@ -1538,7 +1538,7 @@ import { Icon } from './components/Icon'
 import type { PipelineNode } from './pipeline'
 import type { Status } from './status'
 import { workflows, META } from './workflows'
-import { encodeHandoff, type Message } from '@platform/core'
+import { encodeHandoff, type Message } from '@atizar/core'
 
 export const InboxView = () => {
   const { copilotkit } = useCopilotKit()

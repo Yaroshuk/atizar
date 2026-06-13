@@ -1,5 +1,5 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@platform/core'
+import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@atizar/core'
 import { mapMastraStream } from './mastra-stream.js'
 import type { MastraRunner, MastraRun } from './mastra-types.js'
 

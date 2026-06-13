@@ -2,9 +2,9 @@ import type { ServerBinding } from '../server-binding.js'
 import { createQualifierPrompts } from '../../agents/qualifier.prompts.js'
 import { createReplyPrompts } from '../../agents/reply.prompts.js'
 import { qualifierAgent, replyAgent } from './descriptor.js'
-import { createDraft } from '@platform/integrations/gmail/create-draft'
-import { resolveCredential, atizarEnv } from '@platform/server'
-import { auth as gmailAuth } from '@platform/integrations/gmail/auth'
+import { createDraft } from '@atizar/integrations/gmail/create-draft'
+import { resolveCredential, atizarEnv } from '@atizar/server'
+import { auth as gmailAuth } from '@atizar/integrations/gmail/auth'
 
 // Resolve the live Gmail credential for the single beta connection ('default'). A null result =
 // not connected (the effect returns a clear "Connect" message).

@@ -40,7 +40,7 @@ export default tseslint.config(
   {
     // MCP server scripts run in Node — expose Node built-in globals (Buffer, etc.)
     // and allow console for MCP stdio logging. Covers the app's own MCP scripts
-    // (`apps/inbox/mcp/`) and the node-only `@platform/integrations` package.
+    // (`apps/inbox/mcp/`) and the node-only `@atizar/integrations` package.
     files: ['**/mcp/**/*.mjs', 'packages/integrations/src/**/*.mjs'],
     languageOptions: {
       globals: {

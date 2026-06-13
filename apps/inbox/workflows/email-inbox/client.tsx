@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { RenderSpec, HitlSpec, AgentMeta } from '@platform/react'
+import type { RenderSpec, HitlSpec, AgentMeta } from '@atizar/react'
 import { SortSummaryCard } from '../../client/src/components/SortSummaryCard'
 import { EmailBatchCard } from '../../client/src/components/EmailBatchCard'
 import { sorterAgent, replyAgent, readerAgent, spamAgent, importantAgent } from './descriptor'

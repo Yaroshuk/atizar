@@ -1,4 +1,4 @@
-import type { WorkflowsConfig, AgentMeta, RenderSpec, HitlSpec } from '@platform/react'
+import type { WorkflowsConfig, AgentMeta, RenderSpec, HitlSpec } from '@atizar/react'
 import { workflowDescriptors } from '../../workflows'
 import { leadInboxMeta, leadInboxRenders, leadInboxHitl } from '../../workflows/lead-inbox/client'
 import { githubTriageMeta, githubTriageRenders } from '../../workflows/github-triage/client'

@@ -1,5 +1,5 @@
 {
-  "name": "@platform/server",
+  "name": "@atizar/server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@platform/core": "*",
+    "@atizar/core": "*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.23",
     "postgres": "^3.4.9",

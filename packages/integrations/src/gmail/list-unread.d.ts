@@ -1,5 +1,5 @@
 // Type declaration for list-unread.mjs (JS module — no TS source).
-import type { ReadResult, ResolvedCredential } from '@platform/core'
+import type { ReadResult, ResolvedCredential } from '@atizar/core'
 
 export type EmailRef = {
   messageId: string

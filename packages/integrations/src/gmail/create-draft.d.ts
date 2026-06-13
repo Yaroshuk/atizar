@@ -1,5 +1,5 @@
 // Type declaration for create-draft.mjs (JS module — no TS source).
-import type { ResolvedCredential } from '@platform/core'
+import type { ResolvedCredential } from '@atizar/core'
 
 export declare function createDraft(
   args: { threadId: string; body: string },

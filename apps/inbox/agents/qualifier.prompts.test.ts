@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeHandoff } from '@platform/core'
+import { encodeHandoff } from '@atizar/core'
 import { createQualifierPrompts } from './qualifier.prompts.js'
 
 const input = (messages: unknown[]) => ({ messages }) as never

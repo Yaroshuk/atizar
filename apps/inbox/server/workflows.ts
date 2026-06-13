@@ -5,7 +5,7 @@ import { leadInboxServer } from '../workflows/lead-inbox/server.js'
 import { githubTriageServer } from '../workflows/github-triage/server.js'
 import { emailInboxServer } from '../workflows/email-inbox/server.js'
 import type { ServerBinding } from '../workflows/server-binding.js'
-import type { WorkflowDescriptor } from '@platform/core'
+import type { WorkflowDescriptor } from '@atizar/core'
 
 export type WorkflowServer = {
   descriptor: WorkflowDescriptor

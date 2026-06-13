@@ -31,19 +31,19 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
 **Build order (beta), with implementation hints:**
 
 1. **Provider contract v2** (`resume?` + `GATE_OPENED`) + conformance suite — BEFORE any PipelineService code. — ✅ **BUILT** on `feat/provider-contract-v2` (2026-06-10), 187 unit tests + typecheck/lint/format green + live browser E2E (HITL approve→resume→draft saved; `GATE_OPENED` captured in the live cassette with the right shape). Spec → `docs/superpowers/specs/2026-06-10-provider-contract-v2-design.md`; plan → `docs/superpowers/plans/2026-06-10-provider-contract-v2.md`.
-   - **As-built:** `@platform/core` gained `gate.ts` (`GATE_OPENED` CUSTOM-event helpers + zod `GateOpenedValueSchema`), `Provider.resume?` + `ResumeHandle`/`GateResolution` in `providers.ts`, and `conformance.ts` (`providerConformanceChecks` — 4 invariants). `claude-stream` emits `GATE_OPENED` at both approval suspend points; `claude-cli` + `mock` implement `resume()` and pass conformance. **The new run-envelope type was NOT added** — the additive surface keeps `RunAgentInput` (the `{workItemId,source,payload,origin}` envelope belongs to the dispatch chokepoint, step 3, not this contract). record/replay untouched (per answer (5)).
+   - **As-built:** `@atizar/core` gained `gate.ts` (`GATE_OPENED` CUSTOM-event helpers + zod `GateOpenedValueSchema`), `Provider.resume?` + `ResumeHandle`/`GateResolution` in `providers.ts`, and `conformance.ts` (`providerConformanceChecks` — 4 invariants). `claude-stream` emits `GATE_OPENED` at both approval suspend points; `claude-cli` + `mock` implement `resume()` and pass conformance. **The new run-envelope type was NOT added** — the additive surface keeps `RunAgentInput` (the `{workItemId,source,payload,origin}` envelope belongs to the dispatch chokepoint, step 3, not this contract). record/replay untouched (per answer (5)).
    - Where: `packages/core/src/providers.ts`. Keep `run(input) → AsyncIterable<BaseEvent>` untouched; add optional `resume?(handle, resolution) → AsyncIterable<BaseEvent>` (spec §1.4). [run-envelope: deferred to step 3 dispatch — see As-built.]
    - `GATE_OPENED` = an AG-UI `CUSTOM` event (typed helper in core). claude-cli synthesizes it inside `claude-stream.ts` exactly where approval-tool-call detection lives today; the orchestrator must listen ONLY for this signal, never for tool names.
    - Conformance suite = one vitest file parameterized over providers (mock now; claude-cli via the already-injected fake `spawn`): asserts stream shape, GATE_OPENED at the approval point, resume continues with the verbatim artifact. Mastra joins the same suite at step 5.
    - Don't break the running app: the current CopilotKit path keeps working until step 6 — add an adapter from the old `RunAgentInput` to the new envelope rather than rewiring the server now.
    - **Step-1 design decisions (ANSWERED 2026-06-10 — do not re-ask):**
      (1) Coexistence = **additive**: `run()` stays backward-compatible (still detects resume via messages), `resume()`/`GATE_OPENED` added beside it; `resume()` has no prod caller until step 3 — the conformance suite covers it.
-     (2) `GATE_OPENED` = **AG-UI CUSTOM event** with a zod-typed value in `@platform/core`. Value = `{ gateKind, toolName, toolCallId, proposedArtifact }` — **NO `resumeHandle` inside the event**: events get recorded into cassettes (and the Trace table at step 3), so they must stay light and must not duplicate the transcript. The caller of `run()` already owns everything the handle needs — it mints and holds the handle itself.
+     (2) `GATE_OPENED` = **AG-UI CUSTOM event** with a zod-typed value in `@atizar/core`. Value = `{ gateKind, toolName, toolCallId, proposedArtifact }` — **NO `resumeHandle` inside the event**: events get recorded into cassettes (and the Trace table at step 3), so they must stay light and must not duplicate the transcript. The caller of `run()` already owns everything the handle needs — it mints and holds the handle itself.
      (3) `resume?(handle, resolution)` with `ResumeHandle = { runId, input }` is right for step 1 (opaque-token abstraction deferred until a provider needs it). Two notes: (a) full transcript-seeded resume (§3.1) arrives only at step 3 when Trace exists — until then claude-cli's resume re-primes from input + resolution exactly like today's mechanism, extracted into a shared helper; (b) make the resume PROMPT TEXT a parameter of that helper, not hardcoded "human approved" — at step 4 it changes to "the action was already executed by the server with <artifact>" (server-executed effects), and `GateResolution` will gain an optional `executedResult?` field then.
      (4) Conformance suite = provider-agnostic `runProviderConformance(makeProvider)` against claude-cli (fake spawn) + mock now, Mastra slot at step 5. Invariants as proposed (GATE_OPENED on approval tool; resume(approved) completes without re-gating; resume(rejected) terminates; surface filtering; one messageId per contiguous text).
      (5) record/replay **untouched at step 1** (keep `resolvedApprovalCount` keying; old cassettes simply lack GATE_OPENED, which is backward-tolerant). Re-key + wipe happens at step 5 with the envelope change.
 2. **Week-0 spike: RunObserver + browser attach** — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 200 unit tests + typecheck/lint/format green; all 4 PASS criteria verified in the browser on the `lead-inbox__reply` cassette (`DEV_RECORD_REPLAY=1`, true replay — cassette mtime unchanged). Spec → `docs/superpowers/specs/2026-06-10-runobserver-browser-attach-spike-design.md`; plan → `docs/superpowers/plans/2026-06-10-runobserver-browser-attach-spike.md`.
-   - **As-built — what SURVIVES into steps 3/6:** (1) **`foldEventsToMessages`** in `@platform/core` (`packages/core/src/fold.ts`) — pure left-fold of AG-UI events → `Message[]` (the reduction CopilotKit did internally); the client pairs results with the existing `pairToolResults`. (2) The **read endpoint shapes**: `GET /api/workitems/:id/trace?from=seq` → `{id,status,done,nextSeq,events:[{seq,event}]}` and `GET /api/workitems/:id/stream` (SSE, `id:`=seq, `data:`=AG-UI event, named `event: status` on status change, honors `Last-Event-ID`). (3) The per-WorkItem monotonic `seq` cursor; the client orders/dedupes by `seq` (so duplicate/out-of-order SSE on reconnect is harmless — the server makes no ordering guarantee between backlog and live).
+   - **As-built — what SURVIVES into steps 3/6:** (1) **`foldEventsToMessages`** in `@atizar/core` (`packages/core/src/fold.ts`) — pure left-fold of AG-UI events → `Message[]` (the reduction CopilotKit did internally); the client pairs results with the existing `pairToolResults`. (2) The **read endpoint shapes**: `GET /api/workitems/:id/trace?from=seq` → `{id,status,done,nextSeq,events:[{seq,event}]}` and `GET /api/workitems/:id/stream` (SSE, `id:`=seq, `data:`=AG-UI event, named `event: status` on status change, honors `Last-Event-ID`). (3) The per-WorkItem monotonic `seq` cursor; the client orders/dedupes by `seq` (so duplicate/out-of-order SSE on reconnect is harmless — the server makes no ordering guarantee between backlog and live).
    - **As-built — THROWAWAY (deleted/replaced at step 3):** the in-memory `Map<id,WorkItemRun>` store + RunObserver consume loop (`apps/inbox/server/dev-runs.ts`); the dev start/resolve routes (`POST /api/dev/runs`, `POST /api/dev/workitems/:id/resolve`); the `?spike=1` client page (`apps/inbox/client/src/spike/TraceSpike.tsx`, mounted in `main.tsx`). Step 3 replaces the store with Postgres-backed Trace + the dispatch chokepoint; step 4 replaces resolve with gate-keyed `POST /api/gates/:id/resolve` (transition + ledger).
    - **As-built — durable refactor:** `buildProvider` extracted from `buildAgent` (`build-agent.ts`) so the RunObserver consumes the SAME wrapped provider (incl. record/replay) as the CopilotKit agents — one code path. `withRecordReplay` now also wraps `resume()` (Variant A, key = `resolvedApprovalCount(handle.input)+1`), exercising the real v2 `resume()` and reusing the recorded `step:1`.
    - **Browser E2E (all 4 PASS):** (1) attach mid-run → `renderLead` done + `saveDraft` running + gate banner with the proposed draft artifact, `awaiting_approval`; (2) reload mid-run (id rides in `?spike=1&id=…`) → re-attaches to the same live server run, full history restored, nothing lost; (3) Approve (plain POST) → the already-open SSE tail continues across the resume boundary (no reconnect), resume text appears, status flips to `done`; (4) reload after approve → full **stitched** history (one trace, two provider runs: `run()` 18 events + `resume()` 2 → `nextSeq` 20). **Loss boundary** = a SERVER restart (in-memory store) — exactly what step 3's Postgres Trace removes; not hardened now (2-day timebox).
@@ -65,7 +65,7 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - **As-built — DB topology:** `client.ts` DEFAULTS `DATABASE_URL` to the compose creds so zero env setup is needed. **Migrate-on-boot** + a **startup sweep** (`running`→`error('executor lost')`, `queued` re-enqueued, `awaiting_approval` LEFT durable). `predev` now `docker compose up -d --wait postgres`.
    - **As-built — test isolation (IMPORTANT footgun fixed):** pipeline tests run against a SEPARATE `aiworkflow_test` DB (vitest `test.env.DATABASE_URL` + a `globalSetup` that creates+migrates it). The no-truncate test strategy (unique uuids/sources per test, membership-based board asserts → DB test files run parallel-safe) left rows in the shared DB; on the next dev boot the **startup sweep re-enqueued those `queued` rows and spawned REAL `claude`** (DEV_RECORD_REPLAY unset). Separate DBs remove it. **If you add pipeline tests, keep them on `aiworkflow_test` and DO NOT truncate in `beforeEach`** (clobbers parallel files).
    - **As-built — resolve is dev-grade (step-4 boundary held):** `POST /api/dev/workitems/:id/resolve` → `transition(resume)` + `provider.resume()` ONLY. NO formRev/ledger/server-executed effect (that is step 4); the model proposes, nothing is executed. The step-2 `withRecordReplay` resume wrapper replays `step:1` so approve→resume works under `DEV_RECORD_REPLAY=1`.
-   - **For the step-4 agent:** the gate-keyed `POST /api/gates/:id/resolve` (formRev 409 + `action_ledger` claim + execute `@platform/integrations/gmail-basic` createDraft directly + `resume` primed with "executed with <artifact>") replaces the dev `/api/dev/workitems/:id/resolve`; `GateResolution` gains `executedResult?`; cancel edges + the full all-inbound-edges guard table extend `transition.ts`; the effect tool leaves the model allow-list (`apps/inbox/workflows/lead-inbox/server.ts`) and `reply.prompts.ts` becomes propose-don't-execute. The `transition()` guard mechanism + `action_ledger` table + `form_rev` column already exist.
+   - **For the step-4 agent:** the gate-keyed `POST /api/gates/:id/resolve` (formRev 409 + `action_ledger` claim + execute `@atizar/integrations/gmail-basic` createDraft directly + `resume` primed with "executed with <artifact>") replaces the dev `/api/dev/workitems/:id/resolve`; `GateResolution` gains `executedResult?`; cancel edges + the full all-inbound-edges guard table extend `transition.ts`; the effect tool leaves the model allow-list (`apps/inbox/workflows/lead-inbox/server.ts`) and `reply.prompts.ts` becomes propose-don't-execute. The `transition()` guard mechanism + `action_ledger` table + `form_rev` column already exist.
    - `docker-compose.yml` with a `postgres` service only; `DATABASE_URL` in `.env.local`; extend `predev` to start the container if it isn't running.
    - Drizzle schema (`work_items`, `gates`, `trace` PK `(work_item_id, seq)`, `action_ledger` PK `key`) + drizzle-kit migrations from the very first table (spec §1.7).
    - ONE `transition(workItemId, edge)` function owns every status change: `BEGIN` → `SELECT … FOR UPDATE` on the row (and the parent for finish/reopen, ascending-id lock order) → guard check → `UPDATE` → `COMMIT`. The `finished` entry guard lives HERE, once, for all five inbound edges (spec §1.2).
@@ -73,39 +73,39 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
    - RunObserver (from the spike, now real): consume `provider.run()`, append trace rows, GATE_OPENED → insert Gate + `transition(awaiting_approval)` + kill via provider; registered render tool → fill `card`; stream end → finalize status.
    - Race tests run against REAL Postgres (the compose container) in CI: concurrent finish-vs-finish and finish-vs-dispatch.
 4. **Server-executed effects + Stop** — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 248 unit tests (incl. real-PG: ledger one-execution, formRev 409, cancel/reject edges, failing-effect→error) + typecheck/lint/format green; all 6 browser/runtime E2E flows verified (below). Spec → `docs/superpowers/specs/2026-06-10-server-executed-effects-stop-design.md`; plan → `docs/superpowers/plans/2026-06-10-server-executed-effects-stop.md`. Commits `43611b6`…`1ab2b0a` (incl. fixes: `e300153` qualifier-tools surfacing, `4b24bb5` cancelItem terminal guard, the double-release + failing-effect fix, and prettier).
-   - **As-built — contract:** `@platform/core` `defineAgent` gained `effects: string[]` (zod **`effects ⊆ approvals`**) + `readonly: string[]`; `GateResolution.executedResult?` + `PromptStrategy.buildResume(args, executedResult?)`. `ServerBinding.effects: { [approvalTool]: (form, ctx) => Promise<result> }` (functions in the server layer, names in core — the `renders` pattern); `EffectFn` type in `server-binding.ts`. **Boot checks** (`apps/inbox/server/agent-checks.ts`, wired in `index.ts`): (1) effect bindings ⇔ `def.effects` both ways; (2) every allow-listed tool's bare name ∈ `readonly ∪ approvals ∪ keys(renders)` — unclassified ⇒ server refuses to start. The model's allow-list lost `mcp__gmail__create_draft`; `qualifier` declares `readonly: ['get_latest_email']`; `triage` got `readonly: ['list_my_tickets','get_ticket']`.
-   - **As-built — effect execution:** `createDraft` was EXTRACTED from the Gmail MCP into a pure exported `@platform/integrations/gmail-basic/create-draft` (injectable `getGmail`; MCP wrapper + server both call it; `errText` moved to `format.mjs`). `POST /api/gates/:id/resolve` `{formRev, decision, form?, comment?}` → `PipelineService.resolveGate(gateId, …)`: formRev mismatch → **409**; `claimLedger` (INSERT ON CONFLICT DO NOTHING, key `workItemId:gateId`) licenses exactly ONE execution; the SERVER calls `effects[gate.toolName](editedForm, ctx)` → real `createDraft`; `setLedgerResult`; then `observer.resume` primed via the propose-don't-execute reply prompt (reads `executedResult.draftId`). **A failing effect (`{error}`) fails the work item (`transition(fail)`, HTTP 502) — never a false "saved".** A re-resolve after the gate closed is idempotent (returns the prior ledger result, no second execution).
+   - **As-built — contract:** `@atizar/core` `defineAgent` gained `effects: string[]` (zod **`effects ⊆ approvals`**) + `readonly: string[]`; `GateResolution.executedResult?` + `PromptStrategy.buildResume(args, executedResult?)`. `ServerBinding.effects: { [approvalTool]: (form, ctx) => Promise<result> }` (functions in the server layer, names in core — the `renders` pattern); `EffectFn` type in `server-binding.ts`. **Boot checks** (`apps/inbox/server/agent-checks.ts`, wired in `index.ts`): (1) effect bindings ⇔ `def.effects` both ways; (2) every allow-listed tool's bare name ∈ `readonly ∪ approvals ∪ keys(renders)` — unclassified ⇒ server refuses to start. The model's allow-list lost `mcp__gmail__create_draft`; `qualifier` declares `readonly: ['get_latest_email']`; `triage` got `readonly: ['list_my_tickets','get_ticket']`.
+   - **As-built — effect execution:** `createDraft` was EXTRACTED from the Gmail MCP into a pure exported `@atizar/integrations/gmail-basic/create-draft` (injectable `getGmail`; MCP wrapper + server both call it; `errText` moved to `format.mjs`). `POST /api/gates/:id/resolve` `{formRev, decision, form?, comment?}` → `PipelineService.resolveGate(gateId, …)`: formRev mismatch → **409**; `claimLedger` (INSERT ON CONFLICT DO NOTHING, key `workItemId:gateId`) licenses exactly ONE execution; the SERVER calls `effects[gate.toolName](editedForm, ctx)` → real `createDraft`; `setLedgerResult`; then `observer.resume` primed via the propose-don't-execute reply prompt (reads `executedResult.draftId`). **A failing effect (`{error}`) fails the work item (`transition(fail)`, HTTP 502) — never a false "saved".** A re-resolve after the gate closed is idempotent (returns the prior ledger result, no second execution).
    - **As-built — Stop:** `transition.ts` gained `cancel` (from queued/running/awaiting_approval/awaiting_input) + `reject` (from awaiting_approval) edges, each writing the `resolution` marker; the active-children deferral guard stays scoped to `finish`. RunObserver drives an explicit `AsyncIterator` registered in `Map<id, iterator>`; `cancel(id)` calls `iterator.return()` → the claude-cli generator's `finally` kills the subprocess; `consume`'s post-loop is **terminal-tolerant** (a concurrent cancel that already finalized the item is not overridden). `PipelineService.cancel`/`cancelWorkflow` cascade parent-first then ascending-id; `cancelItem` early-returns on already-terminal items and does NOT release the pool slot (queued never held one; running's slot is released by its own consume loop; awaiting_approval's was released at the gate) — fixes a double-release that could over-admit queued work. `WorkerPool.dequeue` removes a queued id on cancel. Routes: `/api/workitems/:id/cancel`, `/api/workflows/:id/cancel`, `GET /api/workitems/:id/gate`; the dev `/api/dev/workitems/:id/resolve` is GONE (the dev START `/api/dev/runs` stays for the spike until step 6).
    - **As-built — deviations from the plan's pseudo-code (all sound, verified):** (a) `resolveGate` does NOT itself `transition(resume)` — `observer.resume` owns that edge (avoids a double-transition); (b) the **reject** path does `transition(reject)` and does NOT call `observer.resume` (resume from `finished` would be illegal; the claude-cli rejected-branch is now reachable only via the legacy `run()` path — UI shows the `rejected` marker, no model narration); (c) no `setResolution` store method (the transition writes the marker).
    - **Browser/runtime E2E (all 6 PASS, `DEV_RECORD_REPLAY=1` + the trimmed `lead-inbox__reply` cassette):** (1) **edited approve → real Gmail draft** — edited the gate body, approved; DB: gate `resolved` with the edited `form.body`, `action_ledger` one row `{ok:true, draftId}`, work item `finished`; **fetched the real draft by id from Gmail → body contained the edited marker `7Q3Z`** (the load-bearing guarantee); thread showed the new resume narration "The Gmail draft was saved successfully." (no `create_draft`). (2) **reject** → `finished`/`rejected`, zero ledger rows. (3) **Stop mid-running** → caught at `running`; stream killed mid-flight (8/18 trace events), `finished`/`cancelled`, status not flipped back (terminal-tolerant). (4) **Stop at awaiting_approval** → `finished`/`cancelled`, gate `GET` → 404. (5) **restart durability** → killed+restarted the server mid-`awaiting_approval`; both gates SURVIVED (startup sweep leaves `awaiting_approval` durable), gate still fetchable. (6) **stale formRev → 409**, item not consumed (stays `awaiting_approval`). The `saveDraft` chip stays "running" (expected — HITL-kill means the approval tool never gets a `TOOL_CALL_RESULT`). Effect runs OUTSIDE record/replay → approve hits real Gmail (draft-only; the one test draft was deleted).
    - **Deferred to post-beta (decided, NOT built):** gate `capabilities` (editability derives from `kind`); runtime default-deny at the execution seam (only the boot-time classification kernel was taken — it is physically meaningful at the Mastra/server seam, step 5+); budget edge. **For the step-5 agent:** the `expires_at`/`assignee` Gate columns + stale badge are seams present in the schema but UI is post-beta; `reply.prompts.ts` is now propose-don't-execute; the conformance suite from step 1 is the Mastra definition-of-done.
 5. **Mastra provider** (production path) beside claude-cli (dev). — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 276 unit tests (incl. the Mastra conformance suite — the two-unlike-providers proof) + typecheck/lint/format green; live Mastra E2E (approve→real Gmail draft / reject / cancel) verified server-side AND in the browser (`?spike=1` replay). Spec → `docs/superpowers/specs/2026-06-10-mastra-provider-design.md`; plan → `docs/superpowers/plans/2026-06-10-mastra-provider.md`. Commits `26cee2c`…`845597b`.
-   - **As-built — injected `MastraRunner` seam (fork 1):** `@platform/providers` gained `mastra-types.ts` (`MastraRunner`/`MastraRun`/`MastraRunResult`/`MastraChunk`), `mastra-stream.ts` (chunk→AG-UI mapper, mirrors `claude-stream`), `mastra-provider.ts` (`createMastraProvider` — pure, NO `@mastra/*` import). The real Mastra Agent + 2-step workflow + Postgres storage lives in `apps/inbox/server/mastra/{tools,runner}.ts`. Conformance runs on a fake runner (no API key); the live key is only for E2E.
-   - **As-built — gate via propose tool (fork 2):** one generic workflow `agentStep → gateStep`. `saveDraft`/`renderLead`/`renderVerdict` are no-op capture tools (`execute: (inputData)=>inputData`); `get_latest_email` is a native read tool calling the **extracted** `@platform/integrations/gmail-basic/get-latest-email` (mirrors `createDraft`; the MCP `index.mjs` now delegates to it too). agentStep captures the LAST approval tool-call; gateStep `suspend()`s with it. The provider synthesizes `GATE_OPENED` from the observed approval call (refinement vs spec — robust to Mastra's suspend-payload shape).
+   - **As-built — injected `MastraRunner` seam (fork 1):** `@atizar/providers` gained `mastra-types.ts` (`MastraRunner`/`MastraRun`/`MastraRunResult`/`MastraChunk`), `mastra-stream.ts` (chunk→AG-UI mapper, mirrors `claude-stream`), `mastra-provider.ts` (`createMastraProvider` — pure, NO `@mastra/*` import). The real Mastra Agent + 2-step workflow + Postgres storage lives in `apps/inbox/server/mastra/{tools,runner}.ts`. Conformance runs on a fake runner (no API key); the live key is only for E2E.
+   - **As-built — gate via propose tool (fork 2):** one generic workflow `agentStep → gateStep`. `saveDraft`/`renderLead`/`renderVerdict` are no-op capture tools (`execute: (inputData)=>inputData`); `get_latest_email` is a native read tool calling the **extracted** `@atizar/integrations/gmail-basic/get-latest-email` (mirrors `createDraft`; the MCP `index.mjs` now delegates to it too). agentStep captures the LAST approval tool-call; gateStep `suspend()`s with it. The provider synthesizes `GATE_OPENED` from the observed approval call (refinement vs spec — robust to Mastra's suspend-payload shape).
    - **As-built — native resume (fork 3 / fork 4):** `resume()` = `createRun({ runId }) + resumeStream({ resumeData })` against the parked suspended snapshot (NO kill-and-re-prime). One **shared** `PostgresStore` (bounded pool `max 8`) across all agents — a per-agent store exhausted PG connections at boot. `ProviderConfig` gained `instructions` + `agentId` (threaded from `buildProvider`); `providers.ts` adds the `mastra` factory + `PROVIDER=mastra` alias (default stays `claude-cli`) + `ANTHROPIC_API_KEY` fail-fast + `MASTRA_MODEL` (default `claude-sonnet-4-6`); DB url reuses `client.ts` `databaseUrl`.
    - **THE bug the live E2E caught (cautions paid off):** the provider's `finally{run.abort()}` fired on a clean SUSPEND too, cancelling the parked Mastra run → resume failed _"This workflow run was not suspended"_. Fix: track `settled`; abort ONLY on interrupt (Stop/`iterator.return`), never on a clean suspend/finish (+2 unit tests). caution (a) cancel-mid-run, caution (b) last-wins/no-draft, caution (c) Mastra tables out of our drizzle set + `reset.ts`/test-globalSetup init — all built and verified.
    - **Deviations from the plan (sound):** record/replay re-key was **DEFERRED** — the message-scan step key already yields the correct 0/1 steps in the server-spine single-gate model (`input.messages` carries no resolved-approval transcript; re-keying would couple the dev decorator to StateStore + risk regressing claude-cli for zero behavioural gain). Cassettes were wiped. `/api/dev/runs` gained an optional `payload` (drives the gate on a fresh real run — throwaway, dies at step 6). **Pre-existing latent issue noted (NOT step-5):** `WorkerPool.resumeAcquire` calls `opts.run` → a benign `IllegalTransition: cannot "start" from "running"` is logged on every resume (the real resume runs via `observer.resume`'s own `consume`); harmless but worth cleaning at step 6.
    - **DX note:** the server does NOT auto-load `.env.local`; `PROVIDER=mastra` needs `ANTHROPIC_API_KEY` in the process env (`set -a; . ./.env.local; set +a` before `yarn dev`, or add `--env-file`). Worth wiring `.env.local` loading at step 6/7.
 6. **Re-point board/thread UI** to server state; delete `@copilotkit/*` deps. — ✅ **BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10). 277 unit tests + typecheck/lint/format/build green; the UI is fully server-driven and `@copilotkit/*` is gone from the import graph AND `package.json` (`@ag-ui/client` stays — the event vocabulary). Spec → `docs/superpowers/specs/2026-06-10-server-driven-ui-step6-design.md`; plan → `docs/superpowers/plans/2026-06-10-server-driven-ui-step6.md`.
-   - **Scope discovery (the step-6 line glossed it):** server-side **handoff did not exist** — steps 3–5 only ever drove single agents via `/api/dev/runs`. But handoff is **human-gated** (a card button with a hardcoded `Destination`, NOT model-autonomous), so it became one `POST /api/deliver` endpoint + lifting the pure `resolveDelivery`/`deliveryKey` into `@platform/core` (`packages/core/src/delivery.ts`). The server resolves the destination and dispatches a CHILD work item (`parentId` = the card's work item); dedup-by-`source` is the chokepoint's existing job.
+   - **Scope discovery (the step-6 line glossed it):** server-side **handoff did not exist** — steps 3–5 only ever drove single agents via `/api/dev/runs`. But handoff is **human-gated** (a card button with a hardcoded `Destination`, NOT model-autonomous), so it became one `POST /api/deliver` endpoint + lifting the pure `resolveDelivery`/`deliveryKey` into `@atizar/core` (`packages/core/src/delivery.ts`). The server resolves the destination and dispatches a CHILD work item (`parentId` = the card's work item); dedup-by-`source` is the chokepoint's existing job.
    - **As-built — server:** `POST /api/deliver` ({origin, dest, payload, parentId} → resolve + dispatch child, origin `agent`); `/api/dev/runs` promoted to `POST /api/dispatch` (human START); `PipelineService.deliver` (+ `descriptors` dep); `dispatch`/`deliver` now `publishBoard()` so a freshly-queued item shows immediately. The CopilotKit endpoint (`createCopilotEndpoint`) + `buildAgent` are DELETED — pipeline routes are the only transport.
    - **As-built — client:** four data hooks (`hooks/useBoard` snapshot+SSE-refetch, `hooks/useWorkItemThread` trace+SSE-tail+`foldEventsToMessages`, `hooks/useGate` gate+formRev approve/reject, `hooks/useDispatch` start/deliver/cancel); `boardModel.ts` maps server `WorkItem[]` → the EXISTING pure `pipelineModel`/`aggregate` (cap/queue now server-side); `status.mapStatus` (server union → display `Status`); `serverTypes.ts` (client mirror of the schema fields). `buildRenderToolCall` replaces CopilotKit `useRenderToolCall` (parse tool args → render spec). Approval is **gate-driven**: `HitlSpec.render` ctx changed to `{form, formRev, status, approve, reject}`; `ApprovalDialog` is now an editable textarea (the edited body is the load-bearing "edited text → Gmail" path); `ThreadModal` owns the per-item hooks (keyed by id so a reload remounts fresh) + renders the gate card from `useGate`. Handoff notes are DERIVED from board `parentId` topology (no client deliver state). The open work item id rides in `?open=<id>` so a reload re-attaches. A per-workitem **Stop** button was added to the thread (found missing during E2E — "Stop per agent" is a locked decision).
    - **DELETED:** `useAgentInstances`, `instancesCore` (client copy), `statusFrom`, `InstanceTools`, `useWorkflowRenders`, `LiveInstanceModal`, `spike/TraceSpike`, the `?spike=1` mount, the `<CopilotKit>` tree, `/api/dev/runs`, both `@copilotkit/*` deps. KEPT: `renderRegistry` + all cards, `RenderSpec`/`HitlSpec` (HITL ctx changed), `pipelineModel`/`aggregate`/`buckets`/`devMode`/`status`/`threadResults`, `WorkflowSwitcher`/`PipelineColumn`/`AgentCard`/`InstancePickerModal`, Smedja `styles.css`, `?dev=1`.
    - **Browser E2E (replay, `DEV_RECORD_REPLAY=1`):** ✅ **single run** (START → qualifier runs → Done); ✅ **handoff** (`/api/deliver` → reply child nested under the qualifier with the ↓ connector, parent reopened to Working, derived "→ Handed / ← Received" notes + "Open" jump); ✅ **approve WITH an edited artifact** — edited the gate body to insert `EDITED-MARKER-7Q3Z`, approved, **fetched the real Gmail draft by id → the edited body was present** (ledger one row `{ok,draftId}`, item `finished`, parent auto-finished); ✅ **reject** (`finished`/`rejected`, zero ledger rows); ✅ **cancel via the UI Stop button** (`finished`/`cancelled`, gate 404); ✅ **reload re-attach** (fresh navigation to `?open=<id>` rebuilds the full thread + gate from the trace/gate endpoints); ✅ **board SSE live coherence** (handoff/status updates appeared live without reload); ✅ **post-deps-removal smoke** (booted clean, single run works, no `@copilotkit` in node_modules). **NOT browser-driven this session (honest):** 3-at-once cap (covered by the `pipelineService` blocking-provider integration test — under fast replay the gate releases slots, so "2 active + queued 1" isn't reliably observable); cross-workflow "Treat as lead" (the contract resolution + schema validation are covered by the `pipelineService.deliver` integration test; a live triage run has no cassette and would hit the real GitHub board). Both are follow-ups for step 7's golden-set/eval pass.
-7. **Extraction + packaging (the beta IS the framework — locked decision #7, 2026-06-10)**: FIRST extract `apps/inbox/server/pipeline/` → `@platform/server` and the board/thread UI → `@platform/react` (mechanical folder moves if the import discipline below held), then slim the demo app down to workflows/config that consume ONLY the public packages — the living proof of belief #3 (userland never imports internals). The beta deliverable = the monorepo of libraries + this thin demo app, NOT a clone-template app. Then: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`). npm publish at launch vs monorepo-first is a launch-time call — the package BOUNDARY is the deliverable, the registry is logistics.
-   - **Sub-step 7a — `@platform/server` extraction: ✅ BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10), commits `6713ba9`…`e7123e5`. Plan → `docs/superpowers/plans/2026-06-10-extract-platform-server.md`. `check-foundation` verdict = CLEAR (realizes I5; no engine import added to core).
-     - **As-built:** `EffectFn` (a pure server-effect contract type) relocated `apps/inbox/workflows/server-binding.ts` → `@platform/core` (`packages/core/src/effects.ts`) FIRST — that was the ONLY out-of-folder import in `server/pipeline/`, so the move was then violation-free. `apps/inbox/server/pipeline/*` (23 src files: StateStore, dispatch, transition, WorkerPool, RunObserver, eventBus, pipelineService, routes, sweep, drizzle schema+migrations, 9 tests) `git mv`'d wholesale → `packages/server/src/*`. New package follows the no-build `@platform/*` pattern (`exports` → `./src/index.ts` + a `./db/schema` subpath for drizzle-kit; package-local `outDir`/`tsBuildInfoFile` per the TS5055 gotcha). Barrel re-exports the app-consumed surface (`db`, `databaseUrl`, `runMigrations`, `resetDb`, `startupSweep`, `makePipelineService`, `createPipelineRoutes`, `PipelineService`/`AgentRuntime`/`Db` types). App import sites repointed: `server/index.ts` (6→1 barrel import), `server/providers.ts` (`databaseUrl`).
-     - **3 config touchpoints that broke on the move (all fixed):** drizzle.config schema/out paths; vitest `globalSetup` path; `apps/inbox` `db:migrate`/`db:reset` scripts (now `tsx -e "import('@platform/server')…"`). The migrations-folder path in `migrate.ts` + `test-global-setup.ts` is now resolved from `import.meta.url` (cwd-independent) instead of a cwd-relative string.
-     - **Boundary smell flagged (NOT fixed — for a future @platform/server test-harness cleanup):** `packages/server/src/db/test-global-setup.ts` imports `@mastra/pg` (to init Mastra's tables in the shared test DB) — a concrete engine inside a framework package's TEST infra. Test-only, not runtime, not in `@platform/core` → no invariant violated, but the package's test harness shouldn't know Mastra (an `apps/inbox` concern); also `@mastra/pg` is undeclared in the package's deps (resolves via hoisting). Clean up when the package's test-DB setup is designed for standalone consumers.
+7. **Extraction + packaging (the beta IS the framework — locked decision #7, 2026-06-10)**: FIRST extract `apps/inbox/server/pipeline/` → `@atizar/server` and the board/thread UI → `@atizar/react` (mechanical folder moves if the import discipline below held), then slim the demo app down to workflows/config that consume ONLY the public packages — the living proof of belief #3 (userland never imports internals). The beta deliverable = the monorepo of libraries + this thin demo app, NOT a clone-template app. Then: zero-cred demo (`DEMO=1` → mock provider + SYNTHETIC cassettes authored fresh, scanCassette gate in CI), README 10-minute script, LICENSE (MIT vs Apache-2.0 — ask the user), `@atizar/*` scope rename, golden-set eval per workflow, shared bearer token on all mutation routes (honest `resolvedBy`). npm publish at launch vs monorepo-first is a launch-time call — the package BOUNDARY is the deliverable, the registry is logistics.
+   - **Sub-step 7a — `@atizar/server` extraction: ✅ BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10), commits `6713ba9`…`e7123e5`. Plan → `docs/superpowers/plans/2026-06-10-extract-platform-server.md`. `check-foundation` verdict = CLEAR (realizes I5; no engine import added to core).
+     - **As-built:** `EffectFn` (a pure server-effect contract type) relocated `apps/inbox/workflows/server-binding.ts` → `@atizar/core` (`packages/core/src/effects.ts`) FIRST — that was the ONLY out-of-folder import in `server/pipeline/`, so the move was then violation-free. `apps/inbox/server/pipeline/*` (23 src files: StateStore, dispatch, transition, WorkerPool, RunObserver, eventBus, pipelineService, routes, sweep, drizzle schema+migrations, 9 tests) `git mv`'d wholesale → `packages/server/src/*`. New package follows the no-build `@atizar/*` pattern (`exports` → `./src/index.ts` + a `./db/schema` subpath for drizzle-kit; package-local `outDir`/`tsBuildInfoFile` per the TS5055 gotcha). Barrel re-exports the app-consumed surface (`db`, `databaseUrl`, `runMigrations`, `resetDb`, `startupSweep`, `makePipelineService`, `createPipelineRoutes`, `PipelineService`/`AgentRuntime`/`Db` types). App import sites repointed: `server/index.ts` (6→1 barrel import), `server/providers.ts` (`databaseUrl`).
+     - **3 config touchpoints that broke on the move (all fixed):** drizzle.config schema/out paths; vitest `globalSetup` path; `apps/inbox` `db:migrate`/`db:reset` scripts (now `tsx -e "import('@atizar/server')…"`). The migrations-folder path in `migrate.ts` + `test-global-setup.ts` is now resolved from `import.meta.url` (cwd-independent) instead of a cwd-relative string.
+     - **Boundary smell flagged (NOT fixed — for a future @atizar/server test-harness cleanup):** `packages/server/src/db/test-global-setup.ts` imports `@mastra/pg` (to init Mastra's tables in the shared test DB) — a concrete engine inside a framework package's TEST infra. Test-only, not runtime, not in `@atizar/core` → no invariant violated, but the package's test harness shouldn't know Mastra (an `apps/inbox` concern); also `@mastra/pg` is undeclared in the package's deps (resolves via hoisting). Clean up when the package's test-DB setup is designed for standalone consumers.
      - **Browser/runtime E2E verified (`DEV_RECORD_REPLAY=1`, lead-inbox cassettes):** board loads (routes mounted + migrate-on-boot); single run START→qualifier Working→Done (UI); gate opens (`GATE_OPENED`→Gate insert→`awaiting_approval`); **approve WITH an edited body → real Gmail draft fetched by id contained the edit `[EDITED-MARKER-7Q3Z]`** (UI approve; ledger one `{ok,draftId}` row, gate `resolved`, item `finished`; test draft deleted); reject→`finished`/`rejected`, 0 ledger (API); cancel at `awaiting_approval`→`finished`/`cancelled`, gate 404 (API); reload re-attach (fresh nav to `?open=<id>` rebuilt thread+gate from endpoints); `db:reset`/`db:migrate`/`db:generate` scripts work on the moved paths. (Pre-existing robustness gap noticed, NOT 7a's scope: the resolve route does not strictly validate `decision` against `'approved'|'rejected'` — an unknown value falls through to the approve/execute branch; the browser `useGate` always sends the right enum, but a malformed direct POST would execute. Worth a zod parse on the route later.)
-   - **Sub-step 7b — `@platform/react` extraction: NEXT, and NOT purely mechanical.** Audit (this session): "machinery in, cards out" holds cleanly EXCEPT `ThreadModal` imports the demo's `renderRegistry` + `workflows` aggregator, and the locked component inventory names `WorkflowBoard`/`registerCard` as PACKAGE primitives — so the card-injection API (how the package receives userland cards + render/HITL specs: a `registerCard` registry vs props/context) is a real design fork. **Start 7b with a short brainstorm on that injection API** before moving files (`registerCard` is the documented intended primitive — confirm and lock it). Then it's a folder move like 7a (hooks/, chrome components, models, renderSpecs, buildRenderToolCall, styles.css → `@platform/react`; LeadCard/TriageCard/ReplyDraftCard/VerdictCard/TicketResultCard/ApprovalDialog + the registry + `workflows.ts` + App shell stay in the demo as userland). `IconName` lives in `components/Icon.tsx`; since Icon + the models both go into the package, no extraction needed. Then 7c = slim demo + packaging tail (DEMO=1/PGlite, README, LICENSE [ask user], scope rename, eval, bearer token).
+   - **Sub-step 7b — `@atizar/react` extraction: NEXT, and NOT purely mechanical.** Audit (this session): "machinery in, cards out" holds cleanly EXCEPT `ThreadModal` imports the demo's `renderRegistry` + `workflows` aggregator, and the locked component inventory names `WorkflowBoard`/`registerCard` as PACKAGE primitives — so the card-injection API (how the package receives userland cards + render/HITL specs: a `registerCard` registry vs props/context) is a real design fork. **Start 7b with a short brainstorm on that injection API** before moving files (`registerCard` is the documented intended primitive — confirm and lock it). Then it's a folder move like 7a (hooks/, chrome components, models, renderSpecs, buildRenderToolCall, styles.css → `@atizar/react`; LeadCard/TriageCard/ReplyDraftCard/VerdictCard/TicketResultCard/ApprovalDialog + the registry + `workflows.ts` + App shell stay in the demo as userland). `IconName` lives in `components/Icon.tsx`; since Icon + the models both go into the package, no extraction needed. Then 7c = slim demo + packaging tail (DEMO=1/PGlite, README, LICENSE [ask user], scope rename, eval, bearer token).
      - **7b injection API (ANSWERED 2026-06-10, check-foundation: CLEAR — do not re-ask):**
        (1) **Typed-spec injection via props + one package `<Provider>` context** (e.g.
        `<WorkflowBoard renders hitl meta workflows/>` wrapped once), NOT a global mutable
        `registerCard` singleton — `registerCard` in the inventory named the CAPABILITY (userland
        plugs cards in), and injection IS that mechanism; React-idiomatic, StrictMode/test-safe,
        two boards with different configs for free. (2) **Collapse the string-name registry**:
-       `RenderSpec`/`HitlSpec` TYPES live in `@platform/react`; userland instances reference card
+       `RenderSpec`/`HitlSpec` TYPES live in `@atizar/react`; userland instances reference card
        components DIRECTLY; `renderRegistry.tsx` is deleted. This makes `renders` mirror the
        `effects` pattern — names in core (classification, I15), implementations in a binding
        outside (ServerBinding = effect fns; client spec binding = components). Foundation check:
@@ -115,11 +115,11 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
        a possible Record→array tidy happens at the §3 ARCHITECTURE doc level, explicitly via
        check-foundation, post-extraction, never silently); and the context comes from ONE
        package-level Provider so userland doesn't thread specs into every component.
-     - **Sub-step 7b — `@platform/react` extraction: ✅ BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10), commits `ea64d0e`…`e61dd1e`. Spec → `docs/superpowers/specs/2026-06-10-extract-platform-react-design.md`; plan → `docs/superpowers/plans/2026-06-10-extract-platform-react.md`. `check-foundation` = CLEAR. 277 unit tests + typecheck/lint/build/format(my files) green.
+     - **Sub-step 7b — `@atizar/react` extraction: ✅ BUILT & browser-verified** on `feat/provider-contract-v2` (2026-06-10), commits `ea64d0e`…`e61dd1e`. Spec → `docs/superpowers/specs/2026-06-10-extract-platform-react-design.md`; plan → `docs/superpowers/plans/2026-06-10-extract-platform-react.md`. `check-foundation` = CLEAR. 277 unit tests + typecheck/lint/build/format(my files) green.
        - **As-built:** machinery `git mv`'d → `packages/react/src/` (hooks/{useBoard,useDispatch,useGate,useWorkItemThread}; models aggregate/boardModel/pipelineModel/status/statusDisplay/serverTypes/devMode/threadResults; chrome Icon/AgentCard/AgentModal/PipelineColumn/WorkflowSwitcher/InstancePickerModal/ThreadModal; `InboxView`→`WorkflowBoard`; renderSpecs(types)/buildRenderToolCall; styles.css; the 4 machinery test files). New `workflowsContext.tsx` (`WorkflowsProvider`+`useWorkflowsConfig`). Barrel exports WorkflowBoard, WorkflowsProvider/useWorkflowsConfig, WorkflowsConfig + AgentMeta/DeliverFn/RenderSpec/HitlSpec types, buildRenderToolCall, useThreadResult/ThreadResultsContext, Icon/IconName, and the 4 hooks. `package.json` exports `.` + `./styles.css`; `react`/`react-dom` are peerDeps.
-       - **The injection, as built (matches the locked decision):** `RenderSpec`/`HitlSpec` render closures lost the `registry` param + `renderRegistry.tsx` is DELETED — userland workflow client modules (`workflows/{lead-inbox,github-triage}/client.tsx`) now import their cards DIRECTLY (`<LeadCard/>`, not `registry['LeadCard']`) and import the spec types + `useThreadResult` from `@platform/react`. `buildRenderToolCall(renderSpecs, deliver)` + `ThreadModal` read `renders`/`hitl` from `useWorkflowsConfig()`. `WorkflowBoard` takes `config: WorkflowsConfig` and wraps its tree in ONE `WorkflowsProvider`. Demo: `App = () => <WorkflowBoard config={workflowsConfig}/>`; `client/src/workflows.ts` builds `workflowsConfig` (dedupe-by-toolName) from the workflow modules; `main.tsx` imports `@platform/react/styles.css`.
-       - **Correction to the inventory:** `buckets.ts` (`TriageTicket`/`groupByStatus`) is **vertical-specific** (only TriageCard + github-triage/client use it) — it STAYS userland, NOT in the package. `deliver.ts` (an unused `@platform/core` re-export) was deleted.
-       - **Browser E2E (`DEV_RECORD_REPLAY=1`, lead-inbox cassettes, through `@platform/react`):** app loads + **fully STYLED** (CSS export resolved); single run START→qualifier thread renders; reply gate → **LeadCard + ApprovalDialog render via the injected context + direct card refs**; **approve WITH an edited body (UI Save draft) → real Gmail draft fetched by id contained `[REACT-EDIT-9K2W]`** (ledger one row, item `finished`; test draft deleted); **reject via the UI button** → `finished`/`rejected`, 0 ledger; **cancel via the UI Stop button** → `finished`/`cancelled`, gate 404; reload re-attach (`?open=<id>`); 0 console errors (no `WorkflowsProvider`/import faults). NOT browser-driven (honest, same as prior steps): github-triage live run (read-only, no cassette) — the triage render path's context wiring is covered by typecheck + the renderLead/renderVerdict unit tests through the package's `buildRenderToolCall`.
+       - **The injection, as built (matches the locked decision):** `RenderSpec`/`HitlSpec` render closures lost the `registry` param + `renderRegistry.tsx` is DELETED — userland workflow client modules (`workflows/{lead-inbox,github-triage}/client.tsx`) now import their cards DIRECTLY (`<LeadCard/>`, not `registry['LeadCard']`) and import the spec types + `useThreadResult` from `@atizar/react`. `buildRenderToolCall(renderSpecs, deliver)` + `ThreadModal` read `renders`/`hitl` from `useWorkflowsConfig()`. `WorkflowBoard` takes `config: WorkflowsConfig` and wraps its tree in ONE `WorkflowsProvider`. Demo: `App = () => <WorkflowBoard config={workflowsConfig}/>`; `client/src/workflows.ts` builds `workflowsConfig` (dedupe-by-toolName) from the workflow modules; `main.tsx` imports `@atizar/react/styles.css`.
+       - **Correction to the inventory:** `buckets.ts` (`TriageTicket`/`groupByStatus`) is **vertical-specific** (only TriageCard + github-triage/client use it) — it STAYS userland, NOT in the package. `deliver.ts` (an unused `@atizar/core` re-export) was deleted.
+       - **Browser E2E (`DEV_RECORD_REPLAY=1`, lead-inbox cassettes, through `@atizar/react`):** app loads + **fully STYLED** (CSS export resolved); single run START→qualifier thread renders; reply gate → **LeadCard + ApprovalDialog render via the injected context + direct card refs**; **approve WITH an edited body (UI Save draft) → real Gmail draft fetched by id contained `[REACT-EDIT-9K2W]`** (ledger one row, item `finished`; test draft deleted); **reject via the UI button** → `finished`/`rejected`, 0 ledger; **cancel via the UI Stop button** → `finished`/`cancelled`, gate 404; reload re-attach (`?open=<id>`); 0 console errors (no `WorkflowsProvider`/import faults). NOT browser-driven (honest, same as prior steps): github-triage live run (read-only, no cassette) — the triage render path's context wiring is covered by typecheck + the renderLead/renderVerdict unit tests through the package's `buildRenderToolCall`.
 
 **Anticipated decisions, steps 3–7 (ANSWERED 2026-06-10 — decide-and-go, do not re-ask the user):**
 
@@ -130,22 +130,22 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   NOT write an old↔new adapter beyond what step 1 already shipped.
 - **Code layout:** pipeline code lives in `apps/inbox/server/pipeline/` (PipelineService,
   StateStore, RunObserver, WorkerPool, transition, dispatch) **during steps 3–6**. Do NOT create
-  `@platform/server` mid-build — extraction happens ONCE, at step 7, after the API stops churning
+  `@atizar/server` mid-build — extraction happens ONCE, at step 7, after the API stops churning
   (it IS a beta deliverable, not post-beta — locked decision #7).
   **Extraction discipline so the step-7 move is mechanical:** CONTRACTS/types/pure helpers go into
-  `@platform/core` immediately (the steps-1/2 pattern: `gate.ts`, `conformance.ts`, `fold.ts`);
-  implementation stays in the app, and `server/pipeline/` may import ONLY `@platform/*` + its own
+  `@atizar/core` immediately (the steps-1/2 pattern: `gate.ts`, `conformance.ts`, `fold.ts`);
+  implementation stays in the app, and `server/pipeline/` may import ONLY `@atizar/*` + its own
   folder — never the rest of `apps/inbox` (no reaching into workflows/, client/, mcp/). Same rule
-  for the new board/thread UI at step 6: components destined for `@platform/react` import only
-  `@platform/*` + each other.
-  **`@platform/react` boundary (decided 2026-06-10): machinery in, cards out.** The package ships
+  for the new board/thread UI at step 6: components destined for `@atizar/react` import only
+  `@atizar/*` + each other.
+  **`@atizar/react` boundary (decided 2026-06-10): machinery in, cards out.** The package ships
   the data hooks (useBoard / useWorkItemThread / useGate-with-formRev / useCancel), the chrome
   (workflow board/desktop, workflow SWITCHER tabs with delivery badges, pipeline column +
   instance tree, AgentCard type-cards, thread view, editable GateForm with approve/reject,
   Stop button, status/stale badges), the `registerCard` render-registry + primitives kit, and
   the theme. Litmus test: renders from the generic model (Workflow/Agent/WorkItem/Gate/status)
   → package; knows the vertical's payload (lead, ticket, draft) → userland card.
-  **`@platform/react` beta component inventory (decided 2026-06-10):**
+  **`@atizar/react` beta component inventory (decided 2026-06-10):**
   _Board surface:_ WorkflowBoard (desktop grid), WorkflowSwitcher (tabs + delivery badges),
   PipelineColumn + InstanceTree (L-connectors, `queued: N`), AgentCard (type card: name, START,
   aggregate), StartButton/dialog (THE human-initiated dispatch gesture), InstancePicker, idle
@@ -189,8 +189,8 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   mode (token structure permits it later), a Tailwind preset.
   Workflow-specific cards (LeadCard, TriageCard, ReplyDraftCard) are USERLAND — they stay in the
   demo app as exemplars of `registerCard`, never in the package. UI-framework-agnostic logic
-  (foldEventsToMessages, status mapping) stays in `@platform/core` (pure TS), so a future
-  `@platform/vue` would rewrite only the thin binding layer.
+  (foldEventsToMessages, status mapping) stays in `@atizar/core` (pure TS), so a future
+  `@atizar/vue` would rewrite only the thin binding layer.
 - **Step 3 micro-decisions:** Drizzle over `pg` (node-postgres) — don't bikeshed the driver;
   WorkItem id = `crypto.randomUUID()` ("deterministic at dispatch" in the spec means minted at an
   engine-controlled moment, NOT derived from model output — dedup uses `source`, never the id);
@@ -203,7 +203,7 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   `board` + `workitem:<id>` topics; port lead-inbox first, GitHub-triage second (it's read-only —
   porting it is mostly config).
 - **Step 4 micro-decisions:** the server executes effects by importing
-  `@platform/integrations/gmail-basic` DIRECTLY (plain function call — the stdio MCP child is for
+  `@atizar/integrations/gmail-basic` DIRECTLY (plain function call — the stdio MCP child is for
   the claude CLI, not for the server; no loopback API needed); the approval tool's args ARE the
   initial Gate `form` AND `proposedArtifact`; `GateResolution` gains `executedResult?` now;
   stale badge = client-side age computation (no sweeper, no cron); cancel cascades to active
@@ -242,7 +242,7 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   Definition of done = the step-1 conformance suite passes against it. Default provider stays
   `claude-cli` locally (env switch, e.g. `PROVIDER=mastra`).
   **Step-5 design APPROVED (2026-06-10 — do not re-ask), four forks:** (1) INJECT a
-  `MastraRunner` interface into `@platform/providers/mastra-provider.ts` (the spawn-injection
+  `MastraRunner` interface into `@atizar/providers/mastra-provider.ts` (the spawn-injection
   pattern; package stays isomorphic; conformance runs on a fake runner, no API key — live key
   only for E2E; the real Mastra assembly lives in `apps/inbox/server/`). (2) Proposal→gate =
   a no-op PROPOSE tool (`saveDraft`, args = the artifact) inside agentStep, then gateStep
@@ -262,7 +262,7 @@ E2E pass (unit tests provably miss this codebase's bug class); one step = one br
   resolved-gate count, wipe `.cassettes/` once) and live E2E for approve AND reject AND
   cancel.
 - **Step 6 micro-decisions:** the pure `foldEventsToMessages(events) → messages` ALREADY EXISTS
-  (built at step 2, `@platform/core`, unit-tested) — render both history and live tail through it
+  (built at step 2, `@atizar/core`, unit-tested) — render both history and live tail through it
   (the `?spike=1` page already does); do NOT re-extract it. Extend
   `client/src/status.ts` to the server status union (server is now the source of truth);
   `pipelineModel` keeps working — feed it real `parentId` trees from the board snapshot; the Vite
@@ -297,7 +297,7 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
   (2026-06-11, off `master`; commits `8e0fc6d`…`061b65e` + `c70ab81` + the stage-1 docs commit).
   Plan → `docs/superpowers/plans/2026-06-11-gmail-viewer-integration.md`. 291 unit tests +
   typecheck/lint green; all gmail-viewer files Prettier-clean.
-  - **As-built:** `@platform/integrations/gmail-viewer/*` — `list-unread` (unread inbox window,
+  - **As-built:** `@atizar/integrations/gmail-viewer/*` — `list-unread` (unread inbox window,
     metadata-only, capped 25, hours round up to whole days for Gmail search), `get-email` (full
     body by id, reuses gmail-basic's `parseLatestMessage`), `modify` (markRead/trash/star,
     best-effort batch: per-row `{messageId,error}` collected, wholesale `{error}` on client
@@ -321,7 +321,7 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
   tests + typecheck/lint/prettier-clean green. Plan →
   `docs/superpowers/plans/2026-06-11-email-inbox-stage2-core-server.md`.
   - **F9 — thin integration contract (types-only):** `HealthCheck`/`ReadResult<T>`/`BatchActionResult`
-    in `@platform/core`; gmail-basic + gmail-viewer `.d.ts` retyped against them;
+    in `@atizar/core`; gmail-basic + gmail-viewer `.d.ts` retyped against them;
     `write-integration` + `gmail-viewer` skills + `docs/AGENTIC.md` reference the contract.
   - **F1 — workflow-level prompt (mechanism):** `composeInstructions()` helper +
     `defineWorkflow.prompt` field in core; threaded into `buildProvider` via a composed-instructions
@@ -398,7 +398,7 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     terminal `reject`/`cancel`. (b) **Flow "re-route a batch row to reply" is NOT wired** — the batch
     agents declare `handoffs:['reply']` but `HitlSpec.render` ctx has no `deliver` (only `RenderSpec`
     gets it), and `EmailBatchCard` has no per-row "Draft reply" button, so that handoff is currently
-    inert. Wiring it needs a small `@platform/react` addition (deliver-from-a-HITL-card) → its own
+    inert. Wiring it needs a small `@atizar/react` addition (deliver-from-a-HITL-card) → its own
     step + `check-foundation`.
     **For Stage 4 (UI chrome):** the F3 health badge, F6 START-disable, F7 "Delegating"/"Done" pipeline
     states, the ActivityLog panel, and the polished EmailBatchCard styling (it currently reuses the
@@ -475,11 +475,11 @@ updated `write-integration` skill.
   `docs/superpowers/plans/2026-06-11-integration-auth-substage1-contract-env.md`. 354 unit tests
   (344 + 10 new) + typecheck/lint green; touched files Prettier-clean. `check-foundation` = CLEAR
   (I3 purity held — core imports nothing; I5 reinforced — open `kind`; I7 aligned — secrets by name).
-  - **As-built:** `@platform/core` `integration-auth.ts` — `AuthSpec` (OPEN `kind`: `none`/`apiKey`/
+  - **As-built:** `@atizar/core` `integration-auth.ts` — `AuthSpec` (OPEN `kind`: `none`/`apiKey`/
     `oauth2`/`{kind:string;…}` escape hatch — a custom auth method needs NO core edit), `ResolvedCredential`
     (per-kind payload), `CredentialResolver` (`(ctx:{integration,connectionId,auth}) => Promise<cred|null>`;
     `null` = not connected), `isOAuth2` guard. Sibling of `integration.ts`, pure (no fs/env/engine).
-  - `@platform/server` `env.ts` — `atizarEnv`, the SINGLE reader of `ATIZAR_*` (never scattered as raw
+  - `@atizar/server` `env.ts` — `atizarEnv`, the SINGLE reader of `ATIZAR_*` (never scattered as raw
     `process.env.ATIZAR_…`): `secretKey()`, `apiKey(integration)` → `ATIZAR_<INTEGRATION>_API_KEY`,
     `oauthClient(provider)` → `ATIZAR_<PROVIDER>_CLIENT_ID/_SECRET`, `connection()` (defaults `'default'`),
     `databaseUrl()` (precedence `ATIZAR_DATABASE_URL` > `DATABASE_URL` > compose default). Rule encoded:
@@ -494,9 +494,9 @@ updated `write-integration` skill.
   (2026-06-11), commits `444fcad`…`bb8df03`. Plan →
   `docs/superpowers/plans/2026-06-11-integration-auth-substage2-credential-store.md`. 361 unit tests
   (344 + 17 new) + typecheck/lint green; touched files Prettier-clean. `check-foundation` = CLEAR
-  (I3 held — all in `@platform/server`, core only consumed; I5 reinforced — `registerResolver` seam;
+  (I3 held — all in `@atizar/server`, core only consumed; I5 reinforced — `registerResolver` seam;
   I7 aligned — secrets AES-encrypted at rest, never plaintext DB, apiKey env-only).
-  - **As-built (all `@platform/server`):** `credentials` table (drizzle, PK `(connection_id,
+  - **As-built (all `@atizar/server`):** `credentials` table (drizzle, PK `(connection_id,
     integration)`, `secret` = AES blob, `kind` plain text not enum, `expires_at` drives refresh) +
     migration `0001_*.sql`. `crypto.ts` — AES-256-GCM `deriveKey`(sha256→32B)/`encryptSecret`/
     `decryptSecret` (blob `base64(iv):base64(tag):base64(ct)`), pure (caller supplies the key).
@@ -520,7 +520,7 @@ updated `write-integration` skill.
   code-quality review). `check-foundation` = CLEAR (I1 human gesture; I3/I5 routes/UI outside core,
   flow generic over `oauthProvider`, userland injects scopes/list; I7 consistent with sub-stage 2 —
   client secrets env-only, user tokens encrypted-at-rest, never plaintext).
-  - **As-built — `@platform/server`:** `oauthState.ts` (`signState`/`verifyState` — HMAC-SHA256
+  - **As-built — `@atizar/server`:** `oauthState.ts` (`signState`/`verifyState` — HMAC-SHA256
     `base64url(json).base64url(sig)`, anti-CSRF/tamper, key = `ATIZAR_SECRET_KEY`); `atizarEnv.publicUrl()`
     (default `http://localhost:5173`, the `redirect_uri` origin); `connectRoutes.ts`
     (`createConnectRoutes({ store, scopesFor, list, fetchFn? })`) — `GET /api/connect/:provider` (404
@@ -539,7 +539,7 @@ updated `write-integration` skill.
     routes. `claude-spawn.ts` got a load-bearing COMMENT: the child inherits `process.env` (spread),
     so `ATIZAR_*` reach MCP children automatically — a future env allow-list MUST keep forwarding them
     or credential resolution in MCP children breaks silently.
-  - **As-built — `@platform/react`:** `hooks/useConnections.ts` (fetch `GET /api/connections`,
+  - **As-built — `@atizar/react`:** `hooks/useConnections.ts` (fetch `GET /api/connections`,
     refetch on focus + strip `?connected=`/`?connect_error=` from the URL after the redirect lands,
     unmount-guarded like `useBoard`), `components/ConnectionChip.tsx` (presentational: not-connected →
     a real `<a href="/api/connect/:provider?…">` FULL NAVIGATION (an OAuth redirect can't happen in
@@ -587,17 +587,17 @@ updated `write-integration` skill.
   Plan → `docs/superpowers/plans/2026-06-11-integration-auth-substage5-gmail-rewrite.md`.
   `check-foundation` = CLEAR. **The integration-auth track is COMPLETE** — end users connect Gmail via
   a button, tokens are stored encrypted, no hand-placed files.
-  - **As-built:** ONE pure `@platform/integrations/gmail` (merged basic+viewer) declaring
+  - **As-built:** ONE pure `@atizar/integrations/gmail` (merged basic+viewer) declaring
     `auth: oauth2/google/gmail.modify`, functions taking `deps.credential` (`ResolvedCredential`),
-    NO file/env/`@platform/server` reads (grep-proven). lead-inbox + email-inbox re-pointed: server
+    NO file/env/`@atizar/server` reads (grep-proven). lead-inbox + email-inbox re-pointed: server
     effects + health resolve the credential server-side (`resolveCredential` + `atizarEnv.connection()`);
     Mastra read tools resolve in-process; `connections.ts` scopes derive from the integration's `auth.scopes`.
     Old gmail-basic/gmail-viewer DELETED; the consumer skill moved to `skills/gmail/`.
   - **Architectural decision (honoring "integration imports core only, never the store"):** the
     credential-resolving READ-ONLY MCP server lives in the APP (`apps/inbox/mcp/gmail-tools.mts`), NOT
-    the integration package — it imports `@platform/server` (resolveCredential/atizarEnv) and runs via
-    the tsx loader (`node --import tsx`, since `@platform/server` is `.ts`); it exposes ONLY the 3 read
-    tools (no write tool — I2/I9). The integration package stays pure (no `@platform/server` dep).
+    the integration package — it imports `@atizar/server` (resolveCredential/atizarEnv) and runs via
+    the tsx loader (`node --import tsx`, since `@atizar/server` is `.ts`); it exposes ONLY the 3 read
+    tools (no write tool — I2/I9). The integration package stays pure (no `@atizar/server` dep).
   - **Live browser E2E (real Google OAuth + real Gmail, both providers):** claude-cli — connect→chip✓;
     email-inbox sort+dispatch+batch-approve→REAL read/trash (verified, undone); lead-inbox qualifier
     read→handoff→reply→approve→REAL draft (verified by id, deleted); disconnect→agents "not connected".
@@ -606,7 +606,7 @@ updated `write-integration` skill.
     email (known stage-3b, not a credential bug; createDraft effect is provider-agnostic, proven on
     claude-cli). All real Gmail mutations were UNDONE; the test token was disconnected at the end.
   - **`~/.gmail-mcp/` files are now UNUSED** by the framework (gmail reads the Connect-stored token).
-  - **Dev reset commands (run from repo root; `resetCredentials`/`resetAll` added to `@platform/server`):**
+  - **Dev reset commands (run from repo root; `resetCredentials`/`resetAll` added to `@atizar/server`):**
     `yarn workspace inbox db:reset` clears ONLY pipeline state (`work_items`/`gates`/`trace`/`action_ledger`)
     and **keeps the Gmail connection** — a state reset never logs you out (the encrypted `credentials`
     row survives every restart/hot-reload; tokens auto-refresh, so you reconnect only after one of these
@@ -624,7 +624,7 @@ Design handoff bundle (project `smedja`, file `Consumer Desktop v2.html` — fet
 share link, README + 2 chat transcripts read for intent). The brief: a reusable **primitives**
 layer (buttons + containers, extensible via props + className + tokens), **Trace/Activity log**,
 the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tabs**. Built into
-`@platform/react`, wired to REAL server data (not the prototype's Acme mocks).
+`@atizar/react`, wired to REAL server data (not the prototype's Acme mocks).
 
 - **✅ BUILT & browser-verified** on `feat/gmail-viewer` (2026-06-12). 386 unit tests +
   typecheck/lint/build green; live browser E2E (true replay, lead-inbox cassettes — mtimes
@@ -693,7 +693,7 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
 
 > **CONTINUATION NOTE (2026-06-12, after Stage 4 chrome) — for the next agent.** Stage 4 chrome is
 > **committed `c3b4aa5` and PUSHED to `origin/feat/gmail-viewer`** (new remote branch; PR not opened).
-> Built into `@platform/react`: 9 primitives (`primitives/`), `AppHeader`/`WorkflowTabs`/`ActivityPanel`,
+> Built into `@atizar/react`: 9 primitives (`primitives/`), `AppHeader`/`WorkflowTabs`/`ActivityPanel`,
 > `useActivity`/`useHealth`, rewritten `PipelineColumn`/`AgentCard`/`ConnectionChip`. NOT merged
 > (same branch strategy). The dev server may still be running (`:4000`/`:5173`); a `db:reset` was run
 > so the board is clean (creds kept — gmail stays connected).
@@ -737,7 +737,7 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
 onto `feat/7c-packaging`, branched off `feat/gmail-viewer`): **A** cheap cleanups · **B** zero-cred
 `DEMO=1` mode (mock provider + PGlite + SYNTHETIC cassettes + scanCassette CI gate) · **C** bearer
 token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-ups · **E**
-`@platform/*` scope rename (needs the final scope name) · **F** README 10-min script + LICENSE
+`@atizar/*` scope rename (needs the final scope name) · **F** README 10-min script + LICENSE
 (user's call, recommend MIT). Order A→B→C→D→E→F (rename late to avoid churn; docs as capstone).
 
 - **Sub-project A — cheap cleanups: ✅ BUILT & browser-verified** (2026-06-12, commit `d746a68`).
@@ -764,7 +764,7 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
   spec-review + quality-review per task + a final holistic review). 400 unit tests + typecheck +
   lint + build green.
   - **As-built:** `isDemo()` (standalone, unprefixed `DEMO`, sibling of `DEV_RECORD_REPLAY`, in
-    `@platform/server` env.ts) gates everything. **DB:** `client.ts`/`migrate.ts` select an
+    `@atizar/server` env.ts) gates everything. **DB:** `client.ts`/`migrate.ts` select an
     in-memory **PGlite** (`drizzle-orm/pglite`, lazy optional peer `@electric-sql/pglite`) vs
     postgres-js at module load; same dialect → migrations unchanged; `Db` stays the single
     postgres-js type (pglite cast). **Provider:** new strict `'demo'` mode in `record-replay.ts`
@@ -865,16 +865,29 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
   - **github-triage deterministic golden scenario = SKIPPED (stretch, decided):** triage is covered by the F2
     browser verify + the existing `pipelineService.deliver` integration test; a synthetic triage cassette adds
     marginal value over the board-read-surfacing risk. No silent gap — stated here.
-- **Sub-projects E–F:** NEXT, in order (E `@platform/*` scope rename — **needs the final scope name from the
-  user**; F root `yarn demo` alias + CI `demo:scan-cassettes` hook if/when CI lands + optional `App.tsx`
-  `/api/config`-fallback tidy — README + LICENSE are ALREADY DONE per the note below).
+- **Sub-project E — `@platform/*` → `@atizar/*` scope rename: ✅ BUILT** (2026-06-13; spec
+  `docs/superpowers/specs/2026-06-13-platform-scope-rename-atizar-design.md`). The user chose the final
+  brand scope **`@atizar`**. Global `@platform/` → `@atizar/` sweep over **162 tracked files** (5 package
+  `name`s, `apps/inbox` 5 workspace deps + 4 `db:*` script import strings, ~101 code imports, all `.md`
+  docs **including the protected `ARCHITECTURE.md`/`PHILOSOPHY.md`** — user explicitly authorized the
+  protected-doc edits; verified the only changed lines there are the cosmetic name swap, no invariant
+  meaning changed → `check-foundation` = CLEAR). `exports` subpath keys (`./gmail/*`, `./db/schema`,
+  `./styles.css`) and configs (drizzle/tsconfig/vite/vitest) were untouched (relative paths). `yarn install
+  --ignore-engines` relinked `node_modules/@atizar/*` (the `node_modules/@platform` symlinks are gone). The
+  rename spec keeps the literal `@platform` (it documents the transition). Zero `@platform` left in tracked
+  files. **Green:** typecheck + lint + `yarn test` 414 + `yarn eval` 5 + build. CLAUDE.md's stale
+  "placeholder scope" line corrected (now "final scope, renamed at 7c-E; all five packages extracted").
+- **Sub-project F — packaging tail: NEXT (LAST).** Reduced (README + LICENSE already done by the user) to:
+  (1) a ROOT `yarn demo` alias (`"demo": "yarn workspace inbox demo"`) so the README's one-command story
+  works; (2) wire `demo:scan-cassettes` into CI **if/when** a CI config exists (none today — don't fabricate);
+  (3) optional `App.tsx` `/api/config`-failure-fallback tidy. Align code to the README if anything differs.
 
-> **CONTINUATION NOTE (2026-06-13, after 7c-A + 7c-B + 7c-C + 7c-D) — read me first, next agent.**
+> **CONTINUATION NOTE (2026-06-13, after 7c-A + 7c-B + 7c-C + 7c-D + 7c-E) — read me first, next agent.**
 > The 7c track is being built on **`feat/7c-packaging`** (branched off `feat/gmail-viewer`; NOT
-> merged — keep building on it, same long-lived-branch strategy as prior tracks). **A + B + C + D are ✅
-> done & browser-verified** (A: dev `.env.local` autoload + quiet `resumeAcquire`; B: zero-cred
-> `DEMO=1`; C: bearer token on mutating routes; D: golden-set eval harness + the two step-6 follow-ups
-> — see the 7c-D as-built bullet above). Latest state:
+> merged — keep building on it, same long-lived-branch strategy as prior tracks). **A + B + C + D + E are ✅
+> done** (A: dev `.env.local` autoload + quiet `resumeAcquire`; B: zero-cred `DEMO=1`; C: bearer token on
+> mutating routes; D: golden-set eval harness + the two step-6 follow-ups; E: `@platform/*` → `@atizar/*`
+> final-scope rename — see the as-built bullets above). **Only F remains.** Latest state:
 > **414 unit tests (`yarn test`) + 5 golden-eval tests (`yarn eval`) + typecheck + lint + build green**
 > (the prior "417" figure was a stale hand-count; 7c-D's diff deletes zero existing `.test.ts` — the
 > 5 eval tests run under the separate `yarn eval` config); Postgres is UP; no dev server should be
@@ -892,10 +905,11 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   unreachable in a live demo). If the already-written README references a command/flag that differs
 >   from what's built, ALIGN THE CODE to the README (or flag the mismatch to the user).
 >
-> - **Build order = E → F (C and D are done).** Each sub-project = its own brainstorm→spec→plan→build
+> - **Build order = F only (C, D, E are done).** Each sub-project = its own brainstorm→spec→plan→build
 >   cycle (the user chose subagent-driven execution for B/C/D — ask which approach for each). Run
->   `check-foundation` on anything touching actions/providers/`@platform/core`/the framework-userland
->   boundary. **E (scope rename) and F are both mechanical.** START AT E.
+>   `check-foundation` on anything touching actions/providers/`@atizar/core`/the framework-userland
+>   boundary. **F is mechanical** (root `yarn demo` alias + CI hook if CI lands + optional App.tsx tidy).
+>   START AT F. E renamed the scope to `@atizar/*` (see the 7c-E as-built bullet above).
 >
 > - **D — golden-set eval + two step-6 follow-ups: ✅ DONE** (see the 7c-D as-built bullet above). The
 >   harness (`apps/inbox/eval/`, `yarn eval`) covers lead-inbox (3) + email-inbox sorter fan-out (1) on
@@ -903,7 +917,7 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   browser-verified live. github-triage deterministic scenario skipped (stretch — covered by F2 + the
 >   deliver integration test).
 >
-> - **E — `@platform/*` scope rename:** ~130 files grep/replace + 5 package.json `name`s. **NEEDS the
+> - **E — `@atizar/*` scope rename:** ~130 files grep/replace + 5 package.json `name`s. **NEEDS the
 >   final scope name from the user** (ask before starting). Do it LATE/isolated (touches everything).
 >   If the already-written README uses the final scope name, that name is your target.
 >
@@ -932,19 +946,19 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   client rebuild.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
-packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
-**sub-step 7b (`@platform/react`, commits `ea64d0e`…`e61dd1e`)** are ✅ BUILT & browser-verified on
+packaging tail). Steps 1–6 + **sub-step 7a (`@atizar/server`, commits `6713ba9`…`e7123e5`)** +
+**sub-step 7b (`@atizar/react`, commits `ea64d0e`…`e61dd1e`)** are ✅ BUILT & browser-verified on
 `feat/provider-contract-v2` (NOT merged — same branch strategy). Both extractions done: the
 framework/userland boundary is now physical for BOTH the server spine and the board/thread UI; the
-demo app consumes only `@platform/{core,providers,integrations,server,react}` + its own
+demo app consumes only `@atizar/{core,providers,integrations,server,react}` + its own
 workflows/cards. **7c = the packaging tail**
-(mechanical folder moves — the import discipline held: `server/pipeline/` imports only `@platform/*`
+(mechanical folder moves — the import discipline held: `server/pipeline/` imports only `@atizar/*`
 
-- its own folder; the new client hooks/components import only `@platform/*` + each other). The
-  `@platform/react` boundary + beta component inventory + styling decisions are in the anticipated-
+- its own folder; the new client hooks/components import only `@atizar/*` + each other). The
+  `@atizar/react` boundary + beta component inventory + styling decisions are in the anticipated-
   decisions block above. Then: zero-cred demo (`DEMO=1` → PGlite + mock provider + SYNTHETIC cassettes,
   scanCassette CI gate), README 10-minute script, **LICENSE (ask the user — recommend MIT)**,
-  `@platform/*` scope rename, golden-set eval per workflow, shared bearer token on mutation routes.
+  `@atizar/*` scope rename, golden-set eval per workflow, shared bearer token on mutation routes.
   **Two step-6 follow-ups for the step-7 eval pass** (NOT browser-driven this session): (1) the
   3-at-once server cap (`pipelineService` cap test passes with a blocking provider; under fast replay
   the gate releases slots so it's not browser-observable — drive it with a slow/blocking eval fixture);
@@ -956,7 +970,7 @@ from "running"` logged on every resume — make `resumeAcquire` reserve the slot
   (b) wire `.env.local` loading into the dev server so `PROVIDER=mastra` "just works".
   **Provider knobs:** `PROVIDER=mastra`, `MASTRA_MODEL` (default `claude-sonnet-4-6`), `ANTHROPIC_API_KEY`
   (in the process env). The Mastra adapter is `apps/inbox/server/mastra/{tools,runner}.ts`; the pure
-  provider is `@platform/providers/mastra-*`.
+  provider is `@atizar/providers/mastra-*`.
 
 > **CONTINUATION NOTE (2026-06-10) — read me first.** Step 1 was **NOT merged to `master`**; by
 > the user's call we keep building **on `feat/provider-contract-v2`** (so step 1 + step 2 share
@@ -1014,7 +1028,7 @@ server-authoritative model in updated-3 — keep for reference, do not build sta
 each real provider run to disk once and replays it instantly on every subsequent run. Recordings
 are one JSONL file per `wf__agent` under `apps/inbox/.cassettes/` (gitignored), each line
 `{step, event}`; the **step** is `resolvedApprovalCount(input)` (new pure helper in
-`@platform/core`) — the number of human approvals already resolved, so HITL's multi-request
+`@atizar/core`) — the number of human approvals already resolved, so HITL's multi-request
 split is handled transparently. Mode toggle: `=1`/`=replay` → auto (replay if recorded, else
 record); `=record` → force-overwrite; unset → pure production path. `CassetteStore` uses atomic
 writes; a provider error does not write. `scanCassette` backs a mandatory agent share-safety scan
@@ -1126,7 +1140,7 @@ shows and reads **Done**; triage card + reply card lay out correctly; the narrat
 **On `master` (MERGED `3a92241`, BUILT, browser-verified):** the **workflow-
 separation** pass. Each workflow is now a **self-contained module** (`apps/inbox/workflows/<id>/`
 descriptor+server+client) and workflows are **isolated boxes** that talk only through a typed
-**published contract**. Highlights: `@platform/core` `defineWorkflow` + `instanceId` +
+**published contract**. Highlights: `@atizar/core` `defineWorkflow` + `instanceId` +
 `Destination`; agent **roles `input`/`worker`** (input = user-startable + only cross-workflow target;
 worker = handoff-only); **all agents of all workflows mounted idle** keyed by instance id (so the same
 agent is reusable as independent copies and a cross-workflow target is always ready — no mount race);
@@ -1159,7 +1173,7 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
 
 **Recently built (deep dives → `docs/BUILD-LOG.md`):**
 
-1. Vertical slice + reusable **`@platform/core`** layer (message layer, `Provider` contract,
+1. Vertical slice + reusable **`@atizar/core`** layer (message layer, `Provider` contract,
    `defineAgent` passport). — §1
 2. **`claude-cli` provider** — runs the real `claude` CLI as a subprocess behind the `Provider`
    seam; HITL = detect-tool-call-and-kill + stateless re-prime resume. — §2
@@ -1167,7 +1181,7 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
    approval (never sends). — §3
 4. **Two agents + manual handoff** (`56f07d0`) — LEAD QUALIFIER (only reader) → REPLY AGENT
    (writer); `handoff.ts` is the pure encode/decode seam; per-agent MCP allow-list = hard boundary. — §4
-5. **`@platform/*` package split** — `core` + `providers` + `integrations` as yarn-classic
+5. **`@atizar/*` package split** — `core` + `providers` + `integrations` as yarn-classic
    workspace packages consumed as raw TS source. — §5
 6. **Consumer desktop re-skin** (`56c8454`) — above. — §6
 7. **GitHub triage workflow** (MERGED) — real read-only Magma Board, N-agent
@@ -1205,12 +1219,12 @@ while its subagent runs**; reply is handoff-only. Detail → `docs/BUILD-LOG.md`
 
 ## Other next-ups (suggested order)
 
-1. **Finish the split — `@platform/react` + `@platform/server` extraction (deferred):** the
+1. **Finish the split — `@atizar/react` + `@atizar/server` extraction (deferred):** the
    client React layer and the Hono/BFF + spawn server layer still live in `apps/inbox/`. Extract
-   when the app/framework boundary settles. The `@platform/*` scope is a **placeholder** — rename
+   when the app/framework boundary settles. The `@atizar/*` scope is a **placeholder** — rename
    before any npm publish.
 2. **Multi-provider / Mastra** (can interleave): add a `mastra` (or `claude-api`) factory beside
-   `claude-cli` behind the existing `Provider` seam in `@platform/providers` — no seam change
+   `claude-cli` behind the existing `Provider` seam in `@atizar/providers` — no seam change
    needed. Needs an API key.
 3. _Polish (cosmetic, deferred):_ the model still narrates a bit ("I'll load the tool schemas…")
    AND the verdict prints as plain markdown paragraphs in the modal alongside the card — strip

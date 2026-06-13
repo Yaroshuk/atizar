@@ -1,5 +1,5 @@
 // Type declarations for modify.mjs (JS module — no TS source).
-import type { BatchActionResult, ResolvedCredential } from '@platform/core'
+import type { BatchActionResult, ResolvedCredential } from '@atizar/core'
 
 export declare function markRead(
   args: { messageIds: string[] },

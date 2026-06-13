@@ -1,5 +1,5 @@
 import type { RunAgentInput } from '@ag-ui/client'
-import { decodeHandoff, HandoffPayloadSchema, type PromptStrategy } from '@platform/core'
+import { decodeHandoff, HandoffPayloadSchema, type PromptStrategy } from '@atizar/core'
 
 function fromInbox(instructions: string, origin: string): string {
   return [

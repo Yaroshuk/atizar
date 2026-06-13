@@ -1,4 +1,4 @@
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 
 type TicketResultCardProps = { data: { title: string; kind: string; analysis: string } }
 

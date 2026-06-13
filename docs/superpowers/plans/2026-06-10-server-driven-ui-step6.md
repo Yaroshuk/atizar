@@ -4,9 +4,9 @@
 
 **Goal:** Make the server the single source of truth for the consumer UI — the React client reads board/thread state over HTTP+SSE and acts via plain HTTP — and delete all `@copilotkit/*` packages and the `<CopilotKit>` tree.
 
-**Architecture:** The step 3–5 spine already exposes every read/act endpoint. Step 6 (a) lifts the pure delivery helpers into `@platform/core` and adds two small server routes (`/api/deliver`, `/api/dispatch`), then (b) rewrites the client from CopilotKit proxied-agents to four data hooks (`useBoard`, `useWorkItemThread`, `useGate`, `useDispatch`) feeding the EXISTING pure models (`pipelineModel`, `aggregate`) and cards (`renderRegistry`). Handoff is a human-gated card-button → `POST /api/deliver` (server resolves the `Destination` + dispatches a child with `parentId`). Approval is gate-driven (`GET .../gate` + `POST /api/gates/:id/resolve`), not a CopilotKit `respond` callback.
+**Architecture:** The step 3–5 spine already exposes every read/act endpoint. Step 6 (a) lifts the pure delivery helpers into `@atizar/core` and adds two small server routes (`/api/deliver`, `/api/dispatch`), then (b) rewrites the client from CopilotKit proxied-agents to four data hooks (`useBoard`, `useWorkItemThread`, `useGate`, `useDispatch`) feeding the EXISTING pure models (`pipelineModel`, `aggregate`) and cards (`renderRegistry`). Handoff is a human-gated card-button → `POST /api/deliver` (server resolves the `Destination` + dispatches a child with `parentId`). Approval is gate-driven (`GET .../gate` + `POST /api/gates/:id/resolve`), not a CopilotKit `respond` callback.
 
-**Tech Stack:** TypeScript, React 18, Vite, Hono, `@ag-ui/client` (kept — the event vocabulary), `@platform/core` (`foldEventsToMessages`, `resolveDelivery`), Postgres spine, vitest, Playwright-MCP for browser E2E.
+**Tech Stack:** TypeScript, React 18, Vite, Hono, `@ag-ui/client` (kept — the event vocabulary), `@atizar/core` (`foldEventsToMessages`, `resolveDelivery`), Postgres spine, vitest, Playwright-MCP for browser E2E.
 
 **Spec:** `docs/superpowers/specs/2026-06-10-server-driven-ui-step6-design.md`
 
@@ -49,7 +49,7 @@
 
 ## Phase A — Server: delivery helpers in core + deliver/dispatch routes
 
-### Task 1: Move `resolveDelivery`/`deliveryKey` into `@platform/core`
+### Task 1: Move `resolveDelivery`/`deliveryKey` into `@atizar/core`
 
 **Files:**
 - Create: `packages/core/src/delivery.ts`
@@ -109,7 +109,7 @@ export function deliveryKey(payload: unknown): string | undefined {
 - [ ] **Step 6: Re-point the client `deliver.ts`** — replace its body with a re-export so existing client imports keep working until they're rewritten:
 
 ```ts
-export { resolveDelivery, deliveryKey, type DeliveryResult } from '@platform/core'
+export { resolveDelivery, deliveryKey, type DeliveryResult } from '@atizar/core'
 ```
 
 Delete `apps/inbox/client/src/deliver.test.ts` (now covered in core).
@@ -119,7 +119,7 @@ Delete `apps/inbox/client/src/deliver.test.ts` (now covered in core).
 ```bash
 git add packages/core/src/delivery.ts packages/core/src/delivery.test.ts packages/core/src/index.ts apps/inbox/client/src/deliver.ts
 git rm apps/inbox/client/src/deliver.test.ts
-git commit -m "refactor(core): lift resolveDelivery/deliveryKey into @platform/core (pure, server-reusable)"
+git commit -m "refactor(core): lift resolveDelivery/deliveryKey into @atizar/core (pure, server-reusable)"
 ```
 
 ### Task 2: `PipelineService.deliver` + `/api/deliver` + promote `/api/dispatch`
@@ -134,12 +134,12 @@ git commit -m "refactor(core): lift resolveDelivery/deliveryKey into @platform/c
 
 ```ts
 // in PipelineServiceDeps:
-descriptors: import('@platform/core').WorkflowDescriptor[]
+descriptors: import('@atizar/core').WorkflowDescriptor[]
 
 // new façade method (uses resolveDelivery + deliveryKey from core):
 async deliver(req: {
   origin: string
-  dest: import('@platform/core').Destination
+  dest: import('@atizar/core').Destination
   payload: Record<string, unknown>
   parentId: string
 }): Promise<{ ok: true; id: string; deduped: boolean } | { ok: false; error: string }> {
@@ -158,7 +158,7 @@ async deliver(req: {
 },
 ```
 
-Add the import at the top: `import { resolveDelivery, deliveryKey } from '@platform/core'`. NOTE: `this.dispatch` inside an object literal — convert the returned object to a `const service = {...}; return service` form if `this` doesn't bind, OR call the local `dispatchChokepoint` directly with the resolved `maxInstances` (preferred — mirror the existing `dispatch` method body to avoid `this`):
+Add the import at the top: `import { resolveDelivery, deliveryKey } from '@atizar/core'`. NOTE: `this.dispatch` inside an object literal — convert the returned object to a `const service = {...}; return service` form if `this` doesn't bind, OR call the local `dispatchChokepoint` directly with the resolved `maxInstances` (preferred — mirror the existing `dispatch` method body to avoid `this`):
 
 ```ts
 async deliver(req) {
@@ -196,7 +196,7 @@ async deliver(req) {
 app.post('/api/deliver', async (c) => {
   const body = await c.req.json<{
     origin: string
-    dest: import('@platform/core').Destination
+    dest: import('@atizar/core').Destination
     payload: Record<string, unknown>
     parentId: string
   }>()
@@ -441,7 +441,7 @@ git commit -m "feat(client): useBoard — snapshot + board SSE refetch"
 ```ts
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BaseEvent } from '@ag-ui/client'
-import { foldEventsToMessages, pairToolResults } from '@platform/core'
+import { foldEventsToMessages, pairToolResults } from '@atizar/core'
 import type { ServerStatus } from '../serverTypes'
 
 export const useWorkItemThread = (id: string | null) => {
@@ -506,7 +506,7 @@ git commit -m "feat(client): useWorkItemThread — trace snapshot + SSE tail →
 
 ```ts
 import { useCallback, useEffect, useState } from 'react'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import type { Gate } from '../serverTypes'
 
 // The gate is authoritative (its form + formRev, not the stream args). Fetch it when the
@@ -551,7 +551,7 @@ export const useGate = (workItemId: string | null, awaiting: boolean) => {
 
 ```ts
 import { useCallback } from 'react'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 
 export const useDispatch = () => {
   const start = useCallback(async (agentKey: string): Promise<string> => {
@@ -679,7 +679,7 @@ Render `{gateSlot}` after `{thread}` (and after `{sent}` notes). Keep everything
 
 ```tsx
 import type { ReactNode } from 'react'
-import type { ToolCall, ToolMessage } from '@platform/core'
+import type { ToolCall, ToolMessage } from '@atizar/core'
 import { renderRegistry } from './renderRegistry'
 import { renderSpecs } from './workflows'
 import type { DeliverFn } from './renderSpecs'
@@ -722,8 +722,8 @@ git commit -m "refactor(client): AgentModal takes a local renderToolCall + gate 
 
 ```tsx
 import { useState } from 'react'
-import type { AgentDefinition, Destination } from '@platform/core'
-import { instanceId } from '@platform/core'
+import type { AgentDefinition, Destination } from '@atizar/core'
+import { instanceId } from '@atizar/core'
 import { useBoard } from './hooks/useBoard'
 import { useDispatch } from './hooks/useDispatch'
 import { useWorkItemThread } from './hooks/useWorkItemThread'
@@ -776,7 +776,7 @@ git commit -m "refactor(client): InboxView driven by useBoard + pure models (no 
 
 ```tsx
 import { useMemo } from 'react'
-import type { Destination } from '@platform/core'
+import type { Destination } from '@atizar/core'
 import { useWorkItemThread } from '../hooks/useWorkItemThread'
 import { useGate } from '../hooks/useGate'
 import { buildRenderToolCall } from '../buildRenderToolCall'

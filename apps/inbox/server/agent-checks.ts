@@ -1,4 +1,4 @@
-import type { AgentDefinition, EffectFn } from '@platform/core'
+import type { AgentDefinition, EffectFn } from '@atizar/core'
 
 // Strip the `mcp__<server>__` prefix to the bare tool name the passport declares.
 function bareName(fullyQualified: string): string {

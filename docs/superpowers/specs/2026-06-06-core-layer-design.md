@@ -49,7 +49,7 @@ for the broader vision. This spec is the next concrete increment of that vision.
 - Real integrations (Gmail, MCP).
 - A database; config file/DB split; base⊕overrides layering.
 - Auth, roles, RBAC, audit.
-- The `@platform/*` package split — the core lives in `apps/inbox/core/` for now
+- The `@atizar/*` package split — the core lives in `apps/inbox/core/` for now
   and migrates to a package later, once the contract shape settles and a second
   consumer exists.
 - `defineAgent.fields` (configurable fields + auto-form + storage split): nothing

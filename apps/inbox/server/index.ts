@@ -1,7 +1,7 @@
 import './load-dev-env.js' // MUST be first: loads .env.local (dev) before any env read below
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { instanceId, composeInstructions, type HealthCheck } from '@platform/core'
+import { instanceId, composeInstructions, type HealthCheck } from '@atizar/core'
 import { providerRegistry } from './providers.js'
 import { buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
@@ -17,7 +17,7 @@ import {
   atizarEnv,
   isDemo,
   type AgentRuntime,
-} from '@platform/server'
+} from '@atizar/server'
 import { assertAgentClassification } from './agent-checks.js'
 import { scopesFor, connectionList } from './connections.js'
 import { aggregateHealth, providerHealth } from './health.js'

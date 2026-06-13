@@ -1,5 +1,5 @@
 {
-  "name": "@platform/react",
+  "name": "@atizar/react",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@platform/core": "*",
+    "@atizar/core": "*",
     "zod": "^3.25.76"
   },
   "peerDependencies": {

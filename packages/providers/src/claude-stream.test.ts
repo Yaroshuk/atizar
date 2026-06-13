@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { EventType } from '@ag-ui/client'
-import { readGateOpened } from '@platform/core'
+import { readGateOpened } from '@atizar/core'
 import { mapClaudeStream } from './claude-stream.js'
 
 async function* fromLines(lines: string[]) {

@@ -1,4 +1,4 @@
-import type { PromptStrategy } from '@platform/core'
+import type { PromptStrategy } from '@atizar/core'
 
 function triageFirst(instructions: string, origin: string): string {
   return [

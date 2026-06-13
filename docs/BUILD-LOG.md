@@ -9,15 +9,15 @@ index; this file holds the detailed per-feature narratives (each also has a spec
 ## 1 · Vertical slice + reusable core layer (BUILT, browser-verified)
 
 The vertical slice loop works AND the reusable core layer is extracted into
-`@platform/core` (was `apps/inbox/core/`):
+`@atizar/core` (was `apps/inbox/core/`):
 
-- `@platform/core` (`messages.ts`) — typed message layer over `@ag-ui`
+- `@atizar/core` (`messages.ts`) — typed message layer over `@ag-ui`
   (`hasPendingApproval`, `approvalResolved`, `pairToolResults`, guards). Replaces the
   `toolCallId↔toolMessage` logic that was duplicated in 3 files; no more `any`.
-- `@platform/core` (`providers.ts` contract) + `@platform/providers` (`mock-provider.ts`)
+- `@atizar/core` (`providers.ts` contract) + `@atizar/providers` (`mock-provider.ts`)
   — `Provider` interface (`run(input) → AsyncIterable<BaseEvent>`) + `defineProviders`
   registry + one fake provider that emits the scripted inbox stream.
-- `@platform/core` (`defineAgent.ts`) + `apps/inbox/agents/` — the Zod-validated agent
+- `@atizar/core` (`defineAgent.ts`) + `apps/inbox/agents/` — the Zod-validated agent
   passport + the concrete inbox instances (`replyAgent`/`qualifierAgent`, registries).
 - Threaded through both sides: server (`apps/inbox/server/build-agent.ts`) builds the
   `BuiltInAgent` from the passport + registry; client (`renderRegistry.tsx`, `actions.tsx`,
@@ -100,9 +100,9 @@ is archived + blocked by the Claude Code safety classifier. Spec:
 ## 4 · Two agents + manual handoff (BUILT, `feat/two-agents-handoff`, MERGED `56f07d0`)
 
 The **second consumer** that proves the `core/` contract is reusable (the precondition for the
-`@platform/*` split). A **LEAD QUALIFIER** agent beside the **REPLY AGENT** on a two-card
+`@atizar/*` split). A **LEAD QUALIFIER** agent beside the **REPLY AGENT** on a two-card
 desktop; the manager hands the qualifier's verdict to the reply agent with one click. Files
-(`apps/inbox`, paths pre-split — now under `@platform/core`):
+(`apps/inbox`, paths pre-split — now under `@atizar/core`):
 
 - `core/handoff.ts` — **pure, isomorphic** handoff contract: `HandoffPayloadSchema`
   (`{threadId, from, subject, summary, category, priority}`), `encodeHandoff(payload)` → a seed
@@ -141,7 +141,7 @@ Spec/plan: `docs/superpowers/specs|plans/2026-06-07-two-agents-handoff*`.
 
 ---
 
-## 5 · `@platform/*` package split (BUILT, `feat/platform-package-split`, browser-verified)
+## 5 · `@atizar/*` package split (BUILT, `feat/platform-package-split`, browser-verified)
 
 The library is extracted into a **yarn-classic (1.22) workspace**. Layout:
 
@@ -151,15 +151,15 @@ The library is extracted into a **yarn-classic (1.22) workspace**. Layout:
   tsconfig.json (solution: references all packages + apps/inbox)
   vitest.config.ts, eslint.config.js, .prettierrc, .prettierignore  (all at ROOT now)
 packages/
-  core/         @platform/core         (isomorphic: messages, defineAgent, providers[contract], handoff) deps: @ag-ui/client, zod
-  providers/    @platform/providers    (isomorphic; claude-stream, claude-cli-provider, mock-provider; spawn INJECTED) deps: @platform/core, @ag-ui/client
-  integrations/ @platform/integrations (node-only batteries) subpath exports: "./gmail-basic" + "./gmail-basic/format"; deps @modelcontextprotocol/sdk + zod; googleapis = OPTIONAL peer
-apps/inbox/     "inbox" — depends on the three @platform/* by name ("*"); concrete agents in apps/inbox/agents/; server/, client/, mcp/inbox-tools.mjs
+  core/         @atizar/core         (isomorphic: messages, defineAgent, providers[contract], handoff) deps: @ag-ui/client, zod
+  providers/    @atizar/providers    (isomorphic; claude-stream, claude-cli-provider, mock-provider; spawn INJECTED) deps: @atizar/core, @ag-ui/client
+  integrations/ @atizar/integrations (node-only batteries) subpath exports: "./gmail-basic" + "./gmail-basic/format"; deps @modelcontextprotocol/sdk + zod; googleapis = OPTIONAL peer
+apps/inbox/     "inbox" — depends on the three @atizar/* by name ("*"); concrete agents in apps/inbox/agents/; server/, client/, mcp/inbox-tools.mjs
 ```
 
-- **Dependency direction:** everything depends on `@platform/core`; **core depends on nothing
-  concrete** (just `@ag-ui/client` + `zod`). `@platform/providers` is **isomorphic** (the `spawn`
-  is INJECTED, so it stays Node-free). `@platform/integrations` is **node-only batteries** with
+- **Dependency direction:** everything depends on `@atizar/core`; **core depends on nothing
+  concrete** (just `@ag-ui/client` + `zod`). `@atizar/providers` is **isomorphic** (the `spawn`
+  is INJECTED, so it stays Node-free). `@atizar/integrations` is **node-only batteries** with
   **subpath exports** (`./gmail-basic`, `./gmail-basic/format`) + **optional peer deps**
   (`googleapis` is loaded lazily inside the MCP server via `optional-peer.mjs` → `optionalPeerError`,
   fail-fast; the app installs it because it uses the entrypoint).
@@ -167,11 +167,11 @@ apps/inbox/     "inbox" — depends on the three @platform/* by name ("*"); conc
   Vite + tsx + vitest transpile workspace deps directly. Typecheck = `tsc --build` (composite
   project references).
 - `apps/inbox/server/claude-spawn.ts` resolves the gmail MCP server via
-  `require.resolve('@platform/integrations/gmail-basic')` (createRequire), not a relative path.
+  `require.resolve('@atizar/integrations/gmail-basic')` (createRequire), not a relative path.
   The app's OWN generative-UI tools `mcp/inbox-tools.mjs` stayed in the app (contract, not
   integration).
-- The contract (`@platform/core`) is what enables third-party extension. **`@platform/*` is a
-  placeholder scope — rename before any npm publish.** `@platform/react` + `@platform/server` are
+- The contract (`@atizar/core`) is what enables third-party extension. **`@atizar/*` is a
+  placeholder scope — rename before any npm publish.** `@atizar/react` + `@atizar/server` are
   deferred (client + server layers still live in `apps/inbox/`).
 
 79 unit tests; browser-verified end-to-end on real Gmail.
@@ -281,7 +281,7 @@ module** and workflows are **isolated boxes** that talk only through a typed con
 
 What changed:
 
-- **`@platform/core` `defineWorkflow`** (`packages/core/src/defineWorkflow.ts`) — a pure, structure-
+- **`@atizar/core` `defineWorkflow`** (`packages/core/src/defineWorkflow.ts`) — a pure, structure-
   only validator (mirrors `defineAgent`) for a `WorkflowDescriptor` (`{id, label, iconName, agents:
   {agent, role}[], entryAgentId, inputs}`). Adds `instanceId(workflowId, agentId)` (`wf__agent`) and
   the `Destination` union (`{kind:'agent',agentId}` | `{kind:'contract',workflow,input}`).
@@ -414,7 +414,7 @@ real `claude` CLI each time.
 **What was built:**
 
 - **`resolvedApprovalCount(messages, approvalNames): number`** — a new pure helper in
-  `@platform/core` (`packages/core/src/messages.ts`), beside the existing `approvalResolved`.
+  `@atizar/core` (`packages/core/src/messages.ts`), beside the existing `approvalResolved`.
   It counts the number of distinct approval tool calls that have a matching `role:'tool'`
   result in the message thread. This becomes the **step index**: step 0 = first run (no
   approvals answered), step 1 = after the first approval, etc. Because the `claude-cli`
@@ -495,7 +495,7 @@ spike store (`apps/inbox/server/dev-runs.ts`, now deleted) with a durable, serve
 pipeline on Postgres. Spec → `docs/superpowers/specs/2026-06-10-server-spine-postgres-design.md`;
 plan → `docs/superpowers/plans/2026-06-10-server-spine-postgres.md`.
 
-**What it is.** Everything lives in `apps/inbox/server/pipeline/` (no `@platform/server` extraction
+**What it is.** Everything lives in `apps/inbox/server/pipeline/` (no `@atizar/server` extraction
 yet — deferred). drizzle-orm + postgres.js over the dev Postgres container (`docker compose up -d
 postgres`; app stays on the host). One `transition(db, id, edge)` owns every `work_items.status`
 write (`SELECT … FOR UPDATE`, edges `start|gate|resume|finish|fail`, a leaf→root auto-finish walk
@@ -546,7 +546,7 @@ plan → `docs/superpowers/plans/2026-06-10-server-driven-ui-step6.md`.
 **Scope discovery.** Server-side **handoff did not exist** — steps 3–5 only drove single agents via
 `/api/dev/runs`. But handoff is **human-gated** (a rendered card's button carries a hardcoded
 `Destination`; the model never emits one), so it became a small `POST /api/deliver` endpoint plus
-lifting the pure `resolveDelivery`/`deliveryKey` into `@platform/core` (`delivery.ts`). The server
+lifting the pure `resolveDelivery`/`deliveryKey` into `@atizar/core` (`delivery.ts`). The server
 resolves the destination and dispatches a CHILD work item (`parentId` = the card's work item);
 dedup-by-`source` and the depth cap are the chokepoint's existing job.
 

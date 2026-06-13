@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeHandoff, type TicketHandoffPayload } from '@platform/core'
+import { encodeHandoff, type TicketHandoffPayload } from '@atizar/core'
 import { createTicketPrompts } from './ticket.prompts.js'
 
 const ticket: TicketHandoffPayload = {

@@ -1,5 +1,5 @@
 import type { RunAgentInput } from '@ag-ui/client'
-import { decodeHandoff, type PromptStrategy } from '@platform/core'
+import { decodeHandoff, type PromptStrategy } from '@atizar/core'
 import { ReplyPayloadSchema, EmailBatchSchema } from './descriptor.js'
 
 // ── SORTER ─────────────────────────────────────────────────────────────────

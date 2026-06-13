@@ -11,7 +11,7 @@ import {
   type GateResolution,
   type Provider,
   type ResumeHandle,
-} from '@platform/core'
+} from '@atizar/core'
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import type { AgentRuntime } from './runObserver.js'

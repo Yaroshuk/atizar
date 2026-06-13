@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest'
 import { resolveCredential, registerResolver } from './resolveCredential.js'
-import type { AuthSpec } from '@platform/core'
+import type { AuthSpec } from '@atizar/core'
 
 const fakeStore = (
   initial: Record<string, { kind: string; secret: string; expiresAt: Date | null }>

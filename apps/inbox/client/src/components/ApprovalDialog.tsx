@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon } from '@platform/react'
+import { Icon } from '@atizar/react'
 
 type ApprovalData = { threadId: string; body: string }
 

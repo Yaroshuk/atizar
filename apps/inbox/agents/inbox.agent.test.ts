@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { qualifierAgent, replyAgent, leadInboxAgents } from '../workflows/lead-inbox/descriptor.js'
-import { defineProviders } from '@platform/core'
-import { createMockInboxProvider } from '@platform/providers'
+import { defineProviders } from '@atizar/core'
+import { createMockInboxProvider } from '@atizar/providers'
 
 describe('inbox agents wiring', () => {
   it('reply passport validates and references the claude-cli provider', () => {
