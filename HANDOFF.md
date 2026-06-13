@@ -825,39 +825,32 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 - **Sub-projects D–F:** NEXT, in order (D golden-set eval + step-6 follow-ups · E `@platform/*` scope
   rename · F README/LICENSE/root-demo-alias/CI).
 
-> **CONTINUATION NOTE (2026-06-12, after 7c-A + 7c-B) — read me first, next agent.**
+> **CONTINUATION NOTE (2026-06-13, after 7c-A + 7c-B + 7c-C) — read me first, next agent.**
 > The 7c track is being built on **`feat/7c-packaging`** (branched off `feat/gmail-viewer`; NOT
-> merged — keep building on it, same long-lived-branch strategy as prior tracks). **A + B are ✅
+> merged — keep building on it, same long-lived-branch strategy as prior tracks). **A + B + C are ✅
 > done & browser-verified** (A: dev `.env.local` autoload + quiet `resumeAcquire`; B: zero-cred
-> `DEMO=1`). Latest state: 400 unit tests + typecheck + lint + build green; Postgres is back UP; no
-> dev server should be running.
+> `DEMO=1`; C: bearer token on mutating routes — see the 7c-C as-built bullet above). Latest state:
+> **417 unit tests + typecheck + lint + build green**; Postgres is UP; no dev server should be running
+> (the session ended with the stack killed + ports free).
 >
 > - **⚠️ README + LICENSE are ALREADY DONE — do NOT author them.** By the time you start, the
 >   **README and the LICENSE file are already filled in** (the user is handling them). Treat the
 >   README/LICENSE pieces of sub-project F as COMPLETE. **F therefore reduces to:** (1) a ROOT
 >   `yarn demo` alias (today the demo script lives only in the `inbox` workspace —
 >   `yarn workspace inbox demo`; add a root `"demo": "yarn workspace inbox demo"` so the README's
->   one-command story works); (2) wire `demo:scan-cassettes` into CI **if/when** a CI config exists
->   (none exists today — do not fabricate one); (3) optional tidy of `App.tsx`'s `/api/config`-failure
->   fallback (currently shows all workflows — non-fail-safe but unreachable in a live demo). If the
->   already-written README references a command/flag that differs from what's built, ALIGN THE CODE to
->   the README (or flag the mismatch to the user) — do not silently diverge.
+>   one-command story works) — NOTE 7c-C documents `ATIZAR_AUTH_TOKEN`+`VITE_ATIZAR_AUTH_TOKEN` for a
+>   token-protected deploy, so the README's auth story should match; (2) wire `demo:scan-cassettes`
+>   into CI **if/when** a CI config exists (none exists today — do not fabricate one); (3) optional tidy
+>   of `App.tsx`'s `/api/config`-failure fallback (currently shows all workflows — non-fail-safe but
+>   unreachable in a live demo). If the already-written README references a command/flag that differs
+>   from what's built, ALIGN THE CODE to the README (or flag the mismatch to the user).
 >
-> - **Build order = C → D → E → F.** Each sub-project = its own brainstorm→spec→plan→build cycle (the
->   user chose subagent-driven execution for B; ask which approach for each). Run `check-foundation`
->   on anything touching actions/providers/`@platform/core`/the framework-userland boundary.
+> - **Build order = D → E → F (C is done).** Each sub-project = its own brainstorm→spec→plan→build
+>   cycle (the user chose subagent-driven execution for B and C — ask which approach for each). Run
+>   `check-foundation` on anything touching actions/providers/`@platform/core`/the framework-userland
+>   boundary. **D is the most research-y of the three; E (scope rename) and F are mechanical.**
 >
-> - **C — bearer token (small, do first):** add an `AUTH_TOKEN` (decide ATIZAR-prefix vs not — it IS
->   official runtime config, so likely `ATIZAR_AUTH_TOKEN` per the env contract) checked by a Hono
->   middleware on every MUTATING route. The exact mutating routes (from the step-7 audit): `POST
->   /api/dispatch`, `POST /api/deliver`, `POST /api/gates/:id/resolve`, `POST /api/workitems/:id/cancel`,
->   `POST /api/workflows/:id/cancel`, `POST /api/cancel-all` (all in `packages/server/src/routes.ts`),
->   and `DELETE /api/connections/:integration` (`connectRoutes.ts`). GET/SSE stay open. **In demo mode
->   default the token OFF** (no token required) so `yarn demo` stays one-command — gate the middleware
->   on `!isDemo() && AUTH_TOKEN set`. Goal = honest `resolvedBy` + the README claim "mutations require a
->   token". The client must send the token on its mutation `fetch`es (thread it via the existing hooks).
->
-> - **D — golden-set eval + two step-6 follow-ups:** (1) the 3-at-once server cap (covered by a
+> - **D — golden-set eval + two step-6 follow-ups (START HERE):** (1) the 3-at-once server cap (covered by a
 >   `pipelineService` blocking-provider integration test; drive it live with a slow/blocking eval
 >   fixture — under fast replay the gate releases slots so it's not browser-observable); (2) the
 >   cross-workflow "Treat as lead → Lead inbox" full browser flow (resolution + schema are
@@ -881,6 +874,16 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   commit** (a `require-yield` error slipped to the final green check this session).
 >   (f) Gmail OAuth credential does not always survive across sessions — if a non-demo gmail flow
 >   reports "no credential", reconnect via the header Connect chip; demo needs no creds at all.
+>   (g) **Stale-stack bit me in 7c-C (the browser-verify #1 footgun, confirmed):** switching dev modes
+>   between cycles, the prior `yarn dev` kept `:4000` → the next server hit `EADDRINUSE` and the OLD
+>   one answered (`/api/config` showed the wrong `demo` flag). The `.bin/(tsx|vite)` pkill MISSES the
+>   `tsx watch` child; what reliably frees it: `pkill -9 -f "tsx watch server/index.ts"` +
+>   `for p in 4000 5173 5174; do lsof -tiTCP:$p | xargs kill -9; done`, then confirm ports free BEFORE
+>   restart. (h) **To browser-test the bearer token (7c-C):** set BOTH `ATIZAR_AUTH_TOKEN` (server) and
+>   `VITE_ATIZAR_AUTH_TOKEN` (client) in the SAME `yarn dev` invocation — Vite reads `VITE_*` from the
+>   process env, so one command sets both; the in-browser fetch matrix (`fetch('/api/cancel-all',{method:'POST',
+>   headers:{Authorization:'Bearer …'}})` via Playwright `browser_evaluate`) proves the gate without a
+>   client rebuild.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +
 packaging tail). Steps 1–6 + **sub-step 7a (`@platform/server`, commits `6713ba9`…`e7123e5`)** +
