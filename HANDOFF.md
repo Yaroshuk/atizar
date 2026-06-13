@@ -822,16 +822,63 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
     batch gate → `finished` + "applied successfully" narration, **reject** READER → `finished`/`rejected`
     (both `useGate.resolve` paths through the real gate UI, fake effect, no Gmail). NOT browser-driven:
     a real wrong-token client rebuild (covered by the in-browser fetch 401 matrix + the unit suite).
-- **Sub-projects D–F:** NEXT, in order (D golden-set eval + step-6 follow-ups · E `@platform/*` scope
-  rename · F README/LICENSE/root-demo-alias/CI).
+- **Sub-project D — golden-set eval harness + two step-6 follow-ups: ✅ BUILT & browser-verified**
+  (2026-06-13, commits `e6fb0e0`…`<head>`; spec `docs/superpowers/specs/2026-06-13-golden-set-eval-design.md`,
+  plan `docs/superpowers/plans/2026-06-13-golden-set-eval.md`). Built subagent-driven (impl per task +
+  an independent spec-review on the load-bearing runner). `check-foundation` = CLEAR. 414 unit tests
+  (`yarn test`) + 5 golden-eval tests (`yarn eval`) + typecheck/lint/build green.
+  - **As-built — the harness (structural-on-replay, decided with the user):** `apps/inbox/eval/runner.ts`
+    builds a REAL `PipelineService` exactly as `server/index.ts`'s composition root does, but under
+    `DEMO=1` (in-memory PGlite + the `demo` cassette-replay provider reading `apps/inbox/demo-cassettes/`)
+    and with each agent's server effects REPLACED by credential-free fakes that LOG every call (the eval
+    asserts on the log, never touches Gmail/GitHub or the ledger table). `buildEvalService()` loops
+    `workflowServers`; `runGolden(scenario)` dispatches ONE entry agent, polls `getBoard()`, records gate
+    facts AT resolution time (board returns only OPEN gates), auto-approves (or runs the scenario's
+    `gateScript`), and returns `{ items, gates, effects }` once no item is active. Asserts STRUCTURE only
+    (tree topology, gate kind/toolName/form-keys, statuses + `resolution` markers, effect-fired count) —
+    NOT the LLM's prose. **No LLM-judge** (post-beta).
+  - **As-built — scenarios & fixtures:** synthetic share-safe lead-inbox cassettes authored
+    (`demo-cassettes/lead-inbox__{qualifier,reply}.jsonl`, invented `.example` data, `demo:scan-cassettes`
+    clean). `scenarios/lead-inbox.ts` (3: reply-approve → saveDraft gate `[threadId,body]` + effect fires
+    once + finished; qualifier → VerdictCard, no gate, finished; reply-reject → finished/`rejected`, zero
+    effects) + `scenarios/email-inbox.ts` (1: sorter machine-dispatches 4 children — reader/spam/important
+    via `applyActions`+`items`, reply via `saveDraft` — a batch `applyActions` gate opens, approve fires the
+    fake effect, sorter finished; CONTAINS-not-equals gate asserts since the fan-out opens multiple gates).
+    `yarn eval` = a SEPARATE vitest config (`vitest.eval.config.ts`, `env.DEMO=1`, glob `*.eval.ts`) — NOT
+    in `yarn test` (process-global env can't be both PGlite-DEMO and the test-Postgres in one run); **CI runs
+    BOTH `yarn test` and `yarn eval`.**
+  - **As-built — F1 (observable 3-at-once cap):** `apps/inbox/eval/cap.eval.ts` injects a BLOCKING `Provider`
+    (parks `run()` on a controllable promise so slots stay held — a replayed cassette streams instantly and
+    can't show the cap), dispatches 3 for a `maxInstances:2` agent (`origin:'agent'`), asserts `{active:2,
+    queued:1}` mid-flight, releases, then drains to `{active:0,queued:0}` (the queued 3rd auto-started). Closes
+    the step-6 honesty gap (was only fast-replay integration-tested).
+  - **As-built — F2 (cross-workflow "Treat as lead → Lead inbox"): BROWSER-VERIFIED LIVE.** `DEV_RECORD_REPLAY=record`,
+    ran github-triage triage live (read-only board, 12 real tickets rendered with "Treat as lead → Lead inbox"
+    buttons); clicked it → board API showed a `lead-inbox__qualifier` child with `parentId` = the triage item,
+    running; the lead-inbox pipeline UI showed the child "Working"; the triage parent reopened to running
+    (finish-vs-dispatch reopen). Proves `resolveDelivery`/`deliveryKey` + `POST /api/deliver` live (was only
+    integration-tested). Screenshot: `7c-D-F2-cross-workflow-handoff.png` (repo root). The recorded
+    `github-triage__triage.jsonl` + refreshed `lead-inbox__qualifier.jsonl` stay GITIGNORED in `.cassettes/`
+    (real board + Gmail data — NEVER committed). **Observed (NOT a 7c-D bug):** the live triage run logged a
+    trailing `Provider error: claude run timed out` at the tail AFTER rendering the card + summary (a long
+    12-ticket real run hits the claude-cli timeout); the item still finalized Done and the card was fully usable.
+  - **github-triage deterministic golden scenario = SKIPPED (stretch, decided):** triage is covered by the F2
+    browser verify + the existing `pipelineService.deliver` integration test; a synthetic triage cassette adds
+    marginal value over the board-read-surfacing risk. No silent gap — stated here.
+- **Sub-projects E–F:** NEXT, in order (E `@platform/*` scope rename — **needs the final scope name from the
+  user**; F root `yarn demo` alias + CI `demo:scan-cassettes` hook if/when CI lands + optional `App.tsx`
+  `/api/config`-fallback tidy — README + LICENSE are ALREADY DONE per the note below).
 
-> **CONTINUATION NOTE (2026-06-13, after 7c-A + 7c-B + 7c-C) — read me first, next agent.**
+> **CONTINUATION NOTE (2026-06-13, after 7c-A + 7c-B + 7c-C + 7c-D) — read me first, next agent.**
 > The 7c track is being built on **`feat/7c-packaging`** (branched off `feat/gmail-viewer`; NOT
-> merged — keep building on it, same long-lived-branch strategy as prior tracks). **A + B + C are ✅
+> merged — keep building on it, same long-lived-branch strategy as prior tracks). **A + B + C + D are ✅
 > done & browser-verified** (A: dev `.env.local` autoload + quiet `resumeAcquire`; B: zero-cred
-> `DEMO=1`; C: bearer token on mutating routes — see the 7c-C as-built bullet above). Latest state:
-> **417 unit tests + typecheck + lint + build green**; Postgres is UP; no dev server should be running
-> (the session ended with the stack killed + ports free).
+> `DEMO=1`; C: bearer token on mutating routes; D: golden-set eval harness + the two step-6 follow-ups
+> — see the 7c-D as-built bullet above). Latest state:
+> **414 unit tests (`yarn test`) + 5 golden-eval tests (`yarn eval`) + typecheck + lint + build green**
+> (the prior "417" figure was a stale hand-count; 7c-D's diff deletes zero existing `.test.ts` — the
+> 5 eval tests run under the separate `yarn eval` config); Postgres is UP; no dev server should be
+> running (the session ended with the stack killed + ports free).
 >
 > - **⚠️ README + LICENSE are ALREADY DONE — do NOT author them.** By the time you start, the
 >   **README and the LICENSE file are already filled in** (the user is handling them). Treat the
@@ -845,17 +892,16 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   unreachable in a live demo). If the already-written README references a command/flag that differs
 >   from what's built, ALIGN THE CODE to the README (or flag the mismatch to the user).
 >
-> - **Build order = D → E → F (C is done).** Each sub-project = its own brainstorm→spec→plan→build
->   cycle (the user chose subagent-driven execution for B and C — ask which approach for each). Run
+> - **Build order = E → F (C and D are done).** Each sub-project = its own brainstorm→spec→plan→build
+>   cycle (the user chose subagent-driven execution for B/C/D — ask which approach for each). Run
 >   `check-foundation` on anything touching actions/providers/`@platform/core`/the framework-userland
->   boundary. **D is the most research-y of the three; E (scope rename) and F are mechanical.**
+>   boundary. **E (scope rename) and F are both mechanical.** START AT E.
 >
-> - **D — golden-set eval + two step-6 follow-ups (START HERE):** (1) the 3-at-once server cap (covered by a
->   `pipelineService` blocking-provider integration test; drive it live with a slow/blocking eval
->   fixture — under fast replay the gate releases slots so it's not browser-observable); (2) the
->   cross-workflow "Treat as lead → Lead inbox" full browser flow (resolution + schema are
->   integration-tested; needs a github-triage cassette — record one, a live triage run reads the real
->   GitHub board). Plus a golden-set eval per workflow.
+> - **D — golden-set eval + two step-6 follow-ups: ✅ DONE** (see the 7c-D as-built bullet above). The
+>   harness (`apps/inbox/eval/`, `yarn eval`) covers lead-inbox (3) + email-inbox sorter fan-out (1) on
+>   committed synthetic cassettes; F1 (observable cap) is `cap.eval.ts`; F2 (cross-workflow handoff) was
+>   browser-verified live. github-triage deterministic scenario skipped (stretch — covered by F2 + the
+>   deliver integration test).
 >
 > - **E — `@platform/*` scope rename:** ~130 files grep/replace + 5 package.json `name`s. **NEEDS the
 >   final scope name from the user** (ask before starting). Do it LATE/isolated (touches everything).
