@@ -138,13 +138,12 @@ The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come 
 
 **Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
 
-Not done yet: the zero-credential demo mode, the `@atizar/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
+Recently shipped: the zero-credential demo mode (`DEMO=1`), the `@platform/* → @atizar/*` scope rename, a shared bearer token on mutation routes, and per-workflow golden-set evals. Not done yet: an npm release. APIs may still shift. Stars and feedback are very welcome.
 
 ## Roadmap
 
-- **Zero-credential demo** (`DEMO=1`) — in-process Postgres (PGlite) + a mock provider + synthetic fixtures, so anyone can try it with one command and no keys.
+- **npm release** — publish the `@atizar/*` packages so the framework installs as a versioned dependency.
 - **Workflows that learn** *(planned — not built yet).* A direction we're designing toward: the agent improves from how you correct it, without fine-tuning. Two channels — implicit few-shot memory from past corrections, and explicit rules a distiller proposes and **you approve**. The model never changes, only the context it receives.
-- **Packaging** — the `@atizar/*` scope rename, an npm release, a shared bearer token on mutation routes, and per-workflow golden-set evals.
 
 ## Docs & community
 
