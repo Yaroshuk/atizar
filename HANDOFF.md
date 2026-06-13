@@ -877,10 +877,14 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
   rename spec keeps the literal `@platform` (it documents the transition). Zero `@platform` left in tracked
   files. **Green:** typecheck + lint + `yarn test` 414 + `yarn eval` 5 + build. CLAUDE.md's stale
   "placeholder scope" line corrected (now "final scope, renamed at 7c-E; all five packages extracted").
-- **Sub-project F — packaging tail: NEXT (LAST).** Reduced (README + LICENSE already done by the user) to:
-  (1) a ROOT `yarn demo` alias (`"demo": "yarn workspace inbox demo"`) so the README's one-command story
-  works; (2) wire `demo:scan-cassettes` into CI **if/when** a CI config exists (none today — don't fabricate);
-  (3) optional `App.tsx` `/api/config`-failure-fallback tidy. Align code to the README if anything differs.
+- **Sub-project F — packaging tail: ✅ BUILT (substantive items done; one optional deferred)** (2026-06-13).
+  README + LICENSE were already authored by the user. (1) **DONE** — root `yarn demo` alias added
+  (`"demo": "yarn workspace inbox demo"`, commit `260d130`) so the README's one-command story works.
+  (2) **N/A** — `demo:scan-cassettes` into CI: no `.github/workflows` / CI config exists in the repo, so
+  there is nothing to wire (do NOT fabricate a CI config; add the hook if/when CI lands). (3) **OPTIONAL,
+  NOT done** — `App.tsx`'s `/api/config`-failure fallback shows all workflows (non-fail-safe but unreachable
+  in a live demo, since the config fetch is same-origin and always succeeds); left as a tiny future tidy.
+  **This completes the 7c packaging track and the beta build order (steps 1–7).**
 
 > **CONTINUATION NOTE (2026-06-13, after 7c-A + 7c-B + 7c-C + 7c-D + 7c-E) — read me first, next agent.**
 > The 7c track is being built on **`feat/7c-packaging`** (branched off `feat/gmail-viewer`; NOT
