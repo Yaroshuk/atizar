@@ -126,7 +126,7 @@ Integrations on demand (`write-integration`) · Swap the runtime, keep the code 
 act) as "build your first automation," linking to a full walkthrough.
 
 **8. What's included — packages.** `@atizar/*` map: `core · providers · integrations · server ·
-react`, one line each. (Requires the `@atizar/* → @atizar/*` rename first.)
+react`, one line each. (Requires the `@platform/* → @atizar/*` rename first.)
 
 **9. Status — building in the open / beta.** Honest: what works end-to-end today, what's still
 landing (the packaging tail), no public npm release yet. Feedback welcome.
@@ -169,7 +169,7 @@ itself (its own spec); recording the actual GIF/screenshots (a follow-up once DE
 ## Dependencies & sequencing
 
 1. **DEMO=1** must run before the Quick start prose is finalized (separate spec already exists).
-2. **`@atizar/* → @atizar/*` rename** before the packages section / install commands are real.
+2. **`@platform/* → @atizar/*` rename** before the packages section / install commands are real.
 3. **GIF/screenshots** recorded after DEMO=1 (synthetic data, safe to publish — never real
    captured cassette data, per the cassette share-safety rule).
 4. The README text (everything except the Quick start command and the visuals) can be written

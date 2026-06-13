@@ -82,7 +82,7 @@ SOFTWARE.
 <!--
   DRAFT — do not publish/merge to a public default branch until:
   (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
-  (2) the @atizar/* → @atizar/* rename is done,
+  (2) the @platform/* → @atizar/* rename is done,
   (3) the approval-gate demo GIF is recorded.
   Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
 -->
@@ -387,7 +387,7 @@ git commit -m "docs(readme): flagship inbox example + package map"
 
 **Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
 
-Not done yet: the zero-credential demo mode, the `@atizar/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
+Not done yet: the zero-credential demo mode, the `@platform/* → @atizar/*` scope rename, an npm release, and a golden-set eval per workflow. APIs may still shift. Stars and feedback are very welcome.
 
 ## Roadmap
 
@@ -606,6 +606,6 @@ git commit -m "docs: final verification pass on README + repo presentation"
 These are the spec's sequencing dependencies; each is its own piece of work:
 
 1. **DEMO=1** lands (separate spec `2026-06-12-demo-mode-zero-cred-design.md`) → replace the gated quick-start placeholder with the real one-command path.
-2. **`@atizar/* → @atizar/*` rename** → the `@atizar/*` names become real; remove draft-guard line (2).
+2. **`@platform/* → @atizar/*` rename** → the `@atizar/*` names become real; remove draft-guard line (2).
 3. **Record the approval-gate GIF + the two-views screenshot** from the DEMO=1 build (synthetic data only — never real cassette data) → replace the `<!-- TODO -->` media placeholders; remove draft-guard line (3).
 4. When all three are done, remove the draft-guard comment entirely and the README is publish-ready.
