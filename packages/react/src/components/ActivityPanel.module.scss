@@ -1,0 +1,341 @@
+// ActivityPanel — co-located CSS Module (migrated from the global styles.css).
+// The observability drawer body (header children + filters + feed + trace view).
+// The drawer shell itself lives in primitives/Drawer.module.scss. Rules MOVED
+// verbatim (token refs unchanged); descendant/compound selectors nested as scss.
+//
+// Runtime-keyed classes: kind→marker (`.mk-blue` …) and trace type (`.tt-*`) are
+// looked up with a camelize() helper (camelCaseOnly camelizes `-` AND `_`), so the
+// literal class names are kept here. `@keyframes stopspin` is copied in (like
+// StopButton) so the scoped `.cspin` spinner resolves; `@keyframes act-pulse` is
+// exclusive to this panel and moved here.
+
+// header children (caller-supplied to the Drawer head)
+.act-title {
+  font-size: 15px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  svg {
+    width: 17px;
+    height: 17px;
+    color: var(--muted);
+  }
+}
+
+.act-head-spacer {
+  flex: 1;
+}
+
+// connection chip
+.act-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+
+  .cdot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &.live {
+    background: rgba(0, 170, 119, 0.1);
+    color: var(--teal-deep);
+
+    .cdot {
+      animation: act-pulse 1.6s ease-in-out infinite;
+    }
+  }
+
+  &.reconnecting {
+    background: rgba(240, 192, 0, 0.16);
+    color: var(--amber-ink);
+  }
+
+  .cspin {
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(138, 109, 0, 0.3);
+    border-top-color: var(--amber-ink);
+    border-radius: 50%;
+    animation: stopspin 0.7s linear infinite;
+  }
+}
+
+@keyframes act-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes stopspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// filters
+.act-filters {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.act-filter-ico {
+  width: 15px;
+  height: 15px;
+  color: var(--muted-2);
+  flex: 0 0 auto;
+}
+
+.act-select {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: #f4f4f6;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    border-color 0.14s;
+
+  &:hover {
+    background: #eeeef0;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+}
+
+// feed
+.act-feed {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+
+  &.trace-feed {
+    background: #fcfcfd;
+  }
+}
+
+.act-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 40px;
+  text-align: center;
+}
+
+.act-empty-title {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+  margin-top: 6px;
+}
+
+.act-empty-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  max-width: 220px;
+}
+
+// operator activity row
+.act-row {
+  display: flex;
+  gap: 11px;
+  padding: 10px 18px;
+
+  & + .act-row {
+    border-top: 1px solid #f4f4f5;
+  }
+}
+
+.act-marker {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex: 0 0 auto;
+}
+
+.act-row-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.act-row-meta {
+  font-size: 11px;
+  color: var(--muted-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.act-chip-wf {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.act-agent {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.act-dot-sep {
+  color: var(--muted-2);
+}
+
+.act-row-summary {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+// kind → marker colour
+.mk-blue {
+  background: #3b6fe0;
+  box-shadow: 0 0 0 3px rgba(59, 111, 224, 0.16);
+}
+.mk-amber {
+  background: var(--amber-border);
+  box-shadow: 0 0 0 3px rgba(240, 192, 0, 0.18);
+}
+.mk-green {
+  background: var(--teal);
+  box-shadow: 0 0 0 3px rgba(0, 170, 119, 0.16);
+}
+.mk-red {
+  background: #d6453a;
+  box-shadow: 0 0 0 3px rgba(214, 69, 58, 0.16);
+}
+.mk-grey {
+  background: var(--grey-dot);
+  box-shadow: 0 0 0 3px rgba(160, 160, 168, 0.16);
+}
+
+// trace (dev)
+.trace-group {
+  border-bottom: 1px solid var(--border);
+}
+
+.trace-ghead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px 9px 12px;
+  cursor: pointer;
+  border: none;
+  background: #f4f5f6;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text);
+  text-align: left;
+
+  &:hover {
+    background: #eeeff1;
+  }
+
+  .tg-chev {
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+    transition: transform 0.15s;
+    flex: 0 0 auto;
+  }
+
+  &.collapsed .tg-chev {
+    transform: rotate(-90deg);
+  }
+}
+
+.tg-item {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+}
+
+.tg-wf {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-2);
+}
+
+.trace-gcount {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-2);
+  font-weight: 600;
+}
+
+.trace-line {
+  display: grid;
+  grid-template-columns: 36px 64px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 14px 5px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+
+  & + .trace-line {
+    border-top: 1px solid #f3f3f4;
+  }
+}
+
+.trace-seq {
+  color: var(--muted-2);
+}
+
+.trace-type {
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+// trace type colour by event kind
+.tt-tool_call {
+  color: #3b6fe0;
+}
+.tt-tool_result {
+  color: var(--teal-deep);
+}
+.tt-text {
+  color: #7a4fd0;
+}
+.tt-status {
+  color: var(--muted);
+}
+
+.trace-detail {
+  color: var(--text);
+  word-break: break-word;
+  line-height: 1.45;
+}
