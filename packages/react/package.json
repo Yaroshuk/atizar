@@ -3,9 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "files": ["dist"],
+  "sideEffects": ["*.css"],
   "exports": {
-    ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css",
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": {
+      "development": "./src/styles.css",
+      "default": "./dist/react.css"
+    },
     "./tokens.css": "./src/tokens.css"
   },
   "dependencies": {
