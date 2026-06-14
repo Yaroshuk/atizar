@@ -56,11 +56,19 @@ Yarn-classic (1.22) workspace. Quick map (full detail → `docs/BUILD-LOG.md` §
 - `apps/inbox` — depends on the three by name; concrete agents in `apps/inbox/agents/`; `server/`,
   `client/`, `mcp/inbox-tools.mjs`.
 
-**No build step** — each package's `exports` points at `./src/index.ts`; Vite/tsx/vitest
-transpile workspace deps directly; typecheck = `tsc --build`. `@atizar/*` is the **final npm
-scope** (renamed from the `@platform/*` placeholder at sub-step 7c-E). All five packages —
-`core`, `providers`, `integrations`, `server`, `react` — are extracted (`@atizar/server` at 7a,
-`@atizar/react` at 7b); the demo app `apps/inbox/` consumes them by name.
+**Build step (publishable packages)** — `@atizar/react` builds via **Vite library mode** to `dist/`
+(ESM + rolled-up `.d.ts` + a compiled `react.css` carrying the `--atz-*` tokens + layout shells);
+React/peers/siblings are externalized. The monorepo still consumes `./src` in dev **and** typecheck
+via a conditional `development` export condition (`customConditions: ["development"]` in
+`tsconfig.base.json`) — so `yarn dev` HMR and `tsc --build` need no prior build, while a published
+install resolves `dist`. This **reverses** the earlier "no build step" rule, deliberately, for npm
+publication (CSS-Modules source can't be relied on to compile in an arbitrary consumer bundler).
+`@atizar/react` is converted first (it has the CSS); the other packages (`core`, `providers`,
+`integrations`, `server`) still point `exports` at `./src/index.ts` and adopt the same lib-build
+pattern when each is published. `@atizar/*` is the **final npm scope** (renamed from the
+`@platform/*` placeholder at sub-step 7c-E). All five packages — `core`, `providers`,
+`integrations`, `server`, `react` — are extracted (`@atizar/server` at 7a, `@atizar/react` at 7b);
+the demo app `apps/inbox/` consumes them by name.
 
 ## Stack
 

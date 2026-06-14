@@ -201,3 +201,15 @@ diverge** (weight or conflict) or its **release cadence diverges** — not for t
 package (`@atizar/core`) is what enables third-party extension. `@atizar/*` is a placeholder
 scope; the framework is named **atizar**, so the locked rename target is **`@atizar/*`** — flip the
 code (package names + imports) and the docs together in one pass before any npm publish.
+
+**Build step for publishable packages.** A publishable package builds via **Vite library mode** to
+`dist/` (ESM + rolled-up `.d.ts` + a compiled stylesheet that bundles the `--atz-*` token defaults
+and shared layout), with React, peers, and `@atizar/*` siblings externalized. The monorepo still
+consumes `./src` in dev and typecheck through a conditional `development` export condition
+(`customConditions: ["development"]`), so HMR and `tsc --build` need no prior build while a published
+install resolves `dist`. This **reverses** the earlier "no build step" convention — that was a
+monorepo shortcut valid only while the sole consumer was the local Vite app; it is incompatible with
+npm publication of a CSS-Modules-styled library. `@atizar/react` is converted first (it owns the
+CSS); the other packages adopt the same lib-build pattern when each is published. The "no build
+step" rule was a packaging convention, **not** an invariant (§0) — reversing it for publication
+realizes belief #3 (a versioned dependency, not fork-and-patch) without touching any invariant.
