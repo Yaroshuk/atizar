@@ -3,6 +3,15 @@ import type { BaseEvent } from '@ag-ui/client'
 import { foldEventsToMessages, pairToolResults } from '@atizar/core'
 import type { ServerStatus } from '../serverTypes'
 
+// Terminal statuses: the run is over and the server emits no further events. The server CLOSES
+// the per-item SSE once a run reaches one of these (after replaying its backlog). The browser's
+// EventSource auto-reconnects on any server close, so without this guard a finished run's stream
+// gets reopened in a tight loop — a reconnect STORM that exhausts the ~6-connections-per-host
+// budget and starves the other streams (the board, and any newly-opened live thread, whose tail
+// events then never arrive → its render cards silently never appear). awaiting_approval /
+// awaiting_input are NOT terminal — the stream stays open to deliver resume events post-gate.
+const TERMINAL: ReadonlySet<ServerStatus> = new Set(['finished', 'error', 'closed'])
+
 // Attach to a server-side run WITHOUT CopilotKit: snapshot the trace from 0 (so a reload
 // loses nothing), then follow the live SSE tail from nextSeq, ordering/deduping by seq.
 // `foldEventsToMessages` is the reduction CopilotKit's runtime used to do internally.
@@ -27,16 +36,39 @@ export const useWorkItemThread = (id: string | null) => {
     void (async () => {
       const snap = (await (await fetch(`/api/workitems/${id}/trace?from=0`)).json()) as {
         status: ServerStatus
+        done: boolean
         nextSeq: number
         events: { seq: number; event: BaseEvent }[]
       }
       if (cancelled) return
       setBySeq(new Map(snap.events.map((e) => [e.seq, e.event])))
       setStatus(snap.status)
+      // The run is already terminal: the snapshot IS the whole trace, there is nothing to tail.
+      // Opening an SSE here would hit the server's immediate close → auto-reconnect storm.
+      if (snap.done) return
       const es = new EventSource(`/api/workitems/${id}/stream?from=${snap.nextSeq}`)
       esRef.current = es
       es.onmessage = (m) => setEvent(Number(m.lastEventId), JSON.parse(m.data) as BaseEvent)
-      es.addEventListener('status', (m) => setStatus((m as MessageEvent).data as ServerStatus))
+      es.addEventListener('status', (m) => {
+        const next = (m as MessageEvent).data as ServerStatus
+        setStatus(next)
+        if (!TERMINAL.has(next)) return
+        // The run just reached a terminal state; the server closes the stream now. Two things:
+        // (1) close our side so the browser does NOT auto-reconnect to a finished run — that
+        //     reconnect loop is a storm that exhausts the connection pool and starves other
+        //     streams; (2) the live tail can race the server's stream-close (the backlog flush
+        //     and the terminal-close interleave server-side), so reconcile against the
+        //     authoritative complete trace before stopping — otherwise tail events (e.g. the
+        //     final renderVerdict tool call) can be silently missing.
+        esRef.current?.close()
+        esRef.current = null
+        void (async () => {
+          const full = (await (await fetch(`/api/workitems/${id}/trace?from=0`)).json()) as {
+            events: { seq: number; event: BaseEvent }[]
+          }
+          if (!cancelled) setBySeq(new Map(full.events.map((e) => [e.seq, e.event])))
+        })()
+      })
     })()
     return () => {
       cancelled = true
