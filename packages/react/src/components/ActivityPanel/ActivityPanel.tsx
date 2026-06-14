@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Icon } from './Icon/Icon'
-import { Drawer } from '../primitives/Drawer/Drawer'
-import { Segmented } from '../primitives/Segmented/Segmented'
+import { Icon } from '../Icon/Icon'
+import { Drawer } from '../../primitives/Drawer/Drawer'
+import { Segmented } from '../../primitives/Segmented/Segmented'
 import s from './ActivityPanel.module.scss'
-import type { ActivityEntry } from '../serverTypes'
-import type { ActivityFeed } from '../hooks/useActivity'
+import type { ActivityEntry } from '../../serverTypes'
+import type { ActivityFeed } from '../../hooks/useActivity'
 
 // CSS Modules (`localsConvention: 'camelCaseOnly'`) camelize BOTH `-` and `_`, so
 // runtime-keyed class names (kind → `mk-<colour>` marker, kind → `tt-<kind>` trace

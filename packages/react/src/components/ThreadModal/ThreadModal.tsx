@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import type { Destination } from '@atizar/core'
-import { useWorkItemThread } from '../hooks/useWorkItemThread'
-import { useGate } from '../hooks/useGate'
-import { buildRenderToolCall } from '../buildRenderToolCall'
-import { useWorkflowsConfig } from '../workflowsContext'
-import { mapStatus } from '../status'
-import { AgentModal, type HandoffNote } from './AgentModal/AgentModal'
-import type { IconName } from './Icon/Icon'
+import { useWorkItemThread } from '../../hooks/useWorkItemThread'
+import { useGate } from '../../hooks/useGate'
+import { buildRenderToolCall } from '../../buildRenderToolCall'
+import { useWorkflowsConfig } from '../../workflowsContext'
+import { mapStatus } from '../../status'
+import { AgentModal, type HandoffNote } from '../AgentModal/AgentModal'
+import type { IconName } from '../Icon/Icon'
 
 // One open work item: owns the per-id thread + gate hooks and renders AgentModal. The thread
 // is folded from the server trace (live SSE tail); the approval card is rendered from the
