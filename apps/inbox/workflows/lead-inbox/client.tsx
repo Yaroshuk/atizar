@@ -5,6 +5,15 @@ import { VerdictCard } from '../../client/src/components/VerdictCard/VerdictCard
 import { ApprovalDialog } from '../../client/src/components/ApprovalDialog/ApprovalDialog'
 import { qualifierAgent, replyAgent } from './descriptor'
 
+// Typed tool-name constants for this workflow (typo-safety + autocomplete). Values MUST match
+// the toolName strings the render/HITL specs register below and the prompts' tool names. Additive
+// ergonomics — resolution is scoped by workflow (registryScope), not by this const.
+export const LEAD_INBOX_TOOLS = {
+  renderLead: 'renderLead',
+  renderVerdict: 'renderVerdict',
+  saveDraft: 'saveDraft',
+} as const
+
 export const leadInboxMeta: Record<string, AgentMeta> = {
   [qualifierAgent.id]: {
     subtitle: 'Reads inbox, qualifies the lead',
@@ -20,7 +29,7 @@ export const leadInboxMeta: Record<string, AgentMeta> = {
 
 export const leadInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
-    toolName: 'renderLead',
+    toolName: LEAD_INBOX_TOOLS.renderLead,
     parameters: z.object({ from: z.string(), subject: z.string(), summary: z.string() }),
     render: ({ parameters }) => {
       const { from, subject, summary } = parameters
@@ -29,7 +38,7 @@ export const leadInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
     },
   },
   {
-    toolName: 'renderVerdict',
+    toolName: LEAD_INBOX_TOOLS.renderVerdict,
     parameters: z.object({
       origin: z.string(),
       threadId: z.string(),
@@ -72,7 +81,7 @@ export const leadInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
 
 export const leadInboxHitl: Omit<HitlSpec, 'workflowId'>[] = [
   {
-    toolName: 'saveDraft',
+    toolName: LEAD_INBOX_TOOLS.saveDraft,
     parameters: z.object({ threadId: z.string(), body: z.string() }),
     render: ({ form, source, approve, reject }) => {
       const threadId = typeof form.threadId === 'string' ? form.threadId : ''
