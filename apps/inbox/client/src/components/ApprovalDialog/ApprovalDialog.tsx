@@ -1,0 +1,41 @@
+import { useState } from 'react'
+import { CardShell, Button } from '@atizar/react'
+import s from './ApprovalDialog.module.scss'
+
+type ApprovalData = { threadId: string; body: string }
+
+type ApprovalDialogProps = {
+  data: ApprovalData
+  // The edited body flows to onApprove — this is the load-bearing "the edited text is what
+  // lands in the real Gmail draft" path (the server executes the effect with this form).
+  onApprove: (editedBody: string) => void
+  onReject: () => void
+}
+
+export const ApprovalDialog = ({ data, onApprove, onReject }: ApprovalDialogProps) => {
+  const [body, setBody] = useState(data.body ?? '')
+  return (
+    <CardShell
+      tone='attention'
+      icon='pen'
+      kicker='Approval needed'
+      actions={
+        <>
+          <Button variant='teal' onClick={() => onApprove(body)}>
+            Save draft
+          </Button>
+          <Button variant='ghost' onClick={onReject}>
+            Reject
+          </Button>
+        </>
+      }
+    >
+      <textarea
+        className={s.edit}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={8}
+      />
+    </CardShell>
+  )
+}

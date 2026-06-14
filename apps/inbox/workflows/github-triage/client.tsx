@@ -4,7 +4,7 @@ import { useThreadResult } from '@atizar/react'
 import type { TriageTicket } from '../../client/src/buckets'
 import { TriageCard } from '../../client/src/components/TriageCard'
 import { TicketResultCard } from '../../client/src/components/TicketResultCard'
-import { ReplyDraftCard } from '../../client/src/components/ReplyDraftCard'
+import { ReplyDraftCard } from '../../client/src/components/ReplyDraftCard/ReplyDraftCard'
 import type { TicketHandoffPayload } from '@atizar/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
 

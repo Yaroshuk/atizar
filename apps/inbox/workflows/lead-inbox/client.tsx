@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { RenderSpec, HitlSpec, AgentMeta } from '@atizar/react'
 import { LeadCard } from '../../client/src/components/LeadCard'
 import { VerdictCard } from '../../client/src/components/VerdictCard'
-import { ApprovalDialog } from '../../client/src/components/ApprovalDialog'
+import { ApprovalDialog } from '../../client/src/components/ApprovalDialog/ApprovalDialog'
 import { qualifierAgent, replyAgent } from './descriptor'
 
 export const leadInboxMeta: Record<string, AgentMeta> = {

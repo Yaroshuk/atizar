@@ -1,0 +1,24 @@
+// ApprovalDialog — the editable draft body. The frame (amber tone, header, actions)
+// is the shared CardShell; only the textarea is card-unique. Rule lifted from the old
+// global `.approval-edit` (styles.css); literal colors resolved to `--atz-*` tokens.
+
+.edit {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 120px;
+  background: var(--atz-color-surface);
+  border: 1px solid var(--atz-amber-border);
+  border-radius: var(--atz-radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--atz-color-text);
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+
+  &:focus {
+    outline: none;
+    border-color: var(--atz-amber-ink);
+    box-shadow: 0 0 0 2px var(--atz-amber-bg);
+  }
+}
