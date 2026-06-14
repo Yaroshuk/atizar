@@ -5,6 +5,8 @@ import { LEAD_INBOX_TOOLS } from './lead-inbox/tools'
 import { LEAD_INBOX_CARDS } from './lead-inbox/cards'
 import { EMAIL_INBOX_TOOLS } from './email-inbox/tools'
 import { EMAIL_INBOX_CARDS } from './email-inbox/cards'
+import { GITHUB_TRIAGE_TOOLS } from './github-triage/tools'
+import { GITHUB_TRIAGE_CARDS } from './github-triage/cards'
 import {
   sorterAgent,
   replyAgent as emailReply,
@@ -12,12 +14,7 @@ import {
   spamAgent,
   importantAgent,
 } from './email-inbox/descriptor'
-import {
-  triageAgent,
-  featureAgent,
-  bugfixAgent,
-  replyDraftAgent,
-} from './github-triage/descriptor'
+import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './github-triage/descriptor'
 
 const ALL = [
   qualifierAgent,
@@ -93,7 +90,34 @@ describe('email-inbox tool/card consts', () => {
     expect(EMAIL_INBOX_CARDS.EmailBatchCard).toBe('EmailBatchCard')
   })
   it('descriptor references the consts', () => {
-    expect(sorterAgent.renders[EMAIL_INBOX_TOOLS.renderSort]).toBe(EMAIL_INBOX_CARDS.SortSummaryCard)
-    expect(readerAgent.renders[EMAIL_INBOX_TOOLS.applyActions]).toBe(EMAIL_INBOX_CARDS.EmailBatchCard)
+    expect(sorterAgent.renders[EMAIL_INBOX_TOOLS.renderSort]).toBe(
+      EMAIL_INBOX_CARDS.SortSummaryCard
+    )
+    expect(readerAgent.renders[EMAIL_INBOX_TOOLS.applyActions]).toBe(
+      EMAIL_INBOX_CARDS.EmailBatchCard
+    )
+  })
+})
+
+describe('github-triage tool/card consts', () => {
+  it('tool consts equal the wire tool names', () => {
+    expect(GITHUB_TRIAGE_TOOLS.list_my_tickets).toBe('list_my_tickets')
+    expect(GITHUB_TRIAGE_TOOLS.get_ticket).toBe('get_ticket')
+    expect(GITHUB_TRIAGE_TOOLS.render_triage).toBe('render_triage')
+    expect(GITHUB_TRIAGE_TOOLS.render_ticket_result).toBe('render_ticket_result')
+    expect(GITHUB_TRIAGE_TOOLS.render_reply_draft).toBe('render_reply_draft')
+  })
+  it('card consts equal the wire card names', () => {
+    expect(GITHUB_TRIAGE_CARDS.TriageCard).toBe('TriageCard')
+    expect(GITHUB_TRIAGE_CARDS.TicketResultCard).toBe('TicketResultCard')
+    expect(GITHUB_TRIAGE_CARDS.ReplyDraftCard).toBe('ReplyDraftCard')
+  })
+  it('descriptor references the consts', () => {
+    expect(triageAgent.renders[GITHUB_TRIAGE_TOOLS.render_triage]).toBe(
+      GITHUB_TRIAGE_CARDS.TriageCard
+    )
+    expect(featureAgent.renders[GITHUB_TRIAGE_TOOLS.render_ticket_result]).toBe(
+      GITHUB_TRIAGE_CARDS.TicketResultCard
+    )
   })
 })

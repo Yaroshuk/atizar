@@ -1,44 +1,47 @@
 import { defineAgent, defineWorkflow } from '@atizar/core'
+import { PROVIDERS } from '@atizar/providers'
+import { GITHUB_TRIAGE_TOOLS as t } from './tools'
+import { GITHUB_TRIAGE_CARDS as c } from './cards'
 
 export const triageAgent = defineAgent({
   id: 'triage',
   name: 'TRIAGE',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions:
     "Read the user's open tickets on the project board and recommend how to route each.",
-  tools: ['list_my_tickets', 'get_ticket', 'render_triage'],
+  tools: [t.list_my_tickets, t.get_ticket, t.render_triage],
   approvals: [],
-  readonly: ['list_my_tickets', 'get_ticket'],
-  renders: { render_triage: 'TriageCard' },
+  readonly: [t.list_my_tickets, t.get_ticket],
+  renders: { [t.render_triage]: c.TriageCard },
   handoffs: ['feature', 'bugfix', 'reply-draft'],
   maxInstances: 1,
 })
 export const featureAgent = defineAgent({
   id: 'feature',
   name: 'FEATURE AGENT',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions: 'Analyze a feature-request ticket routed to you and produce a short plan.',
-  tools: ['render_ticket_result'],
+  tools: [t.render_ticket_result],
   approvals: [],
-  renders: { render_ticket_result: 'TicketResultCard' },
+  renders: { [t.render_ticket_result]: c.TicketResultCard },
 })
 export const bugfixAgent = defineAgent({
   id: 'bugfix',
   name: 'BUG-FIX AGENT',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions: 'Investigate a bug ticket routed to you and produce a short analysis.',
-  tools: ['render_ticket_result'],
+  tools: [t.render_ticket_result],
   approvals: [],
-  renders: { render_ticket_result: 'TicketResultCard' },
+  renders: { [t.render_ticket_result]: c.TicketResultCard },
 })
 export const replyDraftAgent = defineAgent({
   id: 'reply-draft',
   name: 'REPLY DRAFT',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions: 'Draft a suggested reply to the last comment on a routed ticket. Never post.',
-  tools: ['render_reply_draft'],
+  tools: [t.render_reply_draft],
   approvals: [],
-  renders: { render_reply_draft: 'ReplyDraftCard' },
+  renders: { [t.render_reply_draft]: c.ReplyDraftCard },
 })
 
 export const githubTriage = defineWorkflow({

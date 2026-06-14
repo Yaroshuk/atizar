@@ -7,6 +7,7 @@ import { TicketResultCard } from '../../client/src/components/TicketResultCard/T
 import { ReplyDraftCard } from '../../client/src/components/ReplyDraftCard/ReplyDraftCard'
 import type { TicketHandoffPayload } from '@atizar/core'
 import { triageAgent, featureAgent, bugfixAgent, replyDraftAgent } from './descriptor'
+import { GITHUB_TRIAGE_TOOLS as t } from './tools'
 
 export const githubTriageMeta: Record<string, AgentMeta> = {
   [triageAgent.id]: {
@@ -96,7 +97,7 @@ const TriageCardConnected = ({
 
 export const githubTriageRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
-    toolName: 'render_triage',
+    toolName: t.render_triage,
     parameters: z.object({ origin: z.string(), recommendations: z.array(recommendationSchema) }),
     render: ({ parameters }, deliver) => {
       const { origin, recommendations } = parameters
@@ -107,7 +108,7 @@ export const githubTriageRenders: Omit<RenderSpec, 'workflowId'>[] = [
     },
   },
   {
-    toolName: 'render_ticket_result',
+    toolName: t.render_ticket_result,
     parameters: z.object({ title: z.string(), kind: z.string(), analysis: z.string() }),
     render: ({ parameters }) => {
       const { title, kind, analysis } = parameters
@@ -116,7 +117,7 @@ export const githubTriageRenders: Omit<RenderSpec, 'workflowId'>[] = [
     },
   },
   {
-    toolName: 'render_reply_draft',
+    toolName: t.render_reply_draft,
     parameters: z.object({ title: z.string(), draft: z.string() }),
     render: ({ parameters }) => {
       const { title, draft } = parameters
