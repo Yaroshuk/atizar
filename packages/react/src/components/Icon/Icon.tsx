@@ -41,6 +41,7 @@ export type IconName =
   | 'gear'
   | 'activity'
   | 'filter'
+  | 'link'
 
 type IconProps = {
   name: IconName
@@ -223,6 +224,13 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   activity: <path d='M22 12h-4l-3 9L9 3l-3 9H2' />,
   filter: <path d='M3 5h18l-7 8v6l-4 2v-8L3 5Z' />,
+  link: (
+    <>
+      <path d='M9 15l6-6' />
+      <path d='M11 6l1-1a4 4 0 0 1 6 6l-2 2' />
+      <path d='M13 18l-1 1a4 4 0 0 1-6-6l2-2' />
+    </>
+  ),
 }
 
 export const Icon = ({ name, size = 16, className, style }: IconProps) => (
