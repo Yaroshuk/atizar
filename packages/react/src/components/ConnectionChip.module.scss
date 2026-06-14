@@ -1,0 +1,35 @@
+// ConnectionChip — co-located CSS Module (migrated from the global styles.css).
+// EXCLUSIVE rules (`.conn-chip`, its `.conn-dot`, the `.conn-ok` connected variant,
+// `.conn-name`) — only this component used them, so they moved here verbatim and
+// were deleted from styles.css. The `.btn*` family stays GLOBAL (owned by the
+// Button primitive); the Connect <a> keeps the global `btn btn-soft btn-sm`
+// literals. Token refs `var(--…)` unchanged.
+
+.conn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 5px 4px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+
+  .conn-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--grey-dot);
+    flex: 0 0 auto;
+  }
+
+  &.conn-ok .conn-dot {
+    background: var(--teal);
+  }
+
+  .conn-name {
+    font-weight: 600;
+  }
+}

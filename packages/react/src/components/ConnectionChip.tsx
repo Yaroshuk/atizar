@@ -1,5 +1,7 @@
+import clsx from 'clsx'
 import { Button } from '../primitives/Button.js'
 import type { ConnectionStatus } from '../hooks/useConnections.js'
+import s from './ConnectionChip.module.scss'
 
 type ConnectionChipProps = {
   connection: ConnectionStatus
@@ -16,9 +18,9 @@ export const ConnectionChip = ({ connection: c, onDisconnect }: ConnectionChipPr
     c.integration
   )}&connection=${encodeURIComponent(c.connection)}`
   return (
-    <span className={'conn-chip' + (c.connected ? ' conn-ok' : '')}>
-      <span className='conn-dot' />
-      <span className='conn-name'>
+    <span className={clsx(s.connChip, c.connected && s.connOk)}>
+      <span className={s.connDot} />
+      <span className={s.connName}>
         {c.integration}
         {c.connected && c.detail ? ` · ${c.detail}` : ''}
       </span>
