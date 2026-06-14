@@ -2,6 +2,7 @@ import { WorkflowTabs } from './WorkflowTabs'
 import { Connections } from './Connections'
 import { StopButton } from '../primitives/StopButton'
 import { IconButton } from '../primitives/IconButton'
+import s from './AppHeader.module.scss'
 import type { WorkflowDescriptor } from '@atizar/core'
 
 // The thin global header (Chrome tab strip + global controls). Left: a static brand
@@ -38,19 +39,20 @@ export const AppHeader = ({
   workspaceName = 'Acme Inbox',
   demo,
 }: AppHeaderProps) => (
-  <header className='app-header'>
-    <div className='ah-brand'>
+  <header className={s.appHeader}>
+    <div className={s.ahBrand}>
+      {/* `.ws-mark` stays a GLOBAL class (shared mark across surfaces) */}
       <span className='ws-mark'>{workspaceName.charAt(0)}</span>
-      <span className='ah-brand-name'>{workspaceName}</span>
+      <span className={s.ahBrandName}>{workspaceName}</span>
     </div>
 
     <WorkflowTabs workflows={workflows} activeId={activeId} unread={unread} onSelect={onSelect} />
 
-    <span className='ah-spacer' />
+    <span className={s.ahSpacer} />
 
-    <div className='ah-right'>
+    <div className={s.ahRight}>
       {!demo && <Connections />}
-      {!demo && <span className='ah-vline' />}
+      {!demo && <span className={s.ahVline} />}
       <StopButton
         scope='all'
         label='Stop all'

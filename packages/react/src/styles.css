@@ -86,83 +86,12 @@ button {
 /* ============================================================
    Global header — Chrome-style workflow tab strip
    ============================================================ */
-.app-header {
-  flex: 0 0 auto;
-  height: 50px;
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  padding: 0 14px 0 12px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border-strong);
-  position: relative;
-  z-index: 30;
-}
-.ah-left {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding-right: 4px;
-}
-.ah-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.ah-logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  transition: background 0.14s;
-}
-.ah-logo:hover {
-  background: rgba(255, 255, 255, 0.7);
-}
-.ah-logo .ws-mark {
-  width: 28px;
-  height: 28px;
-}
-.ah-menu {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  border: none;
-  background: transparent;
-  color: #6a6a72;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition:
-    background 0.14s,
-    color 0.14s;
-}
-.ah-menu:hover {
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--text);
-}
-.ah-menu svg {
-  width: 19px;
-  height: 19px;
-}
-.ah-spacer {
-  flex: 1;
-}
-
-/* `.wf-tabs` / `.wf-tab` (+ `.active` variant, `.wf-name`, `.wf-badge`) moved into
-   components/WorkflowTabs.module.scss (Task 8). */
-
-.ah-vline {
-  width: 1px;
-  height: 22px;
-  background: var(--border-strong);
-  flex: 0 0 auto;
-}
+/* `.app-header` / `.ah-right` / `.ah-spacer` / `.ah-vline` / `.ah-brand` (+
+   `.ah-brand .ws-mark` override) / `.ah-brand-name` moved into
+   components/AppHeader.module.scss (Task 8). The dead `.ah-left` / `.ah-logo` /
+   `.ah-menu` (old header chrome, no longer rendered) were dropped.
+   `.wf-tabs` / `.wf-tab` (+ `.active`, `.wf-name`, `.wf-badge`) moved into
+   components/WorkflowTabs.module.scss. `.ws-mark` stays GLOBAL (shared mark). */
 
 /* ============================================================
    Stop controls — one visual language across all three scopes
@@ -3126,24 +3055,8 @@ button {
    legend markers, right-aligned per-item Stop)
    ============================================================ */
 
-/* static brand (logo + name) — NOT a button, no hover/cursor */
-.ah-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 8px 0 4px;
-}
-.ah-brand .ws-mark {
-  width: 30px;
-  height: 30px;
-  font-size: 14px;
-}
-.ah-brand-name {
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
+/* `.ah-brand` / `.ah-brand .ws-mark` / `.ah-brand-name` moved into
+   components/AppHeader.module.scss (Task 8). */
 
 /* connection chip in the header — ONE cohesive pill: status dot + name + a real button.
    `.conn-list` moved into components/Connections.module.scss; `.conn-chip`

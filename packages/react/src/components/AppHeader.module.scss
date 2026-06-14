@@ -1,0 +1,56 @@
+// AppHeader — co-located CSS Module (migrated from the global styles.css).
+// The thin global header bar. Rules MOVED verbatim (token refs unchanged).
+// `.ws-mark` stays GLOBAL (shared by rail-logo / panel-head); reached via
+// `:global(.ws-mark)` for the brand-size override.
+
+.app-header {
+  flex: 0 0 auto;
+  height: 50px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0 14px 0 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-strong);
+  position: relative;
+  z-index: 30;
+}
+
+.ah-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ah-spacer {
+  flex: 1;
+}
+
+.ah-vline {
+  width: 1px;
+  height: 22px;
+  background: var(--border-strong);
+  flex: 0 0 auto;
+}
+
+// static brand (logo + name) — NOT a button, no hover/cursor
+.ah-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px 0 4px;
+
+  // brand-size override of the shared global `.ws-mark` mark
+  :global(.ws-mark) {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+}
+
+.ah-brand-name {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
