@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BoardApp } from './BoardApp'
+import { BoardApp } from './BoardApp/BoardApp'
 import { workflowsConfig } from './workflows'
 
 type Config = { demo: boolean; workflows: string[] }

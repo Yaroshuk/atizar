@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { instanceId } from '@atizar/core'
 import {
-  WorkflowsProvider,
   AppHeader,
   PipelineColumn,
   AgentGrid,
@@ -25,11 +24,16 @@ import {
   type WorkflowsConfig,
 } from '@atizar/react'
 
+type BoardInnerProps = {
+  config: WorkflowsConfig
+  demo?: boolean
+}
+
 // BoardApp is the reference composition: the former WorkflowBoard monolith, now assembled
 // in userland from @atizar/react blocks + orchestration hooks. Behavior- and DOM-identical
 // to the old board — the only change is that orchestration comes from the three hooks
 // (useWorkflowSelection / useBoardNavigation / useStopController) and the JSX lives here.
-const Inner = ({ config, demo }: { config: WorkflowsConfig; demo?: boolean }) => {
+export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const board = useBoard()
   const health = useHealth()
   const { deliver, cancel } = useDispatch()
@@ -199,9 +203,3 @@ const Inner = ({ config, demo }: { config: WorkflowsConfig; demo?: boolean }) =>
     </div>
   )
 }
-
-export const BoardApp = ({ config, demo }: { config: WorkflowsConfig; demo?: boolean }) => (
-  <WorkflowsProvider config={config}>
-    <Inner config={config} demo={demo} />
-  </WorkflowsProvider>
-)
