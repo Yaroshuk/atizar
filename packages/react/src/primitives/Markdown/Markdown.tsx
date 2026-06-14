@@ -17,19 +17,7 @@ import s from './Markdown.module.scss'
 
 // The safe inline + block element subset. Headings/tables/images/blockquotes are
 // intentionally omitted — a thread bubble and a card body want prose, not document chrome.
-const ALLOWED = [
-  'p',
-  'strong',
-  'em',
-  'del',
-  'ul',
-  'ol',
-  'li',
-  'code',
-  'pre',
-  'a',
-  'br',
-]
+const ALLOWED = ['p', 'strong', 'em', 'del', 'ul', 'ol', 'li', 'code', 'pre', 'a', 'br']
 
 type MarkdownProps = {
   // The markdown source string (e.g. an assistant message or a card reason field).
@@ -46,6 +34,8 @@ export const Markdown = ({ children, className }: MarkdownProps) => (
       allowedElements={ALLOWED}
       unwrapDisallowed
       components={{
+        // Strip the non-DOM `node` prop (react-markdown ExtraProps) before forwarding.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         a: ({ node: _node, ...props }) => (
           <a {...props} target='_blank' rel='noopener noreferrer' />
         ),
