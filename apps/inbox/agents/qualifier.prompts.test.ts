@@ -18,6 +18,11 @@ describe('qualifier prompt strategy', () => {
     expect(p).toContain('origin: "lead-inbox"')
   })
 
+  it('tells the model not to restate the card fields in its text', () => {
+    const p = prompts.buildFirst(input([]))
+    expect(p).toContain('do not restate')
+  })
+
   it('has no resume strategy (no approvals)', () => {
     expect(prompts.buildResume).toBeUndefined()
   })

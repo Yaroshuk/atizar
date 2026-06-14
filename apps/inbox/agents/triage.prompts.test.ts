@@ -23,4 +23,10 @@ describe('triage prompts', () => {
     expect(first).toMatch(/\{\s*number,\s*route\s*\}/)
     expect(first).toMatch(/do not echo the ticket text/i)
   })
+
+  it('tells the model not to restate the tickets in its text', () => {
+    const p = createTriagePrompts('TRIAGE.', 'github-triage')
+    const first = p.buildFirst({ messages: [] } as never)
+    expect(first).toContain('do not restate')
+  })
 })

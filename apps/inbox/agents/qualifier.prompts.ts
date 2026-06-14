@@ -14,8 +14,10 @@ function fromInbox(instructions: string, origin: string): string {
     '- summary: one sentence on what the email asks for',
     '- reason: one sentence on why you classified it this way.',
     'threadId, from and subject come from get_latest_email. Do NOT draft a reply and',
-    'do NOT save anything. Do not narrate your tool usage or mention tools/schemas —',
-    'keep any text brief and user-facing.',
+    'do NOT save anything. Do not narrate your tool usage or mention tools/schemas.',
+    'The card already shows category, priority and reason — do not restate them in',
+    'your text. Reply with at most ONE short plain sentence; do not use markdown',
+    'headings, bold labels, or lists to repeat the structured fields.',
   ].join('\n')
 }
 
@@ -43,7 +45,9 @@ function fromHandedLead(
     '- priority: one of "hot", "warm", "cold"',
     '- summary: one sentence on what the lead asks for',
     '- reason: one sentence on why you classified it this way.',
-    'Keep any text brief and user-facing; do not narrate tools.',
+    'The card already shows category, priority and reason — do not restate them in',
+    'your text. Reply with at most ONE short plain sentence; do not narrate tools or',
+    'use markdown headings/bold labels/lists to repeat the structured fields.',
   ].join('\n')
 }
 

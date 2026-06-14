@@ -15,9 +15,10 @@ function triageFirst(instructions: string, origin: string): string {
     '{ number, route } (route is the recommendation above) — ONE entry per ticket.',
     'Do NOT echo the ticket text — the card already has it from list_my_tickets; just',
     'send the number + route. Do not drop or invent tickets.',
-    'After render_triage, STOP: reply with at most ONE short sentence. Do NOT list or',
-    'summarize the tickets again (the card already shows them) and do not narrate tools —',
-    'repeating them wastes time and can stall the run.',
+    'After render_triage, STOP: reply with at most ONE short plain sentence. The card',
+    'already shows the tickets and routes — do not restate them, and do not use markdown',
+    'headings, bold labels or lists to repeat them. Do not narrate tools; repeating the',
+    'tickets wastes time and can stall the run.',
   ].join('\n')
 }
 

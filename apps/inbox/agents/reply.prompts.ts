@@ -33,8 +33,10 @@ function handoffFirst(instructions: string, h: HandoffPayload): string {
     'short reply tailored to the qualification. Then call saveDraft with { threadId,',
     `body } — threadId is "${h.threadId}", body is your drafted reply — to ask the`,
     'human before saving.',
-    'Do NOT create the draft yet and do NOT send anything. Do not narrate your',
-    'tool usage or mention tools/schemas — keep any text brief and user-facing.',
+    'Do NOT create the draft yet and do NOT send anything. Do not narrate your tool',
+    'usage or mention tools/schemas. The cards already show the lead and the draft — do',
+    'not restate them in your text. Reply with at most ONE short plain sentence; do not',
+    'use markdown headings, bold labels or lists to repeat the structured fields.',
   ].join('\n')
 }
 

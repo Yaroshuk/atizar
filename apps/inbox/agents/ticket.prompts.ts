@@ -35,7 +35,8 @@ function resultFirst(instructions: string, t: TicketHandoffPayload, kind: string
     'Do NOT fetch anything — use only the context above (you have no GitHub access).',
     `Produce a concise ${kind} analysis/plan, then call render_ticket_result with`,
     `{ title, kind: "${kind}", analysis } where title is the ticket title and analysis`,
-    'is your write-up. Do not narrate tool usage — keep text brief and user-facing.',
+    'is your write-up. The card already shows the analysis — do not restate it in your',
+    'text. Reply with at most ONE short plain sentence; do not narrate tool usage.',
   ].join('\n')
 }
 
@@ -52,7 +53,8 @@ function replyFirst(instructions: string, t: TicketHandoffPayload): string {
     'Do NOT fetch anything and do NOT post anything (you have no GitHub access — this is',
     'a DRAFT only). Draft a short, helpful reply comment answering the last comment, then',
     'call render_reply_draft with { title, draft } where title is the ticket title and',
-    'draft is your suggested reply. Do not narrate tool usage — keep text brief.',
+    'draft is your suggested reply. The card already shows the draft — do not restate it',
+    'in your text. Reply with at most ONE short plain sentence; do not narrate tools.',
   ].join('\n')
 }
 
