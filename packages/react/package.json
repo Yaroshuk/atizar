@@ -28,6 +28,8 @@
     "@ag-ui/client": "^0.0.55",
     "@atizar/core": "*",
     "clsx": "^2.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
