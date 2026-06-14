@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
+import clsx from 'clsx'
 import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@atizar/core'
 import { STATUS_LABEL, type Status } from '../status'
 import { isDevMode } from '../devMode'
 import { ThreadResultsContext } from '../threadResults'
 import { Icon, type IconName } from './Icon'
+import s from './AgentModal.module.scss'
 // HandoffNote's single canonical definition lives in useBoardNavigation (so a hook consumer
 // can type notes without importing a React component); re-export it here for back-compat.
 import type { HandoffNote } from '../hooks/useBoardNavigation'
@@ -109,11 +111,11 @@ export const AgentModal = ({
     // Assistant text content -> chat bubble.
     if (typeof msg.content === 'string' && msg.content.length > 0) {
       nodes.push(
-        <div className='thread-item bubble-row' key={`text-${i}`}>
-          <span className='agent-glyph'>
+        <div className={clsx(s.threadItem, s.bubbleRow)} key={`text-${i}`}>
+          <span className={s.agentGlyph}>
             <Icon name='sparkle' size={15} />
           </span>
-          <div className='bubble'>{msg.content}</div>
+          <div className={s.bubble}>{msg.content}</div>
         </div>
       )
     }
@@ -125,7 +127,7 @@ export const AgentModal = ({
         const name = toolCall.function?.name ?? ''
         if (!isDevMode && !renderableToolNames.has(name)) continue
         nodes.push(
-          <div className='thread-item' key={`tc-${toolCall.id}`}>
+          <div className={s.threadItem} key={`tc-${toolCall.id}`}>
             {renderToolCall({
               toolCall,
               toolMessage: toolMessageByCallId.get(toolCall.id),
@@ -158,28 +160,28 @@ export const AgentModal = ({
         </div>
 
         <ThreadResultsContext.Provider value={resultsByToolName}>
-          <div className='thread'>
+          <div className={s.thread}>
             {received.map((note, i) => (
-              <div className='thread-note received' key={`rcv-${i}`}>
+              <div className={clsx(s.threadNote, s.received)} key={`rcv-${i}`}>
                 ← Received <strong>{note.label}</strong> from {note.otherName}
               </div>
             ))}
             {/* Always show the intro — for a running instance it heads the thread; for a
                 type view (idle, no instance) it's the agent's description so the card opens
                 to something meaningful rather than a blank panel. */}
-            <div className='thread-item bubble-row'>
-              <span className='agent-glyph'>
+            <div className={clsx(s.threadItem, s.bubbleRow)}>
+              <span className={s.agentGlyph}>
                 <Icon name='sparkle' size={15} />
               </span>
-              <div className='bubble intro'>{intro}</div>
+              <div className={clsx(s.bubble, s.intro)}>{intro}</div>
             </div>
             {thread}
             {sent.map((note, i) => (
-              <div className='thread-note sent' key={`snt-${i}`}>
+              <div className={clsx(s.threadNote, s.sent)} key={`snt-${i}`}>
                 → Handed <strong>{note.label}</strong> to {note.otherName}
                 {note.targetWorkflow ? (
                   <button
-                    className='note-link'
+                    className={s.noteLink}
                     onClick={() => onOpenWorkflow?.(note.targetWorkflow!)}
                   >
                     Open in {note.targetWorkflow}
@@ -187,7 +189,7 @@ export const AgentModal = ({
                 ) : (
                   note.targetLocalId && (
                     <button
-                      className='note-link'
+                      className={s.noteLink}
                       onClick={() => onOpenInstance?.(note.targetLocalId!)}
                     >
                       Open {note.otherName}
@@ -196,13 +198,13 @@ export const AgentModal = ({
                 )}
               </div>
             ))}
-            {gateSlot && <div className='thread-item'>{gateSlot}</div>}
+            {gateSlot && <div className={s.threadItem}>{gateSlot}</div>}
             {loading && (
-              <div className='thread-item bubble-row'>
-                <span className='agent-glyph'>
+              <div className={clsx(s.threadItem, s.bubbleRow)}>
+                <span className={s.agentGlyph}>
                   <Icon name='sparkle' size={15} />
                 </span>
-                <div className='typing'>
+                <div className={s.typing}>
                   <span />
                   <span />
                   <span />

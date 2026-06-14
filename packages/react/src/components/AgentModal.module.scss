@@ -1,0 +1,166 @@
+// AgentModal — co-located CSS Module (migrated from the global styles.css).
+// Rules MOVED verbatim (token refs `var(--…)` unchanged); compound selectors
+// nested for readability — same compiled output.
+//
+// SCOPED here: the thread body + its content families, all EXCLUSIVE to AgentModal
+// (`thread`, `thread-item`, `bubble-row`, `agent-glyph`, `bubble` + `.intro`/`.sent`,
+// `typing`, `thread-note` + `.sent`/`.received`, `note-link`). The `blink` keyframe
+// is exclusive to `.typing`, so it moves here (deleted from styles.css).
+//
+// Kept GLOBAL in styles.css (NOT here):
+//   - the modal CHROME (`backdrop`, `modal`, `modal-head`, `modal-mark`,
+//     `modal-titles`, `modal-title`, `modal-status`, `modal-x`, `modal-foot`) —
+//     these are the Modal-primitive's kept-global copy; AgentModal renders them
+//     inline as raw divs styled by those global rules.
+//   - the status pill `.status`/`.s-*` + `.dot` + status variants (shared with
+//     AgentCard/PipelineColumn) — emitted as plain string literals.
+//   - the footer `.btn`/`.btn-primary`/`.btn-ghost` (Button primitive globals).
+//   - `@keyframes rise` stays GLOBAL (still used by not-yet-migrated blocks); we
+//     COPY it here so the scoped `.thread-item` animation resolves under module
+//     scoping (same pattern as Modal copying `fade`/`modal-in`).
+
+.thread {
+  padding: 22px 20px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thread-item {
+  animation: rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* assistant bubble */
+.bubble-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.agent-glyph {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: var(--teal-tint);
+  color: var(--teal-deep);
+  margin-top: 1px;
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+.bubble {
+  background: #f4f4f6;
+  border-radius: 4px 13px 13px 13px;
+  padding: 10px 13px;
+  font-size: 14px;
+  color: #2a2a2e;
+  max-width: 340px;
+
+  &.sent {
+    background: var(--teal-tint);
+    color: var(--teal-deep);
+    font-weight: 550;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+  }
+
+  /* intro bubble — the run's hardcoded opening message */
+  &.intro {
+    border: 1px solid var(--accent, #0a7);
+    background: #f0faf6;
+  }
+}
+
+/* typing indicator */
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 13px 14px;
+  background: #f4f4f6;
+  border-radius: 4px 13px 13px 13px;
+
+  span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #b6b6bc;
+    animation: blink 1.3s infinite ease-in-out;
+
+    &:nth-child(2) {
+      animation-delay: 0.18s;
+    }
+    &:nth-child(3) {
+      animation-delay: 0.36s;
+    }
+  }
+}
+@keyframes blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* handoff notes */
+.thread-note {
+  font-size: 12px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: #f5f5f7;
+  color: var(--muted);
+
+  strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  &.sent {
+    border-left: 3px solid var(--accent, #0a7);
+  }
+  &.received {
+    border-left: 3px solid #f0c000;
+  }
+}
+.note-link {
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--teal-deep);
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
+  }
+}
