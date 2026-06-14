@@ -26,7 +26,9 @@ describe('renderLead generative-UI mapping', () => {
     )
     expect(screen.getByText('Order: 10 units')).toBeInTheDocument()
     expect(screen.getByText(/ivan@acme\.ru/)).toBeInTheDocument()
-    expect(container.querySelector('.lead-env')).toBeInTheDocument()
+    // CardShell renders the kicker icon as an SVG in its header (the old `.lead-env`
+    // class is gone after the CardShell migration — assert the icon badge directly).
+    expect(container.querySelector('svg')).toBeInTheDocument()
     expect(screen.getByText(/order 10 units/i)).toBeInTheDocument()
   })
 })

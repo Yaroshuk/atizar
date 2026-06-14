@@ -1,0 +1,18 @@
+// SortSummaryCard — the white-framed inbox-sort recap. Frame + header (inbox icon,
+// "Inbox sorted" kicker) is the shared CardShell; only the summary line and the
+// optional counts pill row are card-unique. Lifted from the old global
+// `.lead-reason` / `.lead-tags` (styles.css), resolved to `--atz-*`.
+
+.reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--atz-color-text-muted);
+  line-height: 1.45;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}

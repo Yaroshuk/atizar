@@ -1,0 +1,12 @@
+// TicketResultCard — the white-framed bug-analysis / feature-plan result. Frame +
+// header (bug/wrench icon, kicker, title) is the shared CardShell; only the analysis
+// body is card-unique. The analysis is preformatted text, so it preserves newlines.
+// Lifted from the old global `.lead-reason` (styles.css), resolved to `--atz-*`.
+
+.reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--atz-color-text-muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}

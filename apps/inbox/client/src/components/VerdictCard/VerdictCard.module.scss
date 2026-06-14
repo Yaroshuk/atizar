@@ -1,0 +1,18 @@
+// VerdictCard — the white-framed inbox verdict. Frame + header (envelope icon,
+// from kicker, subject title) + the "Draft reply" action live in the shared
+// CardShell; only the tags row and reason line are card-unique. Lifted from the
+// old global `.lead-tags` / `.lead-reason` (styles.css), resolved to `--atz-*`.
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--atz-color-text-muted);
+  line-height: 1.45;
+}

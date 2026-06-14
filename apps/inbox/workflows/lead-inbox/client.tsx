@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { RenderSpec, HitlSpec, AgentMeta } from '@atizar/react'
-import { LeadCard } from '../../client/src/components/LeadCard'
-import { VerdictCard } from '../../client/src/components/VerdictCard'
+import { LeadCard } from '../../client/src/components/LeadCard/LeadCard'
+import { VerdictCard } from '../../client/src/components/VerdictCard/VerdictCard'
 import { ApprovalDialog } from '../../client/src/components/ApprovalDialog/ApprovalDialog'
 import { qualifierAgent, replyAgent } from './descriptor'
 

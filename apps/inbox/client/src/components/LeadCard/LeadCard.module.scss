@@ -1,0 +1,11 @@
+// LeadCard — the white-framed lead summary. The frame + header (envelope icon,
+// from kicker, subject title) is the shared CardShell; only the reason line is
+// card-unique. Lifted from the old global `.lead-reason` (styles.css), color
+// resolved to the `--atz-*` token.
+
+.reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--atz-color-text-muted);
+  line-height: 1.45;
+}
