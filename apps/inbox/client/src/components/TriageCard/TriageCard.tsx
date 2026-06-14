@@ -1,5 +1,6 @@
-import { Icon } from '@atizar/react'
-import { groupByStatus, type TriageTicket } from '../buckets'
+import { CardShell, Button } from '@atizar/react'
+import { groupByStatus, type TriageTicket } from '../../buckets'
+import s from './TriageCard.module.scss'
 
 type Route = 'feature' | 'bugfix' | 'reply-draft'
 
@@ -16,7 +17,7 @@ const RECO_TO_ROUTE: Record<string, Route> = {
   reply: 'reply-draft',
 }
 
-// Triage already decided the route, so we show ONE action button for it (not all three).
+// Triage already decided the route, so we show ONE primary action for it (not all three).
 const ROUTE_LABEL: Record<Route, string> = {
   feature: 'Send to Feature',
   bugfix: 'Send to Bug-fix',
@@ -26,29 +27,26 @@ const ROUTE_LABEL: Record<Route, string> = {
 export const TriageCard = ({ tickets, onRoute, onTreatAsLead }: TriageCardProps) => {
   const groups = groupByStatus(tickets)
   return (
-    <div className='lead-card'>
-      <div className='lead-top'>
-        <div className='lead-env'>
-          <Icon name='git' size={16} />
-        </div>
-        <span className='lead-from'>Your tickets · {tickets.length}</span>
-      </div>
+    <CardShell icon='git' kicker={`Your tickets · ${tickets.length}`}>
       {groups.map((group) => (
-        <div key={group.status} className='triage-group'>
-          <div className='triage-status'>{group.status}</div>
+        <div key={group.status} className={s.group}>
+          <div className={s.groupLabel}>{group.status}</div>
           {group.tickets.map((ticket) => {
             const suggested = RECO_TO_ROUTE[ticket.recommendation] ?? 'feature'
             return (
-              <div key={`${ticket.repo}#${ticket.number}`} className='triage-row'>
-                <div className='triage-row-title'>
-                  {ticket.needsReply && <span className='pill amber'>needs reply</span>}
-                  <span className='triage-row-name'>
+              <div key={`${ticket.repo}#${ticket.number}`} className={s.ticket}>
+                <div className={s.ticketTitle}>
+                  <span>
                     #{ticket.number} {ticket.title}
                   </span>
+                  {ticket.needsReply && <span className='pill amber'>needs reply</span>}
                 </div>
-                <div className='triage-routes'>
+                <div className={s.ticketActions}>
+                  <Button variant='primary' onClick={() => onRoute(suggested, ticket)}>
+                    {ROUTE_LABEL[suggested]}
+                  </Button>
                   <a
-                    className='triage-link'
+                    className={s.link}
                     href={ticket.url}
                     target='_blank'
                     rel='noreferrer'
@@ -56,13 +54,10 @@ export const TriageCard = ({ tickets, onRoute, onTreatAsLead }: TriageCardProps)
                   >
                     Open in browser
                   </a>
-                  <button className='btn btn-primary' onClick={() => onRoute(suggested, ticket)}>
-                    {ROUTE_LABEL[suggested]}
-                  </button>
                   {onTreatAsLead && (
-                    <button className='btn btn-primary' onClick={() => onTreatAsLead(ticket)}>
-                      Treat as lead → Lead inbox
-                    </button>
+                    <Button variant='ghost' onClick={() => onTreatAsLead(ticket)}>
+                      Treat as lead
+                    </Button>
                   )}
                 </div>
               </div>
@@ -70,6 +65,6 @@ export const TriageCard = ({ tickets, onRoute, onTreatAsLead }: TriageCardProps)
           })}
         </div>
       ))}
-    </div>
+    </CardShell>
   )
 }

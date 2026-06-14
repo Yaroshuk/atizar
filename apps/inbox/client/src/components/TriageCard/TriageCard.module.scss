@@ -1,0 +1,53 @@
+// TriageCard — grouped tickets, each with one aligned action row. The white frame,
+// header (git icon + "Your tickets · N" kicker) is the shared CardShell; only the
+// group/ticket layout is card-unique. Rules lifted from the old global `.triage-*`
+// (styles.css); legacy aliases resolved to `--atz-*` tokens.
+
+.group {
+  margin-top: 12px;
+}
+
+.groupLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--atz-color-text-muted);
+  margin-bottom: 6px;
+}
+
+.ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--atz-color-border);
+}
+
+.ticketTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ticketActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+// "Open in browser" is a real link (navigation), styled as a ghost action so it
+// sits in the same row as the Button actions without competing with the primary.
+.link {
+  font-size: 12px;
+  color: var(--atz-color-text-muted);
+  text-decoration: underline;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--atz-color-text);
+  }
+}

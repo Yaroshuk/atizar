@@ -1033,6 +1033,13 @@ button {
 .pill.grey .pill-dot {
   background: #b4b4bc;
 }
+.pill.amber {
+  background: var(--atz-amber-bg);
+  color: var(--atz-amber-ink);
+}
+.pill.amber .pill-dot {
+  background: var(--atz-amber-border);
+}
 
 /* approval dialog */
 .approval {
