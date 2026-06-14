@@ -1,4 +1,6 @@
+import clsx from 'clsx'
 import { Icon, type IconName } from '../components/Icon'
+import s from './Button.module.scss'
 
 // The generic action button. Variants map to the Smedja `.btn-*` classes; every
 // value is token-driven so a rebrand needs no component change. Extensible by
@@ -15,13 +17,13 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   iconSize?: number
 }
 
-const VARIANT_CLASS: Record<ButtonVariant, string> = {
-  primary: 'btn-primary',
-  teal: 'btn-teal',
-  ghost: 'btn-ghost',
-  soft: 'btn-soft',
-  danger: 'btn-danger',
-  retry: 'btn-retry',
+const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
+  primary: s.btnPrimary,
+  teal: s.btnTeal,
+  ghost: s.btnGhost,
+  soft: s.btnSoft,
+  danger: s.btnDanger,
+  retry: s.btnRetry,
 }
 
 export const Button = ({
@@ -33,11 +35,11 @@ export const Button = ({
   children,
   ...rest
 }: ButtonProps) => {
-  const cls = ['btn', VARIANT_CLASS[variant], block ? 'btn-block' : '', className]
-    .filter(Boolean)
-    .join(' ')
   return (
-    <button className={cls} {...rest}>
+    <button
+      className={clsx(s.btn, VARIANT_CLASS[variant], block && s.btnBlock, className)}
+      {...rest}
+    >
       {icon && <Icon name={icon} size={iconSize} />}
       {children}
     </button>
