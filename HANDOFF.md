@@ -18,12 +18,24 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
+**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS3 → WS5 → WS2 → WS6 → WS1 → WS7.**
+Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
+so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
+
+- **WS4 — ✅ DONE & merged** (`master` after merge: `71aecb0`). Operator Activity feed flipped to
+  newest-at-top with top-pinned auto-follow + a "Newest first" cue; the dev Trace grouped view keeps
+  its chronological `#1..#n` order (grouping iterates the un-reversed list). Pure presentation change
+  in `packages/react/src/components/ActivityPanel/` (+ a render test). Green gate all green (typecheck
+  / test 456 / lint / format / `@atizar/react` build with `.act-feed-cue` in `dist/react.css`).
+  Browser-verified 6/6 steps PASS (cue present, newest-at-top holds live + across reload, scroll-down
+  pauses auto-follow & scroll-up resumes, Trace `#1..#n` unchanged, 0 related console errors).
+
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
 - WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md`
 - WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md`
 - WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md`
-- WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md`
+- WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
 - WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md`
 - WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md`
 - WS7 app→library boundary migration → `2026-06-14-ws7-app-to-library-migration.md`
