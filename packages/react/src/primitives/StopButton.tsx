@@ -1,3 +1,6 @@
+import clsx from 'clsx'
+import s from './StopButton.module.scss'
+
 // One Stop control, three scopes, one visual language (neutral outline that
 // reddens on hover; a square glyph that becomes a spinner while stopping):
 //   - 'item'     — icon-only, sits on a running work-item card in the pipeline
@@ -23,29 +26,26 @@ export const StopButton = ({
   title,
   ...rest
 }: StopButtonProps) => {
-  const cls = [
-    'stop-btn',
-    scope === 'all' ? 'danger' : '',
-    scope === 'item' ? 'icon' : '',
-    stopping ? 'stopping' : '',
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
   return (
     <button
-      className={cls}
+      className={clsx(
+        s.stopBtn,
+        scope === 'all' && s.danger,
+        scope === 'item' && s.icon,
+        stopping && s.stopping,
+        className
+      )}
       disabled={disabled || stopping}
       title={title || label || 'Stop'}
       aria-label={label || title || 'Stop'}
       {...rest}
     >
       {stopping ? (
-        <span className='stop-spin' aria-hidden='true' />
+        <span className={s.stopSpin} aria-hidden='true' />
       ) : (
-        <span className='stop-glyph' aria-hidden='true' />
+        <span className={s.stopGlyph} aria-hidden='true' />
       )}
-      {label && <span className='stop-label'>{stopping ? 'Stopping…' : label}</span>}
+      {label && <span className={s.stopLabel}>{stopping ? 'Stopping…' : label}</span>}
     </button>
   )
 }
