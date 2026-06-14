@@ -31,7 +31,7 @@ export type ThreadModalProps = {
 
 export const ThreadModal = (p: ThreadModalProps) => {
   const { renders, hitl } = useWorkflowsConfig()
-  const { messages, status } = useWorkItemThread(p.id)
+  const { messages, status, connection } = useWorkItemThread(p.id)
   const display = mapStatus(status)
   const awaiting = display === 'awaiting_approval'
   const { gate, approve, reject } = useGate(p.id, awaiting)
@@ -64,6 +64,7 @@ export const ThreadModal = (p: ThreadModalProps) => {
       title={p.title}
       iconName={p.iconName}
       status={display}
+      connection={connection}
       renderToolCall={renderToolCall}
       renderableToolNames={p.renderableToolNames}
       loading={display === 'running'}

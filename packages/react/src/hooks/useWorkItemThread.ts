@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BaseEvent } from '@ag-ui/client'
 import { foldEventsToMessages, pairToolResults } from '@atizar/core'
 import type { ServerStatus } from '../serverTypes'
+import type { ConnState } from './useActivity'
 
 // Terminal statuses: the run is over and the server emits no further events. The server CLOSES
 // the per-item SSE once a run reaches one of these (after replaying its backlog). The browser's
@@ -17,6 +18,7 @@ const TERMINAL: ReadonlySet<ServerStatus> = new Set(['finished', 'error', 'close
 // `foldEventsToMessages` is the reduction CopilotKit's runtime used to do internally.
 export const useWorkItemThread = (id: string | null) => {
   const [status, setStatus] = useState<ServerStatus>('running')
+  const [connection, setConnection] = useState<ConnState>('live')
   const [bySeq, setBySeq] = useState<Map<number, BaseEvent>>(new Map())
   const esRef = useRef<EventSource | null>(null)
 
@@ -48,6 +50,19 @@ export const useWorkItemThread = (id: string | null) => {
       if (snap.done) return
       const es = new EventSource(`/api/workitems/${id}/stream?from=${snap.nextSeq}`)
       esRef.current = es
+      es.addEventListener('open', () => setConnection('live'))
+      es.addEventListener('error', () => {
+        // A dropped thread stream must NOT look frozen-but-live (the human could approve against
+        // a stale view). EventSource auto-reconnects; re-prime the trace so a gap during the drop
+        // heals, and flip the chip. (Mirror of useActivity's reconnect handling.)
+        setConnection('reconnecting')
+        void (async () => {
+          const full = (await (await fetch(`/api/workitems/${id}/trace?from=0`)).json()) as {
+            events: { seq: number; event: BaseEvent }[]
+          }
+          if (!cancelled) setBySeq(new Map(full.events.map((e) => [e.seq, e.event])))
+        })()
+      })
       es.onmessage = (m) => setEvent(Number(m.lastEventId), JSON.parse(m.data) as BaseEvent)
       es.addEventListener('status', (m) => {
         const next = (m as MessageEvent).data as ServerStatus
@@ -82,5 +97,5 @@ export const useWorkItemThread = (id: string | null) => {
   )
   const messages = useMemo(() => foldEventsToMessages(events), [events])
   const toolResults = useMemo(() => pairToolResults(messages), [messages])
-  return { messages, toolResults, status }
+  return { messages, toolResults, status, connection }
 }

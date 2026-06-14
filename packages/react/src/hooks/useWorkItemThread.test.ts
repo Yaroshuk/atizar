@@ -85,3 +85,22 @@ describe('useWorkItemThread terminal handling (no reconnect storm)', () => {
     expect(es.closed).toBe(false)
   })
 })
+
+describe('useWorkItemThread connection state', () => {
+  it('flips to reconnecting on an SSE error and back to live on open', async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      json: async () => snapshot({ status: 'running', done: false, nextSeq: 0 }),
+    })) as unknown as typeof fetch
+
+    const { result } = renderHook(() => useWorkItemThread('wi-conn'))
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+    expect(result.current.connection).toBe('live')
+
+    const es = FakeEventSource.instances[0]
+    es.emit('error', '')
+    await waitFor(() => expect(result.current.connection).toBe('reconnecting'))
+
+    es.emit('open', '')
+    await waitFor(() => expect(result.current.connection).toBe('live'))
+  })
+})

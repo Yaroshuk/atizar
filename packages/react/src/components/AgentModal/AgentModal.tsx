@@ -30,6 +30,9 @@ export type AgentModalProps = {
   title: string
   iconName: IconName
   status: Status
+  // SSE connection of the underlying thread stream. 'reconnecting' shows a chip in the header so
+  // a dropped stream never reads as a live-but-frozen thread. Optional: a static type view omits it.
+  connection?: 'live' | 'reconnecting'
   renderToolCall: (args: { toolCall: ToolCall; toolMessage?: ToolMessage }) => ReactNode
   // Tool names that render as generative-UI cards (the consumer-facing surface). In
   // normal mode only these are shown; internal data-fetch tools (list_my_tickets,
@@ -64,6 +67,7 @@ export const AgentModal = ({
   title,
   iconName,
   status,
+  connection,
   renderToolCall,
   renderableToolNames,
   loading,
@@ -164,6 +168,12 @@ export const AgentModal = ({
               <span className={`dot ${status}`} />
               {STATUS_LABEL[status]}
             </span>
+            {connection === 'reconnecting' && (
+              <span className={s.reconnectChip}>
+                <span className={s.cspin} />
+                Reconnecting…
+              </span>
+            )}
           </div>
           <button className='modal-x' onClick={onClose} aria-label='Close'>
             <Icon name='close' size={17} />

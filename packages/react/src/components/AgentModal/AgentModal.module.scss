@@ -178,3 +178,27 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* SSE reconnect chip in the modal header */
+.reconnect-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9a6b00;
+}
+.cspin {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #e0c068;
+  border-top-color: transparent;
+  animation: cspin 0.8s linear infinite;
+}
+@keyframes cspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
