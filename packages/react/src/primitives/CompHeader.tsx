@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import clsx from 'clsx'
 import { Icon, type IconName } from '../components/Icon'
+import s from './CompHeader.module.scss'
 
 // The shared component header used by sibling board columns (Pipeline, Your
 // agents): a small uppercase icon+label on the left, an optional actions slot on
@@ -16,12 +18,12 @@ type CompHeaderProps = {
 }
 
 export const CompHeader = ({ icon, label, iconSize = 14, actions, className }: CompHeaderProps) => (
-  <div className={['comp-head', className].filter(Boolean).join(' ')}>
-    <span className='ch-label'>
+  <div className={clsx(s.compHead, className)}>
+    <span className={s.chLabel}>
       <Icon name={icon} size={iconSize} />
       {label}
     </span>
-    <span className='ch-spacer' />
+    <span className={s.chSpacer} />
     {actions}
   </div>
 )

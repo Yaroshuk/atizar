@@ -1,0 +1,33 @@
+// CompHeader — co-located CSS Module (migrated from global styles.css).
+// `.comp-head`/`.ch-label`/`.ch-spacer` are exclusive to this primitive (no other
+// consumer renders them) → DELETED from styles.css. Rules MOVED verbatim; the
+// `.ch-label svg` descendant nested. Token refs `var(--…)` unchanged.
+
+.comp-head {
+  flex: 0 0 auto;
+  height: 53px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+  }
+}
+.ch-spacer {
+  flex: 1;
+}
