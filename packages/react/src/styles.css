@@ -3,42 +3,37 @@
    Calm, modern, professional. Linear/Notion level of polish.
    ============================================================ */
 
+@import './tokens.css';
+
 :root {
-  --bg: #f5f5f7;
-  --surface: #ffffff;
-  --text: #111111;
-  --muted: #888888;
-  --muted-2: #a8a8ac;
-
-  --border: #ececec;
-  --border-strong: #e2e2e4;
-
-  --teal: #00aa77; /* #0a7 */
-  --teal-ink: #0a7;
-  --teal-deep: #008a61;
-  --teal-tint: rgba(0, 170, 119, 0.1);
-  --teal-tint-2: rgba(0, 170, 119, 0.06);
-
-  --grey-dot: #c4c4c8;
-
-  --amber-bg: #fffbe6;
-  --amber-border: #f0c000;
-  --amber-ink: #8a6d00;
-
-  --r-sm: 8px;
-  --r: 12px;
-  --r-lg: 16px;
-  --r-xl: 22px;
-
-  --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.04), 0 6px 16px rgba(17, 17, 17, 0.035);
-  --shadow-card-hover: 0 2px 4px rgba(17, 17, 17, 0.05), 0 12px 30px rgba(17, 17, 17, 0.07);
-  --shadow-pop: 0 1px 2px rgba(17, 17, 17, 0.05), 0 4px 14px rgba(17, 17, 17, 0.06);
-  --shadow-modal: 0 30px 80px rgba(17, 17, 17, 0.28), 0 8px 24px rgba(17, 17, 17, 0.16);
-
-  --font:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, system-ui, sans-serif;
-
-  --sidebar-w: 248px;
+  --bg: var(--atz-color-bg);
+  --surface: var(--atz-color-surface);
+  --text: var(--atz-color-text);
+  --muted: var(--atz-color-text-muted);
+  --muted-2: var(--atz-color-text-subtle);
+  --border: var(--atz-color-border);
+  --border-strong: var(--atz-color-border-strong);
+  --teal: var(--atz-color-accent);
+  --teal-ink: var(--atz-color-accent-ink);
+  --teal-deep: var(--atz-color-accent-deep);
+  --teal-tint: var(--atz-teal-tint);
+  --teal-tint-2: var(--atz-teal-tint-2);
+  --grey-dot: var(--atz-grey-300);
+  --amber-bg: var(--atz-amber-bg);
+  --amber-border: var(--atz-amber-border);
+  --amber-ink: var(--atz-amber-ink);
+  --red-ink: var(--atz-red-ink);
+  --r-sm: var(--atz-radius-sm);
+  --r: var(--atz-radius-md);
+  --r-lg: var(--atz-radius-lg);
+  --r-xl: var(--atz-radius-xl);
+  --shadow-card: var(--atz-shadow-card);
+  --shadow-card-hover: var(--atz-shadow-card-hover);
+  --shadow-pop: var(--atz-shadow-pop);
+  --shadow-modal: var(--atz-shadow-modal);
+  --font: var(--atz-font-sans);
+  --sidebar-w: var(--atz-size-sidebar);
+  --accent: var(--atz-color-accent);
 }
 
 * {
