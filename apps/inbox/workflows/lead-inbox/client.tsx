@@ -18,7 +18,7 @@ export const leadInboxMeta: Record<string, AgentMeta> = {
   },
 }
 
-export const leadInboxRenders: RenderSpec[] = [
+export const leadInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
     toolName: 'renderLead',
     parameters: z.object({ from: z.string(), subject: z.string(), summary: z.string() }),
@@ -70,7 +70,7 @@ export const leadInboxRenders: RenderSpec[] = [
   },
 ]
 
-export const leadInboxHitl: HitlSpec[] = [
+export const leadInboxHitl: Omit<HitlSpec, 'workflowId'>[] = [
   {
     toolName: 'saveDraft',
     parameters: z.object({ threadId: z.string(), body: z.string() }),

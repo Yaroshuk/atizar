@@ -33,9 +33,10 @@ export const emailInboxMeta: Record<string, AgentMeta> = {
 }
 
 // Only the NEW tools are declared here. renderLead + saveDraft (reused by the reply agent) are
-// already registered by lead-inbox; the client aggregator dedupes by tool name, so re-declaring
-// them is unnecessary (and the lead-inbox copy would win anyway).
-export const emailInboxRenders: RenderSpec[] = [
+// already registered by lead-inbox. Resolution is scoped per workflow now (WS2), so email-inbox
+// would need its OWN copy to surface those in its threads; this workflow only renders renderSort
+// + the applyActions HITL, so the reused lead tools are intentionally not re-declared here.
+export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
     toolName: 'renderSort',
     parameters: z.object({
@@ -66,7 +67,7 @@ const BatchItemSchema = z.object({
   action: BatchActionSchema,
 })
 
-export const emailInboxHitl: HitlSpec[] = [
+export const emailInboxHitl: Omit<HitlSpec, 'workflowId'>[] = [
   {
     toolName: 'applyActions',
     parameters: z.object({ items: z.array(BatchItemSchema) }),

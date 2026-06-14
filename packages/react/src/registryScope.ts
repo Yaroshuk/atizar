@@ -1,4 +1,3 @@
-import type { RenderSpec, HitlSpec } from './renderSpecs'
 import type { WorkflowsConfig } from './workflowsContext'
 
 // Render/HITL resolution is scoped by (workflowId, toolName), mirroring how the SERVER scopes
@@ -6,10 +5,8 @@ import type { WorkflowsConfig } from './workflowsContext'
 // the userland-injected, workflow-keyed specs.
 
 // The specs belonging to one workflow (a render OR hitl list filtered by workflowId).
-export const byWorkflow = <T extends { workflowId: string }>(
-  specs: T[],
-  workflowId: string
-): T[] => specs.filter((s) => s.workflowId === workflowId)
+export const byWorkflow = <T extends { workflowId: string }>(specs: T[], workflowId: string): T[] =>
+  specs.filter((s) => s.workflowId === workflowId)
 
 // The tool names that render as generative-UI cards FOR ONE WORKFLOW (render + HITL union).
 // AgentModal hides any tool not in this set (unless dev mode). Scoped so a tool name owned by

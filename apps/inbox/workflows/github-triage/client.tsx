@@ -94,7 +94,7 @@ const TriageCardConnected = ({
   )
 }
 
-export const githubTriageRenders: RenderSpec[] = [
+export const githubTriageRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
     toolName: 'render_triage',
     parameters: z.object({ origin: z.string(), recommendations: z.array(recommendationSchema) }),
