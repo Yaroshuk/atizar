@@ -1,10 +1,10 @@
 import type { AgentDefinition } from '@atizar/core'
-import { AgentCard } from './AgentCard'
-import { CompHeader } from '../primitives/CompHeader/CompHeader'
-import { aggregateLabel } from '../aggregate'
-import type { AgentAggregate } from '../aggregate'
-import type { AgentMeta } from '../renderSpecs'
-import type { AgentHealth, ServerStatus, WorkItem } from '../serverTypes'
+import { AgentCard } from '../AgentCard/AgentCard'
+import { CompHeader } from '../../primitives/CompHeader/CompHeader'
+import { aggregateLabel } from '../../aggregate'
+import type { AgentAggregate } from '../../aggregate'
+import type { AgentMeta } from '../../renderSpecs'
+import type { AgentHealth, ServerStatus, WorkItem } from '../../serverTypes'
 
 const ACTIVE_SERVER: ReadonlySet<ServerStatus> = new Set([
   'queued',

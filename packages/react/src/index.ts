@@ -10,12 +10,12 @@ import './styles.css'
 export { WorkflowsProvider, useWorkflowsConfig } from './workflowsContext.js'
 // Composition blocks — the board's panels, now exported so userland can compose its own
 // board (see apps/inbox/client/src/BoardApp.tsx).
-export { PipelineColumn } from './components/PipelineColumn.js'
-export { AgentCard } from './components/AgentCard.js'
-export { AgentGrid } from './components/AgentGrid.js'
-export { AgentModal } from './components/AgentModal.js'
+export { PipelineColumn } from './components/PipelineColumn/PipelineColumn.js'
+export { AgentCard } from './components/AgentCard/AgentCard.js'
+export { AgentGrid } from './components/AgentGrid/AgentGrid.js'
+export { AgentModal } from './components/AgentModal/AgentModal.js'
 export { ThreadModal } from './components/ThreadModal.js'
-export { InstancePickerModal } from './components/InstancePickerModal.js'
+export { InstancePickerModal } from './components/InstancePickerModal/InstancePickerModal.js'
 export { WorkflowSwitcher } from './components/WorkflowSwitcher/WorkflowSwitcher.js'
 // Orchestration hooks (board selection / navigation / stop) + pure helpers — extracted
 // from the former monolith so a custom board reproduces its behavior.

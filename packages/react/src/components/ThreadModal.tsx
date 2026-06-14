@@ -5,7 +5,7 @@ import { useGate } from '../hooks/useGate'
 import { buildRenderToolCall } from '../buildRenderToolCall'
 import { useWorkflowsConfig } from '../workflowsContext'
 import { mapStatus } from '../status'
-import { AgentModal, type HandoffNote } from './AgentModal'
+import { AgentModal, type HandoffNote } from './AgentModal/AgentModal'
 import type { IconName } from './Icon/Icon'
 
 // One open work item: owns the per-id thread + gate hooks and renders AgentModal. The thread
