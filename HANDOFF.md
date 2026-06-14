@@ -18,7 +18,7 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
-**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS3 → WS5 → WS2 → WS6 → WS1 → WS7.**
+**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS5 → WS2 → WS6 → WS1 → WS7.**
 Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
 so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
 
@@ -29,12 +29,20 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
   / test 456 / lint / format / `@atizar/react` build with `.act-feed-cue` in `dist/react.css`).
   Browser-verified 6/6 steps PASS (cue present, newest-at-top holds live + across reload, scroll-down
   pauses auto-follow & scroll-up resumes, Trace `#1..#n` unchanged, 0 related console errors).
+- **WS3 — ✅ DONE & merged** (`master` after merge: `d64966f`). Constrained `<Markdown>` primitive
+  (react-markdown + remark-gfm, `skipHtml` + safe element allow-list, NO raw HTML / no rehype-raw /
+  no dangerouslySetInnerHTML; links hardened `target=_blank rel=noopener noreferrer`; protocol-relative
+  `//` URLs dropped — a phishing-vector fix surfaced in review) renders the assistant bubble + 5 card
+  free-text fields; agent prompts tightened so bubbles are short plain sentences, not markdown
+  restatements of card chips. Green gate green (typecheck / test 467 / lint / format / `@atizar/react`
+  build). Browser-verified in the real bundle: `**bold**`→`<strong>`, lists→`<li>`, safe link hardened,
+  protocol-relative link neutralized (empty href), 0 console errors; test cassette restored after.
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
 - WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md`
 - WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md`
-- WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md`
+- WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md` — ✅ **DONE & merged** (`d64966f`)
 - WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
 - WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md`
 - WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md`
