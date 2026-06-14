@@ -11,3 +11,7 @@ declare module '*.module.css' {
   const classes: Record<string, string>
   export default classes
 }
+
+// Plain (non-module) global stylesheet, imported for side effects only (e.g. `import './styles.css'`
+// in index.ts so the library build bundles the global CSS). No exported shape.
+declare module '*.css' {}
