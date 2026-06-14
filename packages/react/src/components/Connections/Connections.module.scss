@@ -1,10 +1,63 @@
-// Connections — co-located CSS Module (migrated from the global styles.css).
-// EXCLUSIVE rule (`.conn-list`) — only this panel used it, so it moved here
-// verbatim and was deleted from styles.css. The chips it renders own their own
-// styles in ConnectionChip.module.scss.
+// Connections — co-located CSS Module. The inline chip row was collapsed into ONE
+// compact trigger (link icon + summary dot + count) that toggles a popover listing
+// the chips (stacked). The chips it renders own their own styles in
+// ConnectionChip.module.scss; only colors/spacing use the public --atz-* tokens.
 
-.conn-list {
+.wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--atz-color-border-strong);
+  border-radius: var(--atz-radius-sm);
+  background: var(--atz-color-surface);
+  color: var(--atz-color-text);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--atz-grey-50);
+  }
+}
+
+.summary-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--atz-grey-300);
+  flex: 0 0 auto;
+
+  &.ok {
+    background: var(--atz-color-accent);
+  }
+
+  &.warn {
+    background: var(--atz-amber-border);
+  }
+}
+
+.count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--atz-color-text-muted);
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--atz-color-border);
+  border-radius: var(--atz-radius-md);
+  background: var(--atz-color-surface);
+  box-shadow: var(--atz-shadow-pop);
 }

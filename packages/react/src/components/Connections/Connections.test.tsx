@@ -29,16 +29,29 @@ afterEach(() => {
 })
 
 describe('Connections', () => {
-  it('shows the detail for a connected row', async () => {
+  it('is collapsed by default: a toggle button, no chip rows, warn title when any disconnected', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fakeConnections) as Response)
     render(withProvider(<Connections />))
-    await waitFor(() => expect(screen.getByText(/test@example\.com/)).toBeInTheDocument())
+
+    // The single compact trigger is present.
+    const button = await screen.findByRole('button', { name: /connections/i })
+    // One row in the list is not connected → the trigger flags "Action needed".
+    expect(button).toHaveAttribute('title', 'Action needed')
+    // Collapsed: the chip rows (which show the integration name) are not rendered yet.
+    expect(screen.queryByText('gmail')).not.toBeInTheDocument()
+    expect(screen.queryByText('slack')).not.toBeInTheDocument()
   })
 
-  it('shows a Connect link with the right href for a not-connected row', async () => {
+  it('opens the popover with the chip rows when the trigger is clicked', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fakeConnections) as Response)
     render(withProvider(<Connections />))
-    const link = await screen.findByRole('link', { name: /connect/i })
+
+    const button = await screen.findByRole('button', { name: /connections/i })
+    fireEvent.click(button)
+
+    await waitFor(() => expect(screen.getByText('slack')).toBeInTheDocument())
+    expect(screen.getByText(/test@example\.com/)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /connect/i })
     expect(link.getAttribute('href')).toContain('/api/connect/google?integration=slack')
   })
 
@@ -53,6 +66,9 @@ describe('Connections', () => {
       .mockResolvedValueOnce(jsonResponse(fakeConnections) as Response)
 
     render(withProvider(<Connections />))
+    // Open the popover first — the Disconnect action lives inside it now.
+    const trigger = await screen.findByRole('button', { name: /connections/i })
+    fireEvent.click(trigger)
     const disconnect = await screen.findByRole('button', { name: /disconnect/i })
     fireEvent.click(disconnect)
 
