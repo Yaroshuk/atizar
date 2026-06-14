@@ -355,84 +355,16 @@ button {
 /* ============================================================
    Confirm dialog (bulk Stop actions)
    ============================================================ */
-.confirm-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: rgba(17, 17, 17, 0.34);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  animation: confirm-fade 0.12s ease;
-}
-.confirm {
-  position: fixed;
-  z-index: 201;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 384px;
-  max-width: calc(100vw - 32px);
-  background: var(--surface);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-modal);
-  padding: 26px 26px 22px;
-  text-align: center;
-  animation: confirm-pop 0.16s cubic-bezier(0.2, 0.8, 0.3, 1.1);
-}
-.confirm-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  margin: 0 auto 14px;
-  display: grid;
-  place-items: center;
-  background: #fdecea;
-}
-.confirm-icon .stop-glyph {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: #d6453a;
-  display: block;
-}
-.confirm-title {
-  font-size: 17px;
-  font-weight: 680;
-  letter-spacing: -0.01em;
-  margin: 0 0 7px;
-}
-.confirm-msg {
-  font-size: 13.5px;
-  color: var(--muted);
-  line-height: 1.5;
-  margin: 0 0 20px;
-}
-.confirm-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-.confirm-actions .btn {
-  min-width: 124px;
-  justify-content: center;
-}
+/* `.confirm*` (scrim/dialog/icon/title/msg/actions) and the `confirm-fade`/
+   `confirm-pop` keyframes moved into primitives/ConfirmDialog.module.scss.
+   `.btn-danger` is a Button variant (shared) → kept global here, also in
+   primitives/Button.module.scss. */
 .btn-danger {
   background: #d6453a;
   color: #fff;
 }
 .btn-danger:hover {
   background: #c0392b;
-}
-@keyframes confirm-fade {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes confirm-pop {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -46%) scale(0.97);
-  }
 }
 
 /* ============================================================

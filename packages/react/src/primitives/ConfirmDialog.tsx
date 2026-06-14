@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Button } from './Button'
+import s from './ConfirmDialog.module.scss'
 
 // A small destructive-action confirmation (the bulk Stop scopes use it). Esc and
 // scrim-click cancel; the confirm action is styled danger. Extensible: copy is
@@ -29,14 +30,16 @@ export const ConfirmDialog = ({
 
   return (
     <>
-      <div className='confirm-scrim' onClick={onCancel} />
-      <div className='confirm' role='alertdialog' aria-label={title}>
-        <div className='confirm-icon'>
+      <div className={s.confirmScrim} onClick={onCancel} />
+      <div className={s.confirm} role='alertdialog' aria-label={title}>
+        <div className={s.confirmIcon}>
+          {/* keeps the GLOBAL `stop-glyph` class — styled by `.confirmIcon
+              :global(.stop-glyph)` in the module (shared glyph, owned by StopButton). */}
           <span className='stop-glyph' />
         </div>
-        <h3 className='confirm-title'>{title}</h3>
-        <p className='confirm-msg'>{message}</p>
-        <div className='confirm-actions'>
+        <h3 className={s.confirmTitle}>{title}</h3>
+        <p className={s.confirmMsg}>{message}</p>
+        <div className={s.confirmActions}>
           <Button variant='soft' onClick={onCancel}>
             Cancel
           </Button>
