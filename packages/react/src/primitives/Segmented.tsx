@@ -1,3 +1,6 @@
+import clsx from 'clsx'
+import s from './Segmented.module.scss'
+
 // A small segmented toggle (the Manager/Admin switch and the Activity/Trace
 // switch). Two style families share one component via `variant`:
 //   - 'admin' → `.admin-toggle` / `.at-opt`
@@ -14,8 +17,8 @@ type SegmentedProps<T extends string> = {
   className?: string
 }
 
-const GROUP_CLASS = { admin: 'admin-toggle', seg: 'act-seg' } as const
-const OPT_CLASS = { admin: 'at-opt', seg: 'act-seg-opt' } as const
+const GROUP_CLASS = { admin: s.adminToggle, seg: s.actSeg } as const
+const OPT_CLASS = { admin: s.atOpt, seg: s.actSegOpt } as const
 
 export const Segmented = <T extends string>({
   options,
@@ -25,15 +28,11 @@ export const Segmented = <T extends string>({
   ariaLabel,
   className,
 }: SegmentedProps<T>) => (
-  <div
-    className={[GROUP_CLASS[variant], className].filter(Boolean).join(' ')}
-    role='tablist'
-    aria-label={ariaLabel}
-  >
+  <div className={clsx(GROUP_CLASS[variant], className)} role='tablist' aria-label={ariaLabel}>
     {options.map((o) => (
       <button
         key={o.value}
-        className={OPT_CLASS[variant] + (o.value === value ? ' on' : '')}
+        className={clsx(OPT_CLASS[variant], o.value === value && s.on)}
         role='tab'
         aria-selected={o.value === value}
         onClick={() => onChange(o.value)}

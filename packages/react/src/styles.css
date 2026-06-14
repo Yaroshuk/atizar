@@ -458,33 +458,8 @@ button {
   flex: 1;
 }
 
-/* dev Activity|Trace segmented switch */
-.act-seg {
-  display: inline-flex;
-  background: #ececef;
-  border-radius: 8px;
-  padding: 2px;
-  gap: 2px;
-}
-.act-seg-opt {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 4px 11px;
-  border-radius: 6px;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    box-shadow 0.14s;
-}
-.act-seg-opt.on {
-  background: #fff;
-  color: var(--text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
+/* `.act-seg` / `.act-seg-opt` (the dev Activity|Trace segmented switch) moved into
+   primitives/Segmented.module.scss */
 
 /* connection chip */
 .act-conn {
@@ -2711,32 +2686,8 @@ button {
   flex: 1;
 }
 
-.admin-toggle {
-  display: inline-flex;
-  background: #ececef;
-  border-radius: 9px;
-  padding: 2px;
-  gap: 2px;
-}
-.at-opt {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 5px 12px;
-  border-radius: 7px;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    box-shadow 0.14s;
-}
-.at-opt.on {
-  background: #fff;
-  color: var(--text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
+/* `.admin-toggle` / `.at-opt` (the Manager/Admin segmented switch) moved into
+   primitives/Segmented.module.scss */
 
 /* `.icon-btn` / `.bell-wrap` / `.bell-badge` moved into
    primitives/IconButton.module.scss */

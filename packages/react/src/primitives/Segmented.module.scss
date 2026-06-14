@@ -1,0 +1,61 @@
+// Segmented — co-located CSS Module (migrated from global styles.css).
+// `.admin-toggle`/`.at-opt` and `.act-seg`/`.act-seg-opt` are exclusive to this
+// primitive (no other consumer renders them), so the rules are DELETED from
+// styles.css. Rules MOVED verbatim; the `.on` selected-state modifier is nested as
+// `&.on` on each option class. Token refs `var(--…)` unchanged.
+
+.admin-toggle {
+  display: inline-flex;
+  background: #ececef;
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+.at-opt {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 7px;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    box-shadow 0.14s;
+
+  &.on {
+    background: #fff;
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.act-seg {
+  display: inline-flex;
+  background: #ececef;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.act-seg-opt {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 11px;
+  border-radius: 6px;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    box-shadow 0.14s;
+
+  &.on {
+    background: #fff;
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+}
