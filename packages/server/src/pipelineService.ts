@@ -8,7 +8,7 @@ import {
   type HealthCheck,
 } from '@atizar/core'
 import type { Db } from './db/client.js'
-import { makeStateStore } from './stateStore.js'
+import { makeStateStore, type StateStore } from './stateStore.js'
 import { makeEventBus } from './eventBus.js'
 import { makeWorkerPool } from './workerPool.js'
 import { makeRunObserver, type AgentRuntime, type RunObserver } from './runObserver.js'
@@ -191,7 +191,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
 
     async resolveGate(
       gateId: string,
-      resolution: GateResolution & { formRev: number }
+      resolution: GateResolution & { formRev: number; actor?: string | null }
     ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
       const gate = await store.getGate(gateId)
 
@@ -222,6 +222,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           workItemId: wi.id,
           kind: 'resolved',
           summary: 'rejected',
+        })
+        await store.appendAudit({
+          workItemId: wi.id,
+          gateId: gate.id,
+          workflowId: wi.workflowId,
+          agentId: wi.agentId,
+          kind: 'resolved',
+          summary: 'rejected',
+          actor: resolution.actor ?? null,
         })
         publishBoard()
         return { ok: true }
@@ -260,6 +269,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           kind: 'error',
           summary: msg.slice(0, 80),
         })
+        await store.appendAudit({
+          workItemId: wi.id,
+          gateId: gate.id,
+          workflowId: wi.workflowId,
+          agentId: wi.agentId,
+          kind: 'error',
+          summary: msg.slice(0, 80),
+          actor: resolution.actor ?? null,
+        })
         await transition(db, wi.id, 'fail', { error: msg }).catch(() => {})
         await store.setError(wi.id, msg)
         publishBoard()
@@ -274,6 +292,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         kind: 'resolved',
         summary: `approved ${gate.toolName}`,
       })
+      await store.appendAudit({
+        workItemId: wi.id,
+        gateId: gate.id,
+        workflowId: wi.workflowId,
+        agentId: wi.agentId,
+        kind: 'resolved',
+        summary: `approved ${gate.toolName}`,
+        actor: resolution.actor ?? null,
+      })
 
       if (!claim.alreadyClaimed) {
         activity.record({
@@ -283,6 +310,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           workItemId: wi.id,
           kind: 'effect',
           summary: `executed ${gate.toolName}`,
+        })
+        await store.appendAudit({
+          workItemId: wi.id,
+          gateId: gate.id,
+          workflowId: wi.workflowId,
+          agentId: wi.agentId,
+          kind: 'effect',
+          summary: `executed ${gate.toolName}`,
+          actor: resolution.actor ?? null,
         })
       }
 
@@ -377,6 +413,10 @@ export function makePipelineService(deps: PipelineServiceDeps) {
 
     subscribeActivity(fn: (entry: ActivityEntry) => void): () => void {
       return bus.subscribe('activity', fn as (msg: unknown) => void)
+    },
+
+    getAudit(workItemId: string): ReturnType<StateStore['getAuditByWorkItem']> {
+      return store.getAuditByWorkItem(workItemId)
     },
   }
 }

@@ -144,12 +144,15 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       form?: Record<string, unknown>
       comment?: string
     }>()
+    const authz = c.req.header('Authorization') ?? ''
+    const actor = authz.startsWith('Bearer ') ? 'shared-token' : null
     const result = await service.resolveGate(gateId, {
       gateId,
       formRev: body.formRev,
       decision: body.decision,
       form: body.form,
       comment: body.comment,
+      actor,
     })
     return result.ok
       ? c.json({ ok: true })
@@ -167,6 +170,11 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       formRev: gate.formRev,
       proposedArtifact: gate.proposedArtifact,
     })
+  })
+
+  // The durable, attributed audit for a work item (approval/effect/resolution history).
+  app.get('/api/workitems/:id/audit', async (c) => {
+    return c.json(await service.getAudit(c.req.param('id')))
   })
 
   // STOP a work item (and its active descendants).
