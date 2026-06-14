@@ -54,3 +54,27 @@
   letter-spacing: -0.01em;
   color: var(--text);
 }
+
+/* board SSE reconnect chip */
+.ah-reconnect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9a6b00;
+  white-space: nowrap;
+}
+.ah-reconnect-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #e0c068;
+  border-top-color: transparent;
+  animation: ahspin 0.8s linear infinite;
+}
+@keyframes ahspin {
+  to {
+    transform: rotate(360deg);
+  }
+}

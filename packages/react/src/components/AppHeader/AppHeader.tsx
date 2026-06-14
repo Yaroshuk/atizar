@@ -24,6 +24,8 @@ type AppHeaderProps = {
   onToggleActivity: () => void
   workspaceName?: string
   demo?: boolean
+  // 'reconnecting' shows a header chip so a dropped board stream never reads as live-but-frozen.
+  boardConnection?: 'live' | 'reconnecting'
 }
 
 export const AppHeader = ({
@@ -38,6 +40,7 @@ export const AppHeader = ({
   onToggleActivity,
   workspaceName = 'Acme Inbox',
   demo,
+  boardConnection,
 }: AppHeaderProps) => (
   <header className={s.appHeader}>
     <div className={s.ahBrand}>
@@ -53,6 +56,12 @@ export const AppHeader = ({
     <div className={s.ahRight}>
       {!demo && <Connections />}
       {!demo && <span className={s.ahVline} />}
+      {boardConnection === 'reconnecting' && (
+        <span className={s.ahReconnect}>
+          <span className={s.ahReconnectDot} />
+          Reconnecting…
+        </span>
+      )}
       <StopButton
         scope='all'
         label='Stop all'

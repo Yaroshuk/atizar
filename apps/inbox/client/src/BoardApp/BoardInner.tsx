@@ -10,6 +10,7 @@ import {
   ActivityPanel,
   ConfirmDialog,
   useBoard,
+  useBoardConnection,
   useHealth,
   useActivity,
   useDispatch,
@@ -35,6 +36,7 @@ type BoardInnerProps = {
 // (useWorkflowSelection / useBoardNavigation / useStopController) and the JSX lives here.
 export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const board = useBoard()
+  const boardConnection = useBoardConnection()
   const health = useHealth()
   const { deliver, cancel } = useDispatch()
 
@@ -80,6 +82,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
         activityOpen={activityOpen}
         onToggleActivity={() => setActivityOpen((v) => !v)}
         demo={demo}
+        boardConnection={boardConnection}
       />
 
       <div className='workspace-body'>

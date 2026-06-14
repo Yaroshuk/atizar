@@ -51,7 +51,7 @@ export { AppHeader } from './components/AppHeader/AppHeader.js'
 export { WorkflowTabs } from './components/WorkflowTabs/WorkflowTabs.js'
 export { ActivityPanel } from './components/ActivityPanel/ActivityPanel.js'
 // Headless hooks (the data layer — build your own UI without forking).
-export { useBoard } from './hooks/useBoard.js'
+export { useBoard, useBoardConnection } from './hooks/useBoard.js'
 export { useDispatch } from './hooks/useDispatch.js'
 export { useGate } from './hooks/useGate.js'
 export { useWorkItemThread } from './hooks/useWorkItemThread.js'
