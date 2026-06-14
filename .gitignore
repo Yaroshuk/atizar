@@ -22,3 +22,6 @@ pipeline-*.png
 
 # Dev record/replay cassettes — real captured email/ticket data, never commit
 apps/inbox/.cassettes/
+
+# Subagent git worktrees (harness-managed, transient) — never tracked or linted
+.claude/worktrees/

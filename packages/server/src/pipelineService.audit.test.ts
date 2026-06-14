@@ -1,12 +1,7 @@
 import { beforeAll, describe, it, expect } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import {
-  gateOpened,
-  type GateResolution,
-  type Provider,
-  type ResumeHandle,
-} from '@atizar/core'
+import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@atizar/core'
 import { db } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { makePipelineService } from './pipelineService.js'

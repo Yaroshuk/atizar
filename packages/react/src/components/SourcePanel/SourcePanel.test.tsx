@@ -29,7 +29,9 @@ describe('SourcePanel', () => {
   })
 
   it('hides internal plumbing keys (origin, threadId) from the human view', () => {
-    render(<SourcePanel source={{ origin: 'lead-inbox__qualifier#1', threadId: 't1', from: 'x@y.z' }} />)
+    render(
+      <SourcePanel source={{ origin: 'lead-inbox__qualifier#1', threadId: 't1', from: 'x@y.z' }} />
+    )
     expect(screen.queryByText('origin')).not.toBeInTheDocument()
     expect(screen.queryByText('threadId')).not.toBeInTheDocument()
     expect(screen.getByText('from')).toBeInTheDocument()
