@@ -826,7 +826,6 @@ button {
   background: var(--atz-amber-border);
 }
 
-
 /* idle / empty modal state */
 .empty-run {
   text-align: center;
@@ -2206,10 +2205,7 @@ button {
 /* instance picker (an agent running ≥2 instances) */
 /* picker-list / picker-hint rules MOVED to InstancePickerModal.module.scss */
 
-
-
 /* intro bubble + handoff-note + note-link rules MOVED to AgentModal.module.scss */
-
 
 /* instance-tree nesting (pipeline) — design lacks these (it hardcodes a lead fan-out); kept for the real depth-2 parent→children blocks */
 /* .pl-block + .pl-cont moved → components/PipelineColumn.module.scss */

@@ -37,7 +37,7 @@ the old gmail-basic + gmail-viewer into ONE pure integration that declares `auth
   declares `auth` and receives `deps.credential`.
 - **`.env.example` seeding.** Every required secret gets an empty, commented line in the
   repo-root `.env.example`: a `# --- <Integration/Provider> ---` header + a `# what it is +
-  where to get it` line + `ATIZAR_FOO=` (empty, no value). This skill ADDS the integration's
+where to get it` line + `ATIZAR_FOO=` (empty, no value). This skill ADDS the integration's
   block there. The per-user `oauth2` TOKEN is NOT in `.env.example` — it comes from the
   in-app Connect flow, not the env.
 - **Never throw — return `{ error }`.** Callers (server effects, MCP wrappers) branch on
@@ -60,7 +60,7 @@ the old gmail-basic + gmail-viewer into ONE pure integration that declares `auth
   `@atizar/server`'s `resolveCredential`), NOT in the pure integration package — the package
   never imports `@atizar/server` (it declares `auth` + receives `deps.credential`). Such an
   app-side wrapper that imports `.ts` (`@atizar/server`) MUST run via the tsx loader (`node
-  --import tsx <file>.mts`), because a plain `node *.mjs` MCP child cannot import `.ts` source.**
+--import tsx <file>.mts`), because a plain `node *.mjs` MCP child cannot import `.ts` source.**
   (Sub-stage 5 gmail: the MCP child resolving the credential had to live in the app as a `.mts`
   under `node --import tsx`, since `@atizar/server` is `.ts` and the integration package stays
   pure.)

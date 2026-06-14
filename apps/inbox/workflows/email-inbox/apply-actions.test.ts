@@ -72,7 +72,10 @@ describe('applyEmailActions', () => {
       trash: async () => ({ done: [], failed: [] }),
       star: async () => ({ done: [], failed: [] }),
     }
-    const res = await applyEmailActions({ items: [{ messageId: 'a', action: 'read' as const }] }, deps)
+    const res = await applyEmailActions(
+      { items: [{ messageId: 'a', action: 'read' as const }] },
+      deps
+    )
     expect(res.error).toMatch(/no creds/)
   })
 })

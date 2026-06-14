@@ -71,9 +71,9 @@ This Procedure ends at its verdict — no self-improvement stage (the calling Ta
 
 ## Red flags — STOP, you're rationalizing
 
-| Thought | Reality |
-|---|---|
-| "It's a small change, skip the check." | A small change can route around a gate or import an engine into the core. Run the check whenever a change touches actions, providers, `@atizar/core`, the framework/userland boundary, or the foundation docs. |
-| "I'll just edit the invariant to match my change." | That IS the foundation changing — warn + explicit confirmation, never silent. |
-| "The model can execute this directly, it's simpler." | I2 / I9 — the server executes, the model proposes. Simplicity is not a waiver. |
-| "The developer's busy, I'll note it and move on." | A foundation conflict is a STOP, not a footnote. Get the explicit confirmation. |
+| Thought                                              | Reality                                                                                                                                                                                                        |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "It's a small change, skip the check."               | A small change can route around a gate or import an engine into the core. Run the check whenever a change touches actions, providers, `@atizar/core`, the framework/userland boundary, or the foundation docs. |
+| "I'll just edit the invariant to match my change."   | That IS the foundation changing — warn + explicit confirmation, never silent.                                                                                                                                  |
+| "The model can execute this directly, it's simpler." | I2 / I9 — the server executes, the model proposes. Simplicity is not a waiver.                                                                                                                                 |
+| "The developer's busy, I'll note it and move on."    | A foundation conflict is a STOP, not a footnote. Get the explicit confirmation.                                                                                                                                |

@@ -17,7 +17,7 @@
 
 **Developer builds. Human directs. Agent runs.**
 
-*Don't light a fire and walk away. Tend it.*
+_Don't light a fire and walk away. Tend it._
 
 An open-source TypeScript framework for building agentic automations — agentic-first, human-in-the-loop.
 
@@ -37,7 +37,7 @@ Autonomous agents are easy to start and hard to trust. The moment one touches yo
 
 **Atizar keeps a human's hand on the poker.** The agent does the work — reads, drafts, proposes — and a person approves every step that matters. The approved action is run by the server, never by the model. Everything is audited.
 
-The name is the Spanish verb *atizar* — to stoke a fire that's already burning. That's the whole idea: the agent is the fire, you're the one tending it.
+The name is the Spanish verb _atizar_ — to stoke a fire that's already burning. That's the whole idea: the agent is the fire, you're the one tending it.
 
 ### Built for developers — agentic-first.
 
@@ -64,7 +64,7 @@ Safety isn't bolted on. It's the foundation.
 <!-- TODO: GIF — agent board → thread → approval-gate card → approve → action executed & audited -->
 <!-- TODO: side-by-side — a defineAgent snippet next to the clean operator UI -->
 
-*Demo media lands with the zero-credential demo mode — see [Status](#status).*
+_Demo media lands with the zero-credential demo mode — see [Status](#status)._
 
 ## Quick start
 
@@ -114,9 +114,9 @@ The core knows no concrete engine. Swap the runtime without rewriting your workf
 ## Core concepts
 
 - **Human-in-the-loop is a first-class gate.** Approvals are part of the agent contract (`approvals`), not a bolted-on callback. No consequential action runs without a human's yes.
-- **The model proposes, the server executes.** On approval the *server* runs the effect through an action ledger (keyed `workItemId + gateId`), exactly once. The model never holds the trigger.
+- **The model proposes, the server executes.** On approval the _server_ runs the effect through an action ledger (keyed `workItemId + gateId`), exactly once. The model never holds the trigger.
 - **Two views from one config.** A single validated config drives both faces: the developer edits code; the operator edits only declared leaf fields (prompt, name) through the UI.
-- **Agentic-first: skills ride inside the packages.** Knowledge ships *with* the code it describes, so your coding agent reads it to extend the framework instead of guessing.
+- **Agentic-first: skills ride inside the packages.** Knowledge ships _with_ the code it describes, so your coding agent reads it to extend the framework instead of guessing.
 - **Integrations on demand.** No marketplace. The `write-integration` skill walks an agent through a new integration in minutes (the Gmail integration was built this way).
 - **Swap the runtime, keep the code.** Providers (Mastra, claude-cli, a test mock) sit behind one `AgentRuntime` contract — proven, not just declared, by the conformance suite.
 
@@ -126,13 +126,13 @@ The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come 
 
 ## What's included
 
-| Package | What it is |
-|---|---|
-| `@atizar/core` | The isomorphic contract: `defineAgent`, the message layer, the provider interface, gates. React- and Node-free. |
-| `@atizar/providers` | Agent runtimes behind one interface: Mastra, claude-cli, and a mock for tests. |
-| `@atizar/integrations` | Batteries (e.g. Gmail) as injectable functions + read-only MCP wrappers. |
-| `@atizar/server` | The server spine: Postgres-authoritative state, the dispatch chokepoint, server-executed effects, SSE. |
-| `@atizar/react` | The UI: board, thread, approval gates, and the card-construction kit. |
+| Package                | What it is                                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `@atizar/core`         | The isomorphic contract: `defineAgent`, the message layer, the provider interface, gates. React- and Node-free. |
+| `@atizar/providers`    | Agent runtimes behind one interface: Mastra, claude-cli, and a mock for tests.                                  |
+| `@atizar/integrations` | Batteries (e.g. Gmail) as injectable functions + read-only MCP wrappers.                                        |
+| `@atizar/server`       | The server spine: Postgres-authoritative state, the dispatch chokepoint, server-executed effects, SSE.          |
+| `@atizar/react`        | The UI: board, thread, approval gates, and the card-construction kit.                                           |
 
 ## Status
 
@@ -143,7 +143,7 @@ Recently shipped: the zero-credential demo mode (`DEMO=1`), the `@platform/* →
 ## Roadmap
 
 - **npm release** — publish the `@atizar/*` packages so the framework installs as a versioned dependency.
-- **Workflows that learn** *(planned — not built yet).* A direction we're designing toward: the agent improves from how you correct it, without fine-tuning. Two channels — implicit few-shot memory from past corrections, and explicit rules a distiller proposes and **you approve**. The model never changes, only the context it receives.
+- **Workflows that learn** _(planned — not built yet)._ A direction we're designing toward: the agent improves from how you correct it, without fine-tuning. Two channels — implicit few-shot memory from past corrections, and explicit rules a distiller proposes and **you approve**. The model never changes, only the context it receives.
 
 ## Docs & community
 

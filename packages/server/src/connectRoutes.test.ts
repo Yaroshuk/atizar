@@ -111,8 +111,7 @@ describe('createConnectRoutes', () => {
     })
 
     it('302s to ?connect_error on a non-ok token exchange', async () => {
-      const fetchFn = (async () =>
-        new Response('nope', { status: 400 })) as unknown as typeof fetch
+      const fetchFn = (async () => new Response('nope', { status: 400 })) as unknown as typeof fetch
       const app = createConnectRoutes(deps(fetchFn))
       const state = signState({ integration: 'gmail', connection: 'default' }, 'test-secret')
       const res = await app.request(

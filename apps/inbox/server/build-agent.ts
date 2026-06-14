@@ -1,5 +1,10 @@
 import type { AgentDefinition, ProviderRegistry, PromptStrategy, Provider } from '@atizar/core'
-import { withRecordReplay, recordReplayMode, cassettesDir, demoCassettesDir } from './record-replay.js'
+import {
+  withRecordReplay,
+  recordReplayMode,
+  cassettesDir,
+  demoCassettesDir,
+} from './record-replay.js'
 import { isDemo } from '@atizar/server'
 
 // Resolves the provider FACTORY for an agent passport and constructs the provider from

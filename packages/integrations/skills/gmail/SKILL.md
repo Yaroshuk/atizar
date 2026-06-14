@@ -11,14 +11,14 @@ mutations are SERVER-EXECUTED effects behind approval gates — never expose the
 
 ## Surface
 
-| import | function | kind |
-|---|---|---|
-| `@atizar/integrations/gmail/list-unread` | `listUnread({ sinceHours? }, deps)` → `ReadResult<{ emails: EmailRef[] }>` | read |
-| `@atizar/integrations/gmail/get-email` | `getEmail({ messageId }, deps)` → `ReadResult<ParsedEmail>` incl. `body` | read |
-| `@atizar/integrations/gmail/get-latest-email` | `getLatestEmail(args, deps)` → `ReadResult<ParsedEmail>` | read |
-| `@atizar/integrations/gmail/create-draft` | `createDraft({ threadId, body }, deps)` → `{ ok: true, draftId } \| { error }` | mutation/effect |
-| `@atizar/integrations/gmail/modify` | `markRead\|trash\|star({ messageIds }, deps)` → `BatchActionResult` | mutation/effect |
-| `@atizar/integrations/gmail/check-credentials` | `checkCredentials(deps)` → `HealthCheck` | health |
+| import                                         | function                                                                       | kind            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ | --------------- |
+| `@atizar/integrations/gmail/list-unread`       | `listUnread({ sinceHours? }, deps)` → `ReadResult<{ emails: EmailRef[] }>`     | read            |
+| `@atizar/integrations/gmail/get-email`         | `getEmail({ messageId }, deps)` → `ReadResult<ParsedEmail>` incl. `body`       | read            |
+| `@atizar/integrations/gmail/get-latest-email`  | `getLatestEmail(args, deps)` → `ReadResult<ParsedEmail>`                       | read            |
+| `@atizar/integrations/gmail/create-draft`      | `createDraft({ threadId, body }, deps)` → `{ ok: true, draftId } \| { error }` | mutation/effect |
+| `@atizar/integrations/gmail/modify`            | `markRead\|trash\|star({ messageIds }, deps)` → `BatchActionResult`            | mutation/effect |
+| `@atizar/integrations/gmail/check-credentials` | `checkCredentials(deps)` → `HealthCheck`                                       | health          |
 
 All functions receive a `deps` object containing `deps.credential` (a `ResolvedCredential`
 from `resolveCredential`) — the integration never reads env vars or files directly.
@@ -69,9 +69,9 @@ to the integration via `deps.credential`. There are no hand-placed files and no
 
 ## Diagnosing checkCredentials failures
 
-| error contains | meaning | fix |
-|---|---|---|
-| not connected (`resolveCredential` → null) | no per-user token in the credential store | click **Connect** in the app header; ensure `ATIZAR_GOOGLE_CLIENT_ID/SECRET` + `ATIZAR_SECRET_KEY` are set |
-| `invalid_grant` | token expired or revoked | click **Connect** again to re-authorize |
-| `insufficient.*scope` / 403 | token was granted a narrower scope | click **Connect** and re-authorize with `gmail.modify` scope |
-| `Optional dependency "googleapis" is not installed` | peer missing | `yarn add googleapis` in the consuming app |
+| error contains                                      | meaning                                   | fix                                                                                                        |
+| --------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| not connected (`resolveCredential` → null)          | no per-user token in the credential store | click **Connect** in the app header; ensure `ATIZAR_GOOGLE_CLIENT_ID/SECRET` + `ATIZAR_SECRET_KEY` are set |
+| `invalid_grant`                                     | token expired or revoked                  | click **Connect** again to re-authorize                                                                    |
+| `insufficient.*scope` / 403                         | token was granted a narrower scope        | click **Connect** and re-authorize with `gmail.modify` scope                                               |
+| `Optional dependency "googleapis" is not installed` | peer missing                              | `yarn add googleapis` in the consuming app                                                                 |

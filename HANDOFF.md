@@ -19,6 +19,7 @@ subagent per task + a spec/quality review between tasks; `executing-plans` for i
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
+
 - WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md`
 - WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md`
 - WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md`
@@ -32,6 +33,7 @@ WS6**; **WS7 last** so it relocates server code that WS1/WS5 already settled.) M
 you prefer WS1 first (the original ask), fine, but keep WS2-before-WS6 and WS7-last.
 
 **Per-WS execution rules:**
+
 - One branch off `master` per WS; **subagents must NOT switch branches** (read history via `git show <sha>:path`).
 - TDD (`superpowers:test-driven-development`): failing test → implement → green, per unit.
 - Green gate before "done": `yarn typecheck && yarn test && yarn lint && yarn format:check`
@@ -85,11 +87,11 @@ workstream into a plan and execute it.
   dedupe by `(integration,connection)`) and sets `connectionList = deriveConnectionList(workflowDescriptors)`
   — stale/extra chips now impossible (`scopesFor` unchanged). (2b) reshaped `Connections` into ONE
   compact trigger (a new `link` Icon + summary status dot: teal=all-connected / amber=any-disconnected,
-  + count when >1) that toggles a popover (`position:absolute`, z-index 40) listing one `ConnectionChip`
-  per row; dismisses on outside-click + Escape. `AppHeader`/`useConnections`/connect-routes untouched.
-  Green gate all pass (typecheck / test 451 / lint / format / build); browser-verified live:
-  `/api/connections` returns the derived gmail row, the compact control + popover render & dismiss,
-  green connected dot, 0 console errors, header width constant.
+  - count when >1) that toggles a popover (`position:absolute`, z-index 40) listing one `ConnectionChip`
+    per row; dismisses on outside-click + Escape. `AppHeader`/`useConnections`/connect-routes untouched.
+    Green gate all pass (typecheck / test 451 / lint / format / build); browser-verified live:
+    `/api/connections` returns the derived gmail row, the compact control + popover render & dismiss,
+    green connected dot, 0 console errors, header width constant.
 - **WS3 — Card redesign: ✅ DONE & browser-verified** (2026-06-14, merged to `master`, branch deleted).
   Plan → `docs/superpowers/plans/2026-06-14-ws3-card-redesign.md`. As-built: added a `CardShell`
   primitive to `@atizar/react` (`primitives/CardShell/` — shared frame: icon-badge + kicker/title
@@ -427,8 +429,8 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     (re-export). The health check lives in **gmail-basic** (`check-credentials.mjs`, shared OAuth
     client + account) and gmail-viewer re-exports it; the `.d.ts` re-export uses a `.js` specifier
     (TS resolves to the sibling decl). Read-only stdio MCP `index.mjs` exposes ONLY `list_unread`
-    + `get_email` — mutations are NEVER model-visible (verified). 10 subpath exports in
-    `package.json`.
+    - `get_email` — mutations are NEVER model-visible (verified). 10 subpath exports in
+      `package.json`.
   - **Skills:** `write-integration` (L1 Task skill, first of its genre — `.claude/skills/`); first
     A7 consumer skill shipped INSIDE the package
     (`packages/integrations/skills/gmail-viewer/SKILL.md`).
@@ -484,7 +486,7 @@ with per-row trash/read/star/keep; all Gmail mutations are server-executed effec
     via the aggregator's dedup-by-toolName). One line added to each of the three aggregators.
   - **As-built — the batch gate** = ONE `applyActions` approval whose tool-args ARE the editable
     form (`{items:[{messageId,from,subject,action}]}`); `EmailBatchCard` (userland, `client/src/
-    components/`) renders one row per email with a per-row action `<select>` (read/trash/star/keep);
+components/`) renders one row per email with a per-row action `<select>` (read/trash/star/keep);
     the edited rows flow to `approve(form)`; the SERVER runs `applyEmailActions` on approval (the
     `effects` binding), ledger-keyed once. `SortSummaryCard` renders the sorter's `renderSort`.
   - **As-built — machine dispatch** = the sorter's `route_emails` (`dispatches` class); the model
@@ -619,7 +621,7 @@ updated `write-integration` skill.
   (I3 held — all in `@atizar/server`, core only consumed; I5 reinforced — `registerResolver` seam;
   I7 aligned — secrets AES-encrypted at rest, never plaintext DB, apiKey env-only).
   - **As-built (all `@atizar/server`):** `credentials` table (drizzle, PK `(connection_id,
-    integration)`, `secret` = AES blob, `kind` plain text not enum, `expires_at` drives refresh) +
+integration)`, `secret` = AES blob, `kind` plain text not enum, `expires_at` drives refresh) +
     migration `0001_*.sql`. `crypto.ts` — AES-256-GCM `deriveKey`(sha256→32B)/`encryptSecret`/
     `decryptSecret` (blob `base64(iv):base64(tag):base64(ct)`), pure (caller supplies the key).
     `credentialStore.ts` — `makeCredentialStore(db)` → `upsert`/`get`/`remove`, encrypt-on-write /
@@ -630,8 +632,7 @@ updated `write-integration` skill.
     refresh-on-expiry via the provider token endpoint with 60s skew + persist + keep refreshToken,
     `null` when no row / refresh fails) + `registerResolver(kind, fn)` for custom kinds (the I5 seam —
     a custom kind plugs in WITHOUT editing core or this file); `store`/`fetchFn`/`now` injectable for
-    tests. Barrel exports `resolveCredential`/`registerResolver`/`makeCredentialStore`/`oauthProvider`
-    + types (NOT `crypto.ts` — internal). `.env.example` reworked to the single-source format
+    tests. Barrel exports `resolveCredential`/`registerResolver`/`makeCredentialStore`/`oauthProvider` - types (NOT `crypto.ts` — internal). `.env.example` reworked to the single-source format
     (framework `ATIZAR_*` block + provider + google OAuth app + dev tooling).
   - **No consumer yet at sub-stage 2** (by design): sub-stage 3 (below) writes INTO the store via the
     OAuth connect flow; sub-stage 5 (gmail rewrite) consumes `resolveCredential`.
@@ -650,9 +651,9 @@ updated `write-integration` skill.
     URL with client_id, redirect_uri, scope, signed state), `GET /api/connect/:provider/callback`
     (verifyState → 400; form-encoded `authorization_code` exchange via injectable `fetchFn`; on ok →
     `store.upsert` an oauth2 blob byte-identical to `resolveCredential`'s reader — `{accessToken,
-    refreshToken, expiresAt:number ms}` — then 302 `?connected=`; non-ok → 302 `?connect_error=`),
+refreshToken, expiresAt:number ms}` — then 302 `?connected=`; non-ok → 302 `?connect_error=`),
     `GET /api/connections` (per-`list` `{integration, connection, provider, connected}`), `DELETE
-    /api/connections/:integration` (`store.remove`). Barrel exports `createConnectRoutes` +
+/api/connections/:integration` (`store.remove`). Barrel exports `createConnectRoutes` +
     `ConnectRoutesDeps`/`ConnectionDescriptor`.
   - **As-built — app wiring:** `apps/inbox/server/connections.ts` (the app-side glue — `scopesFor`
     map `{gmail: ['…/auth/gmail.modify']}` + `connectionList` `[{gmail, default, google}]`; sub-stage 5
@@ -666,7 +667,7 @@ updated `write-integration` skill.
     unmount-guarded like `useBoard`), `components/ConnectionChip.tsx` (presentational: not-connected →
     a real `<a href="/api/connect/:provider?…">` FULL NAVIGATION (an OAuth redirect can't happen in
     fetch); connected → `"<integration> ✓ <detail?>"` + a Disconnect `<button>`), `components/
-    Connections.tsx` (self-fetching panel; Disconnect = `DELETE` then `refetch`), wired into the
+Connections.tsx` (self-fetching panel; Disconnect = `DELETE` then `refetch`), wired into the
     `WorkflowBoard` header after `WorkflowSwitcher`. Reuses existing Smedja classes (`workflow-tabs`/
     `workflow-tab`/`btn btn-ghost`) — no `styles.css` edit. First `.test.tsx` in the package (RTL +
     happy-dom).
@@ -768,7 +769,7 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
     restructured to the `.app` shell (header + workspace-body + ActivityPanel + bulk-Stop ConfirmDialog).
   - **CSS:** package `styles.css` = the design's `styles.css` (canon — chrome tabs, stop, activity
     drawer, topbar, notif, settings, leads, history, mini/branch pipeline) + a retained app-blocks
-    section (pl-* instance tree, picker, intro/run-foot/thread-notes, approval-edit, triage,
+    section (pl-\* instance tree, picker, intro/run-foot/thread-notes, approval-edit, triage,
     `awaiting_approval` status) the design lacks. Icon set extended ~20 glyphs (filled play/sparkle).
   - **Browser E2E (true replay):** board loads pixel-faithful to the design; **workflow tab switch**
     (Lead inbox ↔ Email inbox swaps agents); **Activity drawer** opens → Live chip → populates with
@@ -819,6 +820,7 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
 > `useActivity`/`useHealth`, rewritten `PipelineColumn`/`AgentCard`/`ConnectionChip`. NOT merged
 > (same branch strategy). The dev server may still be running (`:4000`/`:5173`); a `db:reset` was run
 > so the board is clean (creds kept — gmail stays connected).
+>
 > - **SCOPE DISCIPLINE (the user was emphatic):** Stage 4 = ONLY primitives + Activity/Trace log +
 >   the three Stop controls + workflow tabs. The Smedja prototype ALSO contains a rail/slide-out menu,
 >   a Leads table, Analytics, admin prompt-editing, account/notifications — these are **OUT OF SCOPE,
@@ -839,7 +841,7 @@ the three **Stop** controls (item/workflow/all), and **Chrome-style workflow tab
 >   exercised throughout. **Stage 4 is now fully done.**
 >   - **Two environment notes for the next agent (cost me time, save yours):** (1) the dev server does
 >     NOT auto-load `.env.local` — start it `set -a; . ./.env.local; set +a && DEV_RECORD_REPLAY=record
->     yarn dev`, else `ATIZAR_SECRET_KEY` (credential decryption) + the Google OAuth client vars are
+yarn dev`, else `ATIZAR_SECRET_KEY` (credential decryption) + the Google OAuth client vars are
 >     absent and EVERY gmail flow fails (boot `health` may still print lead-inbox "ok" — that probe does
 >     not match runtime credential resolution; trust an actual run). (2) Gmail credential did NOT survive
 >     from the chrome session — the `credentials` table was empty; reconnect via the header **Connect**
@@ -867,7 +869,7 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
     FIRST import in `index.ts`) walks up to the repo-root `.env.local`, parses `KEY=VALUE` via the
     pure tested `parse-env.ts`, sets only vars not already present (CLI wins), skipped under
     `NODE_ENV=production`. **The `set -a; . ./.env.local` footgun is GONE** — plain `yarn dev` (and
-    `PROVIDER=mastra yarn dev`) now resolves ATIZAR_* creds/OAuth. (The doc env-note above is
+    `PROVIDER=mastra yarn dev`) now resolves ATIZAR\_\* creds/OAuth. (The doc env-note above is
     superseded for the dev server; the `db:reset`/one-off `tsx -e` scripts still need manual
     sourcing — they don't import `index.ts`.)
   - **A2 — quiet `resumeAcquire`:** `WorkerPool.resumeAcquire` now only reserves the slot
@@ -916,16 +918,16 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
   commits `6012271`…`4877ff9`; spec `docs/superpowers/specs/2026-06-12-bearer-token-mutating-routes-design.md`,
   plan `docs/superpowers/plans/2026-06-12-bearer-token-mutating-routes.md`). Built subagent-driven
   (server slice + client slice, each with spec-review + quality-review). 417 unit tests + typecheck
-  + lint + build green.
-  - **As-built — server:** `atizarEnv.authToken()` reads the official `ATIZAR_AUTH_TOKEN`. New
+  - lint + build green.
+  * **As-built — server:** `atizarEnv.authToken()` reads the official `ATIZAR_AUTH_TOKEN`. New
     `packages/server/src/auth.ts` `createAuthMiddleware({ token, demo })` — gates by HTTP METHOD
     (all non-GET = mutation), active ONLY when `!demo && token set`, else fail-open; mismatch/missing
     `Authorization: Bearer <token>` → 401. Method-based (not a path list) so all 7 mutating routes
     (dispatch/deliver/resolve/cancel×3/cancel-all + `DELETE /api/connections`) AND any future one are
     covered; GET/SSE stay open. Mounted in `apps/inbox/server/index.ts` via `app.use('*', …)` BEFORE
     both route factories; `boot()` logs `[auth] disabled — set ATIZAR_AUTH_TOKEN …` when `!demo && no
-    token`. Demo mode → middleware inactive (one-command demo preserved).
-  - **As-built — client:** package stays env-agnostic — `WorkflowsConfig.authToken?` carries the
+token`. Demo mode → middleware inactive (one-command demo preserved).
+  * **As-built — client:** package stays env-agnostic — `WorkflowsConfig.authToken?` carries the
     token; new `authHeaders(token?)` helper merges `Authorization: Bearer …` into every mutation
     fetch (`useDispatch` ×5, `useGate.resolve`, `Connections` disconnect); reads via
     `useWorkflowsConfig()`. **`WorkflowBoard` split** into a thin provider wrapper + `BoardInner` so
@@ -933,9 +935,9 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
     out-of-context call). `useGate.resolve` now throws on non-409 failure (a 401 is no longer a silent
     false-success). Demo app sources the token from `VITE_ATIZAR_AUTH_TOKEN` (vite/client ref lives in
     `vite-env.d.ts`).
-  - **`resolved_by` stays null** (shared token = no per-user identity; per-identity = post-beta;
+  * **`resolved_by` stays null** (shared token = no per-user identity; per-identity = post-beta;
     `runObserver.ts` comment corrected).
-  - **Browser E2E (all verified):** (1) plain `yarn dev`, no token → board renders (the split didn't
+  * **Browser E2E (all verified):** (1) plain `yarn dev`, no token → board renders (the split didn't
     break the provider/context), `[auth] disabled` logged, START → fail-open 200 → run to Done, lead
     text one bubble; (2) `ATIZAR_AUTH_TOKEN=sek`+`VITE_ATIZAR_AUTH_TOKEN=sek` → no warning, server gate
     matrix (curl) 401 no-header / 401 wrong / 200 right / 200 GET, real-UI START carries the token &
@@ -972,7 +974,7 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
   - **As-built — F1 (observable 3-at-once cap):** `apps/inbox/eval/cap.eval.ts` injects a BLOCKING `Provider`
     (parks `run()` on a controllable promise so slots stay held — a replayed cassette streams instantly and
     can't show the cap), dispatches 3 for a `maxInstances:2` agent (`origin:'agent'`), asserts `{active:2,
-    queued:1}` mid-flight, releases, then drains to `{active:0,queued:0}` (the queued 3rd auto-started). Closes
+queued:1}` mid-flight, releases, then drains to `{active:0,queued:0}` (the queued 3rd auto-started). Closes
     the step-6 honesty gap (was only fast-replay integration-tested).
   - **As-built — F2 (cross-workflow "Treat as lead → Lead inbox"): BROWSER-VERIFIED LIVE.** `DEV_RECORD_REPLAY=record`,
     ran github-triage triage live (read-only board, 12 real tickets rendered with "Treat as lead → Lead inbox"
@@ -995,7 +997,7 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
   protected-doc edits; verified the only changed lines there are the cosmetic name swap, no invariant
   meaning changed → `check-foundation` = CLEAR). `exports` subpath keys (`./gmail/*`, `./db/schema`,
   `./styles.css`) and configs (drizzle/tsconfig/vite/vitest) were untouched (relative paths). `yarn install
-  --ignore-engines` relinked `node_modules/@atizar/*` (the `node_modules/@platform` symlinks are gone). The
+--ignore-engines` relinked `node_modules/@atizar/*` (the `node_modules/@platform` symlinks are gone). The
   rename spec keeps the literal `@platform` (it documents the transition). Zero `@platform` left in tracked
   files. **Green:** typecheck + lint + `yarn test` 414 + `yarn eval` 5 + build. CLAUDE.md's stale
   "placeholder scope" line corrected (now "final scope, renamed at 7c-E; all five packages extracted").
@@ -1030,23 +1032,19 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   of `App.tsx`'s `/api/config`-failure fallback (currently shows all workflows — non-fail-safe but
 >   unreachable in a live demo). If the already-written README references a command/flag that differs
 >   from what's built, ALIGN THE CODE to the README (or flag the mismatch to the user).
->
 > - **Build order = F only (C, D, E are done).** Each sub-project = its own brainstorm→spec→plan→build
 >   cycle (the user chose subagent-driven execution for B/C/D — ask which approach for each). Run
 >   `check-foundation` on anything touching actions/providers/`@atizar/core`/the framework-userland
 >   boundary. **F is mechanical** (root `yarn demo` alias + CI hook if CI lands + optional App.tsx tidy).
 >   START AT F. E renamed the scope to `@atizar/*` (see the 7c-E as-built bullet above).
->
 > - **D — golden-set eval + two step-6 follow-ups: ✅ DONE** (see the 7c-D as-built bullet above). The
 >   harness (`apps/inbox/eval/`, `yarn eval`) covers lead-inbox (3) + email-inbox sorter fan-out (1) on
 >   committed synthetic cassettes; F1 (observable cap) is `cap.eval.ts`; F2 (cross-workflow handoff) was
 >   browser-verified live. github-triage deterministic scenario skipped (stretch — covered by F2 + the
 >   deliver integration test).
->
 > - **E — `@atizar/*` scope rename:** ~130 files grep/replace + 5 package.json `name`s. **NEEDS the
 >   final scope name from the user** (ask before starting). Do it LATE/isolated (touches everything).
 >   If the already-written README uses the final scope name, that name is your target.
->
 > - **Env/ops gotchas proven this session (save yourself the rediscovery):**
 >   (a) the dev server now AUTO-LOADS `.env.local` (7c-A) — plain `yarn dev` resolves ATIZAR creds; the
 >   one-off `tsx -e` scripts (`db:reset` etc.) do NOT autoload (they don't import `index.ts`) — source
@@ -1068,7 +1066,7 @@ token on the 6 mutating routes · **D** golden-set eval + the two step-6 follow-
 >   restart. (h) **To browser-test the bearer token (7c-C):** set BOTH `ATIZAR_AUTH_TOKEN` (server) and
 >   `VITE_ATIZAR_AUTH_TOKEN` (client) in the SAME `yarn dev` invocation — Vite reads `VITE_*` from the
 >   process env, so one command sets both; the in-browser fetch matrix (`fetch('/api/cancel-all',{method:'POST',
->   headers:{Authorization:'Bearer …'}})` via Playwright `browser_evaluate`) proves the gate without a
+headers:{Authorization:'Bearer …'}})` via Playwright `browser_evaluate`) proves the gate without a
 >   client rebuild.
 
 **Starting point for the next session = beta build order step 7, sub-step 7c** (slim demo +

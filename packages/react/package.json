@@ -6,8 +6,12 @@
   "scripts": {
     "build": "vite build"
   },
-  "files": ["dist"],
-  "sideEffects": ["*.css"],
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
   "exports": {
     ".": {
       "development": "./src/index.ts",

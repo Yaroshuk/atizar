@@ -20,7 +20,13 @@ describe('email-inbox effects in demo mode', () => {
     // The real batch form key is `items` (what EmailBatchCard emits + applyEmailActions reads),
     // NOT `actions` — assert the demo stub honors the real shape and groups by action.
     const result = await batch!.effects!.applyActions(
-      { items: [{ id: 'a', action: 'trash' }, { id: 'b', action: 'read' }, { id: 'c', action: 'trash' }] },
+      {
+        items: [
+          { id: 'a', action: 'trash' },
+          { id: 'b', action: 'read' },
+          { id: 'c', action: 'trash' },
+        ],
+      },
       {} as never
     )
     expect(result).toMatchObject({ applied: 3, failed: [], byAction: { trash: 2, read: 1 } })

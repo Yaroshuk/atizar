@@ -45,8 +45,7 @@ export function createConnectRoutes(deps: ConnectRoutesDeps): Hono {
     if (!endpoint) return c.json({ error: `unknown provider: ${provider}` }, 404)
 
     const { clientId } = atizarEnv.oauthClient(provider)
-    if (!clientId)
-      return c.json({ error: `OAuth client for "${provider}" is not configured` }, 500)
+    if (!clientId) return c.json({ error: `OAuth client for "${provider}" is not configured` }, 500)
 
     const key = atizarEnv.secretKey()
     if (!key) return c.json({ error: 'ATIZAR_SECRET_KEY not configured' }, 500)

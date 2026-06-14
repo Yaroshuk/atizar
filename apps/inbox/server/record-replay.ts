@@ -180,7 +180,9 @@ export function withRecordReplay(
           return
         }
         if (opts.mode === 'demo') {
-          throw new Error(`DemoCassetteMissing: ${opts.key} step ${step} (demo-cassettes/${opts.key}.jsonl)`)
+          throw new Error(
+            `DemoCassetteMissing: ${opts.key} step ${step} (demo-cassettes/${opts.key}.jsonl)`
+          )
         }
       }
 
@@ -213,7 +215,9 @@ export function withRecordReplay(
           return
         }
         if (opts.mode === 'demo') {
-          throw new Error(`DemoCassetteMissing: ${opts.key} step ${step} (demo-cassettes/${opts.key}.jsonl)`)
+          throw new Error(
+            `DemoCassetteMissing: ${opts.key} step ${step} (demo-cassettes/${opts.key}.jsonl)`
+          )
         }
       }
 

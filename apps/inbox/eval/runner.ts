@@ -68,7 +68,14 @@ export function buildEvalService(): {
       if (!def) throw new Error(`eval: binding for unknown agent "${b.agentId}"`)
       const key = instanceId(descriptor.id, b.agentId)
       const composed = composeInstructions(descriptor.prompt ?? '', def.instructions)
-      const provider = buildProvider(def, b.prompts, providerRegistry, b.allowedTools, key, composed)
+      const provider = buildProvider(
+        def,
+        b.prompts,
+        providerRegistry,
+        b.allowedTools,
+        key,
+        composed
+      )
 
       const fakeEffects: AgentRuntime['effects'] = {}
       for (const name of Object.keys(b.effects ?? {})) {

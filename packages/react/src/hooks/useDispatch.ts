@@ -27,7 +27,12 @@ export const useDispatch = () => {
   )
 
   const deliver = useCallback(
-    async (origin: string, dest: Destination, payload: unknown, parentId: string): Promise<void> => {
+    async (
+      origin: string,
+      dest: Destination,
+      payload: unknown,
+      parentId: string
+    ): Promise<void> => {
       await fetch('/api/deliver', {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...authHeaders(authToken) },
@@ -39,14 +44,20 @@ export const useDispatch = () => {
 
   const cancel = useCallback(
     async (id: string): Promise<void> => {
-      await fetch(`/api/workitems/${id}/cancel`, { method: 'POST', headers: authHeaders(authToken) })
+      await fetch(`/api/workitems/${id}/cancel`, {
+        method: 'POST',
+        headers: authHeaders(authToken),
+      })
     },
     [authToken]
   )
 
   const cancelWorkflow = useCallback(
     async (id: string): Promise<void> => {
-      await fetch(`/api/workflows/${id}/cancel`, { method: 'POST', headers: authHeaders(authToken) })
+      await fetch(`/api/workflows/${id}/cancel`, {
+        method: 'POST',
+        headers: authHeaders(authToken),
+      })
     },
     [authToken]
   )

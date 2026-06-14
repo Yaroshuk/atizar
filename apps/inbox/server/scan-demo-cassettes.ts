@@ -30,7 +30,9 @@ for (const f of files) {
   }
 }
 if (findings > 0) {
-  console.error(`\n[demo:scan-cassettes] ${findings} potential REAL PII finding(s) — fix before commit.`)
+  console.error(
+    `\n[demo:scan-cassettes] ${findings} potential REAL PII finding(s) — fix before commit.`
+  )
   process.exit(1)
 }
 console.log(`[demo:scan-cassettes] ${files.length} cassette(s) clean.`)
