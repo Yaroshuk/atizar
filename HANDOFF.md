@@ -18,7 +18,7 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
-**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS2 → WS6 → WS1 → WS7.**
+**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS6 → WS1 → WS7.**
 Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
 so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
 
@@ -50,11 +50,21 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
   `DEV_RECORD_REPLAY=1`):** (1) delete the test Gmail **draft** `r7666524379648912752` (thread
   `19ebbf9875f60e8c`, body contains `WS5-EDIT-MARK`) from the Drafts folder; (2) the Gmail **OAuth
   refresh token is EXPIRED** (`invalid_grant`) — a live (non-replay) Gmail demo needs re-auth.
+- **WS2 — ✅ DONE & merged** (`master` after merge: `f51a060`). Client render/HITL registry now scoped
+  by `(workflowId, toolName)`: `RenderSpec`/`HitlSpec` carry `workflowId`; pure `byWorkflow` +
+  `renderableNamesFor` helpers in `@atizar/react`; `ThreadModal`/`BoardInner` resolve scoped to the
+  active workflow; the aggregator stamps each workflow's specs + dedups WITHIN a workflow (the global
+  `byName` drop is gone, so a reused agent keeps its own copy per workflow). `@atizar/react` stays
+  workflow-agnostic (I5 — grep of the package src for workflow ids/card names is comments/tests only).
+  Optional Task 7 done (typed `LEAD_INBOX_TOOLS as const`). Green gate green (typecheck / test 488 /
+  lint / format / `@atizar/react` build). **check-foundation: CLEAR** (I5 strengthened, I7/I15 intact).
+  Browser-verified PASS: all four workflows render their cards (VerdictCard+ApprovalDialog, TriageCard,
+  SortSummaryCard), 0 render-collision warnings, reload re-resolves the card.
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
 - WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md`
-- WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md`
+- WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md` — ✅ **DONE & merged** (`f51a060`)
 - WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md` — ✅ **DONE & merged** (`d64966f`)
 - WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
 - WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md` — ✅ **DONE & merged** (`81febc9`)
