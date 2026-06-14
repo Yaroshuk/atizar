@@ -37,6 +37,11 @@ const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected'>> = {
 // Statuses that count as an active child (block a parent's auto-finish).
 const ACTIVE: WorkItemStatus[] = ['queued', 'running', 'awaiting_approval', 'awaiting_input']
 
+// Terminal statuses an edge can land a work item in. Any of these frees the item's parent for
+// the auto-finish walk — not just a clean `finish` (a rejected / cancelled / failed child must
+// release its parent too).
+const TERMINAL_STATUSES: WorkItemStatus[] = ['finished', 'error']
+
 export interface TransitionOpts {
   error?: string
 }
@@ -96,7 +101,11 @@ export async function transition(
       })
       .where(eq(workItems.id, id))
 
-    if (edge === 'finish' && row.parentId) await autoFinishParent(tx, row.parentId)
+    // Any edge that drives THIS item to a terminal status can free its parent: a parent held
+    // `running` only by this (now-terminal) child must walk to finished too. Previously only
+    // `finish` did this, so a rejected / cancelled / failed child left its parent stuck "Working".
+    if (row.parentId && TERMINAL_STATUSES.includes(spec.to))
+      await autoFinishParent(tx, row.parentId)
   })
 }
 

@@ -86,11 +86,23 @@ export function createPipelineRoutes(service: PipelineService): Hono {
           resolve()
         }
 
+        // The backlog replay (below) and a live terminal-status close can interleave: a terminal
+        // status arriving BEFORE the backlog has flushed would close the stream and drop the tail
+        // events (e.g. the final render tool call), which is invisible server-side but leaves the
+        // client's thread incomplete. So gate every terminal close on the backlog being fully
+        // written. `backlogFlushed` resolves once the trailing backlog status write resolves;
+        // stream writes are FIFO, so that also flushes every backlog event queued before it.
+        let resolveBacklog = (): void => {}
+        const backlogFlushed = new Promise<void>((r) => {
+          resolveBacklog = r
+        })
+        const closeAfterBacklog = (): void => void backlogFlushed.then(cleanup)
+
         const onMsg = (raw: unknown) => {
           const msg = raw as WorkItemMsg
           if (isStatusMsg(msg)) {
             const written = stream.writeSSE({ event: 'status', data: msg.status }).catch(() => {})
-            if (TERMINAL.has(msg.status)) void written.then(cleanup)
+            if (TERMINAL.has(msg.status)) void written.then(closeAfterBacklog)
             return
           }
           if (msg.seq < from) return
@@ -105,14 +117,18 @@ export function createPipelineRoutes(service: PipelineService): Hono {
         // Backlog (after subscribing — dupes are fine, the client orders by seq).
         void (async () => {
           const snap = await service.getTrace(id, from)
-          if (!snap) return cleanup()
+          if (!snap) {
+            resolveBacklog()
+            return cleanup()
+          }
           for (const e of snap.events) {
             void stream
               .writeSSE({ id: String(e.seq), data: JSON.stringify(e.event) })
               .catch(() => {})
           }
           const initial = stream.writeSSE({ event: 'status', data: snap.status }).catch(() => {})
-          // Already finished at attach → close only after the status write flushes.
+          void initial.then(resolveBacklog)
+          // Already finished at attach → close only after the backlog flush.
           if (snap.done) void initial.then(cleanup)
         })()
       })

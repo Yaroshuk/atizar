@@ -59,4 +59,40 @@ describe.skipIf(!reachable)('auto-finish parent walk (real Postgres)', () => {
     expect((await store.getWorkItem(mid))?.status).toBe('finished')
     expect((await store.getWorkItem(root))?.status).toBe('finished')
   })
+
+  // A child reaching a terminal status by ANY edge (not just a clean `finish`) must free its
+  // parent — otherwise a rejected / cancelled / failed child leaves the parent stuck "Working".
+  it('auto-finishes the parent when its last child is REJECTED', async () => {
+    const parent = await running()
+    const c = await running(parent)
+    await transition(db, c, 'gate') // → awaiting_approval (reject is only legal from there)
+    await transition(db, c, 'reject')
+    expect((await store.getWorkItem(c))?.resolution).toBe('rejected')
+    expect((await store.getWorkItem(parent))?.status).toBe('finished')
+  })
+
+  it('auto-finishes the parent when its last child is CANCELLED', async () => {
+    const parent = await running()
+    const c = await running(parent)
+    await transition(db, c, 'cancel')
+    expect((await store.getWorkItem(parent))?.status).toBe('finished')
+  })
+
+  it('auto-finishes the parent when its last child FAILS', async () => {
+    const parent = await running()
+    const c = await running(parent)
+    await transition(db, c, 'fail', { error: 'boom' })
+    expect((await store.getWorkItem(parent))?.status).toBe('finished')
+  })
+
+  it('still defers while another child stays active (reject one of two)', async () => {
+    const parent = await running()
+    const a = await running(parent)
+    const b = await running(parent)
+    await transition(db, a, 'gate')
+    await transition(db, a, 'reject')
+    expect((await store.getWorkItem(parent))?.status).toBe('running') // b still active
+    await transition(db, b, 'finish')
+    expect((await store.getWorkItem(parent))?.status).toBe('finished')
+  })
 })
