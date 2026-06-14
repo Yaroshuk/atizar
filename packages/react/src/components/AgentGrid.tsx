@@ -34,29 +34,29 @@ export const AgentGrid = ({
   onStart: (agent: AgentDefinition) => void
   onOpen: (agentId: string) => void
 }) => (
-  <div className="main">
+  <div className='main'>
     <CompHeader
-      icon="layers"
-      label="Your agents"
+      icon='layers'
+      label='Your agents'
       actions={
-        <span className="legend">
-          <span className="legend-item">
-            <span className="dot idle" />
+        <span className='legend'>
+          <span className='legend-item'>
+            <span className='dot idle' />
             Idle
           </span>
-          <span className="legend-item">
-            <span className="dot done" />
+          <span className='legend-item'>
+            <span className='dot done' />
             Running / done
           </span>
-          <span className="legend-item">
-            <span className="dot awaiting_approval" />
+          <span className='legend-item'>
+            <span className='dot awaiting_approval' />
             Awaiting approval
           </span>
         </span>
       }
     />
-    <div className="main-scroll">
-      <div className="agent-grid">
+    <div className='main-scroll'>
+      <div className='agent-grid'>
         {agents.map((agent) => {
           const agg = aggOf(agent.id)
           const singletonBusy =

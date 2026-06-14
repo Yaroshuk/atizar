@@ -12,7 +12,7 @@ describe('AgentGrid', () => {
         agents={agents}
         meta={cfg.meta}
         items={[]}
-        activeWorkflowId="a"
+        activeWorkflowId='a'
         aggOf={() => ({ status: 'idle' }) as any}
         healthOf={() => undefined}
         canStart={() => true}
@@ -24,9 +24,7 @@ describe('AgentGrid', () => {
   })
 
   describe('singletonBusy', () => {
-    const singletonAgents = [
-      { id: 'qualifier', name: 'QUALIFIER', maxInstances: 1 },
-    ] as any
+    const singletonAgents = [{ id: 'qualifier', name: 'QUALIFIER', maxInstances: 1 }] as any
     const singletonMeta: any = { qualifier: { subtitle: 'qualifies leads', iconName: 'inbox' } }
 
     // An active item that matches the singleton agent in workflow "a":
@@ -46,7 +44,7 @@ describe('AgentGrid', () => {
           agents={singletonAgents}
           meta={singletonMeta}
           items={[activeItem]}
-          activeWorkflowId="a"
+          activeWorkflowId='a'
           aggOf={() => idleAgg}
           healthOf={() => undefined}
           canStart={() => true}
@@ -66,7 +64,7 @@ describe('AgentGrid', () => {
           agents={singletonAgents}
           meta={singletonMeta}
           items={[finishedItem]}
-          activeWorkflowId="a"
+          activeWorkflowId='a'
           aggOf={() => idleAgg}
           healthOf={() => undefined}
           canStart={() => true}

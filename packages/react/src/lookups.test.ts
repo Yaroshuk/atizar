@@ -20,7 +20,13 @@ const cfg = {
 } as unknown as WorkflowsConfig
 
 const wi = (over: Partial<WorkItem>): WorkItem =>
-  ({ id: 'w1', workflowId: 'lead-inbox', agentId: 'lead-inbox__reply', payload: {}, ...over }) as WorkItem
+  ({
+    id: 'w1',
+    workflowId: 'lead-inbox',
+    agentId: 'lead-inbox__reply',
+    payload: {},
+    ...over,
+  }) as WorkItem
 
 describe('lookups', () => {
   it('resolves role, name, icon, stripped agent id, and label', () => {

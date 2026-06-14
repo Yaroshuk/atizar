@@ -11,7 +11,9 @@ export const App = () => {
     fetch('/api/config')
       .then((r) => r.json())
       .then((c: Config) => setConfig(c))
-      .catch(() => setConfig({ demo: false, workflows: workflowsConfig.workflows.map((w) => w.id) }))
+      .catch(() =>
+        setConfig({ demo: false, workflows: workflowsConfig.workflows.map((w) => w.id) })
+      )
   }, [])
 
   if (!config) return null // brief load before config resolves (acceptable for the demo)

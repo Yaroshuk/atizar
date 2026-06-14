@@ -75,7 +75,10 @@ describe('useStopController', () => {
   it('item stop tracks stoppingItems[id]=true while cancel is in-flight, clears after', async () => {
     let resolveFn!: () => void
     cancel.mockImplementationOnce(
-      () => new Promise<void>((res) => { resolveFn = res })
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res
+        })
     )
     const { result } = renderHook(() => useStopController('wf-a'))
     act(() => result.current.requestStopItem('w2'))
@@ -83,12 +86,16 @@ describe('useStopController', () => {
     // Kick off confirmStop without awaiting — lets us inspect mid-flight state
     let done = false
     act(() => {
-      void result.current.confirmStop().then(() => { done = true })
+      void result.current.confirmStop().then(() => {
+        done = true
+      })
     })
     expect(result.current.stoppingItems['w2']).toBe(true)
     expect(result.current.confirm).toBeNull() // cleared eagerly before await
 
-    await act(async () => { resolveFn() })
+    await act(async () => {
+      resolveFn()
+    })
     expect(result.current.stoppingItems['w2']).toBeUndefined()
     expect(done).toBe(true)
   })
@@ -107,7 +114,10 @@ describe('useStopController', () => {
   it('workflow stop sets stoppingWorkflow=true during cancel, resets after', async () => {
     let resolveFn!: () => void
     cancelWorkflow.mockImplementationOnce(
-      () => new Promise<void>((res) => { resolveFn = res })
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res
+        })
     )
     const { result } = renderHook(() => useStopController('wf-a'))
     act(() => result.current.requestStopWorkflow())
@@ -117,7 +127,9 @@ describe('useStopController', () => {
     })
     expect(result.current.stoppingWorkflow).toBe(true)
 
-    await act(async () => { resolveFn() })
+    await act(async () => {
+      resolveFn()
+    })
     expect(result.current.stoppingWorkflow).toBe(false)
     expect(result.current.confirm).toBeNull()
   })
@@ -136,7 +148,10 @@ describe('useStopController', () => {
   it('all stop sets stoppingAll=true during cancel, resets after', async () => {
     let resolveFn!: () => void
     cancelAll.mockImplementationOnce(
-      () => new Promise<void>((res) => { resolveFn = res })
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res
+        })
     )
     const { result } = renderHook(() => useStopController('wf-a'))
     act(() => result.current.requestStopAll())
@@ -146,7 +161,9 @@ describe('useStopController', () => {
     })
     expect(result.current.stoppingAll).toBe(true)
 
-    await act(async () => { resolveFn() })
+    await act(async () => {
+      resolveFn()
+    })
     expect(result.current.stoppingAll).toBe(false)
     expect(result.current.confirm).toBeNull()
   })

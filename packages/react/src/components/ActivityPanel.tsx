@@ -223,11 +223,7 @@ export const ActivityPanel = ({ open, dev, feed, workflows, onClose }: ActivityP
         </select>
       </div>
 
-      <div
-        className={clsx(s.actFeed, isTrace && s.traceFeed)}
-        ref={scrollRef}
-        onScroll={onScroll}
-      >
+      <div className={clsx(s.actFeed, isTrace && s.traceFeed)} ref={scrollRef} onScroll={onScroll}>
         {empty ? (
           <div className={s.actEmpty}>
             <Icon name='activity' size={26} style={{ opacity: 0.4 }} />
