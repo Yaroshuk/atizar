@@ -1,0 +1,95 @@
+// CardShell — the shared frame all in-thread cards compose. Values are lifted from
+// the two ad-hoc frames it unifies: `.lead-card` (neutral surface) and `.approval`
+// (amber attention) in styles.css. All colors/radii/shadows resolve through `--atz-*`
+// design tokens (legacy aliases resolved to their --atz-* source). Class names are
+// camelCase so CSS-Modules `camelCaseOnly` leaves them as-is — referenced `s.shell` etc.
+
+.shell {
+  background: var(--atz-color-surface);
+  border: 1px solid var(--atz-color-border-strong);
+  border-radius: var(--atz-radius-md);
+  padding: 15px 16px;
+  box-shadow: var(--atz-shadow-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attention {
+  background: var(--atz-amber-bg);
+  border-color: var(--atz-amber-border);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.iconBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--atz-radius-sm);
+  background: var(--atz-grey-50);
+  color: var(--atz-color-text-muted);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+// Amber tone override — both classes live in this module, so the descendant selector
+// resolves against the hashed local names (do NOT write `.attention .icon-badge`).
+.attention .iconBadge {
+  background: var(--atz-amber-border);
+  color: var(--atz-amber-ink);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--atz-color-text-muted);
+}
+
+.attention .kicker {
+  color: var(--atz-amber-ink);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--atz-color-text);
+}
+
+.badge {
+  margin-left: auto;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--atz-color-text);
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
