@@ -1,0 +1,75 @@
+// Drawer — co-located CSS Module (migrated from global styles.css).
+// `.act-scrim`/`.act-drawer`/`.act-head`/`.act-x` are exclusive to this primitive
+// (ActivityPanel passes `.act-title`/`.act-head-spacer` as caller children of the
+// header, but does not render the shell), so the shell rules are DELETED from
+// styles.css. The `act-slide` keyframe is moved (owned here); the `confirm-fade`
+// keyframe used by `.act-scrim` is SHARED (also `.confirm-scrim`) so it stays
+// global AND is copied here so the scoped `.act-scrim` animation resolves.
+
+.act-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(17, 17, 17, 0.16);
+  animation: confirm-fade 0.12s ease;
+}
+@keyframes confirm-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.act-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 151;
+  width: 446px;
+  max-width: calc(100vw - 40px);
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -16px 0 50px rgba(17, 17, 17, 0.13);
+  display: flex;
+  flex-direction: column;
+  animation: act-slide 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes act-slide {
+  from {
+    transform: translateX(28px);
+    opacity: 0.3;
+  }
+}
+
+.act-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 12px 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.act-x {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background 0.14s,
+    color 0.14s;
+
+  &:hover {
+    background: #f1f1f3;
+    color: var(--text);
+  }
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+}

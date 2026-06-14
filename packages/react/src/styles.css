@@ -438,43 +438,9 @@ button {
 /* ============================================================
    Activity / Trace drawer
    ============================================================ */
-.act-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 150;
-  background: rgba(17, 17, 17, 0.16);
-  animation: confirm-fade 0.12s ease;
-}
-.act-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 151;
-  width: 446px;
-  max-width: calc(100vw - 40px);
-  background: var(--surface);
-  border-left: 1px solid var(--border-strong);
-  box-shadow: -16px 0 50px rgba(17, 17, 17, 0.13);
-  display: flex;
-  flex-direction: column;
-  animation: act-slide 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-@keyframes act-slide {
-  from {
-    transform: translateX(28px);
-    opacity: 0.3;
-  }
-}
-
-.act-head {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 12px 12px 18px;
-  border-bottom: 1px solid var(--border);
-}
+/* `.act-scrim` / `.act-drawer` (+ `act-slide` keyframe) / `.act-head` / `.act-x`
+   moved into primitives/Drawer.module.scss. `.act-title` / `.act-head-spacer`
+   stay here — they're caller-supplied header children (ActivityPanel, Task 8). */
 .act-title {
   font-size: 15px;
   font-weight: 680;
@@ -490,28 +456,6 @@ button {
 }
 .act-head-spacer {
   flex: 1;
-}
-.act-x {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition:
-    background 0.14s,
-    color 0.14s;
-}
-.act-x:hover {
-  background: #f1f1f3;
-  color: var(--text);
-}
-.act-x svg {
-  width: 17px;
-  height: 17px;
 }
 
 /* dev Activity|Trace segmented switch */

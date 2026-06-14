@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
+import clsx from 'clsx'
 import { Icon } from '../components/Icon'
+import s from './Drawer.module.scss'
 
 // A right-anchored slide-in drawer over a dim scrim — the Activity/Trace surface
 // is built on this. Secondary surface: Esc and scrim-click dismiss it; it never
@@ -30,15 +32,11 @@ export const Drawer = ({ open, onClose, ariaLabel, header, children, className }
   if (!open) return null
   return (
     <>
-      <div className='act-scrim' onClick={onClose} />
-      <aside
-        className={['act-drawer', className].filter(Boolean).join(' ')}
-        role='dialog'
-        aria-label={ariaLabel}
-      >
-        <div className='act-head'>
+      <div className={s.actScrim} onClick={onClose} />
+      <aside className={clsx(s.actDrawer, className)} role='dialog' aria-label={ariaLabel}>
+        <div className={s.actHead}>
           {header}
-          <button className='act-x' onClick={onClose} aria-label='Close'>
+          <button className={s.actX} onClick={onClose} aria-label='Close'>
             <Icon name='close' size={17} />
           </button>
         </div>
