@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { Icon, type IconName } from '../../components/Icon'
+import { Icon, type IconName } from '../../components/Icon/Icon'
 import s from './IconButton.module.scss'
 
 // A square icon-only header control (`.icon-btn`) — the bell, the activity pulse.

@@ -1,7 +1,7 @@
 import type { WorkItem } from './serverTypes'
 import { mapStatus, type Status } from './status'
 import type { PInstance } from './pipelineModel'
-import type { IconName } from './components/Icon'
+import type { IconName } from './components/Icon/Icon'
 
 // Map the server-authoritative board (WorkItem[]) onto the pure client pipeline model.
 // The cap/queue is server-side now (WorkerPool); the board is the single source of truth.

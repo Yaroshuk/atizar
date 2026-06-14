@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { Icon, type IconName } from '../../components/Icon'
+import { Icon, type IconName } from '../../components/Icon/Icon'
 import s from './CompHeader.module.scss'
 
 // The shared component header used by sibling board columns (Pipeline, Your

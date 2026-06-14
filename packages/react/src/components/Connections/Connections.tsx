@@ -1,7 +1,7 @@
-import { useConnections, type ConnectionStatus } from '../hooks/useConnections.js'
-import { ConnectionChip } from './ConnectionChip.js'
-import { useWorkflowsConfig } from '../workflowsContext.js'
-import { authHeaders } from '../authHeaders.js'
+import { useConnections, type ConnectionStatus } from '../../hooks/useConnections.js'
+import { ConnectionChip } from '../ConnectionChip/ConnectionChip.js'
+import { useWorkflowsConfig } from '../../workflowsContext.js'
+import { authHeaders } from '../../authHeaders.js'
 import s from './Connections.module.scss'
 
 // The Connections panel: lists every required integration with its chip. A Disconnect on a

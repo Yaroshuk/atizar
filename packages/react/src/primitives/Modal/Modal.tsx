@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { Icon, type IconName } from '../../components/Icon'
+import { Icon, type IconName } from '../../components/Icon/Icon'
 import s from './Modal.module.scss'
 
 // A centered modal over a dim backdrop, with the Smedja head (icon mark + title +

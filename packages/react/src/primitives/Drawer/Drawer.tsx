@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { Icon } from '../../components/Icon'
+import { Icon } from '../../components/Icon/Icon'
 import s from './Drawer.module.scss'
 
 // A right-anchored slide-in drawer over a dim scrim — the Activity/Trace surface

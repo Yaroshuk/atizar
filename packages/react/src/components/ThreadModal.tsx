@@ -6,7 +6,7 @@ import { buildRenderToolCall } from '../buildRenderToolCall'
 import { useWorkflowsConfig } from '../workflowsContext'
 import { mapStatus } from '../status'
 import { AgentModal, type HandoffNote } from './AgentModal'
-import type { IconName } from './Icon'
+import type { IconName } from './Icon/Icon'
 
 // One open work item: owns the per-id thread + gate hooks and renders AgentModal. The thread
 // is folded from the server trace (live SSE tail); the approval card is rendered from the

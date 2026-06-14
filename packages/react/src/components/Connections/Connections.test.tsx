@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { Connections } from './Connections.js'
-import { WorkflowsProvider } from '../workflowsContext.js'
+import { WorkflowsProvider } from '../../workflowsContext.js'
 
 // Minimal config — Connections only reads authToken; other fields unused in these tests.
 const cfg = { workflows: [], meta: {}, renders: [], hitl: [] }

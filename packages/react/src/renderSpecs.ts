@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { z } from 'zod'
 import type { Destination } from '@atizar/core'
-import type { IconName } from './components/Icon'
+import type { IconName } from './components/Icon/Icon'
 
 export type AgentMeta = { subtitle: string; iconName: IconName; intro: string }
 export type DeliverFn = (origin: string, dest: Destination, payload: unknown) => void

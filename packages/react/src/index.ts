@@ -16,7 +16,7 @@ export { AgentGrid } from './components/AgentGrid.js'
 export { AgentModal } from './components/AgentModal.js'
 export { ThreadModal } from './components/ThreadModal.js'
 export { InstancePickerModal } from './components/InstancePickerModal.js'
-export { WorkflowSwitcher } from './components/WorkflowSwitcher.js'
+export { WorkflowSwitcher } from './components/WorkflowSwitcher/WorkflowSwitcher.js'
 // Orchestration hooks (board selection / navigation / stop) + pure helpers — extracted
 // from the former monolith so a custom board reproduces its behavior.
 export { useWorkflowSelection } from './hooks/useWorkflowSelection.js'
@@ -32,8 +32,8 @@ export type { AgentMeta, DeliverFn, RenderSpec, HitlSpec } from './renderSpecs.j
 export { buildRenderToolCall } from './buildRenderToolCall.js'
 export { ThreadResultsContext, useThreadResult } from './threadResults.js'
 export { authHeaders } from './authHeaders.js'
-export { Icon } from './components/Icon.js'
-export type { IconName } from './components/Icon.js'
+export { Icon } from './components/Icon/Icon.js'
+export type { IconName } from './components/Icon/Icon.js'
 // UI primitives (token-driven, extensible — spread native attrs + merge className).
 export { Button, type ButtonVariant } from './primitives/Button/Button.js'
 export { StopButton, type StopScope } from './primitives/StopButton/StopButton.js'
@@ -46,7 +46,7 @@ export { Segmented } from './primitives/Segmented/Segmented.js'
 export { Switch } from './primitives/Switch/Switch.js'
 // Chrome components.
 export { AppHeader } from './components/AppHeader.js'
-export { WorkflowTabs } from './components/WorkflowTabs.js'
+export { WorkflowTabs } from './components/WorkflowTabs/WorkflowTabs.js'
 export { ActivityPanel } from './components/ActivityPanel.js'
 // Headless hooks (the data layer — build your own UI without forking).
 export { useBoard } from './hooks/useBoard.js'
@@ -57,5 +57,5 @@ export { useActivity, type ActivityFeed, type ConnState } from './hooks/useActiv
 export { useHealth } from './hooks/useHealth.js'
 export { useConnections } from './hooks/useConnections.js'
 export type { ConnectionStatus } from './hooks/useConnections.js'
-export { Connections } from './components/Connections.js'
-export { ConnectionChip } from './components/ConnectionChip.js'
+export { Connections } from './components/Connections/Connections.js'
+export { ConnectionChip } from './components/ConnectionChip/ConnectionChip.js'

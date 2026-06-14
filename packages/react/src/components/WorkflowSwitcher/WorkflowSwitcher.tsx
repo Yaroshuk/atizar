@@ -1,4 +1,4 @@
-import { Icon } from './Icon'
+import { Icon } from '../Icon/Icon'
 import type { WorkflowDescriptor } from '@atizar/core'
 
 type WorkflowSwitcherProps = {

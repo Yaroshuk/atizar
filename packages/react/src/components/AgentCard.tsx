@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { STATUS_LABEL, type Status } from '../status'
 import type { AgentHealth } from '../serverTypes'
-import { Icon, type IconName } from './Icon'
+import { Icon, type IconName } from './Icon/Icon'
 import { Button } from '../primitives/Button/Button'
 import s from './AgentCard.module.scss'
 

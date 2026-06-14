@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Icon } from './Icon'
+import { Icon } from '../Icon/Icon'
 import s from './WorkflowTabs.module.scss'
 import type { WorkflowDescriptor } from '@atizar/core'
 

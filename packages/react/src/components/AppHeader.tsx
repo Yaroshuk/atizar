@@ -1,5 +1,5 @@
-import { WorkflowTabs } from './WorkflowTabs'
-import { Connections } from './Connections'
+import { WorkflowTabs } from './WorkflowTabs/WorkflowTabs'
+import { Connections } from './Connections/Connections'
 import { StopButton } from '../primitives/StopButton/StopButton'
 import { IconButton } from '../primitives/IconButton/IconButton'
 import s from './AppHeader.module.scss'

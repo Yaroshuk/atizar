@@ -1,5 +1,5 @@
 import type { Status } from './status'
-import type { IconName } from './components/Icon'
+import type { IconName } from './components/Icon/Icon'
 
 export type PInstance = {
   localId: string

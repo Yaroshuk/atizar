@@ -4,7 +4,7 @@ import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '
 import { STATUS_LABEL, type Status } from '../status'
 import { isDevMode } from '../devMode'
 import { ThreadResultsContext } from '../threadResults'
-import { Icon, type IconName } from './Icon'
+import { Icon, type IconName } from './Icon/Icon'
 import s from './AgentModal.module.scss'
 // HandoffNote's single canonical definition lives in useBoardNavigation (so a hook consumer
 // can type notes without importing a React component); re-export it here for back-compat.

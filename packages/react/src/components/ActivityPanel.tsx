@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Icon } from './Icon'
+import { Icon } from './Icon/Icon'
 import { Drawer } from '../primitives/Drawer/Drawer'
 import { Segmented } from '../primitives/Segmented/Segmented'
 import s from './ActivityPanel.module.scss'

@@ -1,7 +1,7 @@
 import type { PInstance, PipelineBlock } from '../pipelineModel'
 import type { Status } from '../status'
 import { TINT, STATE_WORD } from '../statusDisplay'
-import { Icon } from './Icon'
+import { Icon } from './Icon/Icon'
 import { CompHeader } from '../primitives/CompHeader/CompHeader'
 import { StopButton } from '../primitives/StopButton/StopButton'
 import s from './PipelineColumn.module.scss'

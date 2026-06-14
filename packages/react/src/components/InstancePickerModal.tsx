@@ -1,6 +1,6 @@
 import type { Status } from '../status'
 import { TINT, STATE_WORD } from '../statusDisplay'
-import { Icon, type IconName } from './Icon'
+import { Icon, type IconName } from './Icon/Icon'
 import s from './InstancePickerModal.module.scss'
 
 // When an agent is running more than one instance (e.g. several reply copies), opening
