@@ -11,6 +11,11 @@ export type DeliverFn = (origin: string, dest: Destination, payload: unknown) =>
 // name→component registry (collapsed at the @atizar/react extraction, mirrors the `effects`
 // pattern: names in core for I15, implementations bound outside).
 export type RenderSpec = {
+  // Which workflow this spec belongs to. Resolution is scoped by (workflowId, toolName) so
+  // two workflows can register the same tool name with different components. The userland
+  // aggregator stamps this from each workflow's client module — the package stays
+  // workflow-agnostic (no card knowledge), it just keys by workflow.
+  workflowId: string
   toolName: string
   parameters: z.ZodTypeAny
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,6 +27,8 @@ export type RenderSpec = {
 // reject(comment), which POST /api/gates/:id/resolve (see useGate). Concurrent approvals are
 // independent gate rows, not a shared resolver.
 export type HitlSpec = {
+  // See RenderSpec.workflowId — HITL resolution is scoped by (workflowId, toolName) too.
+  workflowId: string
   toolName: string
   parameters: z.ZodTypeAny
   render: (ctx: {
