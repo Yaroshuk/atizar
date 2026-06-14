@@ -10,7 +10,7 @@ import {
 
 // The demo aggregator: merges every workflow client module into one WorkflowsConfig bundle
 // (descriptors + per-agent chrome meta + render/HITL specs), deduped by tool name (a reused
-// agent registers its render only once), and hands it to <WorkflowBoard config={…} />. This
+// agent registers its render only once), and hands it to <BoardApp config={…} />. This
 // is the userland injection point — the package holds no cards or workflow knowledge.
 const META: Record<string, AgentMeta> = { ...leadInboxMeta, ...githubTriageMeta, ...emailInboxMeta }
 const byName = <T extends { toolName: string }>(specs: T[]): T[] => {

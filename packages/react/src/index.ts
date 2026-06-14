@@ -2,7 +2,6 @@
 // dispatch, theme). Vertical CARDS live in userland; this package never imports one — it
 // receives them via the injected WorkflowsConfig (typed render/HITL specs that reference
 // their card components directly).
-export { WorkflowBoard } from './WorkflowBoard.js'
 export { WorkflowsProvider, useWorkflowsConfig } from './workflowsContext.js'
 // Composition blocks — the board's panels, now exported so userland can compose its own
 // board (see apps/inbox/client/src/BoardApp.tsx).
