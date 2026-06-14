@@ -3516,14 +3516,10 @@ button {
   color: var(--text);
 }
 
-/* connection chip in the header — ONE cohesive pill: status dot + name + a real button */
-.conn-list {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-/* `.conn-chip` (+ `.conn-dot` / `.conn-ok` / `.conn-name`) moved into
-   components/ConnectionChip.module.scss (exclusive to that component). */
+/* connection chip in the header — ONE cohesive pill: status dot + name + a real button.
+   `.conn-list` moved into components/Connections.module.scss; `.conn-chip`
+   (+ `.conn-dot` / `.conn-ok` / `.conn-name`) into components/ConnectionChip.module.scss
+   (each exclusive to its component). */
 .btn-sm {
   padding: 4px 12px;
   font-size: 11.5px;

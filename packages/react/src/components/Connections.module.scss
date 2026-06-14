@@ -1,0 +1,10 @@
+// Connections — co-located CSS Module (migrated from the global styles.css).
+// EXCLUSIVE rule (`.conn-list`) — only this panel used it, so it moved here
+// verbatim and was deleted from styles.css. The chips it renders own their own
+// styles in ConnectionChip.module.scss.
+
+.conn-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}

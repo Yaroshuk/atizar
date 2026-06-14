@@ -2,6 +2,7 @@ import { useConnections, type ConnectionStatus } from '../hooks/useConnections.j
 import { ConnectionChip } from './ConnectionChip.js'
 import { useWorkflowsConfig } from '../workflowsContext.js'
 import { authHeaders } from '../authHeaders.js'
+import s from './Connections.module.scss'
 
 // The Connections panel: lists every required integration with its chip. A Disconnect on a
 // row DELETEs the connection then refetches the snapshot. Self-fetches — no props needed.
@@ -20,7 +21,7 @@ export const Connections = () => {
   }
 
   return (
-    <div className='conn-list'>
+    <div className={s.connList}>
       {connections.map((c) => (
         <ConnectionChip
           key={`${c.integration}:${c.connection}`}
