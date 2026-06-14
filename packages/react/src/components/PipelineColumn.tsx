@@ -2,8 +2,8 @@ import type { PInstance, PipelineBlock } from '../pipelineModel'
 import type { Status } from '../status'
 import { TINT, STATE_WORD } from '../statusDisplay'
 import { Icon } from './Icon'
-import { CompHeader } from '../primitives/CompHeader'
-import { StopButton } from '../primitives/StopButton'
+import { CompHeader } from '../primitives/CompHeader/CompHeader'
+import { StopButton } from '../primitives/StopButton/StopButton'
 import s from './PipelineColumn.module.scss'
 
 type PipelineColumnProps = {

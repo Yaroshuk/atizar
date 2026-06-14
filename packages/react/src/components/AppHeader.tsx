@@ -1,7 +1,7 @@
 import { WorkflowTabs } from './WorkflowTabs'
 import { Connections } from './Connections'
-import { StopButton } from '../primitives/StopButton'
-import { IconButton } from '../primitives/IconButton'
+import { StopButton } from '../primitives/StopButton/StopButton'
+import { IconButton } from '../primitives/IconButton/IconButton'
 import s from './AppHeader.module.scss'
 import type { WorkflowDescriptor } from '@atizar/core'
 

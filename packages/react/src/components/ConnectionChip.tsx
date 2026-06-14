@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Button } from '../primitives/Button.js'
+import { Button } from '../primitives/Button/Button.js'
 import type { ConnectionStatus } from '../hooks/useConnections.js'
 import s from './ConnectionChip.module.scss'
 

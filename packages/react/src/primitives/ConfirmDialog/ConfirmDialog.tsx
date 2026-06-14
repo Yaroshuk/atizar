@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Button } from './Button'
+import { Button } from '../Button/Button'
 import s from './ConfirmDialog.module.scss'
 
 // A small destructive-action confirmation (the bulk Stop scopes use it). Esc and

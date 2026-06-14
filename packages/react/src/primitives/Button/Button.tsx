@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Icon, type IconName } from '../components/Icon'
+import { Icon, type IconName } from '../../components/Icon'
 import s from './Button.module.scss'
 
 // The generic action button. Variants map to the Smedja `.btn-*` classes; every

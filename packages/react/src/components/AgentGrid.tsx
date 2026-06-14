@@ -1,6 +1,6 @@
 import type { AgentDefinition } from '@atizar/core'
 import { AgentCard } from './AgentCard'
-import { CompHeader } from '../primitives/CompHeader'
+import { CompHeader } from '../primitives/CompHeader/CompHeader'
 import { aggregateLabel } from '../aggregate'
 import type { AgentAggregate } from '../aggregate'
 import type { AgentMeta } from '../renderSpecs'
