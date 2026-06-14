@@ -4,6 +4,34 @@ Living session state: **current status + the next thing to build**. Changes ever
 For stable project context (conventions, gotchas, decisions, commands) see `CLAUDE.md`; for the
 full chronological build history see `docs/BUILD-LOG.md`.
 
+## ⏭️ NEXT (start here — fresh session, 2026-06-14)
+
+**Frontend overhaul — 3 workstreams.** Spec (decisions locked):
+`docs/superpowers/specs/2026-06-14-frontend-overhaul-design.md`. The prior session finished the
+`@atizar/react` block decomposition + CSS-module migration + Vite lib build + an SSE-lifecycle
+bug-fix, merged all to `master`, and authored this spec while context was fresh. Your job: turn each
+workstream into a plan and execute it.
+
+- **WS1 — Conventions + structure:** one-component-per-file (split `apps/inbox/client/src/BoardApp.tsx`'s
+  `Inner`), folder-per-component (`Name/Name.tsx` + `Name.module.scss` + local helpers/hooks/tests),
+  CSS Modules incl. `apps/`; write the rules into `docs/CONVENTIONS.md`. (Userland-card `.module.scss`
+  migration is owned by WS3.)
+- **WS2 — Connections:** auto-derive `connectionList` from loaded workflows (add `connections?` to the
+  workflow descriptor; union in `apps/inbox/server/connections.ts`) + collapse the header chip row into
+  ONE compact "Connections" control with a popover.
+- **WS3 — Card redesign (use `frontend-design`):** the in-thread cards look bad — redesign
+  `EmailBatchCard`/`ApprovalDialog` (worst), `TriageCard` (button placement), then sweep the rest;
+  shared `CardShell` frame, aligned action hierarchy, per-row icon-actions; move each card's CSS out of
+  the package `styles.css` into its own folder `*.module.scss`. Keep `--atz-*` + Smedja language.
+
+**How to run it (the user's instruction):** work autonomously, orchestrating subagents. Per workstream:
+`writing-plans` → `subagent-driven-development` (fresh implementer per task + spec/quality review) →
+**browser-verify** (DEV_RECORD_REPLAY=1 + cassettes — this codebase's bugs are browser-only) → green
+gate (`yarn typecheck && yarn test && yarn lint && yarn format:check && yarn workspace @atizar/react build`)
+→ **merge to `master` directly (no PR — beta)**, delete the branch, update this NEXT block. Run
+`check-foundation` for WS1 (convention) + WS2a (descriptor contract); expected CLEAR. Read the spec's
+"Execution rules" + `CLAUDE.md` gotchas (SSE / `useBoard` singleton / `camelCaseOnly`) first.
+
 ## ⏭️ Where we are now
 
 ### 🔒 ARCHITECTURE LOCKED (2026-06-09) → `docs/pipeline-updated-3.md`
