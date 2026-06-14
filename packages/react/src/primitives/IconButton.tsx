@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import clsx from 'clsx'
 import { Icon, type IconName } from '../components/Icon'
+import s from './IconButton.module.scss'
 
 // A square icon-only header control (`.icon-btn`) — the bell, the activity pulse.
 // `active` tints it teal; `badge` overlays a count chip (e.g. unread notifications).
@@ -24,14 +26,13 @@ export const IconButton = ({
   children,
   ...rest
 }: IconButtonProps) => {
-  const cls = ['icon-btn', active ? 'active' : '', className].filter(Boolean).join(' ')
   const hasBadge = typeof badge === 'number' && badge > 0
   return (
-    <span className='bell-wrap'>
-      <button className={cls} {...rest}>
+    <span className={s.bellWrap}>
+      <button className={clsx(s.iconBtn, active && s.active, className)} {...rest}>
         <Icon name={icon} size={iconSize} />
       </button>
-      {hasBadge && <span className='bell-badge'>{badge}</span>}
+      {hasBadge && <span className={s.bellBadge}>{badge}</span>}
       {children}
     </span>
   )

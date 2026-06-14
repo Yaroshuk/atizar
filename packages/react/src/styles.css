@@ -2794,52 +2794,8 @@ button {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-.icon-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  color: #5a5a62;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  position: relative;
-  transition:
-    background 0.14s,
-    color 0.14s;
-}
-.icon-btn svg {
-  width: 20px;
-  height: 20px;
-}
-.icon-btn:hover {
-  background: #f1f1f3;
-  color: var(--text);
-}
-.icon-btn.active {
-  background: var(--teal-tint);
-  color: var(--teal-deep);
-}
-.bell-wrap {
-  position: relative;
-}
-.bell-badge {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: #e0483c;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 17px;
-  text-align: center;
-  border: 2px solid #fff;
-}
+/* `.icon-btn` / `.bell-wrap` / `.bell-badge` moved into
+   primitives/IconButton.module.scss */
 
 .topbar-user {
   display: flex;
