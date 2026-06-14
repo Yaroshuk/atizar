@@ -28,6 +28,10 @@ export type HitlSpec = {
     form: Record<string, unknown>
     formRev: number
     status: string
+    // The untrusted source the agent reacted to (the open work item's payload) — the incoming
+    // email/ticket. Fed beside the editable draft so the human can spot prompt-injection or a
+    // mismatch between source and proposed action. The card composes <SourcePanel source={…}/>.
+    source: Record<string, unknown>
     approve: (form: Record<string, unknown>) => void
     reject: (comment?: string) => void
   }) => ReactElement

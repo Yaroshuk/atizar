@@ -7,6 +7,7 @@ import { useWorkflowsConfig } from '../../workflowsContext'
 import { mapStatus } from '../../status'
 import { AgentModal, type HandoffNote } from '../AgentModal/AgentModal'
 import type { IconName } from '../Icon/Icon'
+import { useBoard } from '../../hooks/useBoard'
 
 // One open work item: owns the per-id thread + gate hooks and renders AgentModal. The thread
 // is folded from the server trace (live SSE tail); the approval card is rendered from the
@@ -34,6 +35,10 @@ export const ThreadModal = (p: ThreadModalProps) => {
   const display = mapStatus(status)
   const awaiting = display === 'awaiting_approval'
   const { gate, approve, reject } = useGate(p.id, awaiting)
+  // The untrusted source the human must see beside the draft = the open work item's payload
+  // (what the agent received). The board is the shared, server-authoritative snapshot.
+  const board = useBoard()
+  const source = (board.items.find((i) => i.id === p.id)?.payload ?? {}) as Record<string, unknown>
 
   // The handoff seam: a card's deliver call carries the open work item as the parent.
   const { deliver, id } = p
@@ -50,7 +55,7 @@ export const ThreadModal = (p: ThreadModalProps) => {
     (() => {
       const spec = hitl.find((s) => s.toolName === gate.toolName)
       if (!spec) return null
-      return spec.render({ form: gate.form, formRev: gate.formRev, status, approve, reject })
+      return spec.render({ form: gate.form, formRev: gate.formRev, status, source, approve, reject })
     })()
 
   return (

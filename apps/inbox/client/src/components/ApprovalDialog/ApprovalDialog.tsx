@@ -1,18 +1,21 @@
 import { useState } from 'react'
-import { CardShell, Button } from '@atizar/react'
+import { CardShell, Button, SourcePanel } from '@atizar/react'
 import s from './ApprovalDialog.module.scss'
 
 type ApprovalData = { threadId: string; body: string }
 
 type ApprovalDialogProps = {
   data: ApprovalData
+  // The untrusted source email the agent drafted a reply TO — shown above the editable body,
+  // flagged untrusted, so the human reviews the real input next to the proposed action.
+  source: Record<string, unknown>
   // The edited body flows to onApprove — this is the load-bearing "the edited text is what
   // lands in the real Gmail draft" path (the server executes the effect with this form).
   onApprove: (editedBody: string) => void
   onReject: () => void
 }
 
-export const ApprovalDialog = ({ data, onApprove, onReject }: ApprovalDialogProps) => {
+export const ApprovalDialog = ({ data, source, onApprove, onReject }: ApprovalDialogProps) => {
   const [body, setBody] = useState(data.body ?? '')
   return (
     <CardShell
@@ -30,6 +33,7 @@ export const ApprovalDialog = ({ data, onApprove, onReject }: ApprovalDialogProp
         </>
       }
     >
+      <SourcePanel source={source} />
       <textarea
         className={s.edit}
         value={body}
