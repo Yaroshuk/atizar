@@ -164,3 +164,17 @@
     color: var(--text);
   }
 }
+
+/* incoming user-turn — the source/seed message the agent reacted to */
+.user-turn {
+  align-self: flex-end;
+  max-width: 340px;
+  background: var(--teal-tint);
+  color: var(--teal-deep);
+  border-radius: 13px 4px 13px 13px;
+  padding: 10px 13px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

@@ -105,6 +105,14 @@ export const AgentModal = ({
   const received = notes.filter((n) => n.dir === 'received')
   const sent = notes.filter((n) => n.dir === 'sent')
 
+  // The incoming user-turn: the seed/source message the agent reacted to. AgentModal otherwise
+  // renders only assistant turns; surfacing the first user message gives the human the input
+  // beside the agent's output (reinforces the SourcePanel oversight surface).
+  const incoming = agent.messages.find(
+    (m) => m.role === 'user' && typeof m.content === 'string' && m.content.length > 0
+  )
+  const incomingText = incoming && typeof incoming.content === 'string' ? incoming.content : ''
+
   const thread = agent.messages.flatMap((msg: Message, i: number) => {
     if (msg.role !== 'assistant') return []
     const nodes: ReactNode[] = []
@@ -169,6 +177,11 @@ export const AgentModal = ({
                 ← Received <strong>{note.label}</strong> from {note.otherName}
               </div>
             ))}
+            {incomingText && (
+              <div className={clsx(s.threadItem, s.userTurn)} key='incoming'>
+                {incomingText}
+              </div>
+            )}
             {/* Always show the intro — for a running instance it heads the thread; for a
                 type view (idle, no instance) it's the agent's description so the card opens
                 to something meaningful rather than a blank panel. */}
