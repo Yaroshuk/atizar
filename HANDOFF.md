@@ -12,10 +12,19 @@ full chronological build history see `docs/BUILD-LOG.md`.
 bug-fix, merged all to `master`, and authored this spec while context was fresh. Your job: turn each
 workstream into a plan and execute it.
 
-- **WS1 — Conventions + structure:** one-component-per-file (split `apps/inbox/client/src/BoardApp.tsx`'s
-  `Inner`), folder-per-component (`Name/Name.tsx` + `Name.module.scss` + local helpers/hooks/tests),
-  CSS Modules incl. `apps/`; write the rules into `docs/CONVENTIONS.md`. (Userland-card `.module.scss`
-  migration is owned by WS3.)
+- **WS1 — Conventions + structure: ✅ DONE & browser-verified** (2026-06-14, merged to `master`,
+  branch deleted). Plan → `docs/superpowers/plans/2026-06-14-ws1-conventions-structure.md`;
+  `check-foundation` = CLEAR. As-built: added the "Component file & folder structure" section to
+  `docs/CONVENTIONS.md` (one-component-per-file incl. private wrappers, folder-per-component, CSS
+  Modules incl. `apps/`); split `BoardApp.tsx` → `BoardApp/BoardApp.tsx` (wrapper) +
+  `BoardApp/BoardInner.tsx` (the former private `Inner`, verbatim body); folderized ALL
+  `@atizar/react` components (13) + primitives (9) from flat `Name.tsx`+`Name.module.scss` →
+  `Name/Name.tsx`+`Name/Name.module.scss` (4 commits: primitives + 3 component batches), repointing
+  the `src/index.ts` barrel + every importer (`.js` ESM specifiers; depth `../` gotcha). Build entry
+  (`src/index.ts`) + dts/tsconfig/vitest globs are recursive so no config change needed.
+  Green gate all pass (typecheck / test 446 / lint / format / `@atizar/react` build); browser-verified
+  the board + a thread render FULLY styled (hashed module classes resolve, status pills/dots colored,
+  text not split, 0 console errors). Userland-card `.module.scss` migration deferred to WS3 (per spec).
 - **WS2 — Connections:** auto-derive `connectionList` from loaded workflows (add `connections?` to the
   workflow descriptor; union in `apps/inbox/server/connections.ts`) + collapse the header chip row into
   ONE compact "Connections" control with a popover.
