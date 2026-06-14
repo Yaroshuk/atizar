@@ -13,12 +13,14 @@ import type { ActivityFeed } from '../../hooks/useActivity'
 const camelize = (input: string): string =>
   input.replace(/[-_]([a-z])/g, (_m, c: string) => c.toUpperCase())
 
-// The observability surface. Operator mode = a chronological feed of meaningful
-// events (status-colored marker, time, workflow + agent, summary), newest at the
-// bottom, auto-following the live SSE. Dev mode (?dev=1) adds a Trace view —
-// the same events grouped by work item, dense + monospace, collapsible. Both
-// share filters (by workflow; by kind), the empty state, and the live/reconnecting
-// chip. Generic over the workflow set so the package owns no vertical labels.
+// The observability surface. Operator mode = a reverse-chronological feed of
+// meaningful events (status-colored marker, time, workflow + agent, summary),
+// NEWEST at the TOP, auto-following the live SSE by pinning to the top (new
+// events push older ones down). Dev mode (?dev=1) adds a Trace view — the same
+// events grouped by work item, dense + monospace, collapsible; within a group
+// the order stays chronological (#1..#n). Both share filters (by workflow; by
+// kind), the empty state, and the live/reconnecting chip. Generic over the
+// workflow set so the package owns no vertical labels.
 type WorkflowLite = { id: string; label: string }
 
 type ActivityPanelProps = {
@@ -131,18 +133,24 @@ export const ActivityPanel = ({ open, dev, feed, workflows, onClose }: ActivityP
   if (wfFilter !== 'all') list = list.filter((e) => e.workflowId === wfFilter)
   if (kindFilter !== 'all') list = list.filter((e) => e.kind === kindFilter)
 
-  // auto-follow the tail while pinned to the bottom
+  // Operator feed shows NEWEST first; the trace grouping below keeps the
+  // chronological `list` so each group's #1..#n stays oldest→newest.
+  const operatorList = [...list].reverse()
+
+  // Newest is at the top, so auto-follow pins to the TOP: new events appear
+  // above and the operator stays at the head of the feed.
   useEffect(() => {
     if (!open || !following) return
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el) el.scrollTop = 0
   }, [events, open, following, mode, wfFilter, kindFilter])
 
-  // Scrolling up pauses auto-follow so the live tail doesn't yank the operator down.
+  // Scrolling DOWN to read history pauses auto-follow so the live tail doesn't
+  // yank the operator back to the top.
   const onScroll = (): void => {
     const el = scrollRef.current
     if (!el) return
-    setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 48)
+    setFollowing(el.scrollTop < 48)
   }
 
   // group for the trace view (by work item, insertion order preserved)
@@ -223,6 +231,8 @@ export const ActivityPanel = ({ open, dev, feed, workflows, onClose }: ActivityP
         </select>
       </div>
 
+      {!isTrace && !empty && <div className={s.actFeedCue}>Newest first</div>}
+
       <div className={clsx(s.actFeed, isTrace && s.traceFeed)} ref={scrollRef} onScroll={onScroll}>
         {empty ? (
           <div className={s.actEmpty}>
@@ -233,7 +243,13 @@ export const ActivityPanel = ({ open, dev, feed, workflows, onClose }: ActivityP
         ) : isTrace ? (
           groups.map((g) => <TraceGroup key={g.key} group={g} wfLabel={labelOf(g.workflow)} />)
         ) : (
-          list.map((e, i) => <ActivityRow key={i} e={e} wfLabel={labelOf(e.workflowId)} />)
+          operatorList.map((e) => (
+            <ActivityRow
+              key={`${e.workItemId}:${e.ts}:${e.kind}`}
+              e={e}
+              wfLabel={labelOf(e.workflowId)}
+            />
+          ))
         )}
       </div>
     </Drawer>
