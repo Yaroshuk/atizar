@@ -55,7 +55,14 @@ export const ThreadModal = (p: ThreadModalProps) => {
     (() => {
       const spec = hitl.find((s) => s.toolName === gate.toolName)
       if (!spec) return null
-      return spec.render({ form: gate.form, formRev: gate.formRev, status, source, approve, reject })
+      return spec.render({
+        form: gate.form,
+        formRev: gate.formRev,
+        status,
+        source,
+        approve,
+        reject,
+      })
     })()
 
   return (
