@@ -1,7 +1,9 @@
+import clsx from 'clsx'
 import { STATUS_LABEL, type Status } from '../status'
 import type { AgentHealth } from '../serverTypes'
 import { Icon, type IconName } from './Icon'
 import { Button } from '../primitives/Button'
+import s from './AgentCard.module.scss'
 
 type AgentCardProps = {
   name: string
@@ -22,6 +24,16 @@ type AgentCardProps = {
   onStart: () => void
   onOpen: () => void
 }
+
+// CSS Modules with `localsConvention: 'camelCaseOnly'` camelize BOTH `-` and `_`,
+// so the runtime status string (e.g. `awaiting_approval`) must be camelized to
+// match the emitted key (`awaitingApproval`; the pill variant `s-awaiting_approval`
+// → `sAwaitingApproval`). This mirrors that transform for the status-keyed lookups.
+const camelize = (input: string): string =>
+  input.replace(/[-_]([a-z])/g, (_m, c: string) => c.toUpperCase())
+
+const statusClass = (status: Status): string | undefined => s[camelize(status)]
+const pillClass = (status: Status): string | undefined => s[camelize(`s-${status}`)]
 
 export const AgentCard = ({
   name,
@@ -49,17 +61,17 @@ export const AgentCard = ({
   const renderFoot = () => {
     if (aggregateLabel) {
       return (
-        <span className='run-foot'>
+        <span className={s.runFoot}>
           <Icon name='sparkle' size={15} />
           {aggregateLabel} · tap to view
         </span>
       )
     }
     if (!canStart) {
-      return <span className='foot-hint'>Runs from a handoff</span>
+      return <span className={s.footHint}>Runs from a handoff</span>
     }
     return (
-      <div className='card-foot'>
+      <div className={s.cardFoot}>
         <Button
           variant='primary'
           block
@@ -76,22 +88,22 @@ export const AgentCard = ({
   }
 
   return (
-    <div className={'agent-card' + (unhealthy ? ' is-error' : '')} onClick={onOpen}>
-      <div className='card-top'>
-        <div className='card-icon'>
+    <div className={clsx(s.agentCard, unhealthy && s.isError)} onClick={onOpen}>
+      <div className={s.cardTop}>
+        <div className={s.cardIcon}>
           <Icon name={iconName} size={20} />
         </div>
-        <span className={`status s-${status}`}>
-          <span className={`dot ${status}`} />
+        <span className={clsx(s.status, pillClass(status))}>
+          <span className={clsx(s.dot, statusClass(status))} />
           {STATUS_LABEL[status]}
         </span>
       </div>
 
-      <div className='card-headtext'>
-        <p className='agent-name'>{name}</p>
-        <p className='agent-sub'>{subtitle}</p>
+      <div className={s.cardHeadtext}>
+        <p className={s.agentName}>{name}</p>
+        <p className={s.agentSub}>{subtitle}</p>
         {unhealthy && (
-          <p className='card-error-msg'>
+          <p className={s.cardErrorMsg}>
             <Icon name='alert' size={13} />
             {health.error}
           </p>

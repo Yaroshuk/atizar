@@ -1147,70 +1147,8 @@ button {
   gap: 20px;
 }
 
-.agent-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 22px 22px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 188px;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  transition:
-    box-shadow 0.18s ease,
-    transform 0.18s ease,
-    border-color 0.18s ease;
-  position: relative;
-}
-.agent-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
-  border-color: var(--border-strong);
-}
-
-.card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.card-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  background: #f3f3f5;
-  color: #5a5a62;
-  flex: 0 0 auto;
-}
-.card-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.agent-name {
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  margin: 0;
-}
-.agent-sub {
-  color: var(--muted);
-  font-size: 13.5px;
-  margin: 2px 0 0;
-  line-height: 1.4;
-}
-
-.card-headtext {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* status pill (top-right of card) */
+/* status pill (top-right of card) — shared across cards/modals; AgentCard's own
+   copy now lives in components/AgentCard.module.scss */
 .status {
   display: inline-flex;
   align-items: center;
@@ -1273,10 +1211,6 @@ button {
 .status.s-running,
 .status.s-done {
   color: var(--teal-deep);
-}
-
-.card-foot {
-  margin-top: auto;
 }
 
 /* ---------- Buttons ---------- */
@@ -2559,9 +2493,8 @@ button {
   overflow: visible;
   z-index: 4;
 }
-.agent-card {
-  z-index: 1;
-}
+/* `.agent-card { z-index: 1 }` (stack below this connector) moved into
+   components/AgentCard.module.scss as the scoped root rule. */
 
 /* stacked lead instances indicator */
 .lead-stack {
@@ -3085,18 +3018,8 @@ button {
 .status.s-error {
   color: #c0392b;
 }
-.agent-card.is-error {
-  border-color: rgba(214, 69, 58, 0.3);
-  background: rgba(214, 69, 58, 0.025);
-}
-.card-error-msg {
-  font-size: 12.5px;
-  color: #c0392b;
-  margin: 8px 0 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+/* `.agent-card.is-error` + `.card-error-msg` moved into
+   components/AgentCard.module.scss */
 .card-empty-msg {
   font-size: 12.5px;
   color: var(--muted);
@@ -3481,17 +3404,8 @@ button {
   animation: pulse 1.8s ease-out infinite;
 }
 
-/* running footer ("✦ Running… tap to view") — AgentModal/AgentCard live run */
-.run-foot {
-  margin-top: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--teal-deep);
-  padding: 10px 4px;
-}
+/* `.run-foot` (live-run footer) moved into components/AgentCard.module.scss
+   (it is AgentCard-only despite the old comment) */
 
 /* empty pipeline state */
 .pipe-empty {
