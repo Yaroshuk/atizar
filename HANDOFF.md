@@ -4,7 +4,57 @@ Living session state: **current status + the next thing to build**. Changes ever
 For stable project context (conventions, gotchas, decisions, commands) see `CLAUDE.md`; for the
 full chronological build history see `docs/BUILD-LOG.md`.
 
-## ⏭️ NEXT (start here — fresh session, 2026-06-14)
+## ⏭️ NEXT (start here — fresh session, 2026-06-14) — Re-run + trust/UX + library boundary (7 work-streams)
+
+**Re-run semantics + trust/UX + library-boundary cleanup — 7 work-streams.** Spec (ALL decisions
+LOCKED, foundation-checked CLEAR): `docs/superpowers/specs/2026-06-14-rerun-and-trust-ux-design.md`.
+Background analysis: `docs/superpowers/specs/2026-06-14-workflow-rerun-semantics-BRIEF.md` + the
+ATIZAR Notion page "Повторный запуск воркфлоу — сравнительный анализ". Authored while context was
+fresh — **your job is to IMPLEMENT, not to re-decide.** WS1–WS7 numbers below refer to THIS spec.
+
+**You run this AUTONOMOUSLY via subagents.** The user hands the session off and is away. Decisions
+are made (the spec); if one turns out wrong mid-build, note it, pick the obvious fix, keep going.
+Per work-stream: read its plan → `superpowers:subagent-driven-development` (a fresh implementer
+subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
+green gate → **browser-verify** → merge to `master` → update this block → next WS.
+
+**Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
+- WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md`
+- WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md`
+- WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md`
+- WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md`
+- WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md`
+- WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md`
+- WS7 app→library boundary migration → `2026-06-14-ws7-app-to-library-migration.md`
+
+**Order (spec §3):** WS4 → WS3 → WS5 → WS2 → WS6 → WS1 → WS7. (Small/independent first; **WS2 before
+WS6**; **WS7 last** so it relocates server code that WS1/WS5 already settled.) Mostly independent — if
+you prefer WS1 first (the original ask), fine, but keep WS2-before-WS6 and WS7-last.
+
+**Per-WS execution rules:**
+- One branch off `master` per WS; **subagents must NOT switch branches** (read history via `git show <sha>:path`).
+- TDD (`superpowers:test-driven-development`): failing test → implement → green, per unit.
+- Green gate before "done": `yarn typecheck && yarn test && yarn lint && yarn format:check`
+  (+ `yarn workspace @atizar/react build` for any `@atizar/react` change). From repo root.
+- **Browser-verify EVERY user-visible flow** (this codebase's bugs are browser-only — use the
+  `browser-verify` skill + `DEV_RECORD_REPLAY=1`). Esp.: WS1 = two sequential STARTs leave ONE input
+  row labeled right (Working while running / Done when finished); WS5 = the full HITL approval flow
+  with the SourcePanel visible.
+- **Merge to `master` directly (no PR — beta), delete the branch, update this block.**
+- **Foundation guard-rails (spec §0) are BINDING** for WS1/WS2/WS6/WS7 — run `check-foundation` if a
+  change feels like it touches a belief/invariant; do NOT erode I8/I12/I1/I5/I7/I3. Key traps: WS1
+  supersede = preserve-to-history (NEVER destroy) + all status via `transition()` + no empty-no-op;
+  WS6 = typed const/union, NEVER a TS `enum`; WS7 = nothing Node/engine-bound into `@atizar/core`.
+- Read `CLAUDE.md` "Don't-rediscover gotchas" first (SSE lifecycle / `useBoard` singleton /
+  `camelCaseOnly` / stale-dev-server + Playwright recovery).
+
+**Out of scope (spec §5):** the `'history'` rerun mode (only the branch point is declared);
+model-level injection classifier; the "Revise/re-propose" gate edge + `MAX_GATES` loop guard (both
+noted as future tracks from the 2026-06-13 architecture analysis — do NOT build here unless trivial).
+
+---
+
+### ✅ ARCHIVED — frontend overhaul (WS1–WS3): DONE & merged 2026-06-14
 
 **Frontend overhaul — 3 workstreams.** Spec (decisions locked):
 `docs/superpowers/specs/2026-06-14-frontend-overhaul-design.md`. The prior session finished the
