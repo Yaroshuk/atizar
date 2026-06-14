@@ -33,6 +33,20 @@ this spec). **CLEAR**, with these **hard guard-rails for WS1** (do not drift pas
 WS2 strengthens the framework/userland boundary (I5). WS5 + durable audit reinforce I1. WS3/WS4 are
 pure client presentation.
 
+**WS6 + WS7 were added after the initial five (user request) and also foundation-checked — CLEAR:**
+
+- **WS6 (type-safe declaration) vs I7 (config-as-data):** the provider/tool/card identifiers must
+  stay **serializable string values**, so use **typed string-literal `const` + union types, NOT a TS
+  `enum`** (a TS enum is a runtime construct that fights config-as-data and contradicts the locked
+  "status is a string-literal union, deliberately not an enum" decision). The value stays the wire
+  string (`'claude-cli'`); only the TYPE narrows. **vs I3/I5:** `@atizar/core`'s `defineAgent` stays
+  `provider: z.string()` (core knows no concrete provider); the typed `ProviderId` lives in
+  `@atizar/providers` and the existence check stays at `registry.resolve` (loud failure at wiring).
+- **WS7 (app→library migration) vs I5/I3/I15:** moving reusable Node machinery from the demo app
+  into `@atizar/server`/`@atizar/providers` **strengthens** the physical boundary (I5) and makes the
+  I15 boot-time classification framework-physical. Guard-rail: **nothing Node-bound or
+  engine-bound moves into `@atizar/core`** (I3) — only one pure helper (`aggregateHealth`) is core-eligible.
+
 ---
 
 ## 1. Background (what's true today — verified in code)
@@ -226,6 +240,87 @@ clearly marked untrusted; a dropped SSE shows "reconnecting…" not a frozen-liv
 is recorded in a durable audit with an actor; green gate + browser-verify (esp. the HITL approval
 flow with SourcePanel visible).
 
+### WS6 — Type-safe agent/workflow declaration (kill the magic strings)
+
+**Problem.** `defineAgent` declarations are raw strings everywhere: `provider: 'claude-cli'`, plus
+`tools`/`approvals`/`effects`/`renders`/`dispatches`/`handoffs` as bare string arrays/maps. No
+autocomplete, easy typos, and the provider name is invented at the call site instead of coming from
+the library.
+
+**Decision (locked):**
+
+1. **Provider list comes from the library.** `@atizar/providers` exports a typed const + union, e.g.
+   `export const PROVIDERS = { claudeCli: 'claude-cli', mastra: 'mastra', mock: 'mock' } as const`
+   and `export type ProviderId = (typeof PROVIDERS)[keyof typeof PROVIDERS]`. Userland descriptors
+   write `provider: PROVIDERS.claudeCli` — autocomplete, typo caught at compile time, list owned by
+   the library. **NOT a TS `enum`** (I7 config-as-data guard-rail — see §0): the runtime value stays
+   the wire string; only the type narrows. Matches the locked "status is a string-literal union, not
+   an enum" decision.
+2. **`@atizar/core` stays provider-agnostic.** `defineAgent`'s schema keeps `provider: z.string()`
+   (core knows no concrete provider — I3/I5); the existence check stays at `registry.resolve` (loud
+   failure at wiring). Do NOT import `@atizar/providers` into `@atizar/core`.
+3. **Tool + card names as per-workflow typed consts.** Each workflow declares an `as const` map of
+   its tool names (and the client a card-name `as const` map); descriptors/specs reference those
+   instead of raw strings (e.g. `tools: [t.renderLead, t.saveDraft]`,
+   `renders: { [t.renderLead]: CARDS.LeadCard }`). Names live in userland (the framework can't
+   enumerate them) — this is a convention + small consts, sequenced right after WS2 (which scopes
+   the render registry per workflow).
+4. **Stronger, OPTIONAL (do only if it stays clean):** make `defineAgent` generic over the
+   tool-name union so `approvals`/`renders`/`effects`/`dispatches` are constrained to the declared
+   `tools` at compile time (today only the runtime `superRefine` checks `approvals ⊆ tools`). Skip
+   if zod+generics balloons the change.
+
+**Files:** `packages/providers/src/` (new `provider-ids.ts` exporting `PROVIDERS`/`ProviderId` + the
+barrel export), `apps/inbox/workflows/*/descriptor.ts` (use `PROVIDERS.*` + tool-name consts),
+`apps/inbox/workflows/*/client.ts` (card-name consts), optionally `packages/core/src/defineAgent.ts`
+(the generic). Tests: a unit/type test that an unknown provider id fails to typecheck (or a
+`PROVIDERS` round-trip test) and that descriptors still parse.
+
+**Acceptance:** no raw `'claude-cli'`/provider string literal in any descriptor (all `PROVIDERS.*`);
+tool/card names referenced through consts (no duplicated literal name); green gate. (Browser-verify
+not strictly required — it's a type/refactor change — but run the app once to confirm boot.)
+
+### WS7 — App → library boundary migration (move the reusable machinery out of the demo)
+
+**Premise (user's words):** "the library implements the reusable things, we just use them." An audit
+of `apps/inbox/server/` found reusable framework machinery stuck in the demo app. **Guard-rail
+(§0):** nothing Node-bound/engine-bound moves into `@atizar/core`; the Node home is `@atizar/server`,
+the provider/runtime home is `@atizar/providers`.
+
+**Decision (locked) — the moves (audit verdicts):**
+
+| File | Verdict | What moves |
+| --- | --- | --- |
+| `agent-checks.ts` | → `@atizar/server` | `assertAgentClassification` + `bareName` (I15 framework-physical) |
+| `record-replay.ts` | → `@atizar/server` | all of it EXCEPT `cassettesDir()`/`demoCassettesDir()` (app paths stay, passed as the `dir` opt) |
+| `health.ts` | SPLIT | `aggregateHealth` → `@atizar/core` (pure fold, Node-free); `providerHealth` (execSync) → `@atizar/server` |
+| `connections.ts` | SPLIT | `deriveConnectionList` → `@atizar/server`; Gmail `scopesFor`/`connectionList` STAY |
+| `claude-spawn.ts` | SPLIT | generic spawn impl → `@atizar/server` as `makeClaudeSpawn({mcpServers,builtins,timeoutMs})`; the concrete MCP paths + `ANTHROPIC_API_KEY` removal + ATIZAR_* forwarding STAY as factory args. (`ClaudeSpawn` **type** already in `@atizar/providers`.) |
+| `parse-env.ts` + `load-dev-env.ts` | → `@atizar/server` | `parseEnvFile` + a `loadDevEnv()`; app keeps the 1-line side-effect shim. LOW priority. |
+| `mastra/runner.ts` | → `@atizar/providers` | `makeMastraRunner` with the tool map **parameterized** (drop the hard `./tools.js` import). Resolve the isomorphic-vs-Node question (PostgresStore is Node-bound) before landing. |
+| `build-agent.ts` | → `@atizar/server` | the resolve→build→optional-wrap helper, with the record/replay decorator **injected** (not a hard import). Depends on `record-replay` move. |
+| `index.ts` | extract → `@atizar/server` | a `createServer({workflowServers, providerRegistry, buildProvider, connections, scopes, enabledWorkflows})` factory (the register loop + handoff check + health cache + Hono assembly + boot). The demo filter + concrete imports STAY in the app shell. MOST INVASIVE — do LAST. |
+| `providers.ts`, `mastra/tools.ts`, `workflows.ts`, `scan-demo-cassettes.ts` | STAY | genuinely app-specific (composition root / Gmail tools / workflow list / app CLI) |
+| `pipeline/` (empty dir) | DELETE | stale 0-file leftover |
+
+**Migration order (leaves first, factory last):** (1) `aggregateHealth`→core; (2) `record-replay`
+→server; (3) `agent-checks`→server; (4) `deriveConnectionList` + `providerHealth`→server; (5)
+`parse-env`/`load-dev-env`→server (optional); (6) `claude-spawn` impl→server; (7) `makeMastraRunner`
+→providers; (8) `build-agent`→server (needs 2 + the inject refactor); (9) `createServer` factory
+→server (needs 2/3/4/8). Each move = re-export from the package + update the app's import + green gate.
+
+**Risk hot-spots (browser-verify the real app, not just unit tests):** `claude-spawn` (a dropped
+ATIZAR_* env-forward breaks MCP-child credential resolution **silently** → run a real claude-cli
+flow), `mastra/runner` (shared-PostgresStore pool + suspend/resume → run `PROVIDER=mastra` incl. an
+HITL approval), `index.ts` factory (boot path → verify boot + board + a full pipeline run).
+
+**Files:** as the table; each move touches the source file (delete/re-export), its test (moves with
+it), the target package barrel, and the app import sites. Tests move with their source.
+
+**Acceptance:** every moved symbol is imported from its package (no app-internal copy); userland
+imports only the public SDK (I5 intact); the empty `pipeline/` dir is gone; green gate after EACH
+move; browser-verify after the three risk hot-spots and the final factory.
+
 ---
 
 ## 3. Recommended build order
@@ -236,14 +331,18 @@ browser-verified + merged before the next:
 
 1. **WS4** Activity newest-first (tiny, isolated warm-up).
 2. **WS3** Markdown render (small, isolated; gives an immediate visible win).
-3. **WS5** SourcePanel (high trust value; mostly client; data ready) — adjacent items after the panel.
-4. **WS2** Render/HITL scoping (framework boundary; do before re-run touches the same client).
-5. **WS1** Re-run semantics (largest, riskiest; touches dispatch/transition/board/pipeline + core).
+3. **WS5** SourcePanel + trust hardening (high trust value; mostly client; adds the audit table server-side).
+4. **WS2** Render/HITL scoping (framework boundary; do before re-run + WS6 touch the same client).
+5. **WS6** Type-safe declaration (builds directly on WS2's per-workflow scoping; adds `PROVIDERS` + tool/card consts).
+6. **WS1** Re-run semantics (largest; touches dispatch/transition/board/pipeline + core).
+7. **WS7** App→library migration (do LAST — relocates code that WS1/WS5 just changed in the server,
+   so the server logic is settled before it moves; risk hot-spots browser-verified per its plan).
 
-Rationale: WS1 is the headline but also the biggest blast radius — doing the four smaller,
-independent improvements first builds momentum and de-risks the shared client surfaces before the
+Rationale: WS1 is the headline but also a big blast radius — doing the smaller, independent
+improvements first builds momentum and de-risks the shared client surfaces before the
 structural change. If the implementing agent prefers WS1 first (it's the original ask), that's
-acceptable — the WSes are independent — but keep WS2 before WS1 (both touch the client render path).
+acceptable — the WSes are mostly independent — but keep **WS2 before WS6** (WS6 builds on the
+per-workflow scoping) and **WS7 last** (it relocates server code that WS1/WS5 modify).
 
 ---
 
@@ -257,8 +356,10 @@ acceptable — the WSes are independent — but keep WS2 before WS1 (both touch 
 - **TDD** (`superpowers:test-driven-development`): failing test → implement → green, for each unit.
 - **Subagents must NOT switch git branches**; read history via `git show <sha>:path` / `git diff`;
   verify `git rev-parse --abbrev-ref HEAD` before finishing (CLAUDE.md rule).
-- **Foundation:** WS1 and WS2 touch the foundation — the guard-rails in §0 are binding. If an
-  implementation detail tempts past a guard-rail, STOP and re-read §0; do not erode I8/I12/I1/I5.
+- **Foundation:** WS1, WS2, WS6 and WS7 touch the foundation — the guard-rails in §0 are binding. If
+  an implementation detail tempts past a guard-rail, STOP and re-read §0; do not erode
+  I8/I12/I1/I5/I7/I3 (notably: WS6 uses a typed const/union, never a TS `enum`; WS7 moves nothing
+  Node/engine-bound into `@atizar/core`).
 - **No cassette sharing** without the scan-and-warn ritual (CLAUDE.md) — not expected here, but if a
   cassette is touched, follow the rule.
 
