@@ -1,0 +1,207 @@
+// PipelineColumn — co-located CSS Module (migrated from the global styles.css).
+// Rules MOVED verbatim (token refs `var(--…)` unchanged); compound selectors
+// nested for readability — same compiled output.
+//
+// SCOPED here: the column shell + the instance-tree STRUCTURE classes, all of
+// which are EXCLUSIVE to this component (`pipeline-col`, `pipeline-body`,
+// `pipe-empty`, `pl-block`, `pl-cont`, `pl-group`, `pl-ahead`, `pl-aname`,
+// `pl-acount`, `pl-kids`, `pl-kid`, `pl-hstub`, `pl-queued`, `connector-down`,
+// `tint-legend`).
+//
+// Kept GLOBAL in styles.css (NOT here) because they are SHARED / applied as
+// runtime-composed plain strings:
+//   - `.mini*` + its tints/`has-stop` (mini card family),
+//   - `.pl-single*` and `.pl-iname` (`pl-single` is also used by the not-yet
+//     migrated InstancePickerModal),
+//   - `.pl-inst*` (composed as `pl-inst ${TINT} ${has-stop}` — tint/stop are
+//     global strings),
+//   - `.m-icon/.m-text/.m-name/.m-state` (shared by mini/pl-single/pl-inst),
+//   - `.dot` + status variants and the status pill (shared with AgentCard),
+//   - `.has-stop/.is-stopping` hover-reveal and `.stop-btn.icon` (StopButton).
+// We reach those global names from inside this module via `:global(...)`.
+
+.pipeline-col {
+  width: 296px;
+  flex: 0 0 296px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  z-index: 10;
+}
+
+.pipeline-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 16px 18px;
+}
+
+.pipe-empty {
+  color: var(--muted-2);
+  font-size: 12.5px;
+  padding: 8px 4px;
+  line-height: 1.5;
+}
+
+// connector: parent -> children (down arrow)
+.connector-down {
+  display: flex;
+  justify-content: center;
+  height: 26px;
+  color: var(--border-strong);
+
+  svg {
+    width: 14px;
+    height: 26px;
+    overflow: visible;
+  }
+}
+
+.pl-block {
+  margin-bottom: 14px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.pl-cont {
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pl-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.pl-ahead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+
+  // `.m-icon` stays a GLOBAL plain class (shared) — reach it under the scoped parent.
+  :global(.m-icon) {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    flex: 0 0 auto;
+    background: #f1f2f1;
+    display: grid;
+    place-items: center;
+    color: #5a5a62;
+    border: 1px solid rgba(17, 17, 17, 0.05);
+  }
+}
+
+.pl-aname {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.pl-acount {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--teal-deep);
+}
+
+.pl-kids {
+  position: relative;
+  margin-left: 15px;
+}
+
+.pl-kid {
+  position: relative;
+  margin-left: 20px;
+  margin-top: 8px;
+
+  &:before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: -9px;
+    width: 2px;
+    height: calc(50% + 9px);
+    background: var(--border-strong);
+  }
+
+  &:not(:last-child):after {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    width: 2px;
+    bottom: -9px;
+    background: var(--border-strong);
+  }
+}
+
+.pl-hstub {
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  background: var(--border-strong);
+}
+
+.pl-queued {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 8px 0 0 35px;
+}
+
+// mini tint legend at panel bottom
+.tint-legend {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 10px;
+  font-size: 11px;
+  color: var(--muted);
+
+  // `.ti` / `.sw` are plain string children — keep their global names.
+  :global(.ti) {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  :global(.sw) {
+    width: 13px;
+    height: 13px;
+    border-radius: 4px;
+    border: 1px solid rgba(17, 17, 17, 0.08);
+    flex: 0 0 auto;
+
+    &.run {
+      background: rgba(0, 170, 119, 0.18);
+      border-color: rgba(0, 170, 119, 0.4);
+    }
+    &.await {
+      background: rgba(240, 192, 0, 0.28);
+      border-color: rgba(240, 192, 0, 0.55);
+    }
+    &.err {
+      background: rgba(214, 69, 58, 0.16);
+      border-color: rgba(214, 69, 58, 0.4);
+    }
+    &.idle {
+      background: #fff;
+    }
+  }
+}

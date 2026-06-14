@@ -4,6 +4,7 @@ import { TINT, STATE_WORD } from '../statusDisplay'
 import { Icon } from './Icon'
 import { CompHeader } from '../primitives/CompHeader'
 import { StopButton } from '../primitives/StopButton'
+import s from './PipelineColumn.module.scss'
 
 type PipelineColumnProps = {
   blocks: PipelineBlock[]
@@ -23,7 +24,7 @@ const isStoppable = (s: Status): boolean => s === 'running' || s === 'awaiting_a
 
 // The down-arrow connector from a parent to its children (SVG, matches the design).
 const ConnectorDown = () => (
-  <div className='connector-down' aria-hidden='true'>
+  <div className={s.connectorDown} aria-hidden='true'>
     <svg viewBox='0 0 14 26' width='14' height='26' style={{ overflow: 'visible' }}>
       <line x1='7' y1='0' x2='7' y2='20' stroke='currentColor' strokeWidth='1.6' />
       <path
@@ -48,6 +49,8 @@ export const PipelineColumn = ({
   stoppingWorkflow = false,
 }: PipelineColumnProps) => {
   // The state pill + (when active and a stop handler exists) a per-item Stop button.
+  // `.m-state`/`.dot`/the status word stay GLOBAL (shared with AgentCard + the
+  // instance picker); the StopButton renders its own (global) `.stop-btn.icon`.
   const stateAndStop = (inst: PInstance) => {
     const stoppable = onStopItem && isStoppable(inst.status)
     return (
@@ -71,13 +74,16 @@ export const PipelineColumn = ({
     )
   }
 
+  // `has-stop`/`is-stopping` are GLOBAL hover-reveal classes (their rules + the
+  // `.mini.has-stop .stop-btn.icon` compounds live in styles.css); composed as
+  // plain strings alongside the global `mini`/`pl-single`/`pl-inst` + tint classes.
   const stopClasses = (inst: PInstance): string => {
     if (!(onStopItem && isStoppable(inst.status))) return ''
     return ' has-stop' + (stoppingItems[inst.localId] ? ' is-stopping' : '')
   }
 
   return (
-    <div className='pipeline-col'>
+    <div className={s.pipelineCol}>
       <CompHeader
         icon='pipeline'
         label='Pipeline'
@@ -95,12 +101,12 @@ export const PipelineColumn = ({
         }
       />
 
-      <div className='pipeline-body'>
+      <div className={s.pipelineBody}>
         {blocks.length === 0 ? (
-          <p className='pipe-empty'>No agent is running yet. Launched agents appear here.</p>
+          <p className={s.pipeEmpty}>No agent is running yet. Launched agents appear here.</p>
         ) : (
           blocks.map((block) => (
-            <div className='pl-block' key={block.parent.localId}>
+            <div className={s.plBlock} key={block.parent.localId}>
               <div
                 className={`mini ${TINT[block.parent.status]}${stopClasses(block.parent)}`}
                 onClick={() => onOpen(block.parent.localId)}
@@ -120,7 +126,7 @@ export const PipelineColumn = ({
               {block.groups.length > 0 && (
                 <>
                   <ConnectorDown />
-                  <div className='pl-cont'>
+                  <div className={s.plCont}>
                     {block.groups.map((g) => {
                       const nested = g.instances.length >= 2 || g.queued > 0
                       if (!nested) {
@@ -145,18 +151,18 @@ export const PipelineColumn = ({
                         )
                       }
                       return (
-                        <div key={g.agentId} className='pl-group'>
-                          <div className='pl-ahead'>
+                        <div key={g.agentId} className={s.plGroup}>
+                          <div className={s.plAhead}>
                             <div className='m-icon'>
                               <Icon name={g.iconName} size={14} />
                             </div>
-                            <span className='pl-aname'>{g.name}</span>
-                            <span className='pl-acount'>{g.instances.length} active</span>
+                            <span className={s.plAname}>{g.name}</span>
+                            <span className={s.plAcount}>{g.instances.length} active</span>
                           </div>
-                          <div className='pl-kids'>
+                          <div className={s.plKids}>
                             {g.instances.map((inst) => (
-                              <div key={inst.localId} className='pl-kid'>
-                                <span className='pl-hstub' />
+                              <div key={inst.localId} className={s.plKid}>
+                                <span className={s.plHstub} />
                                 <div
                                   className={`pl-inst ${TINT[inst.status]}${stopClasses(inst)}`}
                                   onClick={() => onOpen(inst.localId)}
@@ -167,7 +173,7 @@ export const PipelineColumn = ({
                               </div>
                             ))}
                           </div>
-                          {g.queued > 0 && <p className='pl-queued'>queued: {g.queued}</p>}
+                          {g.queued > 0 && <p className={s.plQueued}>queued: {g.queued}</p>}
                         </div>
                       )
                     })}
@@ -179,7 +185,7 @@ export const PipelineColumn = ({
         )}
       </div>
 
-      <div className='tint-legend'>
+      <div className={s.tintLegend}>
         <span className='ti'>
           <span className='sw run' />
           Running

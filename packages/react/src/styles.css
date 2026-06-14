@@ -2144,18 +2144,7 @@ button {
   display: none;
 }
 
-/* connector: Email -> Lead Manager (down arrow) */
-.connector-down {
-  display: flex;
-  justify-content: center;
-  height: 26px;
-  color: var(--border-strong);
-}
-.connector-down svg {
-  width: 14px;
-  height: 26px;
-  overflow: visible;
-}
+/* connector / down-arrow moved → components/PipelineColumn.module.scss (.connectorDown) */
 
 /* Lead Manager fan-out (tree branches) */
 .lm-leads {
@@ -2212,43 +2201,7 @@ button {
   gap: 9px;
 }
 
-/* mini tint legend at panel bottom */
-.tint-legend {
-  border-top: 1px solid var(--border);
-  padding: 12px 16px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px 10px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.tint-legend .ti {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.tint-legend .sw {
-  width: 13px;
-  height: 13px;
-  border-radius: 4px;
-  border: 1px solid rgba(17, 17, 17, 0.08);
-  flex: 0 0 auto;
-}
-.sw.run {
-  background: rgba(0, 170, 119, 0.18);
-  border-color: rgba(0, 170, 119, 0.4);
-}
-.sw.await {
-  background: rgba(240, 192, 0, 0.28);
-  border-color: rgba(240, 192, 0, 0.55);
-}
-.sw.err {
-  background: rgba(214, 69, 58, 0.16);
-  border-color: rgba(214, 69, 58, 0.4);
-}
-.sw.idle {
-  background: #fff;
-}
+/* tint legend (.tint-legend + .ti + .sw + .sw.*) moved → components/PipelineColumn.module.scss */
 
 /* menu-panel footer (user) */
 .panel-spacer {
@@ -2273,16 +2226,7 @@ button {
 }
 
 /* ---------- Always-on Pipeline column ---------- */
-.pipeline-col {
-  width: 296px;
-  flex: 0 0 296px;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  z-index: 10;
-}
+/* .pipeline-col moved → components/PipelineColumn.module.scss (.pipelineCol) */
 .pipeline-head {
   display: flex;
   align-items: center;
@@ -2300,11 +2244,7 @@ button {
   height: 14px;
   color: var(--muted);
 }
-.pipeline-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 16px 18px;
-}
+/* .pipeline-body moved → components/PipelineColumn.module.scss (.pipelineBody) */
 
 /* ---------- LEAD MANAGER big card (main grid) ---------- */
 .grid-wrap {
@@ -3110,12 +3050,7 @@ button {
    (it is AgentCard-only despite the old comment) */
 
 /* empty pipeline state */
-.pipe-empty {
-  color: var(--muted-2);
-  font-size: 12.5px;
-  padding: 8px 4px;
-  line-height: 1.5;
-}
+/* .pipe-empty moved → components/PipelineColumn.module.scss (.pipeEmpty) */
 
 /* instance picker (an agent running ≥2 instances) */
 .picker-list {
@@ -3246,21 +3181,7 @@ button {
 }
 
 /* instance-tree nesting (pipeline) — design lacks these (it hardcodes a lead fan-out); kept for the real depth-2 parent→children blocks */
-.pl-block {
-  margin-bottom: 14px;
-}
-.pl-block:last-child {
-  margin-bottom: 0;
-}
-.pl-cont {
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  padding: 12px;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* .pl-block + .pl-cont moved → components/PipelineColumn.module.scss */
 .pl-single {
   border: 1px solid var(--border);
   border-radius: 11px;
@@ -3336,77 +3257,9 @@ button {
 .pl-single.err .m-state {
   color: var(--red-ink);
 }
-.pl-group {
-  display: flex;
-  flex-direction: column;
-}
-.pl-ahead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 11px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-}
-.pl-ahead .m-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  flex: 0 0 auto;
-  background: #f1f2f1;
-  display: grid;
-  place-items: center;
-  color: #5a5a62;
-  border: 1px solid rgba(17, 17, 17, 0.05);
-}
-.pl-aname {
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-.pl-acount {
-  margin-left: auto;
-  flex: 0 0 auto;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--teal-deep);
-}
-.pl-kids {
-  position: relative;
-  margin-left: 15px;
-}
-.pl-kid {
-  position: relative;
-  margin-left: 20px;
-  margin-top: 8px;
-}
-.pl-kid:before {
-  content: '';
-  position: absolute;
-  left: -20px;
-  top: -9px;
-  width: 2px;
-  height: calc(50% + 9px);
-  background: var(--border-strong);
-}
-.pl-kid:not(:last-child):after {
-  content: '';
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  width: 2px;
-  bottom: -9px;
-  background: var(--border-strong);
-}
-.pl-hstub {
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  width: 14px;
-  height: 2px;
-  background: var(--border-strong);
-}
+/* .pl-group / .pl-ahead / .pl-aname / .pl-acount / .pl-kids / .pl-kid / .pl-hstub
+   moved → components/PipelineColumn.module.scss (the `.pl-ahead .m-icon` rule
+   reaches the still-global `.m-icon` via `:global(.m-icon)` there) */
 .pl-inst {
   display: flex;
   align-items: center;
@@ -3466,11 +3319,7 @@ button {
   white-space: nowrap;
   min-width: 0;
 }
-.pl-queued {
-  font-size: 11px;
-  color: var(--muted);
-  margin: 8px 0 0 35px;
-}
+/* .pl-queued moved → components/PipelineColumn.module.scss (.plQueued) */
 
 /* per-item Stop hover-reveal on the instance-tree leaves (design ships it for .mini;
    generalize to .pl-single/.pl-inst which aren't .mini) */
