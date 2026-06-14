@@ -18,7 +18,7 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
-**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS5 → WS2 → WS6 → WS1 → WS7.**
+**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS2 → WS6 → WS1 → WS7.**
 Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
 so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
 
@@ -37,6 +37,19 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
   restatements of card chips. Green gate green (typecheck / test 467 / lint / format / `@atizar/react`
   build). Browser-verified in the real bundle: `**bold**`→`<strong>`, lists→`<li>`, safe link hardened,
   protocol-relative link neutralized (empty href), 0 console errors; test cassette restored after.
+- **WS5 — ✅ DONE & merged** (`master` after merge: `81febc9`). SourcePanel primitive (untrusted
+  source rendered INERT — plain text, no markdown/HTML — beside the editable draft, labeled
+  "Untrusted external content", hiding `origin`/`threadId` plumbing keys); incoming user-turn shown in
+  the thread; SSE reconnect state on `useWorkItemThread` + `useBoard` with "Reconnecting…" chips
+  (thread + board header); append-only durable `audit_log` table (migration `0002`) written on
+  resolve/effect/reject, stamped with the resolver actor (`'shared-token'` under bearer, else null),
+  surviving restart. Green gate green (typecheck / test 479 / lint / format / `@atizar/react` build).
+  Browser-verified: P1 SourcePanel+user-turn+edit-approve at a real gate (edited body landed), P2 board
+  "Reconnecting…" chip captured on SSE drop, P3 audit rows persisted across a server restart.
+  ⚠ **Two user action items surfaced in browser-verify (do NOT block the track — the whole run is on
+  `DEV_RECORD_REPLAY=1`):** (1) delete the test Gmail **draft** `r7666524379648912752` (thread
+  `19ebbf9875f60e8c`, body contains `WS5-EDIT-MARK`) from the Drafts folder; (2) the Gmail **OAuth
+  refresh token is EXPIRED** (`invalid_grant`) — a live (non-replay) Gmail demo needs re-auth.
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
@@ -44,7 +57,7 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
 - WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md`
 - WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md` — ✅ **DONE & merged** (`d64966f`)
 - WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
-- WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md`
+- WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md` — ✅ **DONE & merged** (`81febc9`)
 - WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md`
 - WS7 app→library boundary migration → `2026-06-14-ws7-app-to-library-migration.md`
 
