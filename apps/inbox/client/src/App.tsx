@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WorkflowBoard } from '@atizar/react'
+import { BoardApp } from './BoardApp'
 import { workflowsConfig } from './workflows'
 
 type Config = { demo: boolean; workflows: string[] }
@@ -21,5 +21,5 @@ export const App = () => {
     ...workflowsConfig,
     workflows: workflowsConfig.workflows.filter((w) => enabled.has(w.id)),
   }
-  return <WorkflowBoard config={filtered} demo={config.demo} />
+  return <BoardApp config={filtered} demo={config.demo} />
 }

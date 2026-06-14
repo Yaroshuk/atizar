@@ -4,6 +4,25 @@
 // their card components directly).
 export { WorkflowBoard } from './WorkflowBoard.js'
 export { WorkflowsProvider, useWorkflowsConfig } from './workflowsContext.js'
+// Composition blocks — the board's panels, now exported so userland can compose its own
+// board (see apps/inbox/client/src/BoardApp.tsx).
+export { PipelineColumn } from './components/PipelineColumn.js'
+export { AgentCard } from './components/AgentCard.js'
+export { AgentGrid } from './components/AgentGrid.js'
+export { AgentModal } from './components/AgentModal.js'
+export { ThreadModal } from './components/ThreadModal.js'
+export { InstancePickerModal } from './components/InstancePickerModal.js'
+export { WorkflowSwitcher } from './components/WorkflowSwitcher.js'
+// Orchestration hooks (board selection / navigation / stop) + pure helpers — extracted
+// from the former monolith so a custom board reproduces its behavior.
+export { useWorkflowSelection } from './hooks/useWorkflowSelection.js'
+export { useBoardNavigation, type HandoffNote } from './hooks/useBoardNavigation.js'
+export { useStopController } from './hooks/useStopController.js'
+export { lookups } from './lookups.js'
+export { buildPipeline } from './pipelineModel.js'
+export { toPInstances, queuedByAgent, statusesOf } from './boardModel.js'
+export { aggregateAgent, aggregateLabel } from './aggregate.js'
+export { isDevMode } from './devMode.js'
 export type { WorkflowsConfig } from './workflowsContext.js'
 export type { AgentMeta, DeliverFn, RenderSpec, HitlSpec } from './renderSpecs.js'
 export { buildRenderToolCall } from './buildRenderToolCall.js'

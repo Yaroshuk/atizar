@@ -4,6 +4,11 @@ import { STATUS_LABEL, type Status } from '../status'
 import { isDevMode } from '../devMode'
 import { ThreadResultsContext } from '../threadResults'
 import { Icon, type IconName } from './Icon'
+// HandoffNote's single canonical definition lives in useBoardNavigation (so a hook consumer
+// can type notes without importing a React component); re-export it here for back-compat.
+import type { HandoffNote } from '../hooks/useBoardNavigation'
+
+export type { HandoffNote }
 
 // AgentModal renders the conversation thread in an overlay panel.
 //
@@ -16,15 +21,6 @@ import { Icon, type IconName } from './Icon'
 // This is the SAME generative-UI surface as before; only the markup/classes
 // changed (Smedja design). The human-in-the-loop approval button keeps its live
 // `respond` callback (sourced from the executing tool-call state, not toolMessage).
-// A handoff line shown at the top of an agent's thread so the flow is legible:
-// the sender notes what it handed off, the receiver notes what it received.
-export type HandoffNote = {
-  dir: 'sent' | 'received'
-  otherName: string
-  label: string
-  targetWorkflow?: string // present on a cross-workflow 'sent' note
-  targetLocalId?: string // the spawned target instance (intra-workflow jump), if it started
-}
 
 export type AgentModalProps = {
   agent: { messages: Message[] }
