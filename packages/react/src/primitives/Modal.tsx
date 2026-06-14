@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import clsx from 'clsx'
 import { Icon, type IconName } from '../components/Icon'
+import s from './Modal.module.scss'
 
 // A centered modal over a dim backdrop, with the Smedja head (icon mark + title +
 // optional subtitle + close ×). Click-outside and the × close it. `footer` is an
@@ -27,30 +29,32 @@ export const Modal = ({
   ariaLabel,
 }: ModalProps) => (
   <div
-    className='backdrop'
+    className={s.backdrop}
     onMouseDown={(e) => {
       if (e.target === e.currentTarget) onClose()
     }}
   >
     <div
-      className={['modal', className].filter(Boolean).join(' ')}
+      className={clsx(s.modal, className)}
       role='dialog'
       aria-modal='true'
       aria-label={ariaLabel ?? title}
     >
-      <div className='modal-head'>
-        <div className='modal-mark'>
+      <div className={s.modalHead}>
+        <div className={s.modalMark}>
           <Icon name={icon} size={17} />
         </div>
-        <div className='modal-titles'>
-          <span className='modal-title'>{title}</span>
-          {subtitle && <span className='modal-status'>{subtitle}</span>}
+        <div className={s.modalTitles}>
+          <span className={s.modalTitle}>{title}</span>
+          {subtitle && <span className={s.modalStatus}>{subtitle}</span>}
         </div>
-        <button className='modal-x' onClick={onClose} aria-label='Close'>
+        <button className={s.modalX} onClick={onClose} aria-label='Close'>
           <Icon name='close' size={17} />
         </button>
       </div>
       {children}
+      {/* `.modal-foot` stays a GLOBAL class (shared): caller-supplied footer
+          children are styled by global `.modal-foot .*` descendant selectors. */}
       {footer && <div className='modal-foot'>{footer}</div>}
     </div>
   </div>

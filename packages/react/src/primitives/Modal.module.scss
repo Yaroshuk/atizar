@@ -1,0 +1,118 @@
+// Modal — co-located CSS Module.
+// ALL these classes are SHARED: AgentModal and InstancePickerModal (not yet
+// migrated, Task 7) render the SAME `.backdrop`/`.modal`/`.modal-head`/… markup as
+// raw divs, so the base rules stay GLOBAL in styles.css AND get this scoped copy
+// (temporary duplication; resolves as those siblings migrate). `.modal-foot` is
+// intentionally NOT scoped here — it stays a global class the primitive emits as a
+// literal, because caller-supplied footer children (`.foot-hint`/`.spacer`) are
+// styled by global `.modal-foot .*` descendant selectors. The `fade`/`modal-in`
+// keyframes are copied so the scoped `.backdrop`/`.modal` animations resolve.
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 24, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  z-index: 50;
+  animation: fade 0.2s ease;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  width: 480px;
+  max-width: 100%;
+  max-height: calc(100vh - 64px);
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-in 0.26s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.modal-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: #f3f3f5;
+  color: #5a5a62;
+  flex: 0 0 auto;
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+.modal-titles {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.modal-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+.modal-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+.modal-x {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background 0.14s,
+    color 0.14s;
+
+  &:hover {
+    background: #f1f1f3;
+    color: var(--text);
+  }
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+}
