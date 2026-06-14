@@ -4,9 +4,11 @@ import type { BaseEvent } from '@ag-ui/client'
 import type { Db } from './db/client.js'
 import {
   actionLedger,
+  auditLog,
   gates,
   trace,
   workItems,
+  type AuditRow,
   type Gate,
   type OriginKind,
   type TraceRow,
@@ -186,6 +188,36 @@ export function makeStateStore(db: Db) {
     async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
       return rows.filter((r) => ACTIVE.includes(r.status))
+    },
+
+    // Append-only durable audit. One INSERT per recorded human decision / server effect.
+    async appendAudit(input: {
+      workItemId: string
+      gateId: string | null
+      workflowId: string
+      agentId: string
+      kind: string
+      summary: string
+      actor: string | null
+    }): Promise<void> {
+      await db.insert(auditLog).values({
+        id: randomUUID(),
+        workItemId: input.workItemId,
+        gateId: input.gateId,
+        workflowId: input.workflowId,
+        agentId: input.agentId,
+        kind: input.kind,
+        summary: input.summary,
+        actor: input.actor,
+      })
+    },
+
+    async getAuditByWorkItem(workItemId: string): Promise<AuditRow[]> {
+      return db
+        .select()
+        .from(auditLog)
+        .where(eq(auditLog.workItemId, workItemId))
+        .orderBy(asc(auditLog.createdAt))
     },
   }
 }

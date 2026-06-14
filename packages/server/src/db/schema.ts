@@ -115,6 +115,24 @@ export const actionLedger = pgTable('action_ledger', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// Durable, attributed audit of human decisions + server-executed effects. Append-only (one row
+// per recorded action), so it survives restart — UNLIKE the in-memory activity ring buffer
+// (which stays the live-UI tail). `actor` is the resolver identity (connection label or
+// 'shared-token' under the bearer-token auth; null in fail-open dev). `kind` mirrors the
+// activity kinds we care to persist (resolved | effect | error). Reinforces I1: every human
+// START/approval leaves a durable, attributable trace.
+export const auditLog = pgTable('audit_log', {
+  id: uuid('id').primaryKey(),
+  workItemId: uuid('work_item_id').notNull(),
+  gateId: uuid('gate_id'),
+  workflowId: text('workflow_id').notNull(),
+  agentId: text('agent_id').notNull(),
+  kind: text('kind').notNull(),
+  summary: text('summary').notNull(),
+  actor: text('actor'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 // Encrypted per-connection credentials (integration auth, spec 2026-06-11 §3). PK
 // (connection_id, integration): connection_id is a developer-chosen LABEL ('default'|'home'|…),
 // NOT a user account. `secret` is the AES-256-GCM blob (oauth2 token JSON or an apiKey) — plaintext
@@ -144,3 +162,5 @@ export type TraceRow = typeof trace.$inferSelect
 export type WorkItemStatus = WorkItem['status']
 export type ResolutionKind = (typeof resolutionKind.enumValues)[number]
 export type OriginKind = (typeof originKind.enumValues)[number]
+export type AuditRow = typeof auditLog.$inferSelect
+export type NewAuditRow = typeof auditLog.$inferInsert
