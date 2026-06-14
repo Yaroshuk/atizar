@@ -3,6 +3,7 @@ import {
   createMockInboxProvider,
   createClaudeCliProvider,
   createMastraProvider,
+  PROVIDERS,
 } from '@atizar/providers'
 import { claudeSpawn } from './claude-spawn.js'
 import { makeMastraRunner } from './mastra/runner.js'
@@ -48,8 +49,8 @@ const usingMastra = process.env.PROVIDER === 'mastra'
 // Runtime registry (server-only). When PROVIDER=mastra, claude-cli-declared agents resolve to the
 // Mastra factory (descriptors keep provider:'claude-cli' — no descriptor churn). Default = claude-cli.
 export const providerRegistry: ProviderRegistry = defineProviders({
-  mock: (config) => createMockInboxProvider(config.approvalNames),
-  'claude-cli': usingMastra
+  [PROVIDERS.mock]: (config) => createMockInboxProvider(config.approvalNames),
+  [PROVIDERS.claudeCli]: usingMastra
     ? mastraFactory
     : (config) =>
         createClaudeCliProvider({
@@ -59,5 +60,5 @@ export const providerRegistry: ProviderRegistry = defineProviders({
           prompts: config.prompts,
           spawn: claudeSpawn,
         }),
-  mastra: mastraFactory,
+  [PROVIDERS.mastra]: mastraFactory,
 })
