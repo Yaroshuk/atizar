@@ -45,6 +45,7 @@ export { ConfirmDialog } from './primitives/ConfirmDialog/ConfirmDialog.js'
 export { Segmented } from './primitives/Segmented/Segmented.js'
 export { Switch } from './primitives/Switch/Switch.js'
 export { CardShell } from './primitives/CardShell/CardShell.js'
+export { Markdown } from './primitives/Markdown/Markdown.js'
 // Chrome components.
 export { AppHeader } from './components/AppHeader/AppHeader.js'
 export { WorkflowTabs } from './components/WorkflowTabs/WorkflowTabs.js'
