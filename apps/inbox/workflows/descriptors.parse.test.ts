@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { PROVIDERS } from '@atizar/providers'
 import { qualifierAgent, replyAgent as leadReply } from './lead-inbox/descriptor'
+import { LEAD_INBOX_TOOLS } from './lead-inbox/tools'
+import { LEAD_INBOX_CARDS } from './lead-inbox/cards'
 import {
   sorterAgent,
   replyAgent as emailReply,
@@ -54,5 +56,22 @@ describe('descriptors parse via defineAgent after the const refactor', () => {
   it('github-triage triage still renders render_triage as TriageCard', () => {
     expect(triageAgent.tools).toContain('render_triage')
     expect(triageAgent.renders.render_triage).toBe('TriageCard')
+  })
+})
+
+describe('lead-inbox tool/card consts', () => {
+  it('tool consts equal the wire tool names', () => {
+    expect(LEAD_INBOX_TOOLS.renderLead).toBe('renderLead')
+    expect(LEAD_INBOX_TOOLS.saveDraft).toBe('saveDraft')
+    expect(LEAD_INBOX_TOOLS.renderVerdict).toBe('renderVerdict')
+  })
+  it('card consts equal the wire card names', () => {
+    expect(LEAD_INBOX_CARDS.LeadCard).toBe('LeadCard')
+    expect(LEAD_INBOX_CARDS.VerdictCard).toBe('VerdictCard')
+    expect(LEAD_INBOX_CARDS.ApprovalDialog).toBe('ApprovalDialog')
+  })
+  it('descriptor references the consts (renders map keyed by the tool const)', () => {
+    expect(leadReply.renders[LEAD_INBOX_TOOLS.renderLead]).toBe(LEAD_INBOX_CARDS.LeadCard)
+    expect(leadReply.renders[LEAD_INBOX_TOOLS.saveDraft]).toBe(LEAD_INBOX_CARDS.ApprovalDialog)
   })
 })

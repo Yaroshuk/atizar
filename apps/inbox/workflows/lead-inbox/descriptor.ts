@@ -1,27 +1,30 @@
 import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@atizar/core'
+import { PROVIDERS } from '@atizar/providers'
+import { LEAD_INBOX_TOOLS as t } from './tools'
+import { LEAD_INBOX_CARDS as c } from './cards'
 
 export const replyAgent = defineAgent({
   id: 'reply',
   name: 'REPLY AGENT',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions:
     'Read the latest email in the inbox, draft a reply, and ask the human before saving it as a draft.',
-  tools: ['renderLead', 'saveDraft'],
-  approvals: ['saveDraft'],
-  effects: ['saveDraft'],
-  renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
+  tools: [t.renderLead, t.saveDraft],
+  approvals: [t.saveDraft],
+  effects: [t.saveDraft],
+  renders: { [t.renderLead]: c.LeadCard, [t.saveDraft]: c.ApprovalDialog },
 })
 
 export const qualifierAgent = defineAgent({
   id: 'qualifier',
   name: 'LEAD QUALIFIER',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions:
     'Read the latest email in the inbox and qualify the lead: category, priority, and a one-line reason.',
-  tools: ['renderVerdict'],
+  tools: [t.renderVerdict],
   approvals: [],
   readonly: ['get_latest_email'],
-  renders: { renderVerdict: 'VerdictCard' },
+  renders: { [t.renderVerdict]: c.VerdictCard },
   handoffs: ['reply'],
   maxInstances: 1,
 })
