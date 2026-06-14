@@ -3,6 +3,8 @@ import { PROVIDERS } from '@atizar/providers'
 import { qualifierAgent, replyAgent as leadReply } from './lead-inbox/descriptor'
 import { LEAD_INBOX_TOOLS } from './lead-inbox/tools'
 import { LEAD_INBOX_CARDS } from './lead-inbox/cards'
+import { EMAIL_INBOX_TOOLS } from './email-inbox/tools'
+import { EMAIL_INBOX_CARDS } from './email-inbox/cards'
 import {
   sorterAgent,
   replyAgent as emailReply,
@@ -73,5 +75,25 @@ describe('lead-inbox tool/card consts', () => {
   it('descriptor references the consts (renders map keyed by the tool const)', () => {
     expect(leadReply.renders[LEAD_INBOX_TOOLS.renderLead]).toBe(LEAD_INBOX_CARDS.LeadCard)
     expect(leadReply.renders[LEAD_INBOX_TOOLS.saveDraft]).toBe(LEAD_INBOX_CARDS.ApprovalDialog)
+  })
+})
+
+describe('email-inbox tool/card consts', () => {
+  it('tool consts equal the wire tool names', () => {
+    expect(EMAIL_INBOX_TOOLS.route_emails).toBe('route_emails')
+    expect(EMAIL_INBOX_TOOLS.renderSort).toBe('renderSort')
+    expect(EMAIL_INBOX_TOOLS.renderLead).toBe('renderLead')
+    expect(EMAIL_INBOX_TOOLS.saveDraft).toBe('saveDraft')
+    expect(EMAIL_INBOX_TOOLS.applyActions).toBe('applyActions')
+  })
+  it('card consts equal the wire card names', () => {
+    expect(EMAIL_INBOX_CARDS.SortSummaryCard).toBe('SortSummaryCard')
+    expect(EMAIL_INBOX_CARDS.LeadCard).toBe('LeadCard')
+    expect(EMAIL_INBOX_CARDS.ApprovalDialog).toBe('ApprovalDialog')
+    expect(EMAIL_INBOX_CARDS.EmailBatchCard).toBe('EmailBatchCard')
+  })
+  it('descriptor references the consts', () => {
+    expect(sorterAgent.renders[EMAIL_INBOX_TOOLS.renderSort]).toBe(EMAIL_INBOX_CARDS.SortSummaryCard)
+    expect(readerAgent.renders[EMAIL_INBOX_TOOLS.applyActions]).toBe(EMAIL_INBOX_CARDS.EmailBatchCard)
   })
 })

@@ -3,6 +3,7 @@ import type { RenderSpec, HitlSpec, AgentMeta } from '@atizar/react'
 import { SortSummaryCard } from '../../client/src/components/SortSummaryCard/SortSummaryCard'
 import { EmailBatchCard } from '../../client/src/components/EmailBatchCard/EmailBatchCard'
 import { sorterAgent, replyAgent, readerAgent, spamAgent, importantAgent } from './descriptor'
+import { EMAIL_INBOX_TOOLS as t } from './tools'
 
 export const emailInboxMeta: Record<string, AgentMeta> = {
   [sorterAgent.id]: {
@@ -38,7 +39,7 @@ export const emailInboxMeta: Record<string, AgentMeta> = {
 // + the applyActions HITL, so the reused lead tools are intentionally not re-declared here.
 export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
-    toolName: 'renderSort',
+    toolName: t.renderSort,
     parameters: z.object({
       summary: z.string(),
       counts: z
@@ -69,7 +70,7 @@ const BatchItemSchema = z.object({
 
 export const emailInboxHitl: Omit<HitlSpec, 'workflowId'>[] = [
   {
-    toolName: 'applyActions',
+    toolName: t.applyActions,
     parameters: z.object({ items: z.array(BatchItemSchema) }),
     render: ({ form, approve, reject }) => {
       const parsed = z.array(BatchItemSchema).safeParse(form.items)

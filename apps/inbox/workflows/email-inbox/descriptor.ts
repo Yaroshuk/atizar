@@ -1,5 +1,8 @@
 import { z } from 'zod'
 import { defineAgent, defineWorkflow } from '@atizar/core'
+import { PROVIDERS } from '@atizar/providers'
+import { EMAIL_INBOX_TOOLS as t } from './tools'
+import { EMAIL_INBOX_CARDS as c } from './cards'
 
 // The dispatch payload shapes (= the route_emails tool args minus `to`). EmailRef mirrors the
 // email metadata shape; defined here as the workflow's own contract (userland), not imported
@@ -28,17 +31,17 @@ export const ReplyPayloadSchema = z.object({ email: EmailRefSchema })
 export const sorterAgent = defineAgent({
   id: 'sorter',
   name: 'EMAIL SORTER',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions:
     'Read the unread inbox emails of the last 24 hours and sort each one. For an email that needs a personal reply, dispatch it to the reply agent. Group the rest into: informational (reader), suspected spam (spam), and important-but-no-reply (important). Then surface a short summary.',
   // CONVENTION (matches lead-inbox qualifier): read tools go in `readonly` ONLY, never in `tools`.
   // `tools` holds the surface/render/propose/approval/dispatch tools. The Mastra factory derives
   // render-vs-read from membership in `tools`, so a read tool in `tools` would be misclassified.
-  tools: ['route_emails', 'renderSort'],
+  tools: [t.route_emails, t.renderSort],
   approvals: [],
   readonly: ['list_unread'],
-  dispatches: ['route_emails'],
-  renders: { renderSort: 'SortSummaryCard' },
+  dispatches: [t.route_emails],
+  renders: { [t.renderSort]: c.SortSummaryCard },
   handoffs: ['reply', 'reader', 'spam', 'important'],
   maxInstances: 1,
 })
@@ -46,14 +49,14 @@ export const sorterAgent = defineAgent({
 export const replyAgent = defineAgent({
   id: 'reply',
   name: 'REPLY AGENT',
-  provider: 'claude-cli',
+  provider: PROVIDERS.claudeCli,
   instructions:
     'You were handed one email that needs a reply. Read its full body, draft a short reply, and ask the human before saving it as a Gmail draft.',
-  tools: ['renderLead', 'saveDraft'],
+  tools: [t.renderLead, t.saveDraft],
   readonly: ['get_email'],
-  approvals: ['saveDraft'],
-  effects: ['saveDraft'],
-  renders: { renderLead: 'LeadCard', saveDraft: 'ApprovalDialog' },
+  approvals: [t.saveDraft],
+  effects: [t.saveDraft],
+  renders: { [t.renderLead]: c.LeadCard, [t.saveDraft]: c.ApprovalDialog },
 })
 
 // reader / spam / important share the SAME shape (one batch gate proposing per-row actions),
@@ -62,13 +65,13 @@ function batchAgent(id: string, name: string): ReturnType<typeof defineAgent> {
   return defineAgent({
     id,
     name,
-    provider: 'claude-cli',
+    provider: PROVIDERS.claudeCli,
     instructions:
       'You were handed a batch of emails. Propose a per-row action for each (read / trash / star / keep) and ask the human to apply them. The human may change any row before approving.',
-    tools: ['applyActions'],
-    approvals: ['applyActions'],
-    effects: ['applyActions'],
-    renders: { applyActions: 'EmailBatchCard' },
+    tools: [t.applyActions],
+    approvals: [t.applyActions],
+    effects: [t.applyActions],
+    renders: { [t.applyActions]: c.EmailBatchCard },
     handoffs: ['reply'], // a row can be re-routed to a reply
   })
 }
