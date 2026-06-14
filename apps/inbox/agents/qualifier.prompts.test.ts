@@ -23,6 +23,19 @@ describe('qualifier prompt strategy', () => {
     expect(p).toContain('do not restate')
   })
 
+  it('tells the model not to restate the card fields in its text (handed-lead path)', () => {
+    const seed = encodeHandoff({
+      threadId: 'thread-1',
+      from: 'alice@example.com',
+      subject: 'Demo request',
+      summary: 'Wants a product demo.',
+      category: 'sales',
+      priority: 'hot',
+    })
+    const p = prompts.buildFirst(input([seed]))
+    expect(p).toContain('do not restate')
+  })
+
   it('has no resume strategy (no approvals)', () => {
     expect(prompts.buildResume).toBeUndefined()
   })

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { Markdown } from './Markdown.js'
 
 describe('Markdown', () => {
@@ -56,5 +56,12 @@ describe('Markdown', () => {
   it('renders nothing extra for empty content', () => {
     const { container } = render(<Markdown>{''}</Markdown>)
     expect(container.querySelector('strong')).toBeNull()
+  })
+
+  it('neutralizes protocol-relative URLs (phishing vector)', () => {
+    const { container } = render(<Markdown>{'[x](//evil.example.com)'}</Markdown>)
+    const link = container.querySelector('a')
+    // href dropped → not navigable off-site
+    expect(link?.getAttribute('href') ?? '').toBe('')
   })
 })
