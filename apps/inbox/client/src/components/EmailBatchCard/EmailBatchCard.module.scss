@@ -1,0 +1,52 @@
+// EmailBatchCard — the per-email review rows. The amber frame, header and actions zone
+// are the shared CardShell; only the row list is card-unique. Each row: meta (from +
+// truncated subject) on the left, a trailing icon-action cluster on the right.
+// `--atz-*` tokens only.
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+
+  & + & {
+    border-top: 1px solid var(--atz-color-border);
+  }
+}
+
+.rowMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.rowFrom {
+  font-size: 12px;
+  color: var(--atz-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowSubject {
+  font-size: 13px;
+  color: var(--atz-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}

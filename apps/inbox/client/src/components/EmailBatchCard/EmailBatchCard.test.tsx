@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { EmailBatchCard } from './components/EmailBatchCard'
+import { EmailBatchCard } from './EmailBatchCard'
 
 describe('EmailBatchCard', () => {
   it('emits the edited rows on approve', () => {
@@ -17,7 +17,8 @@ describe('EmailBatchCard', () => {
         onReject={() => {}}
       />
     )
-    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: 'trash' } })
+    // Each row exposes an icon-button cluster; pick the second row's Trash action by label.
+    fireEvent.click(screen.getByRole('button', { name: /^trash — y$/i }))
     fireEvent.click(screen.getByRole('button', { name: /apply/i }))
     expect(onApprove).toHaveBeenCalledWith({
       items: [

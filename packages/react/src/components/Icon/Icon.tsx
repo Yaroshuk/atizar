@@ -42,6 +42,8 @@ export type IconName =
   | 'activity'
   | 'filter'
   | 'link'
+  | 'trash'
+  | 'star'
 
 type IconProps = {
   name: IconName
@@ -230,6 +232,17 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d='M11 6l1-1a4 4 0 0 1 6 6l-2 2' />
       <path d='M13 18l-1 1a4 4 0 0 1-6-6l2-2' />
     </>
+  ),
+  trash: (
+    <>
+      <path d='M3 6h18' />
+      <path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' />
+      <line x1='10' y1='11' x2='10' y2='17' />
+      <line x1='14' y1='11' x2='14' y2='17' />
+    </>
+  ),
+  star: (
+    <polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2' />
   ),
 }
 
