@@ -4,6 +4,7 @@ import { useWorkItemThread } from '../../hooks/useWorkItemThread'
 import { useGate } from '../../hooks/useGate'
 import { buildRenderToolCall } from '../../buildRenderToolCall'
 import { useWorkflowsConfig } from '../../workflowsContext'
+import { byWorkflow } from '../../registryScope'
 import { mapStatus } from '../../status'
 import { AgentModal, type HandoffNote } from '../AgentModal/AgentModal'
 import type { IconName } from '../Icon/Icon'
@@ -15,6 +16,9 @@ import { useBoard } from '../../hooks/useBoard'
 // already pairs tool results + provides ThreadResultsContext from `agent.messages`.
 export type ThreadModalProps = {
   id: string
+  // The workflow this work item belongs to. Render/HITL resolution is scoped to it so two
+  // workflows' same-named tools resolve to the right component (see registryScope.byWorkflow).
+  workflowId: string
   title: string
   iconName: IconName
   intro: string
@@ -30,7 +34,8 @@ export type ThreadModalProps = {
 }
 
 export const ThreadModal = (p: ThreadModalProps) => {
-  const { renders, hitl } = useWorkflowsConfig()
+  const config = useWorkflowsConfig()
+  const hitl = byWorkflow(config.hitl, p.workflowId)
   const { messages, status, connection } = useWorkItemThread(p.id)
   const display = mapStatus(status)
   const awaiting = display === 'awaiting_approval'
@@ -41,11 +46,13 @@ export const ThreadModal = (p: ThreadModalProps) => {
   const source = (board.items.find((i) => i.id === p.id)?.payload ?? {}) as Record<string, unknown>
 
   // The handoff seam: a card's deliver call carries the open work item as the parent.
-  const { deliver, id } = p
+  const { deliver, id, workflowId } = p
   const renderToolCall = useMemo(
     () =>
-      buildRenderToolCall(renders, (origin, dest, payload) => deliver(origin, dest, payload, id)),
-    [renders, deliver, id]
+      buildRenderToolCall(byWorkflow(config.renders, workflowId), (origin, dest, payload) =>
+        deliver(origin, dest, payload, id)
+      ),
+    [config.renders, workflowId, deliver, id]
   )
 
   // Render the workflow's approval card from the authoritative gate (only while awaiting).
