@@ -1,0 +1,29 @@
+// InstancePickerModal — co-located CSS Module (migrated from the global styles.css).
+// Rules MOVED verbatim (token refs `var(--…)` unchanged).
+//
+// SCOPED here: only the picker's OWN list container classes (`picker-list`,
+// `picker-hint`) — EXCLUSIVE to this component.
+//
+// Kept GLOBAL in styles.css (NOT here) because they are SHARED with the
+// not-being-migrated PipelineColumn (and applied as runtime-composed plain
+// strings via TINT/STATE_WORD):
+//   - `.pl-single` + its tint variants `.pl-single.run/.await/.err` and the
+//     `.pl-single .m-*` descendant styles (also used by PipelineColumn),
+//   - `.m-icon/.m-text/.m-name/.m-state` (shared mini-row family),
+//   - `.dot` + status variants and the status pill `.status`/`.s-*`
+//     (shared with AgentCard/AgentModal/PipelineColumn).
+// And the modal CHROME (`backdrop`/`modal`/`modal-head`/…), rendered inline as
+// raw divs styled by the Modal-primitive's kept-global copy.
+
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+}
+.picker-hint {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}

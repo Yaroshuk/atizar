@@ -2967,18 +2967,7 @@ button {
 /* .pipe-empty moved → components/PipelineColumn.module.scss (.pipeEmpty) */
 
 /* instance picker (an agent running ≥2 instances) */
-.picker-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  overflow-y: auto;
-}
-.picker-hint {
-  margin: 0 0 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
+/* picker-list / picker-hint rules MOVED to InstancePickerModal.module.scss */
 
 /* LeadCard reason line (userland card) */
 .lead-reason {

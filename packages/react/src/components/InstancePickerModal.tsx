@@ -1,6 +1,7 @@
 import type { Status } from '../status'
 import { TINT, STATE_WORD } from '../statusDisplay'
 import { Icon, type IconName } from './Icon'
+import s from './InstancePickerModal.module.scss'
 
 // When an agent is running more than one instance (e.g. several reply copies), opening
 // it shows THIS picker — a card per live instance — instead of one instance's thread.
@@ -45,8 +46,8 @@ export const InstancePickerModal = ({
         </button>
       </div>
 
-      <div className='picker-list'>
-        <p className='picker-hint'>Pick an instance to open its thread.</p>
+      <div className={s.pickerList}>
+        <p className={s.pickerHint}>Pick an instance to open its thread.</p>
         {instances.map((inst) => (
           <div
             key={inst.localId}
