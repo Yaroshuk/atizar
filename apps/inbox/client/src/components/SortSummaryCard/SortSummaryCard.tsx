@@ -1,4 +1,4 @@
-import { CardShell } from '@atizar/react'
+import { CardShell, Markdown } from '@atizar/react'
 import s from './SortSummaryCard.module.scss'
 
 type SortCounts = { reply?: number; reader?: number; spam?: number; important?: number }
@@ -13,7 +13,9 @@ const LABELS: { key: keyof SortCounts; label: string }[] = [
 
 export const SortSummaryCard = ({ summary, counts }: SortSummaryCardProps) => (
   <CardShell icon='inbox' kicker='Inbox sorted'>
-    <p className={s.reason}>{summary}</p>
+    <div className={s.reason}>
+      <Markdown>{summary}</Markdown>
+    </div>
     {counts && (
       <div className={s.tags}>
         {LABELS.filter(({ key }) => typeof counts[key] === 'number').map(({ key, label }) => (

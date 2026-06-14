@@ -1,4 +1,4 @@
-import { CardShell, Button } from '@atizar/react'
+import { CardShell, Button, Markdown } from '@atizar/react'
 import s from './VerdictCard.module.scss'
 
 type Verdict = {
@@ -37,6 +37,8 @@ export const VerdictCard = ({ data, onDraftReply }: VerdictCardProps) => (
         {data.priority}
       </span>
     </div>
-    <p className={s.reason}>{data.reason}</p>
+    <div className={s.reason}>
+      <Markdown>{data.reason}</Markdown>
+    </div>
   </CardShell>
 )
