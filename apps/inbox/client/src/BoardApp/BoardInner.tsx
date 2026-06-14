@@ -22,6 +22,7 @@ import {
   statusesOf,
   aggregateAgent,
   isDevMode,
+  renderableNamesFor,
   type WorkflowsConfig,
 } from '@atizar/react'
 
@@ -48,12 +49,10 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const [activityOpen, setActivityOpen] = useState(false)
   const feed = useActivity(activityOpen)
 
-  // Tool names that render as generative-UI cards. Anything else is plumbing, hidden from
-  // the consumer thread unless dev mode is on.
-  const renderableToolNames: ReadonlySet<string> = new Set([
-    ...config.renders.map((s) => s.toolName),
-    ...config.hitl.map((s) => s.toolName),
-  ])
+  // Tool names that render as generative-UI cards FOR THE ACTIVE WORKFLOW. Anything else is
+  // plumbing, hidden from the consumer thread unless dev mode is on. Scoped per workflow so a
+  // tool name owned by another workflow does not leak into this thread (registryScope).
+  const renderableToolNames: ReadonlySet<string> = renderableNamesFor(config, nav.workflow.id)
 
   const blocks = buildPipeline(nav.pInstances, queuedByAgent(board.items, nav.workflow.id))
   const aggOf = (agentId: string) =>
@@ -112,6 +111,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
           <ThreadModal
             key={nav.openItem.id}
             id={nav.openItem.id}
+            workflowId={nav.openItem.workflowId}
             title={nav.nameOf(nav.stripAgent(nav.openItem))}
             iconName={nav.metaIcon(nav.stripAgent(nav.openItem))}
             intro={config.meta[nav.stripAgent(nav.openItem)]?.intro ?? ''}
