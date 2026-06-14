@@ -17,6 +17,15 @@ export type WorkflowInput = {
   agentId: string
 }
 
+// A connection (OAuth credential) a workflow requires. `connection` defaults to 'default' at the
+// point of use (the server union). `provider` is required so the OAuth bounce knows the endpoint.
+// Names live here in core; the concrete OAuth/provider wiring stays in the server layer.
+export type WorkflowConnection = {
+  integration: string
+  connection?: string
+  provider: string
+}
+
 export type WorkflowDescriptor = {
   id: string
   label: string
@@ -28,6 +37,9 @@ export type WorkflowDescriptor = {
   // rules). Threaded through at binding time via composeInstructions(). A workflow that
   // declares no prompt is entirely unaffected.
   prompt?: string
+  // Integrations (OAuth connections) this workflow needs. The server unions these across all
+  // loaded workflows to derive the live connection list — a stale/extra chip becomes impossible.
+  connections?: WorkflowConnection[]
 }
 
 // A delivery destination: an internal worker (same workflow) or another workflow's

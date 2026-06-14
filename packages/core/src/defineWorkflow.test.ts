@@ -99,4 +99,14 @@ describe('defineWorkflow', () => {
   it('passes through when prompt is absent (no-op for existing workflows)', () => {
     expect(defineWorkflow(base).prompt).toBeUndefined()
   })
+  it('round-trips a declared connections list', () => {
+    const wf = defineWorkflow({
+      ...base,
+      connections: [{ integration: 'gmail', provider: 'google' }],
+    })
+    expect(wf.connections).toEqual([{ integration: 'gmail', provider: 'google' }])
+  })
+  it('leaves connections undefined when none are declared', () => {
+    expect(defineWorkflow(base).connections).toBeUndefined()
+  })
 })
