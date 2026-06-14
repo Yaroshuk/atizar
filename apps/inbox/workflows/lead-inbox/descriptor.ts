@@ -38,6 +38,7 @@ export const leadInbox = defineWorkflow({
   // Published contract: another workflow may deliver a lead here; the qualifier
   // (re-)qualifies it. Shape = the existing lead handoff payload.
   inputs: [{ name: 'lead', schema: HandoffPayloadSchema, agentId: qualifierAgent.id }],
+  connections: [{ integration: 'gmail', provider: 'google' }],
 })
 
 export const leadInboxAgents = [qualifierAgent, replyAgent]

@@ -92,6 +92,7 @@ export const emailInbox = defineWorkflow({
   ],
   entryAgentId: sorterAgent.id,
   inputs: [], // no cross-workflow input contract for the beta (the sorter is human-started)
+  connections: [{ integration: 'gmail', provider: 'google' }],
 })
 
 export const emailInboxAgents = [sorterAgent, replyAgent, readerAgent, spamAgent, importantAgent]
