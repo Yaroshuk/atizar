@@ -40,10 +40,33 @@ workstream into a plan and execute it.
   Green gate all pass (typecheck / test 451 / lint / format / build); browser-verified live:
   `/api/connections` returns the derived gmail row, the compact control + popover render & dismiss,
   green connected dot, 0 console errors, header width constant.
-- **WS3 — Card redesign (use `frontend-design`):** the in-thread cards look bad — redesign
-  `EmailBatchCard`/`ApprovalDialog` (worst), `TriageCard` (button placement), then sweep the rest;
-  shared `CardShell` frame, aligned action hierarchy, per-row icon-actions; move each card's CSS out of
-  the package `styles.css` into its own folder `*.module.scss`. Keep `--atz-*` + Smedja language.
+- **WS3 — Card redesign: ✅ DONE & browser-verified** (2026-06-14, merged to `master`, branch deleted).
+  Plan → `docs/superpowers/plans/2026-06-14-ws3-card-redesign.md`. As-built: added a `CardShell`
+  primitive to `@atizar/react` (`primitives/CardShell/` — shared frame: icon-badge + kicker/title
+  header, body, aligned actions zone; `tone="attention"` = amber approval look, default = neutral
+  card; unifies the old `.lead-card` + `.approval` frames). Rebuilt ALL 8 userland cards on CardShell,
+  each now folder-per-component with a co-located `.module.scss` (`--atz-*` tokens only): ApprovalDialog
+  (editable textarea preserved — edited-text→Gmail path intact), ReplyDraftCard, EmailBatchCard
+  (per-row `<select>` → trailing IconButton cluster trash/mark-read/star/keep with `aria-pressed`
+  single-select; added `trash`+`star` glyphs to Icon), TriageCard (stacked full-width buttons → ONE
+  aligned action row per ticket, primary-vs-ghost hierarchy; added the missing `.pill.amber` rule),
+  LeadCard/VerdictCard/SortSummaryCard/TicketResultCard. Removed the migrated `.approval*`/`.lead-*`/
+  `.triage-*` families from the package `styles.css` (−375 lines, grep-guarded; kept shared
+  `.btn*`/`.pill*`/`.status*`/`.dot*` which chrome uses). Card Props + render-spec wiring unchanged.
+  Green gate all pass (typecheck / test 454 / lint / format / `@atizar/react` build); browser-verified
+  (`DEV_RECORD_REPLAY=1`): TriageCard/VerdictCard/LeadCard/ApprovalDialog/EmailBatchCard/SortSummaryCard
+  all render styled on CardShell, 0 console errors; **ApprovalDialog edit→approve → real Gmail draft**
+  (resolved gate `form.body` has the edit marker, action ledger `ok=true` + draftId); EmailBatchCard
+  per-row icon single-select verified (didn't Apply — avoids real inbox mutation). (ReplyDraftCard +
+  TicketResultCard not individually screenshotted — render-only, same verified CardShell+`.reason`
+  pattern.)
+
+**🎉 All three frontend-overhaul workstreams are DONE & merged to `master`.** The spec
+(`docs/superpowers/specs/2026-06-14-frontend-overhaul-design.md`) definition-of-done is met:
+conventions written + codebase conforms; `connectionList` auto-derived; one compact connections
+control; all in-thread cards redesigned on a shared `CardShell`; package `styles.css` free of
+userland-card CSS. **Next session: pick up the packaging tail (step 7c) / email-inbox track per the
+sections below.**
 
 **How to run it (the user's instruction):** work autonomously, orchestrating subagents. Per workstream:
 `writing-plans` → `subagent-driven-development` (fresh implementer per task + spec/quality review) →
