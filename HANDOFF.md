@@ -25,9 +25,21 @@ workstream into a plan and execute it.
   Green gate all pass (typecheck / test 446 / lint / format / `@atizar/react` build); browser-verified
   the board + a thread render FULLY styled (hashed module classes resolve, status pills/dots colored,
   text not split, 0 console errors). Userland-card `.module.scss` migration deferred to WS3 (per spec).
-- **WS2 — Connections:** auto-derive `connectionList` from loaded workflows (add `connections?` to the
-  workflow descriptor; union in `apps/inbox/server/connections.ts`) + collapse the header chip row into
-  ONE compact "Connections" control with a popover.
+- **WS2 — Connections: ✅ DONE & browser-verified** (2026-06-14, merged to `master`, branch deleted).
+  Plan → `docs/superpowers/plans/2026-06-14-ws2-connections.md`; `check-foundation` (descriptor
+  contract) = CLEAR (realizes I7 config-as-data; type in core, OAuth wiring in server). As-built:
+  (2a) added `WorkflowConnection` type + optional `connections?: WorkflowConnection[]` to
+  `WorkflowDescriptor` in `@atizar/core`; lead-inbox + email-inbox declare
+  `[{integration:'gmail',provider:'google'}]`, github-triage none; `apps/inbox/server/connections.ts`
+  now exports a pure `deriveConnectionList(descriptors)` (union + default `connection:'default'` +
+  dedupe by `(integration,connection)`) and sets `connectionList = deriveConnectionList(workflowDescriptors)`
+  — stale/extra chips now impossible (`scopesFor` unchanged). (2b) reshaped `Connections` into ONE
+  compact trigger (a new `link` Icon + summary status dot: teal=all-connected / amber=any-disconnected,
+  + count when >1) that toggles a popover (`position:absolute`, z-index 40) listing one `ConnectionChip`
+  per row; dismisses on outside-click + Escape. `AppHeader`/`useConnections`/connect-routes untouched.
+  Green gate all pass (typecheck / test 451 / lint / format / build); browser-verified live:
+  `/api/connections` returns the derived gmail row, the compact control + popover render & dismiss,
+  green connected dot, 0 console errors, header width constant.
 - **WS3 — Card redesign (use `frontend-design`):** the in-thread cards look bad — redesign
   `EmailBatchCard`/`ApprovalDialog` (worst), `TriageCard` (button placement), then sweep the rest;
   shared `CardShell` frame, aligned action hierarchy, per-row icon-actions; move each card's CSS out of
