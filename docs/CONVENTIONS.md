@@ -30,6 +30,31 @@ rules in `eslint.config.js`. This file is everything else.
   export const AgentCard = ({ name, status, onStart }: AgentCardProps) => { ... }
   ```
 
+## Component file & folder structure
+
+These extend the one-component-per-file rule above with where a component's files live.
+
+1. **One component per file — including private wrappers.** A file exports exactly one React
+   component (plus its own `Props` type). No second component in the same file — not even a small
+   private `Inner`/wrapper. Extract it to its own file. (Pure non-component helpers/hooks may live
+   beside it per rule 2.)
+2. **Folder per component.** A component lives in its own folder named for it:
+   `ComponentName/ComponentName.tsx` + `ComponentName/ComponentName.module.scss` (its styles) + any
+   component-local helpers / hooks / sub-components / tests in that same folder
+   (`ComponentName.test.tsx`, `useComponentNameThing.ts`, …). A barrel `index.ts` is optional —
+   prefer importing the file directly (`./ComponentName/ComponentName.js`). Truly shared
+   helpers/hooks stay at the package top level (`hooks/`, models like `boardModel.ts`) — folder
+   locality is for things used ONLY by that component.
+3. **CSS Modules everywhere, including `apps/`.** Every component (package AND userland) owns its
+   styles in a co-located `*.module.scss`. No component-specific rules in a global stylesheet. The
+   only global CSS is the reset + cross-cutting layout shells + the `--atz-*` token layer
+   (`tokens.css`). Import class names from the module (`import s from './X.module.scss'`) and merge
+   an incoming `className` with `clsx`. Note `localsConvention: 'camelCaseOnly'` camelizes BOTH `-`
+   AND `_` (`.card-top` → `cardTop`, `awaiting_approval` → `awaitingApproval`); a runtime
+   status-keyed class needs a `camelize()` helper, and the convention must match in every Vite
+   config that compiles the package's `*.module.scss` (the demo's `apps/inbox/vite.config.ts` and
+   `packages/react/vite.config.ts`).
+
 ## Hooks
 
 - React hooks follow the component rule: **arrow-function const, named export**,
