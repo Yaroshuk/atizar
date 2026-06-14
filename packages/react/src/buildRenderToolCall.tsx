@@ -8,6 +8,8 @@ import type { DeliverFn, RenderSpec } from './renderSpecs'
 // (a data-fetch tool like list_my_tickets) returns null — AgentModal already filters those
 // out by `renderableToolNames` unless dev mode is on. Specs are injected (from the
 // WorkflowsConfig context), not statically imported — the package holds no userland cards.
+// The caller passes an ALREADY-WORKFLOW-SCOPED list (via byWorkflow): resolution is by
+// toolName WITHIN one workflow, so two workflows' same-named tools resolve independently.
 export const buildRenderToolCall =
   (renderSpecs: RenderSpec[], deliver: DeliverFn) =>
   ({ toolCall }: { toolCall: ToolCall; toolMessage?: ToolMessage }): ReactNode => {
