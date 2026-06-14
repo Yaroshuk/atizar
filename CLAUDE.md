@@ -136,6 +136,30 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   mode** (`?dev=1`, persisted to localStorage via `devMode.ts`) reveals every raw tool-call chip for
   debugging. Adding a new card → register its render spec (so it surfaces); a pure data tool stays
   hidden by design.
+- **A per-WorkItem thread `EventSource` MUST stop on terminal status — else a reconnect STORM.**
+  The server closes `GET /api/workitems/:id/stream` once a run is terminal (after replaying its
+  backlog); the browser's `EventSource` auto-reconnects on ANY close, so without a guard a finished
+  run's stream reopens in a tight loop (seen: **119** reconnects) that exhausts the **~6-per-host**
+  HTTP/1.1 budget (through the Vite proxy) and STARVES other streams — the board, and a newly-opened
+  live thread whose tail events (e.g. the final `renderVerdict` card) then silently never arrive, so
+  the card just doesn't appear. **Reload masks it** (a complete snapshot needs no live tail), so it's
+  a pure "only the browser catches it" bug — and only after a few thread-opens accumulate. Fix lives
+  in `useWorkItemThread`: don't open an SSE when the snapshot is already `done`; on a terminal
+  `status` event close the stream (no reconnect) AND refetch the full trace (the live tail can race
+  the server's backlog-flush-vs-close, dropping events). Server side, `/stream` defers its terminal
+  close until the backlog has flushed (`backlogFlushed`). (`fea7835`, `98a0e04`.)
+- **`useBoard()` is a SHARED ref-counted singleton — never give each consumer its own board SSE.**
+  Several hooks call `useBoard()` in one tree (`useWorkflowSelection`, `useBoardNavigation`, the demo
+  board). It is a module-level singleton: ONE `/api/board/stream` + ONE `/api/board` refetch per poke,
+  shared across callers. The hook-split once opened 3 independent board streams + 3× refetch, which
+  (with the storm above) blew the ~6-connection budget. If you add a board consumer, just call
+  `useBoard()` — do NOT open a board `EventSource` per component.
+- **CSS-Module `localsConvention: 'camelCaseOnly'` camelizes BOTH `-` AND `_`.** `.card-top`→`cardTop`
+  AND `awaiting_approval`→`awaitingApproval`, `s-running`→`sRunning`. So a runtime status-keyed class
+  needs a `camelize()` helper (`s[camelize(status)]`), not `s[status]`. The convention MUST match in
+  BOTH places that compile the package's `*.module.scss`: the demo's `apps/inbox/vite.config.ts` (dev)
+  AND `packages/react/vite.config.ts` (lib build) — a mismatch renders status dots/pills unstyled, and
+  **only the browser catches it**.
 - **Generative-UI render closures are captured ONCE.** `useRenderTool`'s effect deps stringify a
   function to `"[null]"`, so the render callback you pass is frozen on first registration. Any
   callback it closes over (e.g. the handoff trigger) MUST be a stable `useCallback` that reads
