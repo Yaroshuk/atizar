@@ -1,10 +1,5 @@
-import { spawn as nodeSpawn, type ChildProcessByStdio } from 'node:child_process'
-import type { Readable } from 'node:stream'
-import { createInterface } from 'node:readline'
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { makeClaudeSpawn } from '@atizar/server'
 import type { ClaudeSpawn } from '@atizar/providers'
 
 // Absolute path to the stdio MCP server scripts.
@@ -14,7 +9,7 @@ const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.u
 const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mts', import.meta.url))
 const GITHUB_SERVER = fileURLToPath(new URL('../mcp/github-tools.mjs', import.meta.url))
 
-// Built-in tools the model must not use — only our two MCP tools are allowed.
+// Built-in tools the model must not use — only our MCP tools are allowed.
 const BUILTINS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']
 
 // A whole run shouldn't outlive a human-scale interaction; kill stuck processes.
@@ -22,116 +17,27 @@ const BUILTINS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebFetch', '
 // model headroom beyond the original 120s before we consider it stuck.
 const RUN_TIMEOUT_MS = 180_000
 
-// Yields stdout lines, and — so the provider never silently ends on a broken run —
-// appends a synthetic `result` error line (which the parser surfaces as text) when
-// the process fails to spawn or times out.
-async function* readLines(
-  child: ChildProcessByStdio<null, Readable, Readable>,
-  onDone: () => void
-): AsyncGenerator<string> {
-  let spawnError: Error | null = null
-  let timedOut = false
-  child.on('error', (err) => {
-    spawnError = err
-  })
-  const timer = setTimeout(() => {
-    timedOut = true
-    try {
-      child.kill('SIGKILL')
-    } catch {
-      // already gone
-    }
-  }, RUN_TIMEOUT_MS)
-  try {
-    for await (const line of createInterface({ input: child.stdout })) yield line
-  } finally {
-    clearTimeout(timer)
-    onDone()
-  }
-  if (timedOut) {
-    yield JSON.stringify({ type: 'result', is_error: true, result: 'claude run timed out' })
-  } else if (spawnError) {
-    yield JSON.stringify({ type: 'result', is_error: true, result: (spawnError as Error).message })
-  }
-}
-
-// Real spawn: writes a temp mcp-config + permission settings, runs `claude` in
-// stream-json mode, exposes stdout as an async line iterator. Auth = the Claude
-// Code subscription login; ANTHROPIC_API_KEY is removed so it can't override.
-export const claudeSpawn: ClaudeSpawn = (prompt, allowedTools) => {
-  const dir = mkdtempSync(join(tmpdir(), 'inbox-claude-'))
-  const mcpConfig = join(dir, 'mcp.json')
-  const settings = join(dir, 'settings.json')
-  writeFileSync(
-    mcpConfig,
-    JSON.stringify({
-      mcpServers: {
-        inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
-        gmail: { type: 'stdio', command: 'node', args: ['--import', 'tsx', GMAIL_SERVER] },
-        github: { type: 'stdio', command: 'node', args: [GITHUB_SERVER] },
-      },
-    })
-  )
-  writeFileSync(
-    settings,
-    JSON.stringify({
-      permissions: {
-        // Per-agent allow-list (the hard single-entry-point boundary): the qualifier
-        // gets the inbox reader, the reply agent gets the writers — never both.
-        allow: [...allowedTools],
-        deny: BUILTINS,
-      },
-    })
-  )
-
-  // The child inherits the full process env (spread), so the framework's ATIZAR_* vars
-  // — ATIZAR_SECRET_KEY / ATIZAR_DATABASE_URL / ATIZAR_CONNECTION / ATIZAR_<PROVIDER>_CLIENT_*
-  // — flow through to the spawned MCP servers automatically; that is REQUIRED so an MCP child
-  // can `resolveCredential` against the same encrypted store. Do NOT switch to an allow-list of
-  // env keys here without also forwarding the ATIZAR_* set, or credential resolution in MCP
-  // children breaks silently. ANTHROPIC_API_KEY is the one deliberate removal (subscription auth).
-  const env = { ...process.env }
-  delete env.ANTHROPIC_API_KEY
-
-  const child = nodeSpawn(
-    'claude',
-    [
-      // NB: do NOT pass --bare — it skips keychain reads, which breaks the
-      // subscription (OAuth-in-keychain) auth and yields "Not logged in".
-      '-p',
-      prompt,
-      '--mcp-config',
-      mcpConfig,
-      '--strict-mcp-config',
-      '--disallowed-tools',
-      ...BUILTINS,
-      '--settings',
-      settings,
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      '--include-partial-messages',
-    ],
-    { env, stdio: ['ignore', 'pipe', 'pipe'] }
-  )
-
-  // Remove the temp config dir once the run ends (success, kill, or error).
-  const cleanup = () => {
-    try {
-      rmSync(dir, { recursive: true, force: true })
-    } catch {
-      // best effort
-    }
-  }
-
-  return {
-    lines: readLines(child, cleanup),
-    kill: () => {
-      try {
-        child.kill('SIGKILL')
-      } catch {
-        // already gone
-      }
-    },
-  }
-}
+// Concrete claude spawn for the inbox app. The generic engine lives in @atizar/server; the
+// app injects the MCP server paths, the builtins deny-list, the timeout, and the env policy.
+//
+// ENV POLICY (DO NOT WEAKEN): the child inherits the FULL process env (spread), so the
+// framework's ATIZAR_* vars — ATIZAR_SECRET_KEY / ATIZAR_DATABASE_URL / ATIZAR_CONNECTION /
+// ATIZAR_<PROVIDER>_CLIENT_* — flow through to the spawned MCP servers automatically; that is
+// REQUIRED so an MCP child can `resolveCredential` against the same encrypted store. Do NOT
+// switch to an allow-list of env keys without also forwarding the ATIZAR_* set, or credential
+// resolution in MCP children breaks SILENTLY. ANTHROPIC_API_KEY is the one deliberate removal
+// (subscription auth — see browser-verify).
+export const claudeSpawn: ClaudeSpawn = makeClaudeSpawn({
+  mcpServers: {
+    inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
+    gmail: { type: 'stdio', command: 'node', args: ['--import', 'tsx', GMAIL_SERVER] },
+    github: { type: 'stdio', command: 'node', args: [GITHUB_SERVER] },
+  },
+  builtins: BUILTINS,
+  timeoutMs: RUN_TIMEOUT_MS,
+  prepareEnv: (base) => {
+    const env = { ...base }
+    delete env.ANTHROPIC_API_KEY
+    return env
+  },
+})
