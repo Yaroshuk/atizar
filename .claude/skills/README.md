@@ -14,14 +14,14 @@ RECURRED, never speculatively.
 The two staged kinds are **Tasks** (own a whole run, have a self-improvement stage) and
 **Procedures** (building blocks invoked by Tasks, or standalone for a one-off; no self-improvement
 stage). See [`CONVENTIONS.md`](CONVENTIONS.md) Part 1. The build order for the rest lives in
-[`docs/AGENTIC.md`](../../docs/AGENTIC.md) Phase 1. Next Task skill to add: `add-workflow`
-(Phase 1, `docs/AGENTIC.md`).
+[`docs/AGENTIC.md`](../../docs/AGENTIC.md) Phase 1.
 
 ### Tasks (genre 2b — own a run)
 
-| Skill               | When to use                                                                                                                                                   | SKILL.md                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `write-integration` | Adding/writing/building an integration in `@atizar/integrations`, connecting an external service, or extending an existing integration with new capabilities. | [write-integration/SKILL.md](write-integration/SKILL.md) |
+| Skill               | When to use                                                                                                                                                       | SKILL.md                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `add-workflow`      | Adding/writing/scaffolding/building a new workflow (a multi-agent automation: input agent + workers, inbound flow, approval pipeline) in `apps/inbox/workflows/`. | [add-workflow/SKILL.md](add-workflow/SKILL.md)           |
+| `write-integration` | Adding/writing/building an integration in `@atizar/integrations`, connecting an external service, or extending an existing integration with new capabilities.     | [write-integration/SKILL.md](write-integration/SKILL.md) |
 
 ### Procedures (genre 2a — building blocks)
 
