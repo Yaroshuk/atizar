@@ -9,7 +9,7 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 // SELECT … FOR UPDATE the row → check the edge is legal from the current status →
 // UPDATE → COMMIT. The row lock serializes concurrent transitions (design §3.6).
 
-export type Edge = 'start' | 'gate' | 'resume' | 'finish' | 'fail' | 'cancel' | 'reject'
+export type Edge = 'start' | 'gate' | 'resume' | 'finish' | 'fail' | 'cancel' | 'reject' | 'supersede'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -26,12 +26,17 @@ const EDGES: Record<Edge, { from: WorkItemStatus[]; to: WorkItemStatus }> = {
   fail: { from: ['running', 'awaiting_approval'], to: 'error' },
   cancel: { from: ['queued', 'running', 'awaiting_approval', 'awaiting_input'], to: 'finished' },
   reject: { from: ['awaiting_approval'], to: 'finished' },
+  // Re-run/refresh (WS1): retire a prior FINISHED scan root into the preserved Done bucket.
+  // 'closed' is NOT in TERMINAL_STATUSES, so this edge never triggers the parent auto-finish
+  // walk — and there is no children cascade here (per-item work items stay durable, I12).
+  supersede: { from: ['finished', 'result'], to: 'closed' },
 }
 
 // Terminal-outcome marker set by explicit human commands (orthogonal to status).
-const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected'>> = {
+const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected' | 'superseded'>> = {
   cancel: 'cancelled',
   reject: 'rejected',
+  supersede: 'superseded',
 }
 
 // Statuses that count as an active child (block a parent's auto-finish).

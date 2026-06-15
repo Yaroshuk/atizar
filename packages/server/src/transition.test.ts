@@ -89,4 +89,33 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     await transition(db, id, 'start')
     await expect(transition(db, id, 'reject')).rejects.toThrow(/cannot "reject"/)
   })
+
+  it('supersede from finished → closed with resolution superseded', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'finish')
+    await transition(db, id, 'supersede')
+    const row = await store.getWorkItem(id)
+    expect(row?.status).toBe('closed')
+    expect(row?.resolution).toBe('superseded')
+  })
+
+  it('supersede is illegal from running (only a finished/result root can be superseded)', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await expect(transition(db, id, 'supersede')).rejects.toThrow(/cannot "supersede"/)
+  })
+
+  it('supersede does NOT cascade to the parent (children stay durable, I12)', async () => {
+    const { id: parent } = await newQueued()
+    await transition(db, parent, 'start')
+    await transition(db, parent, 'finish')
+    // a child still active under the parent
+    const { id: child } = await newQueued({ parentId: parent })
+    await transition(db, child, 'start')
+    await transition(db, parent, 'supersede')
+    // the child is untouched by the parent's supersede
+    expect((await store.getWorkItem(child))?.status).toBe('running')
+    expect((await store.getWorkItem(parent))?.status).toBe('closed')
+  })
 })
