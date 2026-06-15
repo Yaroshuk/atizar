@@ -106,6 +106,41 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     await expect(transition(db, id, 'supersede')).rejects.toThrow(/cannot "supersede"/)
   })
 
+  it('reset from finished → closed with resolution reset', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'finish')
+    await transition(db, id, 'reset')
+    const row = await store.getWorkItem(id)
+    expect(row?.status).toBe('closed')
+    expect(row?.resolution).toBe('reset')
+  })
+
+  it('reset from error → closed with resolution reset', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'fail', { error: 'boom' })
+    await transition(db, id, 'reset')
+    const row = await store.getWorkItem(id)
+    expect(row?.status).toBe('closed')
+    expect(row?.resolution).toBe('reset')
+  })
+
+  it('reset is illegal from running (must cancel first)', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await expect(transition(db, id, 'reset')).rejects.toThrow(/cannot "reset"/)
+    expect((await store.getWorkItem(id))?.status).toBe('running')
+  })
+
+  it('reset is illegal from awaiting_approval (must cancel first)', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'gate')
+    await expect(transition(db, id, 'reset')).rejects.toThrow(/cannot "reset"/)
+    expect((await store.getWorkItem(id))?.status).toBe('awaiting_approval')
+  })
+
   it('supersede does NOT cascade to the parent (children stay durable, I12)', async () => {
     const { id: parent } = await newQueued()
     await transition(db, parent, 'start')

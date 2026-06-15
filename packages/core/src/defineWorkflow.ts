@@ -47,6 +47,12 @@ export type WorkflowDescriptor = {
   // no auto-supersede — every finished scan is kept and the human chooses which is current.
   // The 'history' branch point lives in pipelineService.dispatch(); see its comment there.
   rerun?: 'refresh' | 'history'
+  // Clear-on-START policy (config-as-data, I7). Default off. When true, a human START of this
+  // workflow's input agent first RESETs the workflow's TERMINAL items — they move to 'closed'
+  // (resolution 'reset') via transition() so the board starts clean for the new run; per-item
+  // rows stay durable (hidden, not deleted — I12). Active/awaiting work is never touched. This
+  // is a declarative knob; the behavior lives in pipelineService.dispatch().
+  resetOnStart?: boolean
 }
 
 // A delivery destination: an internal worker (same workflow) or another workflow's

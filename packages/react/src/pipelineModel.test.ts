@@ -15,14 +15,33 @@ const i = (over: Partial<PInstance>): PInstance => ({
 })
 
 describe('buildPipeline', () => {
-  it('keeps a done input agent as a lone header', () => {
+  it('keeps a RUNNING input agent as a lone header', () => {
     const blocks = buildPipeline(
-      [i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done', label: '' })],
+      [i({ localId: 'in', agentId: 'triage', isInput: true, status: 'running', label: '' })],
       {}
     )
     expect(blocks).toHaveLength(1)
     expect(blocks[0].parent.localId).toBe('in')
     expect(blocks[0].groups).toEqual([])
+  })
+
+  it('drops a DONE input agent with no active child (it leaves the live column, Unit 4.1)', () => {
+    const blocks = buildPipeline(
+      [i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done', label: '' })],
+      {}
+    )
+    expect(blocks).toHaveLength(0)
+  })
+
+  it('keeps a DONE input agent that still has an active child', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
+        i({ localId: 'c1', agentId: 'reply', parentLocalId: 'in', status: 'running' }),
+      ],
+      {}
+    )
+    expect(blocks.map((b) => b.parent.localId)).toContain('in')
   })
 
   it('one child instance renders as a single-instance group', () => {
@@ -91,7 +110,7 @@ describe('buildPipeline', () => {
     expect(g.queued).toBe(2)
   })
 
-  it('drops a done worker with no active child', () => {
+  it('drops a done worker with no active child (and its now-terminal input root too)', () => {
     const blocks = buildPipeline(
       [
         i({ localId: 'in', agentId: 'triage', isInput: true, status: 'done' }),
@@ -99,6 +118,20 @@ describe('buildPipeline', () => {
       ],
       {}
     )
+    // Both the worker and the now-terminal input root with no live work leave the live column.
+    expect(blocks).toHaveLength(0)
+  })
+
+  it('keeps a running input root and drops its done leaf worker', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'triage', isInput: true, status: 'running' }),
+        i({ localId: 'c1', agentId: 'feature', parentLocalId: 'in', status: 'done' }),
+      ],
+      {}
+    )
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].parent.localId).toBe('in')
     expect(blocks[0].groups).toEqual([])
   })
 
@@ -122,14 +155,6 @@ describe('buildPipeline', () => {
     expect(parentIds).toContain('r1')
     const r1Block = blocks.find((bl) => bl.parent.localId === 'r1')!
     expect(r1Block.groups[0].instances[0].localId).toBe('b1')
-  })
-
-  it('a finished input root with no live child keeps Done (not relabeled Working)', () => {
-    const blocks = buildPipeline(
-      [i({ localId: 'in', agentId: 'sorter', isInput: true, status: 'done', label: '' })],
-      {}
-    )
-    expect(blocks[0].parent.status).toBe('done')
   })
 
   it('a kept input root WITH a live child still shows Working', () => {

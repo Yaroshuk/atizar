@@ -160,6 +160,42 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     }
   }
 
+  // Board RESET (Unit 4.4, I8/I12): retire every TERMINAL item (finished/result/error) of the
+  // scope into the preserved Done bucket (status 'closed', resolution 'reset') via transition()
+  // — every status change still goes through the one guarded edge; no row is deleted (hidden,
+  // reachable in Activity/history). ACTIVE / awaiting-approval items are NOT touched here: they
+  // require an explicit human confirm + cancel first (the route returns their count so the client
+  // can confirm), so open work is never silently lost. Returns how many were reset and how many
+  // active items were left untouched.
+  async function resetImpl(workflowId?: string): Promise<{ reset: number; active: number }> {
+    const resettable = await store.getResettable(workflowId)
+    let reset = 0
+    for (const item of resettable.sort((a, b) => a.id.localeCompare(b.id))) {
+      try {
+        await transition(db, item.id, 'reset')
+      } catch (e) {
+        // Tolerate a lost race (a concurrent edge moved the item out of a resettable status
+        // between the read and here). Re-throw a genuine DB error.
+        if (e instanceof IllegalTransition) continue
+        throw e
+      }
+      reset++
+      activity.record({
+        ts: Date.now(),
+        workflowId: item.workflowId,
+        agentId: item.agentId,
+        workItemId: item.id,
+        kind: 'reset',
+        summary: 'cleared from board',
+      })
+    }
+    const activeItems = workflowId
+      ? await store.getActiveByWorkflow(workflowId)
+      : (await store.getBoardSnapshot()).items.filter((i) => ACTIVE.includes(i.status))
+    if (reset > 0) publishBoard()
+    return { reset, active: activeItems.length }
+  }
+
   // True when `agentId` (= wf__agent) is the runtime key of a role:'input' agent in some loaded
   // descriptor. The set of input runtime keys is derived once from deps.descriptors; refresh
   // applies ONLY to input roots (a worker re-START is an ordinary new dispatch, never a refresh).
@@ -169,6 +205,11 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     )
   )
   const isInputAgent = (agentId: string): boolean => inputAgentKeys.has(agentId)
+
+  // Workflows that opt into clear-on-START (resetOnStart, config-as-data I7) — derived once.
+  const resetOnStartWorkflows = new Set<string>(
+    deps.descriptors.filter((wf) => wf.resetOnStart).map((wf) => wf.id)
+  )
 
   // 'refresh' re-run (WS1, I1/I8/I12): on a human START of an input agent, retire each prior
   // FINISHED root of the same workflow × input-agent into the preserved Done bucket (status
@@ -216,6 +257,11 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // re-run (prior root already finished, slot free).
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
         await supersedePriorRoots(req.workflowId, req.agentId)
+        // resetOnStart (I7): clear this workflow's terminal items so the board starts clean for
+        // the new scan. Only TERMINAL items move (transition('reset')); active/awaiting work is
+        // left untouched, and rows are hidden, never deleted (I12). Runs after the supersede so a
+        // just-superseded prior root ('closed') is excluded by resetImpl's RESETTABLE filter.
+        if (resetOnStartWorkflows.has(req.workflowId)) await resetImpl(req.workflowId)
       }
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
       activity.record({
@@ -398,6 +444,18 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         ...new Set(snap.items.filter((i) => ACTIVE.includes(i.status)).map((i) => i.workflowId)),
       ]
       for (const workflowId of activeWorkflowIds) await cancelWorkflowImpl(workflowId)
+    },
+
+    // Clear a workflow's TERMINAL items from the live board (hidden, not deleted — I12). Active /
+    // awaiting items are left untouched; the returned `active` count lets the client confirm +
+    // cancel them first.
+    async resetWorkflow(workflowId: string): Promise<{ reset: number; active: number }> {
+      return resetImpl(workflowId)
+    },
+
+    // Clear TERMINAL items across ALL workflows ("reset all"). Same contract as resetWorkflow.
+    async resetAll(): Promise<{ reset: number; active: number }> {
+      return resetImpl()
     },
 
     async getStatus(id: string): Promise<{ status: WorkItemStatus; done: boolean } | undefined> {

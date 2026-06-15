@@ -18,6 +18,7 @@ export type Edge =
   | 'cancel'
   | 'reject'
   | 'supersede'
+  | 'reset'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -38,17 +39,30 @@ const EDGES: Record<Edge, { from: WorkItemStatus[]; to: WorkItemStatus }> = {
   // 'closed' is NOT in TERMINAL_STATUSES, so this edge never triggers the parent auto-finish
   // walk — and there is no children cascade here (per-item work items stay durable, I12).
   supersede: { from: ['finished', 'result'], to: 'closed' },
+  // Board RESET (Unit 4.4): a human cleared the board — retire a TERMINAL item into the
+  // preserved Done bucket so it leaves the live column. Legal ONLY from a terminal status
+  // (finished/result/error); a running/awaiting item must be `cancel`led first (I12 — open
+  // work is never silently lost). Like supersede: 'closed' is not terminal, no parent walk,
+  // no children cascade — every work item row stays durable (hidden, not deleted).
+  reset: { from: ['finished', 'result', 'error'], to: 'closed' },
 }
 
 // Terminal-outcome marker set by explicit human commands (orthogonal to status).
-const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected' | 'superseded'>> = {
+const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected' | 'superseded' | 'reset'>> = {
   cancel: 'cancelled',
   reject: 'rejected',
   supersede: 'superseded',
+  reset: 'reset',
 }
 
 // Statuses that count as an active child (block a parent's auto-finish).
 const ACTIVE: WorkItemStatus[] = ['queued', 'running', 'awaiting_approval', 'awaiting_input']
+
+// Statuses the `reset` edge accepts, DERIVED from the edge table so the two can't drift. A
+// board RESET only retires items already in one of these terminal statuses; active/awaiting
+// work must be cancelled first (I12). Exported so the service/store classify resettable items
+// in one place.
+const RESETTABLE: WorkItemStatus[] = EDGES.reset.from
 
 // Terminal statuses an edge can land a work item in. Any of these frees the item's parent for
 // the auto-finish walk — not just a clean `finish` (a rejected / cancelled / failed child must
@@ -122,5 +136,6 @@ export async function transition(
   })
 }
 
-// Re-exported (the auto-finish walk reuses the active-child predicate).
-export { ACTIVE }
+// Re-exported (the auto-finish walk reuses the active-child predicate; the store classifies
+// resettable items against RESETTABLE, which is derived from EDGES.reset.from).
+export { ACTIVE, RESETTABLE }

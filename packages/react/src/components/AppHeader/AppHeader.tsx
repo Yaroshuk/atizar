@@ -1,6 +1,7 @@
 import { WorkflowTabs } from '../WorkflowTabs/WorkflowTabs'
 import { Connections } from '../Connections/Connections'
 import { StopButton } from '../../primitives/StopButton/StopButton'
+import { ResetButton } from '../../primitives/ResetButton/ResetButton'
 import { IconButton } from '../../primitives/IconButton/IconButton'
 import s from './AppHeader.module.scss'
 import type { WorkflowDescriptor } from '@atizar/core'
@@ -19,6 +20,10 @@ type AppHeaderProps = {
   globalActive: number
   stoppingAll: boolean
   onStopAll: () => void
+  // Reset all — clear every finished item across all workflows (in-progress work is kept;
+  // confirm-gated upstream). Optional: omit to hide the global Reset control.
+  onResetAll?: () => void
+  resettingAll?: boolean
   // Activity drawer
   activityOpen: boolean
   onToggleActivity: () => void
@@ -36,6 +41,8 @@ export const AppHeader = ({
   globalActive,
   stoppingAll,
   onStopAll,
+  onResetAll,
+  resettingAll = false,
   activityOpen,
   onToggleActivity,
   workspaceName = 'Acme Inbox',
@@ -61,6 +68,15 @@ export const AppHeader = ({
           <span className={s.ahReconnectDot} />
           Reconnecting…
         </span>
+      )}
+      {onResetAll && (
+        <ResetButton
+          scope='all'
+          label='Reset all'
+          resetting={resettingAll}
+          onClick={onResetAll}
+          title='Clear every finished item across all workflows (in-progress work is kept)'
+        />
       )}
       <StopButton
         scope='all'

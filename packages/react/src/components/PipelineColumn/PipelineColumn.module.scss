@@ -37,6 +37,13 @@
   padding: 16px 16px 18px;
 }
 
+// Header action cluster — the workflow Reset + Stop controls sit side by side.
+.pipe-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .pipe-empty {
   color: var(--muted-2);
   font-size: 12.5px;

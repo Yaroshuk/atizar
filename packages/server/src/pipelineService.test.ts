@@ -408,6 +408,116 @@ describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
   }, 10_000)
 })
 
+describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
+  // A provider that finishes immediately so the item reaches a terminal (finished) status.
+  function quickProvider(): Provider {
+    return {
+      async *run(_input: RunAgentInput) {
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'done' })
+      },
+    }
+  }
+
+  function makeResetService() {
+    const runtime: AgentRuntime = {
+      provider: quickProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+  }
+
+  it('resetWorkflow closes a finished item (resolution reset), preserving the row (I12)', async () => {
+    const svc = makeResetService()
+    const wf = `reset-wf-${randomUUID().slice(0, 8)}`
+    const { id } = await svc.dispatch({
+      workflowId: wf,
+      agentId: `${wf}__sorter`,
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(id))?.status === 'finished')
+
+    const res = await svc.resetWorkflow(wf)
+    expect(res.reset).toBe(1)
+    expect(res.active).toBe(0)
+
+    const status = await svc.getStatus(id)
+    expect(status?.status).toBe('closed') // hidden from the live column, not deleted
+    const board = await svc.getBoard()
+    const row = board.items.find((i) => i.id === id)
+    expect(row).toBeDefined() // row preserved (openable via Activity/trace)
+    expect(row?.resolution).toBe('reset')
+  })
+
+  it('resetWorkflow does NOT close an active item and reports it in `active`', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(), // stays running, occupies its slot
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const wf = `reset-active-${randomUUID().slice(0, 8)}`
+    const { id } = await svc.dispatch({
+      workflowId: wf,
+      agentId: `${wf}__sorter`,
+      origin: 'human',
+      payload: {},
+    })
+    // queued or running — either way it is ACTIVE, so reset must leave it alone.
+    const res = await svc.resetWorkflow(wf)
+    expect(res.reset).toBe(0)
+    expect(res.active).toBe(1)
+    expect((await svc.getStatus(id))?.done).toBe(false)
+  })
+
+  it('resetAll closes finished items across multiple workflows', async () => {
+    const svc = makeResetService()
+    const wfA = `reset-all-a-${randomUUID().slice(0, 8)}`
+    const wfB = `reset-all-b-${randomUUID().slice(0, 8)}`
+    const a = await svc.dispatch({
+      workflowId: wfA,
+      agentId: `${wfA}__sorter`,
+      origin: 'human',
+      payload: {},
+    })
+    const b = await svc.dispatch({
+      workflowId: wfB,
+      agentId: `${wfB}__sorter`,
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(a.id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(b.id))?.status === 'finished')
+
+    const res = await svc.resetAll()
+    expect(res.reset).toBeGreaterThanOrEqual(2)
+    expect((await svc.getStatus(a.id))?.status).toBe('closed')
+    expect((await svc.getStatus(b.id))?.status).toBe('closed')
+  }, 15_000)
+
+  it('reset records a `reset` activity entry', async () => {
+    const svc = makeResetService()
+    const wf = `reset-act-${randomUUID().slice(0, 8)}`
+    const { id } = await svc.dispatch({
+      workflowId: wf,
+      agentId: `${wf}__sorter`,
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(id))?.status === 'finished')
+    await svc.resetWorkflow(wf)
+    const entry = svc.getActivity().find((e) => e.workItemId === id && e.kind === 'reset')
+    expect(entry).toBeDefined()
+  })
+})
+
 describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real Postgres)', () => {
   const runtime: AgentRuntime = {
     provider: blockingProvider(), // occupies its slot; the test asserts rows, not completion

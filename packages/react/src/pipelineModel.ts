@@ -42,9 +42,12 @@ export function buildPipeline(
     childrenOf.set(x.parentLocalId, arr)
   }
 
-  // shown = input agents ∪ active instances, then promote their ancestors (fixpoint).
+  // shown = active instances, then promote their ancestors (fixpoint). An input root is NO
+  // longer force-shown once terminal: a finished input scan with no active descendant leaves
+  // the LIVE column (Unit 4.1). A non-terminal input root is active and seeded here anyway; a
+  // terminal one re-enters `shown` only via the ancestor-promotion walk below (a live child).
   const shown = new Set<string>()
-  for (const x of instances) if (x.isInput || ACTIVE.has(x.status)) shown.add(x.localId)
+  for (const x of instances) if (ACTIVE.has(x.status)) shown.add(x.localId)
   // Promote ancestors of shown nodes (a parent is kept because a child is shown).
   let changed = true
   while (changed) {

@@ -195,6 +195,20 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json({ ok: true })
   })
 
+  // RESET a workflow — clear its TERMINAL items from the live board (hidden, not deleted, I12).
+  // Active/awaiting items are NOT closed here; `active` is their count so the client can confirm
+  // + cancel them separately before a follow-up reset.
+  app.post('/api/workflows/:id/reset', async (c) => {
+    const { reset, active } = await service.resetWorkflow(c.req.param('id'))
+    return c.json({ ok: true, reset, active })
+  })
+
+  // RESET every workflow ("reset all"). Same contract as the per-workflow reset.
+  app.post('/api/reset-all', async (c) => {
+    const { reset, active } = await service.resetAll()
+    return c.json({ ok: true, reset, active })
+  })
+
   // CREDENTIAL HEALTH — explicit on-demand refresh: re-runs every agent's credential/provider
   // checks (claude-cli's probe shells out via execSync). The UI badge reads the CHEAP cached map
   // on the board snapshot (board.agentHealth via GET /api/board), NOT this endpoint — do not wire
