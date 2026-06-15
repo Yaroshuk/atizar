@@ -491,7 +491,13 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       agentHealth: Record<string, HealthCheck>
     }> {
       const snap = await store.getBoardSnapshot()
-      return { ...snap, lastEventId: boardSeq, agentHealth: deps.getAgentHealth?.() ?? {} }
+      // The LIVE board never carries retired items. A 'closed' work item (Reset or re-START
+      // supersede) has left the board for good — it lives on only in Activity/history (I12, hidden
+      // not deleted). Shipping it here forced every client derivation to re-filter 'closed'
+      // independently, and a missed filter resurfaced it as a phantom "Done" instance / a stale
+      // "received from" badge on a thread reopened by id. Filter once, at the source.
+      const items = snap.items.filter((w) => w.status !== 'closed')
+      return { items, gates: snap.gates, lastEventId: boardSeq, agentHealth: deps.getAgentHealth?.() ?? {} }
     },
 
     async refreshHealth(): Promise<Record<string, HealthCheck>> {

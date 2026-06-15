@@ -95,6 +95,35 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect(trace?.done).toBe(true)
   })
 
+  it('getBoard excludes closed items — a Reset-retired item leaves the live board', async () => {
+    const runtime: AgentRuntime = {
+      provider: gateProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: { saveDraft: async () => ({}) },
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const wf = `closed-board-${randomUUID().slice(0, 8)}`
+    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+
+    const { id } = await service.dispatch({ ...base, workflowId: wf, agentId: `${wf}__reply` })
+    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_approval')
+    const gate = (await service.getBoard()).gates.find((g) => g.workItemId === id)
+    await service.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
+    await waitFor(async () => (await service.getStatus(id))?.status === 'finished')
+
+    // Finished item is still on the live board (kept result, I12)…
+    expect((await service.getBoard()).items.some((w) => w.id === id)).toBe(true)
+    // …Reset retires it to 'closed' → it must DISAPPEAR from the live board (only in history now).
+    await service.resetWorkflow(wf)
+    const board = await service.getBoard()
+    expect(board.items.some((w) => w.id === id)).toBe(false)
+    expect(board.items.every((w) => w.status !== 'closed')).toBe(true)
+    // The item still exists in the store (durable, I12) — just not on the live board.
+    expect((await service.getStatus(id))?.status).toBe('closed')
+  })
+
   it('holds the per-agent cap (3 dispatched, 2 active + 1 queued)', async () => {
     const runtime: AgentRuntime = {
       provider: blockingProvider(),
