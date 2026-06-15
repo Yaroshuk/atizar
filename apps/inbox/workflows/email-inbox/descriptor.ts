@@ -1,59 +1,40 @@
-import { z } from 'zod'
 import { defineAgent, defineWorkflow } from '@atizar/core'
 import { PROVIDERS } from '@atizar/providers/ids'
 import { EMAIL_INBOX_TOOLS as t } from './tools'
 import { EMAIL_INBOX_CARDS as c } from './cards'
+import { EMAIL_INBOX_ID, EMAIL_INBOX_AGENTS as a, ROLES } from './ids'
 
-// The dispatch payload shapes (= the route_emails tool args minus `to`). EmailRef mirrors the
-// email metadata shape; defined here as the workflow's own contract (userland), not imported
-// from the integration's .d.ts (that is a type, not a runtime zod schema).
-// messageId/threadId/from/subject are the fields the reply + batch prompts and cards actually
-// consume, so they are REQUIRED and the route_emails MCP schema requires them too (a thin dispatch
-// missing one surfaces as an MCP validation error, never a silent decodeHandoff→null no-op).
-// date/snippet are passed through from list_unread but never consumed downstream → optional, so a
-// dispatch that drops them still decodes.
-export const EmailRefSchema = z.object({
-  messageId: z.string(),
-  threadId: z.string(),
-  from: z.string(),
-  subject: z.string(),
-  date: z.string().optional(),
-  snippet: z.string().optional(),
-})
-export type EmailRef = z.infer<typeof EmailRefSchema>
-
-// A batch worker (reader/spam/important) receives a list of emails.
-export const EmailBatchSchema = z.object({ emails: z.array(EmailRefSchema) })
-
-// A reply worker receives ONE email (it fetches the body itself via get_email).
-export const ReplyPayloadSchema = z.object({ email: EmailRefSchema })
+// The payload contracts live in ./contracts (so prompts.ts can decode them without importing the
+// descriptor — that would close a descriptor↔prompts cycle). Re-exported here for the descriptor
+// tests and any consumer that reaches for the descriptor as the workflow's single entry point.
+export { EmailRefSchema, EmailBatchSchema, ReplyPayloadSchema, type EmailRef } from './contracts.js'
 
 export const sorterAgent = defineAgent({
-  id: 'sorter',
+  id: a.sorter,
   name: 'EMAIL SORTER',
   provider: PROVIDERS.claudeCli,
   instructions:
     'Read the unread inbox emails of the last 24 hours and sort each one. For an email that needs a personal reply, dispatch it to the reply agent. Group the rest into: informational (reader), suspected spam (spam), and important-but-no-reply (important). Then surface a short summary.',
-  // CONVENTION (matches lead-inbox qualifier): read tools go in `readonly` ONLY, never in `tools`.
-  // `tools` holds the surface/render/propose/approval/dispatch tools. The Mastra factory derives
-  // render-vs-read from membership in `tools`, so a read tool in `tools` would be misclassified.
+  // CONVENTION: read tools go in `readonly` ONLY, never in `tools`. `tools` holds the
+  // surface/render/propose/approval/dispatch tools. The Mastra factory derives render-vs-read from
+  // membership in `tools`, so a read tool in `tools` would be misclassified.
   tools: [t.route_emails, t.renderSort],
   approvals: [],
-  readonly: ['list_unread'],
+  readonly: [t.list_unread],
   dispatches: [t.route_emails],
   renders: { [t.renderSort]: c.SortSummaryCard },
-  handoffs: ['reply', 'reader', 'spam', 'important'],
+  handoffs: [a.reply, a.reader, a.spam, a.important],
   maxInstances: 1,
 })
 
 export const replyAgent = defineAgent({
-  id: 'reply',
+  id: a.reply,
   name: 'REPLY AGENT',
   provider: PROVIDERS.claudeCli,
   instructions:
     'You were handed one email that needs a reply. Read its full body, draft a short reply, and ask the human before saving it as a Gmail draft.',
   tools: [t.renderLead, t.saveDraft],
-  readonly: ['get_email'],
+  readonly: [t.get_email],
   approvals: [t.saveDraft],
   effects: [t.saveDraft],
   renders: { [t.renderLead]: c.LeadCard, [t.saveDraft]: c.ApprovalDialog },
@@ -72,27 +53,27 @@ function batchAgent(id: string, name: string): ReturnType<typeof defineAgent> {
     approvals: [t.applyActions],
     effects: [t.applyActions],
     renders: { [t.applyActions]: c.EmailBatchCard },
-    handoffs: ['reply'], // a row can be re-routed to a reply
+    handoffs: [a.reply], // a row can be re-routed to a reply
   })
 }
 
-export const readerAgent = batchAgent('reader', 'READER')
-export const spamAgent = batchAgent('spam', 'SPAM')
-export const importantAgent = batchAgent('important', 'IMPORTANT')
+export const readerAgent = batchAgent(a.reader, 'READER')
+export const spamAgent = batchAgent(a.spam, 'SPAM')
+export const importantAgent = batchAgent(a.important, 'IMPORTANT')
 
 export const emailInbox = defineWorkflow({
-  id: 'email-inbox',
+  id: EMAIL_INBOX_ID,
   label: 'Email inbox',
   iconName: 'inbox',
   rerun: 'refresh', // human re-START supersedes the prior finished scan (live-source inbox scan)
   prompt:
     'You are part of an email-inbox automation. Be concise and businesslike. NEVER narrate tool plumbing (no "let me load the tools", no schema talk). The human approves every Gmail action — you only propose. Never send email; drafts only.',
   agents: [
-    { agent: sorterAgent, role: 'input' },
-    { agent: replyAgent, role: 'worker' },
-    { agent: readerAgent, role: 'worker' },
-    { agent: spamAgent, role: 'worker' },
-    { agent: importantAgent, role: 'worker' },
+    { agent: sorterAgent, role: ROLES.input },
+    { agent: replyAgent, role: ROLES.worker },
+    { agent: readerAgent, role: ROLES.worker },
+    { agent: spamAgent, role: ROLES.worker },
+    { agent: importantAgent, role: ROLES.worker },
   ],
   entryAgentId: sorterAgent.id,
   inputs: [], // no cross-workflow input contract for the beta (the sorter is human-started)

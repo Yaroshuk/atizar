@@ -1,25 +1,15 @@
-import { composeInstructions } from '@atizar/core'
 import { createDraft } from '@atizar/integrations/gmail/create-draft'
 import { checkCredentials } from '@atizar/integrations/gmail/check-credentials'
 import { resolveCredential, atizarEnv, isDemo } from '@atizar/server'
 import { auth as gmailAuth } from '@atizar/integrations/gmail/auth'
 import type { ServerBinding } from '../server-binding.js'
-import {
-  emailInbox,
-  sorterAgent,
-  replyAgent,
-  readerAgent,
-  spamAgent,
-  importantAgent,
-} from './descriptor.js'
-import { createSorterPrompts, createReplyPrompts, createBatchPrompts } from './prompts.js'
+import { sorterAgent, replyAgent, readerAgent, spamAgent, importantAgent } from './descriptor.js'
+import { sorterPrompt, replyPrompt, readerPrompt, spamPrompt, importantPrompt } from './prompts.js'
 import { applyEmailActions } from './apply-actions.js'
 
-// F1's claude-cli path: each agent's PromptStrategy is built from the COMPOSED instructions
-// (workflow-level prompt + the agent's own instructions), so the workflow tone/rules apply to
-// every agent without repeating them in each one.
-const compose = (instructions: string): string =>
-  composeInstructions(emailInbox.prompt, instructions)
+// The prompt strategies are TURN-ONLY (no identity prose). The composed identity (workflow prompt
+// ⊕ each agent's instructions) is prepended by the provider at run time — see createServer.ts
+// (composeInstructions → ProviderConfig.instructions), so no agent re-bakes it here.
 
 // Resolve the live Gmail credential for the single beta connection ('default'). A null result =
 // not connected (the effects return a clear "Connect" message; the health check reports ok:false).
@@ -61,7 +51,7 @@ const demoApplyActions = (form: Record<string, unknown>) => {
 export const emailInboxServer = (): ServerBinding[] => [
   {
     agentId: sorterAgent.id,
-    prompts: createSorterPrompts(compose(sorterAgent.instructions)),
+    prompts: sorterPrompt,
     // list_unread (gmail MCP) + renderSort/route_emails (inbox MCP). route_emails is a
     // dispatch tool — the model CALLS it; the server turns the call into a child (RunObserver F2).
     allowedTools: ['mcp__gmail__list_unread', 'mcp__inbox__renderSort', 'mcp__inbox__route_emails'],
@@ -69,7 +59,7 @@ export const emailInboxServer = (): ServerBinding[] => [
   },
   {
     agentId: replyAgent.id,
-    prompts: createReplyPrompts(compose(replyAgent.instructions)),
+    prompts: replyPrompt,
     allowedTools: ['mcp__gmail__get_email', 'mcp__inbox__renderLead', 'mcp__inbox__saveDraft'],
     effects: {
       // The approved/edited form { threadId, body } IS the createDraft args, byte-verbatim.
@@ -87,12 +77,12 @@ export const emailInboxServer = (): ServerBinding[] => [
     health: gmailHealth,
   },
   ...[
-    { agent: readerAgent, def: 'read' as const },
-    { agent: spamAgent, def: 'trash' as const },
-    { agent: importantAgent, def: 'star' as const },
-  ].map(({ agent, def }) => ({
+    { agent: readerAgent, prompts: readerPrompt },
+    { agent: spamAgent, prompts: spamPrompt },
+    { agent: importantAgent, prompts: importantPrompt },
+  ].map(({ agent, prompts }) => ({
     agentId: agent.id,
-    prompts: createBatchPrompts(compose(agent.instructions), def),
+    prompts,
     allowedTools: ['mcp__inbox__applyActions'],
     effects: {
       applyActions: async (form: Record<string, unknown>) => {

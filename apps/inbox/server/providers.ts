@@ -76,6 +76,10 @@ export const providerRegistry: ProviderRegistry = defineProviders({
     ? mastraFactory
     : (config) =>
         createClaudeCliProvider({
+          // The composed identity (workflow prompt ⊕ agent instructions). The provider PREPENDS
+          // it to the turn-only PromptStrategy output — without this the claude-cli path would
+          // lose the agent's identity entirely (the Mastra factory above already passes it).
+          instructions: config.instructions,
           approvalNames: config.approvalNames,
           surfaceTools: config.surfaceTools,
           allowedTools: config.allowedTools,
