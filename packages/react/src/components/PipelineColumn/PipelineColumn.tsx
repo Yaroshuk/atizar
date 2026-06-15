@@ -103,7 +103,7 @@ export const PipelineColumn = ({
                   scope='workflow'
                   resetting={resettingWorkflow}
                   onClick={onResetWorkflow}
-                  title='Reset this workflow — clear finished items (in-progress work is kept)'
+                  title='Reset this workflow — stop and clear everything (running items included)'
                 />
               )}
               {onStopWorkflow && (

@@ -214,10 +214,10 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
         <ConfirmDialog
           title={reset.confirm.kind === 'all' ? 'Reset all workflows?' : 'Reset this workflow?'}
           message={
-            `This cancels ${reset.confirm.active} in-progress / awaiting-approval ` +
-            `item${reset.confirm.active === 1 ? '' : 's'}, then clears every finished item ` +
-            `from ${reset.confirm.kind === 'all' ? 'all workflows' : nav.workflow.label}. ` +
-            'Cleared items stay available in Activity.'
+            `This stops and clears all ${reset.confirm.count} ` +
+            `item${reset.confirm.count === 1 ? '' : 's'} ` +
+            `in ${reset.confirm.kind === 'all' ? 'all workflows' : nav.workflow.label}, ` +
+            'including any that are still running. They move to Activity (nothing is deleted).'
           }
           confirmLabel={reset.confirm.kind === 'all' ? 'Reset all' : 'Reset workflow'}
           onConfirm={() => void reset.confirmReset()}

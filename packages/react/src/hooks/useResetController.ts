@@ -1,68 +1,59 @@
 import { useState } from 'react'
+import { useBoard } from './useBoard'
 import { useDispatch } from './useDispatch'
 
-// Reset clears FINISHED items from the live board (hidden, never deleted — I12). The server
-// leaves ACTIVE/awaiting items untouched and reports their count. This controller turns that
-// count into an explicit human gate: if a reset would leave in-progress / awaiting-approval
-// work behind, it surfaces a confirm ("This cancels N in-progress / awaiting-approval items");
-// on confirm it cancels that scope FIRST, then resets again so the now-terminal items clear.
-// Mirrors useStopController's shape (confirm state + per-scope resetting flags).
-type Pending = { kind: 'workflow' } | { kind: 'all' } | null
-type ResetConfirm = { kind: 'workflow' | 'all'; active: number } | null
+// Reset is a FULL wipe of a scope: it stops every active item AND clears every kept/finished one,
+// moving them all to history (hidden, never deleted — I12). It is a destructive action, so it does
+// NOTHING on its own — the button only opens a confirm. Until the human presses confirm, the board
+// is untouched; Cancel leaves everything exactly as it was. (The old controller cleared terminal
+// items on the first click, before any confirm — that surprise is gone.)
+type ResetConfirm = { kind: 'workflow' | 'all'; count: number } | null
 
 export type ResetController = ReturnType<typeof useResetController>
 
 export function useResetController(activeWorkflowId: string) {
+  const board = useBoard()
   const { resetWorkflow, resetAll, cancelWorkflow, cancelAll } = useDispatch()
   const [confirm, setConfirm] = useState<ResetConfirm>(null)
-  // The scope awaiting a confirmed cancel-then-reset (set alongside `confirm`).
-  const [pending, setPending] = useState<Pending>(null)
   const [resettingWorkflow, setResettingWorkflow] = useState(false)
   const [resettingAll, setResettingAll] = useState(false)
 
-  const runReset = (kind: 'workflow' | 'all'): Promise<{ reset: number; active: number }> =>
-    kind === 'workflow' ? resetWorkflow(activeWorkflowId) : resetAll()
+  // Items a reset will stop + clear: everything in scope that has not already left the board
+  // (status !== 'closed'). Reset is a full wipe, so this counts ACTIVE/running items too.
+  const affected = (kind: 'workflow' | 'all'): number =>
+    board.items.filter(
+      (w) => w.status !== 'closed' && (kind === 'all' || w.workflowId === activeWorkflowId)
+    ).length
 
-  const setResetting = (kind: 'workflow' | 'all', v: boolean): void =>
-    kind === 'workflow' ? setResettingWorkflow(v) : setResettingAll(v)
+  // A click only OPENS the confirm — it never touches the board. An empty scope is a no-op.
+  const request = (kind: 'workflow' | 'all'): void => {
+    const count = affected(kind)
+    if (count === 0) return
+    setConfirm({ kind, count })
+  }
 
-  // First click: reset the terminal items. This first reset is UNCONDITIONAL — it clears
-  // terminal (finished/result/error) items immediately, with no confirm; the ConfirmDialog gate
-  // only governs whether to ALSO cancel any in-flight / awaiting work the server reports remain.
-  // If the server reports active/awaiting items remain, open the confirm gate instead of touching them.
-  const request = async (kind: 'workflow' | 'all'): Promise<void> => {
-    setResetting(kind, true)
+  const requestResetWorkflow = () => request('workflow')
+  const requestResetAll = () => request('all')
+  // Cancel: close the confirm, change NOTHING.
+  const cancelConfirm = () => setConfirm(null)
+
+  // Confirmed: stop every active item in scope, then clear the now-terminal items — a full wipe.
+  const confirmReset = async (): Promise<void> => {
+    if (!confirm) return
+    const { kind } = confirm
+    setConfirm(null)
+    const setResetting = kind === 'workflow' ? setResettingWorkflow : setResettingAll
+    setResetting(true)
     try {
-      const { active } = await runReset(kind)
-      if (active > 0) {
-        setPending({ kind })
-        setConfirm({ kind, active })
+      if (kind === 'workflow') {
+        await cancelWorkflow(activeWorkflowId)
+        await resetWorkflow(activeWorkflowId)
+      } else {
+        await cancelAll()
+        await resetAll()
       }
     } finally {
-      setResetting(kind, false)
-    }
-  }
-
-  const requestResetWorkflow = () => void request('workflow')
-  const requestResetAll = () => void request('all')
-  const cancelConfirm = () => {
-    setConfirm(null)
-    setPending(null)
-  }
-
-  // Confirmed: cancel the scope's in-flight work, then reset again to clear the now-terminal items.
-  const confirmReset = async (): Promise<void> => {
-    if (!pending) return
-    const { kind } = pending
-    setConfirm(null)
-    setPending(null)
-    setResetting(kind, true)
-    try {
-      if (kind === 'workflow') await cancelWorkflow(activeWorkflowId)
-      else await cancelAll()
-      await runReset(kind)
-    } finally {
-      setResetting(kind, false)
+      setResetting(false)
     }
   }
 
