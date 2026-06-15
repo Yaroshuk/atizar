@@ -1,6 +1,5 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { getLatestEmail } from '@atizar/integrations/gmail/get-latest-email'
 import { listUnread } from '@atizar/integrations/gmail/list-unread'
 import { getEmail } from '@atizar/integrations/gmail/get-email'
 import { resolveCredential, atizarEnv } from '@atizar/server'
@@ -24,28 +23,17 @@ function captureTool(id: string, schema: z.ZodTypeAny) {
   })
 }
 
+// renderLead + saveDraft are the reply agent's surfaces (the reply contract reused from the old
+// lead-inbox flow, now owned by email-inbox). renderLead is a no-op render card; saveDraft is the
+// approval/propose tool whose args = the proposed draft.
 export const renderLeadTool = captureTool(
   'renderLead',
   z.object({ from: z.string(), subject: z.string(), summary: z.string() })
 )
-export const renderVerdictTool = captureTool('renderVerdict', z.object({}).passthrough())
 export const saveDraftTool = captureTool(
   'saveDraft',
   z.object({ threadId: z.string(), body: z.string() })
 )
-
-// The lead-inbox qualifier's inbox reader. Calls the same Gmail read as the stdio MCP
-// `get_latest_email`. No write tools exist for any Mastra agent (effects are server-side).
-export const getLatestEmailTool = createTool({
-  id: 'get_latest_email',
-  description: 'Read the most recent email in the inbox.',
-  inputSchema: z.object({}),
-  execute: async () => {
-    const cred = await resolveGmail()
-    if (!cred) return { error: 'Gmail not connected — click Connect in the header' }
-    return getLatestEmail({}, { credential: cred })
-  },
-})
 
 // ── email-inbox read tools ───────────────────────────────────────────────────
 // Call the gmail integration functions (the SAME functions the stdio MCP wrapper delegates to).
@@ -87,32 +75,6 @@ export const routeEmailsTool = captureTool(
 )
 export const renderSortTool = captureTool('renderSort', z.object({}).passthrough())
 
-// ── github-triage tools (NOT Mastra-ready — registered so PROVIDER=mastra BOOTS) ──────────────
-// github-triage runs on claude-cli only (it reads the private Magma board via the gh CLI). Under
-// PROVIDER=mastra EVERY workflow's agents resolve through the Mastra factory at boot, so these tool
-// names must exist or the runner's fail-fast aborts the whole server. The three renders are real
-// capture surfaces (identical in kind to renderSort); the two reads are HONEST stubs — a
-// github-triage run on the Mastra provider is unsupported and says so, rather than silently
-// returning empty data. Wiring the real gh reads as Mastra tools is a deferred follow-up.
-function unsupportedOnMastra(id: string) {
-  return createTool({
-    id,
-    description: `${id} — not available on the Mastra provider (github-triage runs on claude-cli).`,
-    inputSchema: z.object({}).passthrough(),
-    execute: async () => ({
-      error: `"${id}" is not supported on the Mastra provider yet; run github-triage on the claude-cli provider.`,
-    }),
-  })
-}
-
-export const listMyTicketsTool = unsupportedOnMastra('list_my_tickets')
-export const getTicketTool = unsupportedOnMastra('get_ticket')
-export const renderTriageTool = captureTool('render_triage', z.object({}).passthrough())
-export const renderTicketResultTool = captureTool(
-  'render_ticket_result',
-  z.object({}).passthrough()
-)
-export const renderReplyDraftTool = captureTool('render_reply_draft', z.object({}).passthrough())
 export const applyActionsTool = captureTool(
   'applyActions',
   z.object({

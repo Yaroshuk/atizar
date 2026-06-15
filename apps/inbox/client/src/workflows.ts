@@ -1,7 +1,5 @@
 import type { WorkflowsConfig, AgentMeta, RenderSpec, HitlSpec } from '@atizar/react'
 import { workflowDescriptors } from '../../workflows'
-import { leadInboxMeta, leadInboxRenders, leadInboxHitl } from '../../workflows/lead-inbox/client'
-import { githubTriageMeta, githubTriageRenders } from '../../workflows/github-triage/client'
 import {
   emailInboxMeta,
   emailInboxRenders,
@@ -17,7 +15,7 @@ import {
 // both resolve correctly. Dedup is WITHIN a workflow only (a reused agent registers its render
 // once per workflow) — the old global byName drop is gone (it silently lost a second workflow's
 // same-named-but-different component).
-const META: Record<string, AgentMeta> = { ...leadInboxMeta, ...githubTriageMeta, ...emailInboxMeta }
+const META: Record<string, AgentMeta> = { ...emailInboxMeta }
 
 // Stamp a workflow's specs with its id, then drop duplicate tool names WITHIN that workflow.
 const scope = <T extends { toolName: string; workflowId: string }>(
@@ -34,15 +32,8 @@ const scope = <T extends { toolName: string; workflowId: string }>(
   return out
 }
 
-const renderSpecs: RenderSpec[] = [
-  ...scope<RenderSpec>('lead-inbox', leadInboxRenders),
-  ...scope<RenderSpec>('github-triage', githubTriageRenders),
-  ...scope<RenderSpec>('email-inbox', emailInboxRenders),
-]
-const hitlSpecs: HitlSpec[] = [
-  ...scope<HitlSpec>('lead-inbox', leadInboxHitl),
-  ...scope<HitlSpec>('email-inbox', emailInboxHitl),
-]
+const renderSpecs: RenderSpec[] = [...scope<RenderSpec>('email-inbox', emailInboxRenders)]
+const hitlSpecs: HitlSpec[] = [...scope<HitlSpec>('email-inbox', emailInboxHitl)]
 
 export const workflowsConfig: WorkflowsConfig = {
   workflows: workflowDescriptors,

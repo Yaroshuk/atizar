@@ -19,14 +19,19 @@ describe('workflowsConfig render/HITL scoping', () => {
     }
   })
 
-  it('keeps the reused saveDraft/applyActions HITL tool in EACH workflow that registers it', () => {
-    // The reply agent is reused by lead-inbox AND email-inbox. Under the old global byName
-    // dedup, only the first workflow's copy survived. Scoped, every registering workflow keeps
-    // its own copy — that is the whole point of WS2.
-    const leadHitl = byWorkflow(workflowsConfig.hitl, 'lead-inbox')
+  it('email-inbox self-registers both its reply HITL (saveDraft) and its batch HITL (applyActions)', () => {
+    // The reply contract (saveDraft) is registered by email-inbox ITSELF — resolution is scoped
+    // per workflow (WS2), so email-inbox must own its copy or the reply agent's approval card
+    // vanishes. applyActions is the batch gate. Both must be present under email-inbox.
     const emailHitl = byWorkflow(workflowsConfig.hitl, 'email-inbox')
-    expect(leadHitl.some((s) => s.toolName === 'saveDraft')).toBe(true)
+    expect(emailHitl.some((s) => s.toolName === 'saveDraft')).toBe(true)
     expect(emailHitl.some((s) => s.toolName === 'applyActions')).toBe(true)
+  })
+
+  it('email-inbox self-registers the reply card renders (renderLead) alongside renderSort', () => {
+    const emailRenders = byWorkflow(workflowsConfig.renders, 'email-inbox')
+    expect(emailRenders.some((s) => s.toolName === 'renderLead')).toBe(true)
+    expect(emailRenders.some((s) => s.toolName === 'renderSort')).toBe(true)
   })
 
   it('dedups WITHIN a workflow (no duplicate toolName for the same workflow)', () => {

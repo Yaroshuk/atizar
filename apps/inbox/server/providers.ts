@@ -9,40 +9,25 @@ import {
 import { claudeSpawn } from './claude-spawn.js'
 import { databaseUrl } from '@atizar/server'
 import {
-  getLatestEmailTool,
   renderLeadTool,
-  renderVerdictTool,
   saveDraftTool,
   listUnreadTool,
   getEmailTool,
   routeEmailsTool,
   renderSortTool,
   applyActionsTool,
-  listMyTicketsTool,
-  getTicketTool,
-  renderTriageTool,
-  renderTicketResultTool,
-  renderReplyDraftTool,
 } from './mastra/tools.js'
 
 // The concrete Mastra tool map (was ALL_TOOLS in mastra/runner.ts; the runner is now generic and
 // takes this map as a parameter — WS7 move 7).
 const ALL_TOOLS = {
-  get_latest_email: getLatestEmailTool,
   renderLead: renderLeadTool,
-  renderVerdict: renderVerdictTool,
   saveDraft: saveDraftTool,
   list_unread: listUnreadTool,
   get_email: getEmailTool,
   route_emails: routeEmailsTool,
   renderSort: renderSortTool,
   applyActions: applyActionsTool,
-  // github-triage (claude-cli only) — registered so PROVIDER=mastra boots; reads are stubs.
-  list_my_tickets: listMyTicketsTool,
-  get_ticket: getTicketTool,
-  render_triage: renderTriageTool,
-  render_ticket_result: renderTicketResultTool,
-  render_reply_draft: renderReplyDraftTool,
 }
 
 const MASTRA_MODEL = process.env.MASTRA_MODEL ?? 'claude-sonnet-4-6'

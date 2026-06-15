@@ -1,5 +1,5 @@
 // stdio MCP server launched by the `claude` CLI (--mcp-config): READ-ONLY Gmail
-// inbox tools for the lead-inbox qualifier and the email-inbox sorter/reply agents.
+// inbox tools for the email-inbox sorter/reply agents.
 // Writes (create_draft) and mutations (markRead/trash/star) are SERVER-EXECUTED
 // effects behind approval gates and are NEVER exposed to the model (I2/I9).
 //
@@ -13,7 +13,6 @@ import { z } from 'zod'
 
 import { resolveCredential, atizarEnv } from '@atizar/server'
 import { auth } from '@atizar/integrations/gmail/auth'
-import { getLatestEmail } from '@atizar/integrations/gmail/get-latest-email'
 import { listUnread } from '@atizar/integrations/gmail/list-unread'
 import { getEmail } from '@atizar/integrations/gmail/get-email'
 
@@ -35,20 +34,6 @@ const notConnected = {
 const asText = (res: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(res) }],
 })
-
-// Tool: get_latest_email — the lead-inbox qualifier's inbox reader.
-server.registerTool(
-  'get_latest_email',
-  {
-    description: 'Read the most recent email in the inbox.',
-    inputSchema: {},
-  },
-  async () => {
-    const cred = await resolveCred()
-    if (!cred) return notConnected
-    return asText(await getLatestEmail({}, { credential: cred }))
-  }
-)
 
 // Tool: list_unread — metadata + snippet only, no bodies (bounded payload).
 server.registerTool(

@@ -7,13 +7,12 @@ const MCP_SERVER = fileURLToPath(new URL('../mcp/inbox-tools.mjs', import.meta.u
 // The gmail MCP server is a `.mts` file (it imports `@atizar/server` for resolveCredential,
 // which is `.ts` source) → spawned via the tsx loader: `node --import tsx <path>`.
 const GMAIL_SERVER = fileURLToPath(new URL('../mcp/gmail-tools.mts', import.meta.url))
-const GITHUB_SERVER = fileURLToPath(new URL('../mcp/github-tools.mjs', import.meta.url))
 
 // Built-in tools the model must not use — only our MCP tools are allowed.
 const BUILTINS = ['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']
 
 // A whole run shouldn't outlive a human-scale interaction; kill stuck processes.
-// Triage couriers ~13 tickets into render_triage, which is token-heavy, so give the
+// A sorter scan over a full inbox plus the batch cards is token-heavy, so give the
 // model headroom beyond the original 120s before we consider it stuck.
 const RUN_TIMEOUT_MS = 180_000
 
@@ -31,7 +30,6 @@ export const claudeSpawn: ClaudeSpawn = makeClaudeSpawn({
   mcpServers: {
     inbox: { type: 'stdio', command: 'node', args: [MCP_SERVER] },
     gmail: { type: 'stdio', command: 'node', args: ['--import', 'tsx', GMAIL_SERVER] },
-    github: { type: 'stdio', command: 'node', args: [GITHUB_SERVER] },
   },
   builtins: BUILTINS,
   timeoutMs: RUN_TIMEOUT_MS,
