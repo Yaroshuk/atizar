@@ -244,10 +244,18 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
-      // F6: a second human START of a singleton agent (maxInstances=1) is rejected (not queued).
-      // Applies only to singletons — agents with maxInstances > 1 continue to queue overflow.
-      // Machine dispatch (origin 'agent') is unaffected — the chokepoint handles its own cap/queue.
-      if (req.origin === 'human' && maxInstances === 1 && pool.activeCount(req.agentId) >= 1) {
+      // F6 (revised): a second human START of a SINGLETON input agent is rejected while that agent
+      // still has a LIVE scan — keyed off DB tree-liveness, NOT pool.activeCount. The pool frees a
+      // slot the moment a run ends or suspends at a gate, so the old count read 0 while a scan was
+      // still awaiting the human -> duplicate roots leaked. Tree-liveness counts a 'finished' root
+      // with awaiting-approval children as live (Approach B). Non-singletons still queue overflow;
+      // machine dispatch (origin 'agent') is handled by the chokepoint.
+      if (
+        req.origin === 'human' &&
+        maxInstances === 1 &&
+        isInputAgent(req.agentId) &&
+        (await store.hasLiveInputScan(req.workflowId, req.agentId))
+      ) {
         return { id: '', deduped: false, rejected: 'already_running' }
       }
       // WS1 'refresh': a human START of an input agent supersedes its prior finished root(s)
