@@ -111,6 +111,41 @@ inline lambdas like `onClick={() => setOpen(true)}` are fine).
   `client/src/` (it's shared by client + server), so a single `src`-rooted alias
   wouldn't cover it cleanly. Revisit if/when the `@atizar/*` package split lands.
 
+## Workflows: wire strings & prompts
+
+A workflow (`apps/inbox/workflows/<id>/`) is **structure → descriptor, words → prompts.ts**.
+
+- **Every wire string goes through a per-workflow const map**, never a TS `enum`
+  (config-as-data, invariant I7 — `as const` keeps the value identical to the wire
+  string). Each workflow owns its own maps:
+  - `ids.ts` — the workflow id (`WORKFLOW_ID`), the agent ids (`*_AGENTS`), and role
+    strings (`ROLES`).
+  - `tools.ts` — the tool names (`*_TOOLS`), **including read tools** so the descriptor's
+    `readonly` arrays and the prompts share one source (no raw literals anywhere).
+  - `cards.ts` — the card/component names (`*_CARDS`).
+  - Payload **contracts** (zod schemas) live in `contracts.ts` so `prompts.ts` can decode
+    them without importing the descriptor (that would close a descriptor↔prompts cycle);
+    re-export from the descriptor for consumers that treat it as the entry point.
+- **The descriptor** (`descriptor.ts`) stamps `id`, `handoffs`, `role`, and `readonly`
+  from those const maps — no raw `'email-inbox'` / `'reply'` / `'input'` / `'list_unread'`
+  literals.
+- **Prompts are authored with `definePrompt` from `@atizar/core`** — one flat block per
+  agent (`{ input?, onInput?, onStart, onResume? }`); shared shapes use a single factory
+  (e.g. `batchPrompt(defaultAction)`), never copy-paste. Prompts are **TURN-ONLY**: they
+  carry the words for the current turn and nothing else.
+- **Identity belongs to the descriptor, not the prompts.** `defineAgent.instructions`
+  (composed with the workflow-level `prompt`) is the agent's identity; the provider
+  **prepends** it to the turn-only `definePrompt` output at run time. Never re-bake
+  `compose()`/identity into prompt prose.
+- **A tool call in prompt prose is ALWAYS written `` Call ${t.x} `` ** (interpolate the
+  const from `tools.ts`), never a bare hand-typed tool name. This is what lets the
+  drift-guard test enforce that no raw tool literal slipped in.
+- **A drift-guard test is required per workflow** (`prompts.drift.test.ts`): assert every
+  tool-shaped token in the prompt prose is a value in `*_TOOLS`, every `handoffs` target is
+  a value in `*_AGENTS`, and `descriptor.id === WORKFLOW_ID`.
+- **The client scopes its specs with `scope(WORKFLOW_ID, …)`** (import `WORKFLOW_ID` from
+  the workflow's `ids.ts`), never the literal workflow id.
+
 ## Not adopted from Magma (different stack)
 
 Effector class models (`Model.ts` + `model.ts`, constructor DI), React Native

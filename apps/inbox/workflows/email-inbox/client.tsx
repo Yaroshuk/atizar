@@ -36,8 +36,9 @@ export const emailInboxMeta: Record<string, AgentMeta> = {
 }
 
 // Render/HITL resolution is scoped per workflow (WS2), so email-inbox declares EVERY tool it
-// surfaces — including renderLead + saveDraft for the reply agent (they share the lead-inbox
-// reply contract by name, but each workflow owns its own copy).
+// surfaces — including renderLead + saveDraft for the reply agent. The reply contract (one email
+// → a drafted reply for approval) is generic and reusable, but each workflow owns its own copy
+// of the render/HITL specs (scoping is per workflow, never global).
 export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
     toolName: t.renderSort,

@@ -5,6 +5,7 @@ import {
   emailInboxRenders,
   emailInboxHitl,
 } from '../../workflows/email-inbox/client'
+import { EMAIL_INBOX_ID } from '../../workflows/email-inbox/ids'
 
 // The demo aggregator: merges every workflow client module into one WorkflowsConfig bundle
 // (descriptors + per-agent chrome meta + render/HITL specs) and hands it to <BoardApp config={…} />.
@@ -32,8 +33,8 @@ const scope = <T extends { toolName: string; workflowId: string }>(
   return out
 }
 
-const renderSpecs: RenderSpec[] = [...scope<RenderSpec>('email-inbox', emailInboxRenders)]
-const hitlSpecs: HitlSpec[] = [...scope<HitlSpec>('email-inbox', emailInboxHitl)]
+const renderSpecs: RenderSpec[] = [...scope<RenderSpec>(EMAIL_INBOX_ID, emailInboxRenders)]
+const hitlSpecs: HitlSpec[] = [...scope<HitlSpec>(EMAIL_INBOX_ID, emailInboxHitl)]
 
 export const workflowsConfig: WorkflowsConfig = {
   workflows: workflowDescriptors,

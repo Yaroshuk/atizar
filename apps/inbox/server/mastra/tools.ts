@@ -23,9 +23,9 @@ function captureTool(id: string, schema: z.ZodTypeAny) {
   })
 }
 
-// renderLead + saveDraft are the reply agent's surfaces (the reply contract reused from the old
-// lead-inbox flow, now owned by email-inbox). renderLead is a no-op render card; saveDraft is the
-// approval/propose tool whose args = the proposed draft.
+// renderLead + saveDraft are the reply agent's surfaces (a generic reply contract: one email →
+// a drafted reply for approval, owned by email-inbox). renderLead is a no-op render card;
+// saveDraft is the approval/propose tool whose args = the proposed draft.
 export const renderLeadTool = captureTool(
   'renderLead',
   z.object({ from: z.string(), subject: z.string(), summary: z.string() })
