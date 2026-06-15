@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateAgent, aggregateLabel } from './aggregate'
+import { aggregateAgent, aggregateLabel, isBusy } from './aggregate'
 import type { Status } from './status'
 
 describe('aggregateAgent', () => {
@@ -24,5 +24,29 @@ describe('aggregateAgent', () => {
     expect(a.status).toBe('done')
     expect(a.activeCount).toBe(0)
     expect(aggregateLabel(a)).toBe('')
+  })
+})
+
+describe('isBusy (START gating — Unit 4.2)', () => {
+  it('an agent whose only instance is error is NOT busy (START stays available)', () => {
+    const a = aggregateAgent(['error'])
+    expect(a.status).toBe('error')
+    expect(isBusy(a)).toBe(false)
+    // The error still surfaces as a badge alongside START — the headline label is empty so it
+    // does not masquerade as a live "N active" summary that would hide the button.
+    expect(aggregateLabel(a)).toBe('')
+  })
+  it('a running instance IS busy', () => {
+    expect(isBusy(aggregateAgent(['running']))).toBe(true)
+  })
+  it('an awaiting_approval instance IS busy', () => {
+    expect(isBusy(aggregateAgent(['awaiting_approval']))).toBe(true)
+  })
+  it('an error alongside a running instance is still busy (the run holds the slot)', () => {
+    expect(isBusy(aggregateAgent(['error', 'running']))).toBe(true)
+  })
+  it('an idle / done-only agent is not busy', () => {
+    expect(isBusy(aggregateAgent([]))).toBe(false)
+    expect(isBusy(aggregateAgent(['done']))).toBe(false)
   })
 })

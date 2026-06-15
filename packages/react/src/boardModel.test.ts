@@ -66,11 +66,23 @@ describe('toPInstances superseded roots (WS1)', () => {
     const out = toPInstances(withSuperseded, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
     expect(out.map((p) => p.localId)).toEqual(['Q2'])
   })
-  it('still keeps a plain finished input root (not superseded)', () => {
+  it('hides a finished input root with NO active child (it leaves the live column)', () => {
     const finishedRoot: WorkItem[] = [
       wi({ id: 'Q3', agentId: 'lead-inbox__qualifier', status: 'finished' }),
     ]
     const out = toPInstances(finishedRoot, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
-    expect(out.map((p) => p.localId)).toEqual(['Q3'])
+    expect(out.map((p) => p.localId)).toEqual([])
+  })
+
+  it('keeps a finished input root that still has an active child', () => {
+    const withChild: WorkItem[] = [
+      wi({ id: 'Q4', agentId: 'lead-inbox__qualifier', status: 'finished' }),
+      wi({ id: 'C4', agentId: 'lead-inbox__reply', status: 'running', parentId: 'Q4' }),
+    ]
+    const out = toPInstances(withChild, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
+    // toPInstances itself is per-row; buildPipeline does the ancestor-promotion walk. Here we
+    // assert the row is emitted (visible) because it carries a card/resolution OR an active
+    // child — but a bare finished root with no card still needs the active child to stay.
+    expect(out.map((p) => p.localId).sort()).toEqual(['C4', 'Q4'])
   })
 })
