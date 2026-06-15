@@ -2,27 +2,17 @@ import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { listUnread } from '@atizar/integrations/gmail/list-unread'
 import { getEmail } from '@atizar/integrations/gmail/get-email'
-import { resolveCredential, atizarEnv } from '@atizar/server'
+import { resolveCredential, atizarEnv, captureTool } from '@atizar/server'
 import { auth as gmailAuth } from '@atizar/integrations/gmail/auth'
 
 // Resolve the live Gmail credential for the single beta connection ('default'); null = not connected.
 const resolveGmail = () =>
   resolveCredential({ integration: 'gmail', connectionId: atizarEnv.connection(), auth: gmailAuth })
 
-// Render/propose tools are NO-OPs whose args = the artifact. They appear as tool-calls (the
-// mapper surfaces them) but perform no side effect — the SERVER executes effects (step 4) and
-// fills the card from the tool-call args. saveDraft is the approval/propose tool.
-// Mastra 1.41: execute receives the validated inputData as the first positional arg,
-// and the optional ToolExecutionContext as the second: execute(inputData, context).
-function captureTool(id: string, schema: z.ZodTypeAny) {
-  return createTool({
-    id,
-    description: `Surface "${id}" to the UI. Does not perform any action.`,
-    inputSchema: schema,
-    execute: async (inputData: unknown) => inputData,
-  })
-}
-
+// captureTool (from @atizar/server) wraps a no-op "surface" tool: the model CALLS it but it
+// performs no side effect — the SERVER executes effects (step 4) and fills the card from the
+// tool-call args. saveDraft is the approval/propose tool.
+//
 // renderLead + saveDraft are the reply agent's surfaces (a generic reply contract: one email →
 // a drafted reply for approval, owned by email-inbox). renderLead is a no-op render card;
 // saveDraft is the approval/propose tool whose args = the proposed draft.
