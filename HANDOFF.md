@@ -68,12 +68,15 @@ Likely removals: `apps/inbox/workflows/{lead-inbox,github-triage}/`; the agent p
 email-inbox's reply agent uses it); cards only they render (VerdictCard / TriageCard / TicketResultCard
 / ReplyDraftCard — verify each); `mcp/github-tools.mjs`; the github tool defs in `mastra/tools.ts`;
 and their entries in the three aggregators (`workflows/index.ts`, `server/workflows.ts`,
-`client/src/workflows.ts`). Green gate + browser-verify email-inbox end-to-end after.
+`client/src/workflows.ts`). ALSO update/remove the tests that reference the deleted workflows
+(`renderLead.test.tsx`, `renderVerdict.test.tsx`, `workflows.test.ts`, `descriptors.parse.test.ts`)
+and any DEMO-mode / golden-set-eval refs to lead-inbox/github-triage. Green gate + browser-verify
+email-inbox end-to-end after.
 
-### 2. Magic-strings + extensibility refactor — incl. i18n prompts (FOUNDATION-TOUCHING)
+### 2. Magic-strings refactor — incl. prompt texts → named consts (FOUNDATION-TOUCHING)
 
-**The user's core complaint:** too much is raw strings; this blocks extensibility (e.g. prompts in
-different languages). WS6 typed `provider` + tool/card NAMES but left these raw (audited 2026-06-15):
+**The user's core complaint:** too much is raw strings. WS6 typed `provider` + tool/card NAMES but
+left these raw (audited 2026-06-15):
 
 - **Workflow-id literals on the client:** `client/src/workflows.ts` (`scope('lead-inbox', …)` etc.)
   and the cross-workflow deliver target in `github-triage/client.tsx` (`workflow: 'lead-inbox'`).
@@ -82,29 +85,43 @@ different languages). WS6 typed `provider` + tool/card NAMES but left these raw 
   them through `t.*`; lead/email are inconsistent. Same names are duplicated in the prompt prose.
 - **Handoff agent-id targets** (`handoffs: ['reply']`, `['reader','spam','important']`, …) and
   **agent roles** (`role: 'input'|'worker'`) are raw literals.
-- **i18n prompts:** prompts are hardcoded English in `agents/*.prompts.ts`. For multi-language,
-  prompts need to become language-parameterised templates with the language chosen via config-as-data
-  (ARCHITECTURE §3: a `editableBy: manager` leaf field), NOT hardcoded strings.
-  **Decision frame (brainstorm first):** values stay serializable wire strings (config-as-data, I7) —
-  the fix is a typed const/union per workflow (extend WS6's `tools.ts`/`cards.ts` to read tools +
-  workflow-id + handoff targets), NOT a TS enum. The i18n layer is a real design — run brainstorming.
-  `check-foundation` (I7 config-as-data, NOT enum; core stays provider-agnostic). This is the work that
-  most needs doing well — it's why the user is unhappy with the current client.
+- **Prompt texts → named consts** (user: "промпты тоже должны быть в константах"). Prompts are inline
+  hardcoded English in `agents/*.prompts.ts`; lift the prompt strings into named consts (one source
+  per prompt), same discipline as the tool/card consts. **i18n is explicitly NOT in scope now** (user
+  decision — do NOT build a language/translation layer); but consts are the prerequisite that unblocks
+  i18n later, so structure them so a future language variant could drop in.
+
+**Decision frame (brainstorm first):** values stay serializable wire strings (config-as-data, I7) —
+the fix is a typed const/union per workflow (extend WS6's `tools.ts`/`cards.ts` to read tools +
+workflow-id + handoff targets) **+ prompt-text consts**, NEVER a TS enum. `check-foundation` (I7
+config-as-data, NOT enum; core stays provider-agnostic). This is the work that most needs doing well —
+it's why the user is unhappy with the current client.
 
 ### 3. Board cleanup — a Reset button + drop finished scans
 
 **Symptom (user):** opening the app shows a pile of finished `EMAIL SORTER` plates from old scans.
-WS1 supersedes the prior scan on a _re-START_, but input-agent roots are kept as the "pipeline root"
-forever, so without a re-START finished scans accumulate. The user wants: (a) a **Reset** button
-(like the existing Stop — a clear gesture; per-workflow and/or global) that retires finished/closed
-roots from the live column; (b) **finished scans also dropped** from the live board (not just
-superseded ones); (c) a config knob "reset on start" (clean the board at boot). This is a **product
-decision** (auto vs manual vs config) — brainstorm. Touches `@atizar/react` board (`boardModel.isVisible`
-/ a StopButton-style ResetButton), `@atizar/server` (a reset/close-scans route through `transition()`
-— I8: status only via transition; I12: preserve to history, never destroy), and a `defineWorkflow`
-knob. NOTE the related WS1 UX gap: an `error` item makes `aggregateLabel` non-empty which HIDES the
-START button (`aggregate.ts` counts error as active) — fold a fix in (allow START when the only
-"active" item is an error).
+WS1 supersedes the prior scan only on a _re-START_, and it deliberately KEEPS input-agent roots as the
+"pipeline root" forever — which is exactly what the user now wants CHANGED. The user wants:
+
+- **(a) Finished agents — INCLUDING input agents — leave the live pipeline when they finish** (user:
+  "агенты даже input agents удалялись из пайплайна когда закончили чтобы не было такого"). This
+  **REVISES the WS1 decision** to keep input roots: a finished input scan should drop out of the live
+  column (its result/cards stay reachable in Activity/history — I12: hide, never destroy). Revisit
+  `boardModel.isVisible` (it currently returns `true` for any input root) + `pipelineModel`.
+- **(b) A Reset button** like the existing Stop (clear human gesture; per-workflow and/or global) that
+  clears the live column on demand.
+- **(c) A FULL reset too** (user: "возможность полного ресета тоже") — clear the WHOLE board, not just
+  one workflow. Decide the I12 boundary carefully: a full reset HIDES finished/closed scans + their
+  history-cards, but must NOT silently destroy OPEN/awaiting-approval work items the human hasn't
+  closed — if it does, make it an explicit, confirmed, destructive action.
+- **(d) Optional "reset on start" config knob** (clean the board at boot) — same I12 boundary.
+
+This is a **product decision** (what "finished leaves" vs "reset" vs "full reset" each mean) —
+brainstorm first. Touches `@atizar/react` board (`boardModel.isVisible` + a StopButton-style
+ResetButton), `@atizar/server` (a reset/close route through `transition()` — I8: status only via
+transition; I12: preserve-or-explicitly-destroy, never silent loss), and maybe a `defineWorkflow` knob.
+ALSO fold in the WS1 UX gap: an `error` item makes `aggregateLabel` non-empty which HIDES the START
+button (`aggregate.ts` counts error as active) — allow START when the only "active" item is an error.
 
 ### 4. Library/userland boundary re-audit
 
@@ -142,7 +159,7 @@ tool/card consts) → aggregator wiring → tests → browser-verify.
 
 ---
 
-## ⚠ Open tails (carry forward — none block the work above except where noted)
+## ⚠ Open tails — the user will fix these too (in scope; none block the tasks above except where noted)
 
 - **Gmail OAuth refresh token EXPIRED** (`invalid_grant`). Blocks task 6's real flow and any live
   (non-replay) Gmail demo. Re-auth needed. The whole 7-WS run used `DEV_RECORD_REPLAY=1`, so it
