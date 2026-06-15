@@ -497,7 +497,12 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // independently, and a missed filter resurfaced it as a phantom "Done" instance / a stale
       // "received from" badge on a thread reopened by id. Filter once, at the source.
       const items = snap.items.filter((w) => w.status !== 'closed')
-      return { items, gates: snap.gates, lastEventId: boardSeq, agentHealth: deps.getAgentHealth?.() ?? {} }
+      return {
+        items,
+        gates: snap.gates,
+        lastEventId: boardSeq,
+        agentHealth: deps.getAgentHealth?.() ?? {},
+      }
     },
 
     async refreshHealth(): Promise<Record<string, HealthCheck>> {
