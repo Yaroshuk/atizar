@@ -1,16 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateHealth } from '@atizar/core'
-import { providerHealth } from './health.js'
-
-describe('aggregateHealth', () => {
-  it('is ok when all checks are ok', () => {
-    expect(aggregateHealth([{ ok: true }, { ok: true, detail: 'x' }])).toEqual({ ok: true })
-  })
-  it('returns the first failure', () => {
-    const fail = { ok: false, error: 'no creds', hint: 'see skill' } as const
-    expect(aggregateHealth([{ ok: true }, fail])).toEqual(fail)
-  })
-})
+import { providerHealth } from './providerHealth.js'
 
 describe('providerHealth', () => {
   it('mock is always ok', () => expect(providerHealth('mock')).toEqual({ ok: true }))

@@ -1,8 +1,8 @@
 // App-side declaration of which (integration, connection, provider) the loaded workflows require,
-// and the OAuth scopes each integration needs. Scopes are now DERIVED from each integration's own
+// and the OAuth scopes each integration needs. Scopes are DERIVED from each integration's own
 // `auth` declaration (auth.scopes) — no hand-written duplicate (auth sub-stage 5).
+import { deriveConnectionList } from '@atizar/server'
 import type { ConnectionDescriptor } from '@atizar/server'
-import type { WorkflowDescriptor } from '@atizar/core'
 import { auth as gmailAuth } from '@atizar/integrations/gmail/auth'
 import { workflowDescriptors } from '../workflows/index.js'
 
@@ -15,20 +15,8 @@ const SCOPES: Record<string, string[]> = {
 
 export const scopesFor = (integration: string): string[] => SCOPES[integration] ?? []
 
-// Derive the live connection list by unioning every loaded workflow's declared connections,
-// defaulting `connection` to 'default' and deduping by (integration, connection). A stale or extra
-// chip becomes impossible — the list is exactly what the loaded workflows ask for.
-export function deriveConnectionList(descriptors: WorkflowDescriptor[]): ConnectionDescriptor[] {
-  const byKey = new Map<string, ConnectionDescriptor>()
-  for (const d of descriptors) {
-    for (const c of d.connections ?? []) {
-      const connection = c.connection ?? 'default'
-      const key = `${c.integration}:${connection}`
-      if (!byKey.has(key))
-        byKey.set(key, { integration: c.integration, connection, provider: c.provider })
-    }
-  }
-  return [...byKey.values()]
-}
+// deriveConnectionList now lives in @atizar/server (WS7 move 4); re-export so any app import site
+// stays stable. The concrete derived list is composed here from the loaded workflows.
+export { deriveConnectionList }
 
 export const connectionList: ConnectionDescriptor[] = deriveConnectionList(workflowDescriptors)

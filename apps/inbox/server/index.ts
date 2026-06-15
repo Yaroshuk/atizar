@@ -1,7 +1,7 @@
 import './load-dev-env.js' // MUST be first: loads .env.local (dev) before any env read below
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { instanceId, composeInstructions, type HealthCheck } from '@atizar/core'
+import { instanceId, composeInstructions, aggregateHealth, type HealthCheck } from '@atizar/core'
 import { providerRegistry } from './providers.js'
 import { buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
@@ -18,9 +18,9 @@ import {
   isDemo,
   type AgentRuntime,
   assertAgentClassification,
+  providerHealth,
 } from '@atizar/server'
 import { scopesFor, connectionList } from './connections.js'
-import { aggregateHealth, providerHealth } from './health.js'
 
 // In demo mode only the flagship email-inbox workflow is enabled (zero-cred showcase); otherwise
 // all workflows are active. `activeWorkflowServers` is the single filtered source used by the

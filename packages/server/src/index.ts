@@ -34,3 +34,5 @@ export {
 } from './recordReplay.js'
 export type { Finding, RecordReplayMode } from './recordReplay.js'
 export { assertAgentClassification } from './agentChecks.js'
+export { deriveConnectionList } from './connectRoutes.js'
+export { providerHealth } from './providerHealth.js'

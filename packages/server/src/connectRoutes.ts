@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { WorkflowDescriptor } from '@atizar/core'
 import type { CredentialStore } from './credentialStore.js'
 import { atizarEnv } from './env.js'
 import { oauthProvider } from './oauthProviders.js'
@@ -14,6 +15,22 @@ export interface ConnectionDescriptor {
   integration: string
   connection: string
   provider: string
+}
+
+// Derive the live connection list by unioning every loaded workflow's declared connections,
+// defaulting `connection` to 'default' and deduping by (integration, connection). A stale or extra
+// chip becomes impossible — the list is exactly what the loaded workflows ask for.
+export function deriveConnectionList(descriptors: WorkflowDescriptor[]): ConnectionDescriptor[] {
+  const byKey = new Map<string, ConnectionDescriptor>()
+  for (const d of descriptors) {
+    for (const c of d.connections ?? []) {
+      const connection = c.connection ?? 'default'
+      const key = `${c.integration}:${connection}`
+      if (!byKey.has(key))
+        byKey.set(key, { integration: c.integration, connection, provider: c.provider })
+    }
+  }
+  return [...byKey.values()]
 }
 
 export interface ConnectRoutesDeps {

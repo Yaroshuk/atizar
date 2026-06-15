@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { createConnectRoutes } from './connectRoutes.js'
+import { describe, it, expect, test, beforeEach, afterEach } from 'vitest'
+import { createConnectRoutes, deriveConnectionList } from './connectRoutes.js'
+import type { WorkflowDescriptor } from '@atizar/core'
 import { signState, verifyState } from './oauthState.js'
 import type { CredentialStore, UpsertArgs } from './credentialStore.js'
 
@@ -194,5 +195,39 @@ describe('createConnectRoutes', () => {
       expect(await res.json()).toEqual({ ok: true })
       expect(removed).toEqual({ connectionId: 'default', integration: 'gmail' })
     })
+  })
+})
+
+const wf = (id: string, connections?: WorkflowDescriptor['connections']): WorkflowDescriptor => ({
+  id,
+  label: id,
+  iconName: 'inbox',
+  agents: [],
+  entryAgentId: 'x',
+  inputs: [],
+  connections,
+})
+describe('deriveConnectionList', () => {
+  test('unions + defaults connection to "default"', () => {
+    expect(
+      deriveConnectionList([
+        wf('a', [{ integration: 'gmail', provider: 'google' }]),
+        wf('b', [{ integration: 'gmail', provider: 'google' }]),
+      ])
+    ).toEqual([{ integration: 'gmail', connection: 'default', provider: 'google' }])
+  })
+  test('dedupes by (integration, connection), keeps distinct connections', () => {
+    expect(
+      deriveConnectionList([
+        wf('a', [{ integration: 'gmail', provider: 'google' }]),
+        wf('b', [{ integration: 'gmail', connection: 'work', provider: 'google' }]),
+      ])
+    ).toEqual([
+      { integration: 'gmail', connection: 'default', provider: 'google' },
+      { integration: 'gmail', connection: 'work', provider: 'google' },
+    ])
+  })
+  test('no connections contribute nothing', () => {
+    expect(deriveConnectionList([wf('a'), wf('b', [])])).toEqual([])
   })
 })
