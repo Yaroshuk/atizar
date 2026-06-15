@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, ne, or, isNull } from 'drizzle-orm'
+import { and, eq, ne, or, isNull, notInArray } from 'drizzle-orm'
 import type { Db } from './db/client.js'
 import { workItems, type OriginKind } from './db/schema.js'
 import type { WorkerPool } from './workerPool.js'
@@ -56,9 +56,12 @@ export async function dispatch(
   pool: WorkerPool,
   input: DispatchInput
 ): Promise<DispatchResult> {
-  // 1. One-time dedup: a live/finished WorkItem with the same source already covers this
-  //    source (a rejected or errored one does NOT — it offers an explicit re-run). Ledger/
-  //    approved-only dedup is refined at step 4.
+  // 1. One-time dedup, scoped to OPEN/unclosed items only (WS1): a same-source WorkItem that is
+  //    still queued|running|awaiting_approval|awaiting_input, OR finished-but-not-yet-closed,
+  //    already covers this source. A 'closed' item (a superseded scan's leaf), or one resolved
+  //    'rejected' / 'cancelled' / 'superseded', does NOT shadow — a re-scan re-surfaces the
+  //    un-actioned source. The `workItemId+gateId` effect ledger (I9) is the real guard against
+  //    a double irreversible action; this dedup only prevents a duplicate OPEN card.
   if (input.source) {
     const [existing] = await db
       .select({ id: workItems.id })
@@ -67,7 +70,11 @@ export async function dispatch(
         and(
           eq(workItems.source, input.source),
           ne(workItems.status, 'error'),
-          or(isNull(workItems.resolution), ne(workItems.resolution, 'rejected'))
+          ne(workItems.status, 'closed'),
+          or(
+            isNull(workItems.resolution),
+            notInArray(workItems.resolution, ['rejected', 'cancelled', 'superseded'])
+          )
         )
       )
       .limit(1)

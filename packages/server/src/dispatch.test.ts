@@ -93,4 +93,38 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
       expect((await store.getWorkItem(parent))?.status).not.toBe('finished')
     }
   })
+
+  it('re-surfaces a source whose prior item is closed/superseded (open-scoped dedup)', async () => {
+    const { pool } = fakePool()
+    const source = `thread:${randomUUID()}`
+    const first = await dispatch(db, pool, { ...base, source })
+    // drive the first item to closed+superseded (a stale scan's leaf)
+    await transition(db, first.id, 'start')
+    await transition(db, first.id, 'finish')
+    await transition(db, first.id, 'supersede')
+
+    const second = await dispatch(db, pool, { ...base, source })
+    expect(second.deduped).toBe(false)
+    expect(second.id).not.toBe(first.id)
+  })
+
+  it('still dedups a source whose prior item is FINISHED-but-open (not closed)', async () => {
+    const { pool } = fakePool()
+    const source = `thread:${randomUUID()}`
+    const first = await dispatch(db, pool, { ...base, source })
+    await transition(db, first.id, 'start')
+    await transition(db, first.id, 'finish')
+
+    const second = await dispatch(db, pool, { ...base, source })
+    expect(second).toEqual({ id: first.id, deduped: true })
+  })
+
+  it('still dedups a source whose prior item is live (running)', async () => {
+    const { pool } = fakePool()
+    const source = `thread:${randomUUID()}`
+    const first = await dispatch(db, pool, { ...base, source })
+    await transition(db, first.id, 'start')
+    const second = await dispatch(db, pool, { ...base, source })
+    expect(second).toEqual({ id: first.id, deduped: true })
+  })
 })
