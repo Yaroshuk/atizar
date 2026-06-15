@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import type { MastraChunk } from '@atizar/providers'
-import { unwrapStepOutput, makeMastraRunner } from './runner.js'
+import type { MastraChunk } from './mastra-types.js'
+import { unwrapStepOutput, makeMastraRunner } from './mastraRunner.js'
 
 const baseConfig = {
   agentId: 'wf__agent',
@@ -11,10 +11,11 @@ const baseConfig = {
   model: 'claude-sonnet-4-6',
   databaseUrl: 'postgres://unused',
   prompts: { buildFirst: () => 'PROMPT', buildResume: () => null },
+  tools: {} as Record<string, unknown>,
 }
 
 describe('makeMastraRunner tool resolution', () => {
-  it('throws a clear error when an allow-listed tool is not registered in ALL_TOOLS', () => {
+  it('throws a clear error when an allow-listed tool is not in the injected tools map', () => {
     // The tools map is built before any Mastra/DB construction, so this throws synchronously
     // without touching Postgres.
     expect(() => makeMastraRunner({ ...baseConfig, readTools: ['nonexistent'] })).toThrow(

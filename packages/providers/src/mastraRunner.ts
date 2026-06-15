@@ -6,23 +6,12 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { type GateResolution, type Message, type PromptStrategy } from '@atizar/core'
 import type { RunAgentInput } from '@ag-ui/client'
-import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from '@atizar/providers'
-import {
-  getLatestEmailTool,
-  renderLeadTool,
-  renderVerdictTool,
-  saveDraftTool,
-  listUnreadTool,
-  getEmailTool,
-  routeEmailsTool,
-  renderSortTool,
-  applyActionsTool,
-  listMyTicketsTool,
-  getTicketTool,
-  renderTriageTool,
-  renderTicketResultTool,
-  renderReplyDraftTool,
-} from './tools.js'
+import type { MastraRunner, MastraRun, MastraChunk, MastraRunResult } from './mastra-types.js'
+
+// A Mastra tool is opaque to the runner — the app builds the concrete map and injects it. Kept
+// structural (the runner only hands these straight to `new Agent({ tools })`) so the package has
+// no compile-time dependency on the app's tool definitions.
+export type MastraToolLike = unknown
 
 export interface MastraRunnerConfig {
   agentId: string
@@ -36,6 +25,9 @@ export interface MastraRunnerConfig {
   // first-turn prompt from `buildFirst` so both providers share ONE prompt source (per workflow's
   // `prompts` module); there is no Mastra-specific prompt path.
   prompts: PromptStrategy
+  // The concrete tool map, injected by the app (drops the old hard ./tools.js import). Keyed by
+  // bare tool name; the runner picks the subset named by readTools + renderAndProposeTools.
+  tools: Record<string, MastraToolLike>
 }
 
 // ONE Mastra storage shared across every agent. A PostgresStore per agent opened its own pool
@@ -54,24 +46,6 @@ function getSharedStore(databaseUrl: string): PostgresStore {
   }
   return sharedStore
 }
-
-const ALL_TOOLS = {
-  get_latest_email: getLatestEmailTool,
-  renderLead: renderLeadTool,
-  renderVerdict: renderVerdictTool,
-  saveDraft: saveDraftTool,
-  list_unread: listUnreadTool,
-  get_email: getEmailTool,
-  route_emails: routeEmailsTool,
-  renderSort: renderSortTool,
-  applyActions: applyActionsTool,
-  // github-triage (claude-cli only) — registered so PROVIDER=mastra boots; reads are stubs.
-  list_my_tickets: listMyTicketsTool,
-  get_ticket: getTicketTool,
-  render_triage: renderTriageTool,
-  render_ticket_result: renderTicketResultTool,
-  render_reply_draft: renderReplyDraftTool,
-} as const
 
 // Mastra's ToolStream wraps every `writer.write(value)` in a workflow-step-output envelope before
 // it surfaces on `run.stream`. The pure mapper/provider key on 'text-delta'/'tool-call', so we
@@ -107,8 +81,9 @@ export function makeMastraRunner(cfg: MastraRunnerConfig): MastraRunner {
   // (which fails mysteriously only at run time). With more agents a typo here is easy to make.
   const tools = Object.fromEntries(
     [...cfg.readTools, ...cfg.renderAndProposeTools].map((n) => {
-      const t = ALL_TOOLS[n as keyof typeof ALL_TOOLS]
-      if (!t) throw new Error(`Mastra has no tool "${n}" — add it to ALL_TOOLS in mastra/runner.ts`)
+      const t = cfg.tools[n]
+      if (!t)
+        throw new Error(`Mastra has no tool "${n}" — add it to the tools map injected by the app`)
       return [n, t]
     })
   )
