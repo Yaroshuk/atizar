@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseEnvFile } from './parse-env.js'
+import { parseEnvFile } from './parseEnv.js'
 
 describe('parseEnvFile', () => {
   it('parses simple KEY=value lines', () => {
