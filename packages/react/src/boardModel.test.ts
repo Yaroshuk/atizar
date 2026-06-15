@@ -55,6 +55,26 @@ describe('statusesOf', () => {
     expect(statusesOf(items, 'lead-inbox', 'reply')).toEqual(['awaiting_approval'])
     expect(statusesOf(items, 'lead-inbox', 'qualifier')).toEqual(['running'])
   })
+
+  it('excludes closed items so a Reset/superseded agent reads idle, not done', () => {
+    const afterReset: WorkItem[] = [
+      wi({ id: 'S1', agentId: 'lead-inbox__qualifier', status: 'closed', resolution: 'reset' }),
+      wi({
+        id: 'S2',
+        agentId: 'lead-inbox__qualifier',
+        status: 'closed',
+        resolution: 'superseded',
+      }),
+    ]
+    // all runs closed → no statuses contribute → the type card returns to idle (empty list)
+    expect(statusesOf(afterReset, 'lead-inbox', 'qualifier')).toEqual([])
+    // a still-open run is unaffected: a finished (not closed) run keeps reading 'done'
+    const mixed: WorkItem[] = [
+      ...afterReset,
+      wi({ id: 'F', agentId: 'lead-inbox__qualifier', status: 'finished' }),
+    ]
+    expect(statusesOf(mixed, 'lead-inbox', 'qualifier')).toEqual(['done'])
+  })
 })
 
 describe('toPInstances superseded roots (WS1)', () => {
