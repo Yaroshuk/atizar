@@ -2,7 +2,7 @@ import { defineAgent, defineWorkflow } from '@atizar/core'
 import { PROVIDERS } from '@atizar/providers/ids'
 import { EMAIL_INBOX_TOOLS as t } from './tools'
 import { EMAIL_INBOX_CARDS as c } from './cards'
-import { EMAIL_INBOX_ID, EMAIL_INBOX_AGENTS as a, ROLES } from './ids'
+import { EMAIL_INBOX_ID, EMAIL_INBOX_AGENTS as a, ROLES, type EmailInboxAgentId } from './ids'
 
 // The payload contracts live in ./contracts (so prompts.ts can decode them without importing the
 // descriptor — that would close a descriptor↔prompts cycle). Re-exported here for the descriptor
@@ -42,7 +42,7 @@ export const replyAgent = defineAgent({
 
 // reader / spam / important share the SAME shape (one batch gate proposing per-row actions),
 // differing only in the proposed default action — that is the prompt's job, not the passport's.
-function batchAgent(id: string, name: string): ReturnType<typeof defineAgent> {
+function batchAgent(id: EmailInboxAgentId, name: string): ReturnType<typeof defineAgent> {
   return defineAgent({
     id,
     name,
