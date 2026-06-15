@@ -18,7 +18,7 @@ import {
   type DispatchInput,
   type DispatchResult,
 } from './dispatch.js'
-import { transition, ACTIVE } from './transition.js'
+import { transition, IllegalTransition, ACTIVE } from './transition.js'
 import type { Gate, WorkItem, WorkItemStatus } from './db/schema.js'
 import { makeActivityLog, type ActivityEntry } from './activity.js'
 
@@ -179,7 +179,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   async function supersedePriorRoots(workflowId: string, agentId: string): Promise<void> {
     const roots = await store.getFinishedInputRoots(workflowId, agentId)
     for (const root of roots) {
-      await transition(db, root.id, 'supersede').catch(() => {})
+      try {
+        await transition(db, root.id, 'supersede')
+      } catch (e) {
+        // Tolerate a lost race: a concurrent finish/cancel could move the root out of
+        // 'finished' between the read above and here (IllegalTransition) — skip it. Re-throw
+        // anything else (e.g. a real DB error) rather than silently leaving two current roots.
+        if (e instanceof IllegalTransition) continue
+        throw e
+      }
       activity.record({
         ts: Date.now(),
         workflowId: root.workflowId,
