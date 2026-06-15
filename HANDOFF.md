@@ -18,7 +18,7 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
-**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS6 → WS1 → WS7.**
+**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS1 → WS7.**
 Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
 so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
 
@@ -60,6 +60,21 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
   lint / format / `@atizar/react` build). **check-foundation: CLEAR** (I5 strengthened, I7/I15 intact).
   Browser-verified PASS: all four workflows render their cards (VerdictCard+ApprovalDialog, TriageCard,
   SortSummaryCard), 0 render-collision warnings, reload re-resolves the card.
+- **WS6 — ✅ DONE & merged** (`master` after merge: `3429320`). Killed magic strings: `@atizar/providers`
+  exports `PROVIDERS` (typed const + `ProviderId` union — `as const`, NOT a TS enum; value stays the
+  wire string, I7); the server registry keys off `PROVIDERS.*`; each workflow gained a `tools.ts`
+  (`*_TOOLS as const`) + `cards.ts` (`*_CARDS as const`), and descriptors/client specs reference
+  `t.*`/`c.*` instead of raw literals. `@atizar/core` stays provider-agnostic (`provider: z.string()`,
+  no `@atizar/providers` import — I3/I5). Optional Task 6 (defineAgent generic) NOT done — the
+  implementer subagent hit a 401 auth failure after committing Tasks 1-5 (a long-session token
+  expiry, not a code problem); Task 6 is explicitly optional with a revert decision-gate, so it's
+  cleanly skipped. Green gate green (typecheck / test 504 / lint / format / `yarn build`). Acceptance
+  greps clean (no `provider:'claude-cli'` literal; no TS enum; core doesn't import providers).
+  check-foundation CLEAR (I7/I3/I5). Boot smoke PASS (server boots, `/api/board` 200, 0 provider errors).
+  ⚠ **Subagent auth note:** one implementer subagent died on `401 Invalid authentication credentials`
+  ("run /login") after a ~6h hang — the macOS-keychain subscription token expired during a long pause.
+  The MAIN loop's auth is fine (all my own calls work). If subagents keep 401-ing, re-auth may be
+  needed; the run continues regardless (I verify directly when needed).
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
@@ -68,7 +83,7 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
 - WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md` — ✅ **DONE & merged** (`d64966f`)
 - WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
 - WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md` — ✅ **DONE & merged** (`81febc9`)
-- WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md`
+- WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md` — ✅ **DONE & merged** (`3429320`)
 - WS7 app→library boundary migration → `2026-06-14-ws7-app-to-library-migration.md`
 
 **Order (spec §3):** WS4 → WS3 → WS5 → WS2 → WS6 → WS1 → WS7. (Small/independent first; **WS2 before
