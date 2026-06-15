@@ -40,6 +40,13 @@ export type WorkflowDescriptor = {
   // Integrations (OAuth connections) this workflow needs. The server unions these across all
   // loaded workflows to derive the live connection list — a stale/extra chip becomes impossible.
   connections?: WorkflowConnection[]
+  // Re-run policy when a human STARTs an input agent that already has a finished scan root
+  // (config-as-data, I7). Default 'refresh': the prior finished root is superseded
+  // (status 'closed', resolution 'superseded') and the new scan becomes current; per-item
+  // work items the scan surfaced stay durable. 'history' (reserved, NOT wired in the beta):
+  // no auto-supersede — every finished scan is kept and the human chooses which is current.
+  // The 'history' branch point lives in pipelineService.dispatch(); see its comment there.
+  rerun?: 'refresh' | 'history'
 }
 
 // A delivery destination: an internal worker (same workflow) or another workflow's

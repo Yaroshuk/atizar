@@ -109,4 +109,11 @@ describe('defineWorkflow', () => {
   it('leaves connections undefined when none are declared', () => {
     expect(defineWorkflow(base).connections).toBeUndefined()
   })
+  it('round-trips the rerun knob', () => {
+    expect(defineWorkflow({ ...base, rerun: 'refresh' }).rerun).toBe('refresh')
+    expect(defineWorkflow({ ...base, rerun: 'history' }).rerun).toBe('history')
+  })
+  it('leaves rerun undefined when not declared (defaults to refresh at the call site)', () => {
+    expect(defineWorkflow(base).rerun).toBeUndefined()
+  })
 })
