@@ -115,7 +115,33 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect(stats.queued).toBe(1)
   })
 
-  it('rejects a duplicate human START of a singleton agent (maxInstances=1) with rejected=already_running', async () => {
+  // Build a one-input-agent workflow descriptor + a singleton runtime. The START gate now keys
+  // off DB tree-liveness for a SINGLETON INPUT agent, so the agent under test must be a declared
+  // input agent (isInputAgent true) of a loaded descriptor — a bare unregistered agent id no
+  // longer triggers the gate (by design: only input roots get the single-scan refresh/gate).
+  function makeSingletonInputService(prefix: string) {
+    const wf = `${prefix}-${randomUUID().slice(0, 8)}`
+    const inputWf = defineWorkflow({
+      id: wf,
+      label: 'S',
+      iconName: 'inbox',
+      agents: [
+        {
+          agent: defineAgent({
+            id: 'sorter',
+            name: 's',
+            provider: 'mock',
+            instructions: 'x',
+            tools: ['t'],
+            approvals: [],
+            renders: {},
+          }),
+          role: 'input',
+        },
+      ],
+      entryAgentId: 'sorter',
+      inputs: [],
+    })
     const runtime: AgentRuntime = {
       provider: blockingProvider(),
       renderToolNames: [],
@@ -124,60 +150,43 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    return { svc, workflowId: wf, agentId: `${wf}__sorter` }
+  }
 
-    // First human START: should succeed and occupy the sole slot.
-    const first = await service.dispatch({
-      ...base,
-      agentId: 'singleton-agent',
-      origin: 'human',
-    })
+  it('rejects a duplicate human START of a singleton input agent (maxInstances=1) with rejected=already_running', async () => {
+    const { svc, workflowId, agentId } = makeSingletonInputService('singleton')
+
+    // First human START: should succeed and (with blockingProvider) stay running → tree live.
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(first.rejected).toBeUndefined()
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'running')
 
-    // Second human START: maxInstances=1 and one already active → rejected.
-    const second = await service.dispatch({
-      ...base,
-      agentId: 'singleton-agent',
-      origin: 'human',
-    })
+    // Second human START: the input scan is still live → rejected.
+    const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.rejected).toBe('already_running')
 
     // The second dispatch must NOT have been enqueued.
-    const stats = service.stats('singleton-agent')
+    const stats = svc.stats(agentId)
     expect(stats.active).toBe(1)
     expect(stats.queued).toBe(0)
   })
 
   it('machine dispatch (origin=agent) to a saturated singleton is NOT rejected by the START guard', async () => {
-    const runtime: AgentRuntime = {
-      provider: blockingProvider(),
-      renderToolNames: [],
-      maxInstances: 1,
-      effects: {},
-      dispatchToolNames: [],
-      handoffs: [],
-    }
-    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const { svc, workflowId, agentId } = makeSingletonInputService('singleton-machine')
 
-    // First human START occupies the sole slot.
-    const first = await service.dispatch({
-      ...base,
-      agentId: 'singleton-machine-agent',
-      origin: 'human',
-    })
+    // First human START occupies the sole slot (running, tree live).
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(first.rejected).toBeUndefined()
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'running')
 
     // Machine dispatch (origin='agent', e.g. F2 child dispatch) to the same saturated singleton
     // must NOT be rejected — it goes to the chokepoint cap/queue instead of the human guard.
-    const machine = await service.dispatch({
-      ...base,
-      agentId: 'singleton-machine-agent',
-      origin: 'agent',
-    })
+    const machine = await svc.dispatch({ workflowId, agentId, origin: 'agent', payload: {} })
     expect(machine.rejected).toBeUndefined()
 
     // The machine dispatch was accepted: 1 active (blocking) + 1 queued.
-    const stats = service.stats('singleton-machine-agent')
+    const stats = svc.stats(agentId)
     expect(stats.active).toBe(1)
     expect(stats.queued).toBe(1)
   })
@@ -619,57 +628,52 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     }
   }
 
-  const inputWf = defineWorkflow({
-    id: 'rerun-wf',
-    label: 'R',
-    iconName: 'inbox',
-    agents: [
-      {
-        agent: defineAgent({
-          id: 'sorter',
-          name: 's',
-          provider: 'mock',
-          instructions: 'x',
-          tools: ['t'],
-          approvals: [],
-          renders: {},
-        }),
-        role: 'input',
-      },
-    ],
-    entryAgentId: 'sorter',
-    inputs: [],
-  })
-
-  function makeReRunService() {
+  // Each test mints a UNIQUE workflow id. The START gate now reads DB tree-liveness keyed by
+  // workflow×agent, so a shared fixed id would let one test's leftover live/finished root leak
+  // into the next test's gate decision (cross-test DB pollution). A descriptor must carry the
+  // SAME id as the workflow so the input runtime key (`<wf>__sorter`) is recognized as an input
+  // agent (isInputAgent). Returns the service + the matching ids.
+  function makeReRunService(provider: Provider = quickProvider()) {
+    const wf = `rerun-wf-${randomUUID().slice(0, 8)}`
+    const inputWf = defineWorkflow({
+      id: wf,
+      label: 'R',
+      iconName: 'inbox',
+      agents: [
+        {
+          agent: defineAgent({
+            id: 'sorter',
+            name: 's',
+            provider: 'mock',
+            instructions: 'x',
+            tools: ['t'],
+            approvals: [],
+            renders: {},
+          }),
+          role: 'input',
+        },
+      ],
+      entryAgentId: 'sorter',
+      inputs: [],
+    })
     const runtime: AgentRuntime = {
-      provider: quickProvider(),
+      provider,
       renderToolNames: [],
       maxInstances: 1,
       effects: {},
       dispatchToolNames: [],
       handoffs: [],
     }
-    return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
   it('a sequential human re-START supersedes the prior finished root and mints a new one', async () => {
-    const svc = makeReRunService()
-    const agentId = 'rerun-wf__sorter'
-    const first = await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId,
-      origin: 'human',
-      payload: {},
-    })
+    const { svc, workflowId, agentId } = makeReRunService()
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
 
-    const second = await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId,
-      origin: 'human',
-      payload: {},
-    })
+    const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.rejected).toBeUndefined()
     expect(second.id).not.toBe(first.id)
 
@@ -684,16 +688,10 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
   })
 
   it('the supersede is recorded in the Activity log', async () => {
-    const svc = makeReRunService()
-    const agentId = 'rerun-wf__sorter'
-    const first = await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId,
-      origin: 'human',
-      payload: {},
-    })
+    const { svc, workflowId, agentId } = makeReRunService()
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
-    await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     const entry = svc
       .getActivity()
       .find((e) => e.workItemId === first.id && e.kind === 'superseded')
@@ -703,57 +701,131 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
   it('a 2nd CONCURRENT human START of the singleton input still 409s (supersede does not change concurrency)', async () => {
     // blockingProvider keeps the first scan RUNNING (slot occupied) — the concurrency guard fires
     // before any supersede; the prior root is not finished, so there is nothing to supersede.
-    const runtime: AgentRuntime = {
-      provider: blockingProvider(),
-      renderToolNames: [],
-      maxInstances: 1,
-      effects: {},
-      dispatchToolNames: [],
-      handoffs: [],
-    }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
-    const agentId = 'rerun-wf__sorter'
-    const first = await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId,
-      origin: 'human',
-      payload: {},
-    })
+    const { svc, workflowId, agentId } = makeReRunService(blockingProvider())
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(first.rejected).toBeUndefined()
-    const second = await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId,
-      origin: 'human',
-      payload: {},
-    })
+    const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.rejected).toBe('already_running')
   })
 
   it('a non-input agent human START does NOT supersede (only input roots refresh)', async () => {
     // dispatch a worker-role agent directly (origin human) twice; finishing the first should
     // NOT close it — refresh applies only to input agents.
-    const runtime: AgentRuntime = {
-      provider: quickProvider(),
-      renderToolNames: [],
-      maxInstances: 2,
-      effects: {},
-      dispatchToolNames: [],
-      handoffs: [],
-    }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const { svc, workflowId } = makeReRunService()
     const first = await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId: 'rerun-wf__worker-x', // not a declared input agent in inputWf
+      workflowId,
+      agentId: `${workflowId}__worker-x`, // not a declared input agent in this descriptor
       origin: 'human',
       payload: {},
     })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
     await svc.dispatch({
-      workflowId: 'rerun-wf',
-      agentId: 'rerun-wf__worker-x',
+      workflowId,
+      agentId: `${workflowId}__worker-x`,
       origin: 'human',
       payload: {},
     })
     expect((await svc.getStatus(first.id))?.status).toBe('finished') // NOT closed
+  })
+})
+
+describe.skipIf(!reachable)('PipelineService input START tree-liveness gate (Bug 1)', () => {
+  // A provider that opens a gate then ends — the input root suspends at the gate
+  // (status 'awaiting_approval', still ACTIVE) and its pool slot is RELEASED. This is the
+  // Approach-B steady state for a single-agent input scan: the scan is still LIVE (awaiting the
+  // human) yet the worker pool count reads 0. The OLD gate (pool.activeCount) would let a second
+  // START through here; the new tree-liveness gate must reject it.
+  function gateProviderLocal(): Provider {
+    return {
+      async *run(_input: RunAgentInput) {
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'work' })
+        yield gateOpened({
+          gateKind: 'approval',
+          toolName: 'saveDraft',
+          toolCallId: 'toolu_g',
+          proposedArtifact: { body: 'draft' },
+        })
+      },
+      async *resume(_h: ResumeHandle, _r: GateResolution) {
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm2', delta: 'saved' })
+      },
+    }
+  }
+
+  function makeGateInputService() {
+    const wf = `live-scan-${randomUUID().slice(0, 8)}`
+    const inputWf = defineWorkflow({
+      id: wf,
+      label: 'L',
+      iconName: 'inbox',
+      agents: [
+        {
+          agent: defineAgent({
+            id: 'sorter',
+            name: 's',
+            provider: 'mock',
+            instructions: 'x',
+            tools: ['saveDraft'],
+            approvals: ['saveDraft'],
+            renders: {},
+          }),
+          role: 'input',
+        },
+      ],
+      entryAgentId: 'sorter',
+      inputs: [],
+    })
+    const runtime: AgentRuntime = {
+      provider: gateProviderLocal(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: { saveDraft: async () => ({}) },
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    return { svc, workflowId: wf, agentId: `${wf}__sorter` }
+  }
+
+  it('rejects a second human START of the input agent while the prior scan is still live', async () => {
+    const { svc, workflowId, agentId } = makeGateInputService()
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
+    expect(first.rejected).toBeUndefined()
+
+    // Drive the input root to awaiting_approval: it suspends at the gate (still ACTIVE) and the
+    // worker pool RELEASES its slot — so pool.activeCount(agentId) is now 0 even though the scan
+    // is live. This is the exact condition the old pool-count gate failed on.
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_approval')
+    expect(svc.stats(agentId).active).toBe(0) // slot freed at the gate — old gate would pass a 2nd START
+
+    const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
+    expect(second.rejected).toBe('already_running')
+  })
+
+  it('allows a sequential re-START once the prior scan fully settles (gate resolved → finished)', async () => {
+    const { svc, workflowId, agentId } = makeGateInputService()
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_approval')
+    const board = await svc.getBoard()
+    const gate = board.gates.find((g) => g.workItemId === first.id)
+    expect(gate).toBeDefined()
+    // Resolve the gate → the run resumes and finishes; the scan is no longer live.
+    await svc.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+
+    // A fresh human START now PROCEEDS (no live scan) and supersedes the prior finished root.
+    const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
+    expect(second.rejected).toBeUndefined()
+    expect(second.id).not.toBe(first.id)
+    expect((await svc.getStatus(first.id))?.status).toBe('closed') // superseded
+  })
+
+  it('machine dispatch (origin=agent) to a live input scan is NOT rejected by the START gate', async () => {
+    const { svc, workflowId, agentId } = makeGateInputService()
+    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_approval')
+    // origin='agent' bypasses the human START gate entirely — it goes to the chokepoint.
+    const machine = await svc.dispatch({ workflowId, agentId, origin: 'agent', payload: {} })
+    expect(machine.rejected).toBeUndefined()
   })
 })

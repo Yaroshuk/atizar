@@ -219,6 +219,37 @@ export function makeStateStore(db: Db) {
         )
     },
 
+    // True when this input agent (workflow × agentId) has at least one non-'closed' root whose
+    // tree still contains an ACTIVE node (the root itself, or any transitive descendant). Under
+    // Approach B a root finishes on its own run-end, so a 'finished' root with awaiting-approval
+    // children still counts as a LIVE scan — this is the singleton-START gate's source of truth
+    // (replaces the worker-pool process count, which is freed the moment the run/gate suspends).
+    async hasLiveInputScan(workflowId: string, agentId: string): Promise<boolean> {
+      const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
+      const childrenOf = new Map<string, WorkItem[]>()
+      for (const r of rows) {
+        if (!r.parentId) continue
+        const arr = childrenOf.get(r.parentId) ?? []
+        arr.push(r)
+        childrenOf.set(r.parentId, arr)
+      }
+      const subtreeLive = (id: string, seen = new Set<string>()): boolean => {
+        if (seen.has(id)) return false
+        seen.add(id)
+        for (const kid of childrenOf.get(id) ?? []) {
+          if (ACTIVE.includes(kid.status) || subtreeLive(kid.id, seen)) return true
+        }
+        return false
+      }
+      return rows.some(
+        (r) =>
+          r.agentId === agentId &&
+          !r.parentId &&
+          r.status !== 'closed' &&
+          (ACTIVE.includes(r.status) || subtreeLive(r.id))
+      )
+    },
+
     // Append-only durable audit. One INSERT per recorded human decision / server effect.
     async appendAudit(input: {
       workItemId: string

@@ -16,7 +16,9 @@ export const AgentDefinitionSchema = z
     // the agent registry is checked at wiring time (a passport doesn't know it).
     handoffs: z.array(z.string()).optional(),
     // Max concurrent runtime copies of this agent. A cap of 1 = singleton.
-    maxInstances: z.number().int().positive().default(2),
+    // Default is 1: concurrency is opt-in. A wrong-high default risks unwanted
+    // concurrency (a correctness/safety hazard); a low default only costs serialization.
+    maxInstances: z.number().int().positive().default(1),
     // Approval tools whose resolution triggers a SERVER-executed effect (the function
     // lives in the workflow ServerBinding; the model never sees an effect tool).
     effects: z.array(z.string()).default([]),

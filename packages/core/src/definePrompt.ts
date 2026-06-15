@@ -18,6 +18,11 @@ export interface PromptSpec<T> {
   onResume?: (result: Record<string, unknown>) => string
 }
 
+// ESCAPE HATCH: definePrompt is sugar, not a cage. It models a 3-hook lifecycle (onInput/onStart/
+// onResume), forwards only `executedResult` to onResume (drops the resume tool-call `args`), and
+// decodes a single `input` schema. Need more — the resume `args`, multiple handoff shapes, or any
+// other branching? Pass a raw `PromptStrategy` object ({ buildFirst, buildResume }) straight into
+// the agent's `prompts` — it is accepted everywhere definePrompt's output is (providers.ts:40).
 export function definePrompt<T>(spec: PromptSpec<T>): PromptStrategy {
   const { onResume } = spec
   return {

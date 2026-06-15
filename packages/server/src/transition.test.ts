@@ -141,6 +141,27 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     expect((await store.getWorkItem(id))?.status).toBe('awaiting_approval')
   })
 
+  it('a parent finishes on its OWN finish edge regardless of live children (Approach B)', async () => {
+    const { id: root } = await newQueued()
+    const { id: child } = await newQueued({ parentId: root })
+    await transition(db, root, 'start')
+    await transition(db, child, 'start')
+    await transition(db, child, 'gate') // child awaiting
+    await transition(db, root, 'finish')
+    expect((await store.getWorkItem(root))?.status).toBe('finished') // NOT deferred to running
+    expect((await store.getWorkItem(child))?.status).toBe('awaiting_approval') // child untouched
+  })
+
+  it('a child reaching terminal does NOT change its parent (no auto-finish walk)', async () => {
+    const { id: root } = await newQueued()
+    const { id: child } = await newQueued({ parentId: root })
+    await transition(db, root, 'start') // parent still running (its own run in flight)
+    await transition(db, child, 'start')
+    await transition(db, child, 'gate')
+    await transition(db, child, 'reject')
+    expect((await store.getWorkItem(root))?.status).toBe('running') // parent unaffected by the child
+  })
+
   it('supersede does NOT cascade to the parent (children stay durable, I12)', async () => {
     const { id: parent } = await newQueued()
     await transition(db, parent, 'start')

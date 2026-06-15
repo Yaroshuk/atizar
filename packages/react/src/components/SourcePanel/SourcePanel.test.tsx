@@ -17,10 +17,30 @@ describe('SourcePanel', () => {
     expect(screen.getByText('Demo please')).toBeInTheDocument()
   })
 
-  it('stringifies a non-string value rather than crashing', () => {
-    render(<SourcePanel source={{ count: 3, nested: { a: 1 } }} />)
+  it('stringifies a non-string scalar rather than crashing', () => {
+    render(<SourcePanel source={{ count: 3 }} />)
     expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('{"a":1}')).toBeInTheDocument()
+  })
+
+  it('flattens a nested payload object into labelled fields (not raw JSON)', () => {
+    render(
+      <SourcePanel
+        source={{
+          email: {
+            from: 'A <a@b.c>',
+            subject: 'Hi',
+            snippet: 'hello there',
+            date: 'Mon',
+            threadId: 't1',
+            messageId: 'm1',
+          },
+        }}
+      />
+    )
+    expect(screen.getByText('hello there')).toBeInTheDocument() // snippet shown
+    expect(screen.getByText('Hi')).toBeInTheDocument() // subject shown
+    expect(screen.queryByText(/\{".*"\}/)).not.toBeInTheDocument() // NO raw JSON blob
+    expect(screen.queryByText('m1')).not.toBeInTheDocument() // id hidden
   })
 
   it('renders nothing when there are no fields', () => {
