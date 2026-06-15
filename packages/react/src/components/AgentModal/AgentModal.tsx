@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@atizar/core'
 import { STATUS_LABEL, type Status } from '../../status'
 import { isDevMode } from '../../devMode'
+import { useDismiss } from '../../hooks/useDismiss'
 import { ThreadResultsContext } from '../../threadResults'
 import { Icon, type IconName } from '../Icon/Icon'
 import { Markdown } from '../../primitives/Markdown/Markdown'
@@ -81,6 +82,8 @@ export const AgentModal = ({
   onStop,
   onClose,
 }: AgentModalProps) => {
+  // Close plays a brief exit animation (mirrors the open) before the parent unmounts.
+  const { closing, dismiss } = useDismiss(onClose)
   // Index tool result messages by toolCallId so each assistant tool call can be
   // paired with its matching `role:"tool"` result (used to surface a completed
   // saveDraft as done).
@@ -156,7 +159,7 @@ export const AgentModal = ({
   })
 
   return (
-    <div className='backdrop' onClick={onClose}>
+    <div className={clsx('backdrop', closing && 'closing')} onClick={dismiss}>
       <div className='modal' onClick={(e) => e.stopPropagation()}>
         <div className='modal-head'>
           <span className='modal-mark'>
@@ -175,7 +178,7 @@ export const AgentModal = ({
               </span>
             )}
           </div>
-          <button className='modal-x' onClick={onClose} aria-label='Close'>
+          <button className='modal-x' onClick={dismiss} aria-label='Close'>
             <Icon name='close' size={17} />
           </button>
         </div>
