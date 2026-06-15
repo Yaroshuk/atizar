@@ -42,9 +42,14 @@ Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workfl
   `captureTool()`→`@atizar/server` · **U7** the `add-workflow` capstone skill. Each: TDD → two-stage
   review → `check-foundation` (U2/U4 CLEAR; identity composes exactly once on both provider paths) →
   browser-verified → merged to `master`.
+- **Board-fix follow-up** (browser-verified): after Reset the agent type-cards returned to "Idle"
+  (closed items no longer leak into the per-agent aggregate via `statusesOf`); the per-workflow
+  Reset/Stop in the narrow Pipeline header are now icon-only so they stop overflowing into "Your agents".
+- **Cassettes recorded + replay-verified** — full real `email-inbox` run, all 5 `wf__agent` cassettes
+  (4-way routing), true-replay confirmed. Gitignored, real data (see NEXT §B).
 - (Earlier: 7c packaging tail; the 7-WS re-run/trust-UX/library-boundary track. Detail in git.)
 
-**Green gate (HEAD):** `yarn typecheck && yarn test` (**529 passed**) `&& yarn lint && yarn format:check
+**Green gate (HEAD):** `yarn typecheck && yarn test` (**530 passed**) `&& yarn lint && yarn format:check
 && yarn workspace @atizar/react build` — all green.
 
 ---
