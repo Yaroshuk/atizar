@@ -1,4 +1,10 @@
-import type { WorkflowsConfig, AgentMeta, RenderSpec, HitlSpec } from '@atizar/react'
+import {
+  scope,
+  type WorkflowsConfig,
+  type AgentMeta,
+  type RenderSpec,
+  type HitlSpec,
+} from '@atizar/react'
 import { workflowDescriptors } from '../../workflows'
 import {
   emailInboxMeta,
@@ -18,21 +24,8 @@ import { EMAIL_INBOX_ID } from '../../workflows/email-inbox/ids'
 // same-named-but-different component).
 const META: Record<string, AgentMeta> = { ...emailInboxMeta }
 
-// Stamp a workflow's specs with its id, then drop duplicate tool names WITHIN that workflow.
-const scope = <T extends { toolName: string; workflowId: string }>(
-  workflowId: string,
-  specs: Omit<T, 'workflowId'>[]
-): T[] => {
-  const seen = new Set<string>()
-  const out: T[] = []
-  for (const s of specs) {
-    if (seen.has(s.toolName)) continue
-    seen.add(s.toolName)
-    out.push({ ...s, workflowId } as T)
-  }
-  return out
-}
-
+// `scope` (from @atizar/react) stamps a workflow's specs with its id, then drops duplicate tool
+// names WITHIN that workflow.
 const renderSpecs: RenderSpec[] = [...scope<RenderSpec>(EMAIL_INBOX_ID, emailInboxRenders)]
 const hitlSpecs: HitlSpec[] = [...scope<HitlSpec>(EMAIL_INBOX_ID, emailInboxHitl)]
 
