@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateHealth, providerHealth } from './health.js'
+import { aggregateHealth } from '@atizar/core'
+import { providerHealth } from './health.js'
 
 describe('aggregateHealth', () => {
   it('is ok when all checks are ok', () => {

@@ -1,15 +1,9 @@
 import { execSync } from 'node:child_process'
 import type { HealthCheck } from '@atizar/core'
 
-// Aggregate a set of credential/provider checks for ONE agent into a single HealthCheck:
-// the first failing check (so an agent with any unhealthy dependency is unhealthy), else ok.
-// An empty array has no failing checks and returns ok:true (no checks = no constraints).
-export function aggregateHealth(checks: HealthCheck[]): HealthCheck {
-  for (const c of checks) {
-    if (!c.ok) return c
-  }
-  return { ok: true }
-}
+// aggregateHealth now lives in @atizar/core (pure fold, Node-free — I3). Re-exported here so
+// existing import sites stay stable until health.ts is fully retired at WS7 move 4.
+export { aggregateHealth } from '@atizar/core'
 
 // A provider's own readiness: claude-cli needs the `claude` binary on PATH; mastra needs
 // ANTHROPIC_API_KEY; mock is always ok. Never throws (a failing probe returns ok:false).

@@ -21,3 +21,14 @@ export type BatchActionResult =
 export function isOk(h: HealthCheck): h is { ok: true; detail?: string } {
   return h.ok
 }
+
+// Aggregate a set of credential/provider checks for ONE agent into a single HealthCheck:
+// the first failing check (so an agent with any unhealthy dependency is unhealthy), else ok.
+// An empty array has no failing checks and returns ok:true (no checks = no constraints).
+// Pure: no fs, no Node, no engine import (invariant I3 — this lives in @atizar/core).
+export function aggregateHealth(checks: HealthCheck[]): HealthCheck {
+  for (const c of checks) {
+    if (!c.ok) return c
+  }
+  return { ok: true }
+}

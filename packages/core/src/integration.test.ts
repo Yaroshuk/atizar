@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { isOk, type HealthCheck, type ReadResult, type BatchActionResult } from './integration.js'
+import {
+  isOk,
+  aggregateHealth,
+  type HealthCheck,
+  type ReadResult,
+  type BatchActionResult,
+} from './integration.js'
 
 describe('integration contract', () => {
   it('isOk narrows a HealthCheck to the ok branch', () => {
@@ -18,5 +24,18 @@ describe('integration contract', () => {
     expect('error' in r).toBe(false)
     expect('error' in err).toBe(true)
     expect(batch.done).toEqual(['a'])
+  })
+})
+
+describe('aggregateHealth', () => {
+  it('is ok when all checks are ok', () => {
+    expect(aggregateHealth([{ ok: true }, { ok: true, detail: 'x' }])).toEqual({ ok: true })
+  })
+  it('returns the first failure', () => {
+    const fail: HealthCheck = { ok: false, error: 'no creds', hint: 'see skill' }
+    expect(aggregateHealth([{ ok: true }, fail])).toEqual(fail)
+  })
+  it('an empty array has no failing checks → ok', () => {
+    expect(aggregateHealth([])).toEqual({ ok: true })
   })
 })
