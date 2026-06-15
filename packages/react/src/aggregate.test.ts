@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateAgent } from './aggregate'
+import { aggregateAgent, aggregateLabel } from './aggregate'
 import type { Status } from './status'
 
 describe('aggregateAgent', () => {
@@ -18,5 +18,11 @@ describe('aggregateAgent', () => {
     expect(aggregateAgent(['running', 'error']).status).toBe('error')
     expect(aggregateAgent(['error', 'awaiting_approval']).status).toBe('awaiting_approval')
     expect(aggregateAgent(['done']).status).toBe('done')
+  })
+  it('a single finished scan aggregates to Done with no active label', () => {
+    const a = aggregateAgent(['done'])
+    expect(a.status).toBe('done')
+    expect(a.activeCount).toBe(0)
+    expect(aggregateLabel(a)).toBe('')
   })
 })
