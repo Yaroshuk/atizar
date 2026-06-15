@@ -18,7 +18,7 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
-**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS1 → WS7.**
+**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS7 (last). 6 of 7 done.**
 Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
 so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
 
@@ -75,10 +75,31 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
   ("run /login") after a ~6h hang — the macOS-keychain subscription token expired during a long pause.
   The MAIN loop's auth is fine (all my own calls work). If subagents keep 401-ing, re-auth may be
   needed; the run continues regardless (I verify directly when needed).
+- **WS1 — ✅ DONE & merged** (`master` after merge: `fdcfe76`) — THE headline feature. A human re-START
+  of an input agent now **supersedes** the prior finished scan root (status `closed`, resolution
+  `superseded`, via a new `transition()` edge — I8) and mints the single new current root; the prior
+  root drops out of the live Pipeline column but is **preserved** in Activity ("superseded by re-run"
+  — I12, never destroyed, no child cascade). Dispatch dedup is scoped to OPEN items (a re-scan
+  re-surfaces an un-actioned source; the `workItemId+gateId` effect ledger stays the double-action
+  guard — I9). The "Working" mislabel is fixed (`pipelineModel.view()` relabels a parent to running
+  only with a LIVE descendant). A `rerun: 'refresh' | 'history'` knob is declared on `WorkflowDescriptor`
+  (I7); only `'refresh'` is wired (all 3 inputs declare it); `'history'` is a reserved commented branch
+  point (spec §5 out-of-scope). Green gate green (typecheck / test 522 / lint / format / `@atizar/react`
+  build). **check-foundation: CLEAR** (I8/I12/I1/I9/I7 all intact). Review Approved after one fix
+  (narrowed the supersede `.catch` to `IllegalTransition` so a real DB error re-throws instead of
+  silently leaving two roots). Browser-verified PASS: two sequential STARTs of email-inbox/github-triage/
+  lead-inbox each leave exactly ONE live row labeled correctly (Done when finished, never finished-
+  showing-Working); "superseded by re-run" Activity entries present (DB-confirmed closed/superseded);
+  0 WS1 console errors.
+  ⚠ **UX gap noted (NOT a WS1 regression — future track):** when an input agent has an `error` item,
+  `aggregate.ts` counts `error` as active so `aggregateLabel` is non-empty, which HIDES the START
+  button on the agent card (re-run still works via the thread panel / API). WS1's spec only covers
+  re-run of a _finished_ root, so the error→re-run START-button path is out of scope here — worth a
+  small follow-up (e.g. allow START when the only "active" item is an `error`).
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
-- WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md`
+- WS1 re-run semantics (refresh/supersede + open-scoped dedup + Working-label fix + `rerun` knob) → `2026-06-14-ws1-rerun-semantics.md` — ✅ **DONE & merged** (`fdcfe76`)
 - WS2 render/HITL registry scoping per workflow → `2026-06-14-ws2-render-hitl-registry-scoping.md` — ✅ **DONE & merged** (`f51a060`)
 - WS3 markdown rendering (+ prompt tightening) → `2026-06-14-ws3-markdown-rendering.md` — ✅ **DONE & merged** (`d64966f`)
 - WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
