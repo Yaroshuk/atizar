@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, eq, gte } from 'drizzle-orm'
+import { and, asc, count, eq, gte, isNull } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db } from './db/client.js'
 import {
@@ -188,6 +188,25 @@ export function makeStateStore(db: Db) {
     async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
       return rows.filter((r) => ACTIVE.includes(r.status))
+    },
+
+    // The prior FINISHED, parentless scan roots of a given workflow × input-agent — the
+    // candidates a fresh human START supersedes (WS1). Finished-but-open only: a 'closed'
+    // (already-superseded) root, or one with a terminal resolution, is excluded. Children
+    // (parentId != null) are never roots and are never superseded (I12 — they stay durable).
+    async getFinishedInputRoots(workflowId: string, agentId: string): Promise<WorkItem[]> {
+      return db
+        .select()
+        .from(workItems)
+        .where(
+          and(
+            eq(workItems.workflowId, workflowId),
+            eq(workItems.agentId, agentId),
+            isNull(workItems.parentId),
+            eq(workItems.status, 'finished'),
+            isNull(workItems.resolution)
+          )
+        )
     },
 
     // Append-only durable audit. One INSERT per recorded human decision / server effect.
