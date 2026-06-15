@@ -2,6 +2,8 @@ import { z } from 'zod'
 import type { RenderSpec, HitlSpec, AgentMeta } from '@atizar/react'
 import { SortSummaryCard } from '../../client/src/components/SortSummaryCard/SortSummaryCard'
 import { EmailBatchCard } from '../../client/src/components/EmailBatchCard/EmailBatchCard'
+import { LeadCard } from '../../client/src/components/LeadCard/LeadCard'
+import { ApprovalDialog } from '../../client/src/components/ApprovalDialog/ApprovalDialog'
 import { sorterAgent, replyAgent, readerAgent, spamAgent, importantAgent } from './descriptor'
 import { EMAIL_INBOX_TOOLS as t } from './tools'
 
@@ -33,10 +35,9 @@ export const emailInboxMeta: Record<string, AgentMeta> = {
   },
 }
 
-// Only the NEW tools are declared here. renderLead + saveDraft (reused by the reply agent) are
-// already registered by lead-inbox. Resolution is scoped per workflow now (WS2), so email-inbox
-// would need its OWN copy to surface those in its threads; this workflow only renders renderSort
-// + the applyActions HITL, so the reused lead tools are intentionally not re-declared here.
+// Render/HITL resolution is scoped per workflow (WS2), so email-inbox declares EVERY tool it
+// surfaces — including renderLead + saveDraft for the reply agent (they share the lead-inbox
+// reply contract by name, but each workflow owns its own copy).
 export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
     toolName: t.renderSort,
@@ -58,6 +59,15 @@ export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
       return <SortSummaryCard summary={summary} counts={counts} />
     },
   },
+  {
+    toolName: t.renderLead,
+    parameters: z.object({ from: z.string(), subject: z.string(), summary: z.string() }),
+    render: ({ parameters }) => {
+      const { from, subject, summary } = parameters
+      if (from === undefined || subject === undefined || summary === undefined) return <></>
+      return <LeadCard lead={{ from, subject, summary }} />
+    },
+  },
 ]
 
 const BatchActionSchema = z.enum(['read', 'trash', 'star', 'keep'])
@@ -69,6 +79,22 @@ const BatchItemSchema = z.object({
 })
 
 export const emailInboxHitl: Omit<HitlSpec, 'workflowId'>[] = [
+  {
+    toolName: t.saveDraft,
+    parameters: z.object({ threadId: z.string(), body: z.string() }),
+    render: ({ form, source, approve, reject }) => {
+      const threadId = typeof form.threadId === 'string' ? form.threadId : ''
+      const body = typeof form.body === 'string' ? form.body : ''
+      return (
+        <ApprovalDialog
+          data={{ threadId, body }}
+          source={source}
+          onApprove={(editedBody: string) => approve({ ...form, body: editedBody })}
+          onReject={() => reject('no thanks')}
+        />
+      )
+    },
+  },
   {
     toolName: t.applyActions,
     parameters: z.object({ items: z.array(BatchItemSchema) }),
