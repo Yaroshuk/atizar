@@ -23,7 +23,7 @@ import type { ActivityLog } from './activity.js'
 export interface AgentRuntime {
   provider: Provider
   renderToolNames: string[]
-  // The agent passport's maxInstances — the per-agent concurrency cap (defineAgent default 2).
+  // The agent passport's maxInstances — the per-agent concurrency cap (defineAgent default 1).
   maxInstances: number
   // Server-executed effects, keyed by approval tool name (step 4). Empty for read-only agents.
   effects: Record<string, EffectFn>

@@ -135,8 +135,8 @@ describe('dispatches', () => {
 })
 
 describe('maxInstances', () => {
-  it('defaults to 2 when omitted', () => {
-    expect(defineAgent({ ...base }).maxInstances).toBe(2)
+  it('defaults to 1 when omitted', () => {
+    expect(defineAgent({ ...base }).maxInstances).toBe(1)
   })
   it('keeps an explicit override', () => {
     expect(defineAgent({ ...base, maxInstances: 1 }).maxInstances).toBe(1)

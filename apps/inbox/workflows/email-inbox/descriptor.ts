@@ -38,6 +38,7 @@ export const replyAgent = defineAgent({
   approvals: [t.saveDraft],
   effects: [t.saveDraft],
   renders: { [t.renderLead]: c.LeadCard, [t.saveDraft]: c.ApprovalDialog },
+  maxInstances: 2, // one reply instance per email -> allow up to 2 concurrent drafts
 })
 
 // reader / spam / important share the SAME shape (one batch gate proposing per-row actions),
