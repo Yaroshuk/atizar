@@ -29,7 +29,7 @@ export const workItemStatus = pgEnum('work_item_status', [
 ])
 
 // A terminal *outcome* marker, orthogonal to status (NOT a status — honest audit trail).
-export const resolutionKind = pgEnum('resolution_kind', ['cancelled', 'rejected'])
+export const resolutionKind = pgEnum('resolution_kind', ['cancelled', 'rejected', 'superseded'])
 
 // How a WorkItem was minted. `inbound` is reserved (machine dispatch) — no producer ships
 // in the beta (spec §1.8); machine *action* is forbidden, machine *dispatch* is legitimate.
