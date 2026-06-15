@@ -49,25 +49,51 @@ Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workfl
 
 ---
 
-## ⏭️ NEXT — one blocked item, then push
+## ⏭️ NEXT
 
-The cleanup → minimal-demo → extensibility track is **DONE on `master`** (6 units above). What remains:
+The cleanup → minimal-demo → extensibility track is **DONE on `master`** (6 units above), plus a
+board-fix follow-up (Reset→Idle + compact Pipeline-header buttons). What remains:
 
-### Cassettes — record a REAL flow (BLOCKED on the user, needs a real terminal)
+### A. Tunables must be PARAMETERS, not prose (design gap — fix + audit + document)
 
-Wipe `apps/inbox/.cassettes/`, run a **real** `email-inbox` flow (`DEV_RECORD_REPLAY=record`, or
-unset) so fresh cassettes are written (one JSONL per `wf__agent`), then replay with `=1`. **BLOCKER
-confirmed 2026-06-15: Gmail OAuth refresh token is EXPIRED (`invalid_grant`)** — a direct probe of
-`~/.gmail-mcp/credentials.json` returned `invalid_grant`. Re-auth needs the device-code/consent flow
-in a **real terminal** (the `!`-prefix shell can't do the TTY consent), so this can't be done
-autonomously. **User action:** re-auth Gmail, then the record/replay is mechanical. Cassettes are
-gitignored + hold real captured data — **never commit/share without the `scanCassette` ritual**
-(CLAUDE.md HARD RULE). Also delete the stale draft `r7666524379648912752` while there.
+**Found 2026-06-15 (user-flagged).** The sorter's time window ("last 24 hours") lives ONLY in the
+**prompt prose** (`email-inbox/descriptor.ts` instructions + `prompts.ts` sorter step + `client.tsx`
+intro). The `list_unread` tool DOES take a structured `sinceHours` param — but nothing sets it
+declaratively; the **model** reads the prose and passes the number. So a real tunable is "magic in
+prose," parsed by the model, instead of a typed config field. This is the opposite of the consts
+discipline Unit 3 established, and it breaks the consumer-view story: a manager should set the window
+via a **proper control**, not by editing free-text and hoping the model parses it.
 
-### Push
+- **Fix:** make tunables like the window **declared config-as-data parameters** (I7): a typed
+  (Zod) leaf on the workflow/agent descriptor → surfaced as a control in the consumer view → bound
+  **deterministically** to the tool call (pass `sinceHours` from config), NOT inferred from prose.
+  We built the text-leaf layer (prompt/name/description); this is the missing **structured-param**
+  layer.
+- **Audit (task):** sweep the app for other "should-be-a-parameter / magic-in-prose" cases —
+  hardcoded limits, counts, thresholds, windows, defaults expressed in prompt text that the model
+  must parse. List them; convert the real tunables to params.
+- **Document:** write the rule into `docs/CONVENTIONS.md` (and reference the I7 intent in
+  `ARCHITECTURE.md`): a value the operator might tune is a **declared parameter**, never prose; the
+  model receives it, it does not infer it. (This is also a natural extension point for the
+  consumer-view edit surface.)
 
-`master` is ahead of `origin/master` by the 6-unit track (+ the spec/plan doc commit). **Not pushed**
-— push when you're ready (`git push origin master`).
+### B. Cassettes — finish the real-flow set
+
+Gmail OAuth was **re-authed by the user (now connected — `/api/connections` ok)**, NOT the expired
+state the old note claimed. Recorded so far (real flow, replay-verified, true-replay mtimes):
+`email-inbox__sorter` + `email-inbox__reader`. Missing: `reply` / `spam` / `important` — the live
+inbox held only promotional newsletters (even over a 72h window), which all route to `reader`, so
+nothing exercised those agents. **The user is sending test emails** that need-a-reply / look-spammy /
+are-important; once they land, run `email-inbox` (`DEV_RECORD_REPLAY=record`, server is up) so the
+sorter routes to those agents and their cassettes record. Approving a reply creates a real Gmail
+draft; approving spam trashes — warn before each. Cassettes are gitignored + hold real data — **never
+commit/share without the `scanCassette` ritual** (CLAUDE.md HARD RULE). Stale draft to delete:
+`r7666524379648912752`.
+
+### C. Push
+
+`master` is ahead of `origin/master` (the 6-unit track + the spec/plan doc + the board-fix follow-up).
+**Not pushed** — push when ready (`git push origin master`).
 
 ## ⚠ Open tails (none block the work above except where noted)
 
