@@ -206,6 +206,11 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   )
   const isInputAgent = (agentId: string): boolean => inputAgentKeys.has(agentId)
 
+  // Workflows that opt into clear-on-START (resetOnStart, config-as-data I7) — derived once.
+  const resetOnStartWorkflows = new Set<string>(
+    deps.descriptors.filter((wf) => wf.resetOnStart).map((wf) => wf.id)
+  )
+
   // 'refresh' re-run (WS1, I1/I8/I12): on a human START of an input agent, retire each prior
   // FINISHED root of the same workflow × input-agent into the preserved Done bucket (status
   // 'closed', resolution 'superseded') via transition() — children are NOT touched (durable).
@@ -252,6 +257,11 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // re-run (prior root already finished, slot free).
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
         await supersedePriorRoots(req.workflowId, req.agentId)
+        // resetOnStart (I7): clear this workflow's terminal items so the board starts clean for
+        // the new scan. Only TERMINAL items move (transition('reset')); active/awaiting work is
+        // left untouched, and rows are hidden, never deleted (I12). Runs after the supersede so a
+        // just-superseded prior root ('closed') is excluded by resetImpl's RESETTABLE filter.
+        if (resetOnStartWorkflows.has(req.workflowId)) await resetImpl(req.workflowId)
       }
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
       activity.record({

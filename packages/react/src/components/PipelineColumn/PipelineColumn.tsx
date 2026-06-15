@@ -4,6 +4,7 @@ import { TINT, STATE_WORD } from '../../statusDisplay'
 import { Icon } from '../Icon/Icon'
 import { CompHeader } from '../../primitives/CompHeader/CompHeader'
 import { StopButton } from '../../primitives/StopButton/StopButton'
+import { ResetButton } from '../../primitives/ResetButton/ResetButton'
 import s from './PipelineColumn.module.scss'
 
 type PipelineColumnProps = {
@@ -16,6 +17,9 @@ type PipelineColumnProps = {
   onStopWorkflow?: () => void
   workflowActiveCount?: number
   stoppingWorkflow?: boolean
+  // Reset this workflow — clear its finished items from the live column. Absent → no Reset.
+  onResetWorkflow?: () => void
+  resettingWorkflow?: boolean
 }
 
 // A work item is stoppable while it is actively occupying the operator (running or
@@ -47,6 +51,8 @@ export const PipelineColumn = ({
   onStopWorkflow,
   workflowActiveCount = 0,
   stoppingWorkflow = false,
+  onResetWorkflow,
+  resettingWorkflow = false,
 }: PipelineColumnProps) => {
   // The state pill + (when active and a stop handler exists) a per-item Stop button.
   // `.m-state`/`.dot`/the status word stay GLOBAL (shared with AgentCard + the
@@ -88,15 +94,28 @@ export const PipelineColumn = ({
         icon='pipeline'
         label='Pipeline'
         actions={
-          onStopWorkflow && (
-            <StopButton
-              scope='workflow'
-              label='Stop workflow'
-              disabled={workflowActiveCount === 0}
-              stopping={stoppingWorkflow}
-              onClick={onStopWorkflow}
-              title='Stop every active item in this workflow'
-            />
+          (onResetWorkflow || onStopWorkflow) && (
+            <span className={s.pipeActions}>
+              {onResetWorkflow && (
+                <ResetButton
+                  scope='workflow'
+                  label='Reset'
+                  resetting={resettingWorkflow}
+                  onClick={onResetWorkflow}
+                  title='Clear finished items from this workflow (in-progress work is kept)'
+                />
+              )}
+              {onStopWorkflow && (
+                <StopButton
+                  scope='workflow'
+                  label='Stop workflow'
+                  disabled={workflowActiveCount === 0}
+                  stopping={stoppingWorkflow}
+                  onClick={onStopWorkflow}
+                  title='Stop every active item in this workflow'
+                />
+              )}
+            </span>
           )
         }
       />

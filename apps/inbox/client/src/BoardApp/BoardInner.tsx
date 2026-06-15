@@ -17,6 +17,7 @@ import {
   useWorkflowSelection,
   useBoardNavigation,
   useStopController,
+  useResetController,
   buildPipeline,
   queuedByAgent,
   statusesOf,
@@ -44,6 +45,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const sel = useWorkflowSelection(config)
   const nav = useBoardNavigation(config, sel.activeWorkflowId)
   const stop = useStopController(sel.activeWorkflowId)
+  const reset = useResetController(sel.activeWorkflowId)
 
   // Observability drawer (mirrors WorkflowBoard.tsx:63,72,360-366) — one state, one feed.
   const [activityOpen, setActivityOpen] = useState(false)
@@ -78,6 +80,8 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
         globalActive={sel.globalActive}
         stoppingAll={stop.stoppingAll}
         onStopAll={stop.requestStopAll}
+        onResetAll={reset.requestResetAll}
+        resettingAll={reset.resettingAll}
         activityOpen={activityOpen}
         onToggleActivity={() => setActivityOpen((v) => !v)}
         demo={demo}
@@ -93,6 +97,8 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
           onStopWorkflow={stop.requestStopWorkflow}
           workflowActiveCount={sel.workflowActiveCount}
           stoppingWorkflow={stop.stoppingWorkflow}
+          onResetWorkflow={reset.requestResetWorkflow}
+          resettingWorkflow={reset.resettingWorkflow}
         />
 
         <AgentGrid
@@ -201,6 +207,21 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
           }
           onConfirm={() => void stop.confirmStop()}
           onCancel={stop.cancelConfirm}
+        />
+      )}
+
+      {reset.confirm && (
+        <ConfirmDialog
+          title={reset.confirm.kind === 'all' ? 'Reset all workflows?' : 'Reset this workflow?'}
+          message={
+            `This cancels ${reset.confirm.active} in-progress / awaiting-approval ` +
+            `item${reset.confirm.active === 1 ? '' : 's'}, then clears every finished item ` +
+            `from ${reset.confirm.kind === 'all' ? 'all workflows' : nav.workflow.label}. ` +
+            'Cleared items stay available in Activity.'
+          }
+          confirmLabel={reset.confirm.kind === 'all' ? 'Reset all' : 'Reset workflow'}
+          onConfirm={() => void reset.confirmReset()}
+          onCancel={reset.cancelConfirm}
         />
       )}
     </div>
