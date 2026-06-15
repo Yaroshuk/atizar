@@ -1,8 +1,9 @@
 import s from './SourcePanel.module.scss'
 
-// Keys that are plumbing, not human-meaningful source content — hidden from the panel.
-// `origin` is the handoff routing id; `threadId` is the Gmail thread handle (an id, not content).
-const HIDDEN_KEYS: ReadonlySet<string> = new Set(['origin', 'threadId'])
+// Keys that are plumbing, not human-meaningful source content — hidden from the panel (applied at
+// every level). `origin` is the handoff routing id; `threadId`/`messageId` are Gmail handles (ids,
+// not content).
+const HIDDEN_KEYS: ReadonlySet<string> = new Set(['origin', 'threadId', 'messageId'])
 
 type SourcePanelProps = {
   // The untrusted source the agent reacted to (the WorkItem payload / the incoming email or
@@ -11,16 +12,32 @@ type SourcePanelProps = {
   source: Record<string, unknown>
 }
 
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+
+// Flatten ONE level: a nested object (e.g. payload `{ email: {...} }`) contributes its inner
+// fields directly, so the panel shows from/subject/snippet — never a raw JSON blob. Deeper
+// nesting / arrays fall back to a string. Plumbing ids (HIDDEN_KEYS) are dropped at every level.
+const flatten = (source: Record<string, unknown>): [string, string][] => {
+  const out: [string, string][] = []
+  const push = (k: string, v: unknown) => {
+    if (HIDDEN_KEYS.has(k) || v === undefined || v === null || v === '') return
+    out.push([k, typeof v === 'string' ? v : JSON.stringify(v)])
+  }
+  for (const [key, value] of Object.entries(source)) {
+    if (isPlainObject(value)) for (const [k, v] of Object.entries(value)) push(k, v)
+    else push(key, value)
+  }
+  return out
+}
+
 // The daily human-oversight surface AND the prompt-injection defense: show the original
 // untrusted email/ticket NEXT TO the editable draft, visibly flagged as untrusted external
 // content (muted container + explicit label). Workflow-agnostic — it renders whatever payload
 // shape the work item carried; userland decides where to place it.
 export const SourcePanel = ({ source }: SourcePanelProps) => {
-  const fields = Object.entries(source).filter(
-    ([k, v]) => !HIDDEN_KEYS.has(k) && v !== undefined && v !== null && v !== ''
-  )
+  const fields = flatten(source)
   if (fields.length === 0) return null
-  const display = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v))
   return (
     <div className={s.panel}>
       <div className={s.label}>Untrusted external content</div>
@@ -28,7 +45,7 @@ export const SourcePanel = ({ source }: SourcePanelProps) => {
         {fields.map(([key, value]) => (
           <div className={s.field} key={key}>
             <dt className={s.key}>{key}</dt>
-            <dd className={s.value}>{display(value)}</dd>
+            <dd className={s.value}>{value}</dd>
           </div>
         ))}
       </dl>
