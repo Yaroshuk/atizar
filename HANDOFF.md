@@ -11,169 +11,76 @@ finishes, its detail belongs in BUILD-LOG / git, and this file shrinks back to "
 
 ## ✅ Where we are (2026-06-15)
 
-The framework **beta is built and on `origin/master` (`545cf51`, pushed).** Packages:
+The framework **beta is built.** `master` is **ahead of `origin/master` by the cleanup track (NOT
+pushed yet — push is the user's call).** Packages:
 
-- `@atizar/core` — isomorphic contract (`defineAgent`/`defineWorkflow`, messages, providers contract,
-  `aggregateHealth`, gate/fold helpers). No React, no Node.
+- `@atizar/core` — isomorphic contract (`defineAgent`/`defineWorkflow`, `definePrompt`, messages,
+  providers contract, `aggregateHealth`, gate/fold helpers). No React, no Node.
 - `@atizar/providers` — `claude-cli`, `mastra`, `mock` providers + `makeMastraRunner` + the typed
   `PROVIDERS`/`ProviderId` (client-safe subpath `@atizar/providers/ids`).
 - `@atizar/server` — Hono pipeline on Postgres (StateStore/transition/dispatch/WorkerPool/RunObserver),
-  record/replay, `createServer` factory, `makeClaudeSpawn`, `buildAgentProvider`, audit log, auth.
+  record/replay, `createServer` factory, `makeClaudeSpawn`, `buildAgentProvider`, `captureTool`,
+  the `reset` transition + `resetWorkflow`/`resetAll`, audit log, auth.
 - `@atizar/react` — board/thread UI, hooks (`useBoard`/`useWorkItemThread`/`useGate`/`useDispatch`/
-  `useActivity`), primitives (CardShell, Markdown, SourcePanel…), the workflow-scoped render registry.
+  `useActivity`), primitives (CardShell, Markdown, SourcePanel, **ResetButton**…), `scope()`, the
+  workflow-scoped render registry.
 
-Demo app `apps/inbox/` consumes ONLY the public packages. Three workflows ship today:
-**email-inbox**, **lead-inbox**, **github-triage**.
+Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workflow ships now:
+`email-inbox`** (sorter → reply / reader / spam / important).
 
 **Completed recently** (detail in git + `docs/superpowers/plans/`):
 
-- **7c packaging tail** — `DEMO=1` zero-cred mode (mock provider + PGlite + synthetic cassettes),
-  bearer-token auth on mutating routes, golden-set eval harness, `@platform/*`→`@atizar/*` scope
-  rename, README + LICENSE. All done.
-- **Re-run + trust/UX + library-boundary — 7 work-streams** (autonomous run, this session, done &
-  pushed; spec `docs/superpowers/specs/2026-06-14-rerun-and-trust-ux-design.md`):
-  WS4 activity newest-first · WS3 markdown render (safe, no raw HTML; protocol-relative-URL block) ·
-  WS5 SourcePanel + incoming user-turn + SSE-reconnect chips + durable `audit_log` · WS2 render/HITL
-  registry scoped per `(workflowId, toolName)` · WS6 typed `PROVIDERS` + per-workflow tool/card
-  consts · WS1 re-run semantics (a re-START **supersedes** the prior finished scan into history,
-  open-scoped dedup, "Working" mislabel fixed, `rerun: 'refresh'|'history'` knob) · WS7 app→library
-  migration (machinery moved to `@atizar/server`/`@atizar/providers`/`@atizar/core`; app shell is thin).
+- **Cleanup → minimal demo → extensibility — 6 units** (autonomous subagent-driven run, this session;
+  spec/plan `docs/superpowers/{specs,plans}/2026-06-15-cleanup-minimal-demo-extensibility-*`):
+  **U1** trim to a single `email-inbox` (lead-inbox + github-triage deleted; email-inbox self-registers
+  its reply cards) · **U2** `definePrompt` in core (turn-only strategy) + claude-cli prepends the
+  composed identity · **U3** email-inbox wire strings → per-workflow consts (`ids`/`contracts`/`tools`,
+  `as const`, no enums) + prompts via `definePrompt` (turn-only) + the `instructions: config.instructions`
+  provider wire + strict drift-guard test + CONVENTIONS section · **U4** finished agents (incl. input
+  roots) leave the live pipeline, START not blocked by an error, server `reset` edge + Reset UI with a
+  cancel-then-close confirm gate + `resetOnStart` knob · **U5** `scope()`→`@atizar/react`,
+  `captureTool()`→`@atizar/server` · **U7** the `add-workflow` capstone skill. Each: TDD → two-stage
+  review → `check-foundation` (U2/U4 CLEAR; identity composes exactly once on both provider paths) →
+  browser-verified → merged to `master`.
+- (Earlier: 7c packaging tail; the 7-WS re-run/trust-UX/library-boundary track. Detail in git.)
 
-**Green gate:** `yarn typecheck && yarn test` (**528 passed**) `&& yarn lint && yarn format:check &&
-yarn workspace @atizar/react build`. `master` == `origin/master`.
-
----
-
-## ⏭️ NEXT — cleanup → minimal demo → extensibility (brief for a FRESH agent)
-
-**The user wants this next track done with a DIFFERENT agent** — this section is their brief. Their
-goal, in their words: trim the demo to ONE workflow so they can read clean code; **kill the magic
-strings** and make the framework genuinely extensible (incl. prompts in multiple languages); add
-board cleanup (a **Reset**, and drop finished scans); run a **REAL flow** and record fresh cassettes;
-re-check the library/userland boundary; bring the **client code to proper standards** and WRITE those
-standards into the project docs; and capture "how to add a workflow" as an **`add-workflow` skill**.
-
-Suggested order below — mostly independent, but **1 first** gives a clean base for the rest, and
-**7 is the capstone**. Every task: brainstorm if it's a design choice → TDD via subagents → green
-gate → **browser-verify** → `check-foundation` for the foundation-touching ones → merge to `master`
-(no PR — beta) → update this block. Read `CLAUDE.md` "Don't-rediscover gotchas" first.
-
-### 1. Trim the demo to email-inbox ONLY
-
-Delete the `lead-inbox` and `github-triage` workflows + every file only they use, leaving a single
-clean **email-inbox** as the reference workflow. **Care:** email-inbox REUSES the reply agent + some
-cards (LeadCard/ApprovalDialog) — trace dependencies before deleting so email-inbox still runs.
-Likely removals: `apps/inbox/workflows/{lead-inbox,github-triage}/`; the agent prompts only they use
-(`agents/qualifier.prompts.ts`, `triage.prompts.ts`, `ticket.prompts.ts` — KEEP `reply.prompts.ts` if
-email-inbox's reply agent uses it); cards only they render (VerdictCard / TriageCard / TicketResultCard
-/ ReplyDraftCard — verify each); `mcp/github-tools.mjs`; the github tool defs in `mastra/tools.ts`;
-and their entries in the three aggregators (`workflows/index.ts`, `server/workflows.ts`,
-`client/src/workflows.ts`). ALSO update/remove the tests that reference the deleted workflows
-(`renderLead.test.tsx`, `renderVerdict.test.tsx`, `workflows.test.ts`, `descriptors.parse.test.ts`)
-and any DEMO-mode / golden-set-eval refs to lead-inbox/github-triage. Green gate + browser-verify
-email-inbox end-to-end after.
-
-### 2. Magic-strings refactor — incl. prompt texts → named consts (FOUNDATION-TOUCHING)
-
-**The user's core complaint:** too much is raw strings. WS6 typed `provider` + tool/card NAMES but
-left these raw (audited 2026-06-15):
-
-- **Workflow-id literals on the client:** `client/src/workflows.ts` (`scope('lead-inbox', …)` etc.)
-  and the cross-workflow deliver target in `github-triage/client.tsx` (`workflow: 'lead-inbox'`).
-- **Read-tool names NOT through consts** in lead-inbox/email-inbox descriptors
-  (`readonly: ['get_latest_email']`, `['list_unread']`, `['get_email']`) — github-triage DID route
-  them through `t.*`; lead/email are inconsistent. Same names are duplicated in the prompt prose.
-- **Handoff agent-id targets** (`handoffs: ['reply']`, `['reader','spam','important']`, …) and
-  **agent roles** (`role: 'input'|'worker'`) are raw literals.
-- **Prompt texts → named consts** (user: "промпты тоже должны быть в константах"). Prompts are inline
-  hardcoded English in `agents/*.prompts.ts`; lift the prompt strings into named consts (one source
-  per prompt), same discipline as the tool/card consts. **i18n is explicitly NOT in scope now** (user
-  decision — do NOT build a language/translation layer); but consts are the prerequisite that unblocks
-  i18n later, so structure them so a future language variant could drop in.
-
-**Decision frame (brainstorm first):** values stay serializable wire strings (config-as-data, I7) —
-the fix is a typed const/union per workflow (extend WS6's `tools.ts`/`cards.ts` to read tools +
-workflow-id + handoff targets) **+ prompt-text consts**, NEVER a TS enum. `check-foundation` (I7
-config-as-data, NOT enum; core stays provider-agnostic). This is the work that most needs doing well —
-it's why the user is unhappy with the current client.
-
-### 3. Board cleanup — a Reset button + drop finished scans
-
-**Symptom (user):** opening the app shows a pile of finished `EMAIL SORTER` plates from old scans.
-WS1 supersedes the prior scan only on a _re-START_, and it deliberately KEEPS input-agent roots as the
-"pipeline root" forever — which is exactly what the user now wants CHANGED. The user wants:
-
-- **(a) Finished agents — INCLUDING input agents — leave the live pipeline when they finish** (user:
-  "агенты даже input agents удалялись из пайплайна когда закончили чтобы не было такого"). This
-  **REVISES the WS1 decision** to keep input roots: a finished input scan should drop out of the live
-  column (its result/cards stay reachable in Activity/history — I12: hide, never destroy). Revisit
-  `boardModel.isVisible` (it currently returns `true` for any input root) + `pipelineModel`.
-- **(b) A Reset button** like the existing Stop (clear human gesture; per-workflow and/or global) that
-  clears the live column on demand.
-- **(c) A FULL reset too** (user: "возможность полного ресета тоже") — clear the WHOLE board, not just
-  one workflow. Decide the I12 boundary carefully: a full reset HIDES finished/closed scans + their
-  history-cards, but must NOT silently destroy OPEN/awaiting-approval work items the human hasn't
-  closed — if it does, make it an explicit, confirmed, destructive action.
-- **(d) Optional "reset on start" config knob** (clean the board at boot) — same I12 boundary.
-
-This is a **product decision** (what "finished leaves" vs "reset" vs "full reset" each mean) —
-brainstorm first. Touches `@atizar/react` board (`boardModel.isVisible` + a StopButton-style
-ResetButton), `@atizar/server` (a reset/close route through `transition()` — I8: status only via
-transition; I12: preserve-or-explicitly-destroy, never silent loss), and maybe a `defineWorkflow` knob.
-ALSO fold in the WS1 UX gap: an `error` item makes `aggregateLabel` non-empty which HIDES the START
-button (`aggregate.ts` counts error as active) — allow START when the only "active" item is an error.
-
-### 4. Library/userland boundary re-audit
-
-WS7 moved the reusable Node/runtime machinery into the packages. Re-verify the project is **minimal**
-and everything reusable is in a package: audit what's still in `apps/inbox/` that other consumers
-would re-implement (the workflow-aggregator pattern, MCP-server scaffolding, the `mastra/tools.ts`
-tool-definition pattern, the demo client shell). Litmus test (I5): "renders from the generic model →
-package; knows this vertical's payload → userland." Keep `@atizar/core` Node-free (I3).
-
-### 5. Client code → house standards + write them into docs/CONVENTIONS.md
-
-The user finds the client code below standard. Bring `apps/inbox/client/` (and the userland workflow
-client modules) to the Magma house style (`docs/CONVENTIONS.md`) — arrow-const named-export
-components, `type {Name}Props`, one component per file, import grouping, NO magic strings (ties to
-task 2). Then **write the standards that were missing into `docs/CONVENTIONS.md`** so this doesn't
-recur (the user explicitly asked for this). Likely overlaps tasks 1–2; do as a focused cleanup pass.
-
-### 6. Cassettes — delete + record a REAL flow
-
-The user wants to wipe `apps/inbox/.cassettes/`, run a **real** email-inbox flow, and watch fresh
-cassettes get written — then replay. Yes, that is how record/replay works: unset `DEV_RECORD_REPLAY`
-(or `=record`) → first real run records one JSONL per `wf__agent`; `=1` replays. **BLOCKER: the Gmail
-OAuth refresh token is EXPIRED (`invalid_grant`)** — re-auth FIRST (`gh`-style device flow needs a
-real terminal; tell the user to run the connect flow / refresh `~/.gmail-mcp/` creds), or the real
-email-inbox run can't read Gmail. Cassettes are gitignored + hold real captured data — **never commit
-or share without the scanCassette ritual** (CLAUDE.md HARD RULE).
-
-### 7. `add-workflow` skill (capstone)
-
-Capture "how to add a new workflow" as a `.claude/skills/add-workflow/` skill (the user named it).
-Depends on 1–2 + 5 — it documents the CLEAN, minimal, magic-string-free pattern a single email-inbox
-reference establishes. The skill should walk: descriptor (agents + roles + handoffs + connections +
-`rerun`) → server binding (effects, prompts, allowed tools) → client (render/HITL specs, cards,
-tool/card consts) → aggregator wiring → tests → browser-verify.
+**Green gate (HEAD):** `yarn typecheck && yarn test` (**529 passed**) `&& yarn lint && yarn format:check
+&& yarn workspace @atizar/react build` — all green.
 
 ---
 
-## ⚠ Open tails — the user will fix these too (in scope; none block the tasks above except where noted)
+## ⏭️ NEXT — one blocked item, then push
 
-- **Gmail OAuth refresh token EXPIRED** (`invalid_grant`). Blocks task 6's real flow and any live
-  (non-replay) Gmail demo. Re-auth needed. The whole 7-WS run used `DEV_RECORD_REPLAY=1`, so it
-  blocked nothing there.
-- **Test Gmail draft** `r7666524379648912752` (thread `19ebbf9875f60e8c`, body contains
-  `WS5-EDIT-MARK`) — created by a WS5 approve, couldn't be deleted programmatically (OAuth). Delete
-  it from the Gmail Drafts folder.
-- **Flaky test** — `packages/server/src/pipelineService.test.ts` "supersede is recorded in the
-  Activity log" can intermittently fail under concurrent Postgres load (`@mastra/pg` + the Drizzle
-  client contend for the test DB); passes in isolation and on retry. Consider bounding the test-PG pool.
-- **WS6 optional generic** (`defineAgent` generic over the tool-name union) was skipped — optional,
-  with a revert decision-gate; pick up only if desired.
-- **Subagent auth note** (long autonomous runs): one implementer subagent died on a `401` after a
-  ~6h pause (keychain token expiry); re-dispatching worked. The main loop's auth was unaffected.
+The cleanup → minimal-demo → extensibility track is **DONE on `master`** (6 units above). What remains:
+
+### Cassettes — record a REAL flow (BLOCKED on the user, needs a real terminal)
+
+Wipe `apps/inbox/.cassettes/`, run a **real** `email-inbox` flow (`DEV_RECORD_REPLAY=record`, or
+unset) so fresh cassettes are written (one JSONL per `wf__agent`), then replay with `=1`. **BLOCKER
+confirmed 2026-06-15: Gmail OAuth refresh token is EXPIRED (`invalid_grant`)** — a direct probe of
+`~/.gmail-mcp/credentials.json` returned `invalid_grant`. Re-auth needs the device-code/consent flow
+in a **real terminal** (the `!`-prefix shell can't do the TTY consent), so this can't be done
+autonomously. **User action:** re-auth Gmail, then the record/replay is mechanical. Cassettes are
+gitignored + hold real captured data — **never commit/share without the `scanCassette` ritual**
+(CLAUDE.md HARD RULE). Also delete the stale draft `r7666524379648912752` while there.
+
+### Push
+
+`master` is ahead of `origin/master` by the 6-unit track (+ the spec/plan doc commit). **Not pushed**
+— push when you're ready (`git push origin master`).
+
+## ⚠ Open tails (none block the work above except where noted)
+
+- **Gmail OAuth + the stale draft** — both now live in the NEXT "Cassettes" item above (the OAuth
+  re-auth is the one blocker; this whole cleanup run used `DEV_RECORD_REPLAY=1` so it blocked nothing).
+- **Flaky test under concurrent Postgres load** — `packages/server/src/pipelineService.test.ts`
+  ("supersede is recorded in the Activity log", and now the Unit-4 `resetAll` case) can intermittently
+  time out when `@mastra/pg` + the Drizzle client contend for the test DB; passes in isolation and on
+  retry. The full `yarn test` was green on final `master` (529 passed). Consider bounding the test-PG pool.
+- **`defineAgent` optional generic** (over the tool-name union) still skipped — optional; the
+  per-workflow const discipline + the drift-guard test (U3) cover the same ground.
+- **Subagent auth note** (long autonomous runs): a subagent can die on a `401` after a long keychain
+  pause; re-dispatching works. The main loop's auth is unaffected.
 
 ## Execution rules (every task, unchanged from the 7-WS run)
 
