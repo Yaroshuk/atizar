@@ -168,6 +168,19 @@ describe('buildPipeline', () => {
     expect(blocks[0].parent.status).toBe('running')
   })
 
+  it('a finished parent with an awaiting-approval child still renders as Working (live-descendant)', () => {
+    // Approach B: the parent's DB run finished on its own (status 'done' here), but its child is
+    // still awaiting approval, so the view() live-descendant override shows the parent Working.
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'r', agentId: 'sorter', isInput: true, status: 'done' }),
+        i({ localId: 'c', agentId: 'reply', parentLocalId: 'r', status: 'awaiting_approval' }),
+      ],
+      {}
+    )
+    expect(blocks[0].parent.status).toBe('running')
+  })
+
   it('a kept-but-done intermediate parent (live grandchild) shows Working', () => {
     const blocks = buildPipeline(
       [
