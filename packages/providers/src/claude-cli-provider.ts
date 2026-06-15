@@ -49,10 +49,19 @@ export function createClaudeCliProvider(opts: {
   surfaceTools: readonly string[]
   // The agent's permission allow-list (fully-qualified MCP names) — passed to spawn.
   allowedTools: readonly string[]
+  // The composed agent identity (defineAgent.instructions ⊕ the workflow prompt). The provider
+  // PREPENDS this to every turn so the PromptStrategy stays turn-only — identity is never repeated
+  // in the strategy's prose. Optional/empty ⇒ no prepend (no stray separator).
+  instructions?: string
   prompts: PromptStrategy
   spawn: ClaudeSpawn
 }): Provider {
-  const { approvalNames, surfaceTools, allowedTools, prompts, spawn } = opts
+  const { approvalNames, surfaceTools, allowedTools, instructions, prompts, spawn } = opts
+
+  // Prepend the composed identity to a turn prompt. A null turn (buildResume rejected the resume)
+  // stays null; an empty/absent `instructions` yields the turn verbatim (no leading separator).
+  const withIdentity = (turn: string | null): string | null =>
+    turn === null ? null : instructions ? `${instructions}\n\n${turn}` : turn
 
   // Spawn the CLI for a prompt and map its NDJSON to AG-UI events. `detectApprovals` is the
   // approval-name set the stream watches for the GATE_OPENED suspend point — passed [] on a
@@ -86,7 +95,7 @@ export function createClaudeCliProvider(opts: {
   function resumePromptFrom(handle: ResumeHandle, resolution: GateResolution): string | null {
     const messages = (handle.input?.messages ?? []) as Message[]
     const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
-    return prompts.buildResume?.(args, resolution.executedResult) ?? null
+    return withIdentity(prompts.buildResume?.(args, resolution.executedResult) ?? null)
   }
 
   return {
@@ -98,7 +107,7 @@ export function createClaudeCliProvider(opts: {
         // resolved transcript and NO resolution.form, so this reads args from the transcript
         // only. The explicit resume() path (below) prefers resolution.form via resumePromptFrom.
         const args = lastApprovalArgs(messages, approvalNames) ?? {}
-        const resumePrompt = prompts.buildResume?.(args) ?? null
+        const resumePrompt = withIdentity(prompts.buildResume?.(args) ?? null)
         if (!resumePrompt) {
           yield errorChunk('Resume failed: no saved draft found in the thread')
           return
@@ -106,7 +115,7 @@ export function createClaudeCliProvider(opts: {
         yield* primeAndStream(resumePrompt, [])
         return
       }
-      yield* primeAndStream(prompts.buildFirst(input), approvalNames)
+      yield* primeAndStream(withIdentity(prompts.buildFirst(input)) ?? '', approvalNames)
     },
 
     async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {

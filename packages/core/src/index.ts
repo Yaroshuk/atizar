@@ -1,6 +1,7 @@
 export * from './messages.js'
 export * from './prompt.js'
 export * from './defineAgent.js'
+export * from './definePrompt.js'
 export * from './providers.js'
 export * from './gate.js'
 export * from './fold.js'
