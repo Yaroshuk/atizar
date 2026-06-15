@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { defineAgent, defineWorkflow } from '@atizar/core'
-import { PROVIDERS } from '@atizar/providers'
+import { PROVIDERS } from '@atizar/providers/ids'
 import { EMAIL_INBOX_TOOLS as t } from './tools'
 import { EMAIL_INBOX_CARDS as c } from './cards'
 

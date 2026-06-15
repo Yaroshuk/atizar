@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./ids": "./src/provider-ids.ts"
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",

@@ -1,5 +1,5 @@
 import { defineAgent, defineWorkflow, HandoffPayloadSchema } from '@atizar/core'
-import { PROVIDERS } from '@atizar/providers'
+import { PROVIDERS } from '@atizar/providers/ids'
 import { LEAD_INBOX_TOOLS as t } from './tools'
 import { LEAD_INBOX_CARDS as c } from './cards'
 

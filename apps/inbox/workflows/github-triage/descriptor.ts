@@ -1,5 +1,5 @@
 import { defineAgent, defineWorkflow } from '@atizar/core'
-import { PROVIDERS } from '@atizar/providers'
+import { PROVIDERS } from '@atizar/providers/ids'
 import { GITHUB_TRIAGE_TOOLS as t } from './tools'
 import { GITHUB_TRIAGE_CARDS as c } from './cards'
 

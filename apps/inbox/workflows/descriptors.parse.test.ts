@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PROVIDERS } from '@atizar/providers'
+import { PROVIDERS } from '@atizar/providers/ids'
 import { qualifierAgent, replyAgent as leadReply } from './lead-inbox/descriptor'
 import { LEAD_INBOX_TOOLS } from './lead-inbox/tools'
 import { LEAD_INBOX_CARDS } from './lead-inbox/cards'
