@@ -123,4 +123,37 @@ describe('buildPipeline', () => {
     const r1Block = blocks.find((bl) => bl.parent.localId === 'r1')!
     expect(r1Block.groups[0].instances[0].localId).toBe('b1')
   })
+
+  it('a finished input root with no live child keeps Done (not relabeled Working)', () => {
+    const blocks = buildPipeline(
+      [i({ localId: 'in', agentId: 'sorter', isInput: true, status: 'done', label: '' })],
+      {}
+    )
+    expect(blocks[0].parent.status).toBe('done')
+  })
+
+  it('a kept input root WITH a live child still shows Working', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'sorter', isInput: true, status: 'done' }),
+        i({ localId: 'c1', agentId: 'reply', parentLocalId: 'in', status: 'running' }),
+      ],
+      {}
+    )
+    expect(blocks[0].parent.status).toBe('running')
+  })
+
+  it('a kept-but-done intermediate parent (live grandchild) shows Working', () => {
+    const blocks = buildPipeline(
+      [
+        i({ localId: 'in', agentId: 'sorter', isInput: true, status: 'done' }),
+        i({ localId: 'r1', agentId: 'reply', parentLocalId: 'in', status: 'done' }),
+        i({ localId: 'b1', agentId: 'bugfix', parentLocalId: 'r1', status: 'running' }),
+      ],
+      {}
+    )
+    // 'in' has a live descendant (b1 under r1) so it shows Working; r1 also shows Working.
+    expect(blocks.find((bl) => bl.parent.localId === 'in')!.parent.status).toBe('running')
+    expect(blocks.find((bl) => bl.parent.localId === 'r1')!.parent.status).toBe('running')
+  })
 })

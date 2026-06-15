@@ -58,9 +58,29 @@ export function buildPipeline(
     }
   }
 
-  // A kept-but-not-active instance displays as Working (running).
+  // A "live descendant" exists if any node in the subtree rooted at x is ACTIVE (running /
+  // awaiting_approval / error). Precompute per-localId so view() is O(1).
+  const hasLiveDescendant = new Map<string, boolean>()
+  const computeLive = (x: PInstance): boolean => {
+    if (hasLiveDescendant.has(x.localId)) return hasLiveDescendant.get(x.localId)!
+    let live = false
+    for (const kid of childrenOf.get(x.localId) ?? []) {
+      if (ACTIVE.has(kid.status) || computeLive(kid)) live = true
+    }
+    hasLiveDescendant.set(x.localId, live)
+    return live
+  }
+  for (const x of instances) computeLive(x)
+
+  // A parent is shown "Working" (running) ONLY while it has a live descendant; otherwise it
+  // keeps its true status (a finished/closed root with no live child reads Done — WS1 label fix).
+  // An already-active node keeps its own status as-is.
   const view = (x: PInstance): PInstance =>
-    ACTIVE.has(x.status) ? x : { ...x, status: 'running' as Status }
+    ACTIVE.has(x.status) || hasLiveDescendant.get(x.localId)
+      ? ACTIVE.has(x.status)
+        ? x
+        : { ...x, status: 'running' as Status }
+      : x
 
   const isShownChild = (x: PInstance) => shown.has(x.localId)
   const roots = instances.filter((x) => shown.has(x.localId) && (x.isInput || !x.parentLocalId))
