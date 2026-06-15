@@ -22,12 +22,18 @@ const ACTIVE_SERVER: ReadonlySet<WorkItem['status']> = new Set([
 // marker), OR still carrying live work below it (a terminal parent/input root whose subtree
 // has an active descendant). A plain finished leaf — INCLUDING a finished input root — with
 // nothing to show and no active descendant drops out of the LIVE column (it stays reachable in
-// Activity/history; I12 — hidden, not destroyed). A superseded root (WS1: status 'closed',
-// resolution 'superseded') always drops out of the LIVE column.
+// Activity/history; I12 — hidden, not destroyed).
+//
+// A `closed` item has LEFT the board entirely — Reset retired it (resolution 'reset') OR a
+// re-START superseded it (resolution 'superseded'). It is NEVER a live instance, regardless of
+// the summary card it still carries. The card-keeps-it-visible rule below is for `finished`
+// results only; without the explicit `closed` guard a sorter's retained `renderSort` card kept
+// every reset run visible, so they piled up as phantom "Done" instances in the picker/pipeline
+// (the type card was already excluded via statusesOf; this is the matching toPInstances fix).
 const isVisible = (w: WorkItem, hasActiveDescendant: boolean): boolean => {
   if (isQueued(w)) return false
-  if (w.resolution === 'superseded') return false
-  if (w.status !== 'finished' && w.status !== 'closed') return true
+  if (w.status === 'closed') return false
+  if (w.status !== 'finished') return true
   return w.card !== null || w.resolution !== null || hasActiveDescendant
 }
 

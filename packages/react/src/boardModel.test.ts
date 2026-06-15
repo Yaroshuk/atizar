@@ -94,6 +94,40 @@ describe('toPInstances superseded roots (WS1)', () => {
     expect(out.map((p) => p.localId)).toEqual([])
   })
 
+  // Regression: a `closed` input root (Reset OR superseded) carries its summary card forever, so
+  // the old card-keeps-it-visible rule kept EVERY reset run on the board — they piled up as phantom
+  // "Done" instances in the picker/pipeline (the type card was already fixed via statusesOf, but
+  // toPInstances was not). A `closed` item has LEFT the board and must never be a live instance,
+  // card or not. With N resets the picker must show ZERO, not N.
+  it('hides ALL closed input roots even when they carry a card (reset must not pile up)', () => {
+    const card = { tool: 'renderSort', props: {} }
+    const afterResets: WorkItem[] = [
+      wi({
+        id: 'R1',
+        agentId: 'lead-inbox__qualifier',
+        status: 'closed',
+        resolution: 'reset',
+        card,
+      }),
+      wi({
+        id: 'R2',
+        agentId: 'lead-inbox__qualifier',
+        status: 'closed',
+        resolution: 'reset',
+        card,
+      }),
+      wi({
+        id: 'R3',
+        agentId: 'lead-inbox__qualifier',
+        status: 'closed',
+        resolution: 'superseded',
+        card,
+      }),
+    ]
+    const out = toPInstances(afterResets, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
+    expect(out.map((p) => p.localId)).toEqual([])
+  })
+
   it('keeps a finished input root that still has an active child', () => {
     const withChild: WorkItem[] = [
       wi({ id: 'Q4', agentId: 'lead-inbox__qualifier', status: 'finished' }),
