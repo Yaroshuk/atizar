@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { defineAgent } from '@atizar/core'
-import { assertAgentClassification } from './agent-checks.js'
+import { assertAgentClassification } from './agentChecks.js'
 
 const reply = defineAgent({
   id: 'reply',

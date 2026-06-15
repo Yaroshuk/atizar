@@ -33,3 +33,4 @@ export {
   scanCassette,
 } from './recordReplay.js'
 export type { Finding, RecordReplayMode } from './recordReplay.js'
+export { assertAgentClassification } from './agentChecks.js'

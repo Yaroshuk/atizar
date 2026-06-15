@@ -17,8 +17,8 @@ import {
   atizarEnv,
   isDemo,
   type AgentRuntime,
+  assertAgentClassification,
 } from '@atizar/server'
-import { assertAgentClassification } from './agent-checks.js'
 import { scopesFor, connectionList } from './connections.js'
 import { aggregateHealth, providerHealth } from './health.js'
 
