@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 import { EventType, type BaseEvent } from '@ag-ui/client'
 import { db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
+import { transition } from './transition.js'
 
 // Real-PG integration tests. They share ONE database with the other pipeline test files,
 // so every test mints UNIQUE uuids/sources and asserts only on its own rows (no global
@@ -111,5 +112,33 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
       proposedArtifact: { threadId: 't', body: 'b' },
     })
     expect((await store.getGate(gate.id))?.id).toBe(gate.id)
+  })
+
+  it('hasLiveInputScan: true when a root has an awaiting-approval descendant, false when all settled', async () => {
+    const store = makeStateStore(db)
+    const workflowId = `wf-${randomUUID()}`
+    const agentId = `${workflowId}__sorter`
+    const root = await store.insertWorkItem({
+      workflowId,
+      agentId,
+      origin: 'human',
+      payload: {},
+    })
+    const child = await store.insertWorkItem({
+      workflowId,
+      agentId: `${workflowId}__reply`,
+      origin: 'agent',
+      parentId: root.id,
+      payload: {},
+    })
+    // root finished (Approach B: finishes on its own run-end), child still awaiting → scan is LIVE
+    await transition(db, root.id, 'start')
+    await transition(db, root.id, 'finish')
+    await transition(db, child.id, 'start')
+    await transition(db, child.id, 'gate')
+    expect(await store.hasLiveInputScan(workflowId, agentId)).toBe(true)
+    // child settles → scan no longer live
+    await transition(db, child.id, 'reject')
+    expect(await store.hasLiveInputScan(workflowId, agentId)).toBe(false)
   })
 })
