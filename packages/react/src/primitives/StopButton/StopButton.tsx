@@ -31,7 +31,9 @@ export const StopButton = ({
       className={clsx(
         s.stopBtn,
         scope === 'all' && s.danger,
-        scope === 'item' && s.icon,
+        // icon-only whenever there's no label: the per-item stop, and the compact
+        // workflow stop in the narrow Pipeline header.
+        (scope === 'item' || !label) && s.icon,
         stopping && s.stopping,
         className
       )}

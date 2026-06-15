@@ -29,7 +29,14 @@ export const ResetButton = ({
 }: ResetButtonProps) => {
   return (
     <button
-      className={clsx(s.resetBtn, scope === 'all' && s.all, resetting && s.resetting, className)}
+      className={clsx(
+        s.resetBtn,
+        scope === 'all' && s.all,
+        // icon-only when there's no label (the compact reset in the narrow Pipeline header).
+        !label && s.icon,
+        resetting && s.resetting,
+        className
+      )}
       disabled={disabled || resetting}
       title={title || label || 'Reset'}
       aria-label={label || title || 'Reset'}

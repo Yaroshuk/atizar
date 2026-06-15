@@ -12,7 +12,7 @@ export type ServerStatus =
   | 'error'
   | 'closed'
 
-export type Resolution = 'cancelled' | 'rejected' | 'superseded' | null
+export type Resolution = 'cancelled' | 'rejected' | 'superseded' | 'reset' | null
 
 export type WorkItem = {
   id: string

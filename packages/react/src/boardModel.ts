@@ -95,10 +95,17 @@ export const queuedByAgent = (items: WorkItem[], workflowId: string): Record<str
   return out
 }
 
+// `closed` items have LEFT the board (Reset cleared them, or a re-START superseded them) — they
+// live on only in Activity/trace, so they must NOT colour the agent's type card. Without this an
+// agent whose runs were all Reset would keep showing "Done" (closed → mapStatus → 'done') instead
+// of returning to "Idle". `finished`/`result` are NOT closed and correctly stay "Done" until reset.
 export const statusesOf = (items: WorkItem[], workflowId: string, agentId: string): Status[] =>
   items
     .filter(
       (w) =>
-        w.workflowId === workflowId && stripWf(w.agentId, workflowId) === agentId && !isQueued(w)
+        w.workflowId === workflowId &&
+        stripWf(w.agentId, workflowId) === agentId &&
+        !isQueued(w) &&
+        w.status !== 'closed'
     )
     .map((w) => mapStatus(w.status))

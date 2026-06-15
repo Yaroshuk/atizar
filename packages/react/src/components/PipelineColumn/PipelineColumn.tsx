@@ -96,19 +96,19 @@ export const PipelineColumn = ({
         actions={
           (onResetWorkflow || onStopWorkflow) && (
             <span className={s.pipeActions}>
+              {/* Icon-only in the narrow 296px Pipeline header (tooltips carry the meaning);
+                  the labelled affordance lives in the top bar's "Reset all" / "Stop all". */}
               {onResetWorkflow && (
                 <ResetButton
                   scope='workflow'
-                  label='Reset'
                   resetting={resettingWorkflow}
                   onClick={onResetWorkflow}
-                  title='Clear finished items from this workflow (in-progress work is kept)'
+                  title='Reset this workflow — clear finished items (in-progress work is kept)'
                 />
               )}
               {onStopWorkflow && (
                 <StopButton
                   scope='workflow'
-                  label='Stop workflow'
                   disabled={workflowActiveCount === 0}
                   stopping={stoppingWorkflow}
                   onClick={onStopWorkflow}

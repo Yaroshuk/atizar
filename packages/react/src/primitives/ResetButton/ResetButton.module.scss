@@ -62,6 +62,16 @@
   &.all {
     font-weight: 650;
   }
+
+  // icon-only: the compact square button for the narrow Pipeline header (mirrors
+  // StopButton's `.icon`). No label, centered glyph.
+  &.icon {
+    padding: 0;
+    width: 26px;
+    height: 26px;
+    justify-content: center;
+    border-radius: 7px;
+  }
 }
 
 // resetting spinner
