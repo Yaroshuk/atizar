@@ -18,7 +18,7 @@ Per work-stream: read its plan → `superpowers:subagent-driven-development` (a 
 subagent per task + a spec/quality review between tasks; `executing-plans` for inline batches) →
 green gate → **browser-verify** → merge to `master` → update this block → next WS.
 
-**▶ RUN PROGRESS (autonomous run, 2026-06-14) — remaining order: WS7 (last). 6 of 7 done.**
+**▶ RUN PROGRESS (autonomous run, 2026-06-14→15) — ✅ ALL 7 WORK-STREAMS DONE & merged to `master` (`59492ba`).**
 Baseline before the run: `chore(format)` commit `c18c781` cleaned 17 pre-existing prettier violations
 so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were already green).
 
@@ -96,6 +96,56 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
   button on the agent card (re-run still works via the thread panel / API). WS1's spec only covers
   re-run of a _finished_ root, so the error→re-run START-button path is out of scope here — worth a
   small follow-up (e.g. allow START when the only "active" item is an `error`).
+- **WS7 — ✅ DONE & merged** (`master` after merge: `59492ba`) — the library/userland boundary. Moved
+  reusable Node/runtime machinery out of the demo app into the framework packages: `aggregateHealth`
+  (pure fold) → `@atizar/core`; the record/replay engine, `assertAgentClassification`,
+  `deriveConnectionList`, `providerHealth`, `parseEnvFile`/`loadDevEnv`, `makeClaudeSpawn`,
+  `buildAgentProvider`, and the `createServer` factory → `@atizar/server`; `makeMastraRunner` →
+  `@atizar/providers`. `apps/inbox/server/` is now thin shells (`index.ts` = 23 lines: imports + demo
+  filter + `createServer({start:true})`); `health.ts`/`agent-checks.ts`/`parse-env.ts`/`mastra/runner.ts`
+  deleted; the empty `pipeline/` dir gone. 10 leaf-first moves, each green-gated. **check-foundation:
+  CLEAR** (I3 — only the pure `aggregateHealth` in core; I5 — `@atizar/server`/`@atizar/providers` import
+  NO `apps/inbox`, `createServer` uses structural `WorkflowServerLike`/`ServerBindingLike` types; I15 —
+  boot-time classification now framework-physical). Review APPROVED. Green gate green (typecheck / test
+  528 / lint / format).
+  ⚠ **Browser-verify caught a real regression typecheck+tests MISSED (fixed in `59492ba`):** Task 7's
+  `export * from mastraRunner` in the `@atizar/providers` barrel meant the client Vite bundle (it imports
+  `PROVIDERS` via the WS6 descriptors) traced `mastraRunner` → `@mastra/core` native deps → a 500, React
+  never mounted. Fix: a client-safe `@atizar/providers/ids` subpath (only `provider-ids.ts`); descriptors
+  import `PROVIDERS` from there, the server keeps the full barrel (realizes the plan's "mastraRunner is
+  server-only" intent). After the fix: boot via `createServer` (`health: 11 ok`), board mounts, a replay
+  run renders a card, `PROVIDER=mastra` boots clean. (Exactly the "only the browser catches it" class —
+  reinforces the always-browser-verify rule.)
+
+---
+
+## ✅ TRACK COMPLETE — Re-run + trust/UX + library boundary (7 work-streams), autonomous run 2026-06-14→15
+
+All seven work-streams from the spec (`docs/superpowers/specs/2026-06-14-rerun-and-trust-ux-design.md`)
+are **built, reviewed, foundation-checked, browser-verified, and merged to `master`**. Order executed
+(per spec §3): **WS4 → WS3 → WS5 → WS2 → WS6 → WS1 → WS7**. Each WS: one branch off `master` → TDD via
+fresh implementer subagents → spec + code-quality review (fixes applied) → `check-foundation` for the
+foundation-touching ones (WS1/WS2/WS6/WS7 — all **CLEAR**) → green gate → **browser-verify** →
+merge → branch deleted → this block updated.
+
+- **Final state:** `master` at `59492ba`; `yarn typecheck` / `yarn test` (**528 passed**) / `yarn lint`
+  / `yarn format:check` / `yarn workspace @atizar/react build` all green. A baseline `chore(format)`
+  (`c18c781`) first cleaned 17 pre-existing prettier violations so the per-WS `format:check` gate was
+  meaningful. `master` is **75 commits ahead of `origin/master` and NOT pushed** (local beta, no-PR rule
+  — push is the user's call).
+- **Open follow-ups (none blocking the track):**
+  1. **Delete the test Gmail draft** `r7666524379648912752` (thread `19ebbf9875f60e8c`, body has
+     `WS5-EDIT-MARK`) from the Drafts folder — created by a WS5 approve, couldn't be deleted
+     programmatically (OAuth expired).
+  2. **Gmail OAuth refresh token is EXPIRED** (`invalid_grant`) — re-auth before any live (non-replay)
+     Gmail demo. The whole run used `DEV_RECORD_REPLAY=1`, so this blocked nothing.
+  3. **WS1 error→re-run UX gap** — an `error` item hides the START button on the agent card (re-run
+     still works via thread/API); allow START when the only "active" item is an `error`.
+  4. **Pre-existing flaky test** — `pipelineService.test.ts` "supersede is recorded in the Activity log"
+     can intermittently fail under concurrent PG load (`@mastra/pg` + the Drizzle client contend for
+     the test Postgres); passes in isolation and on retry. Consider bounding the test-PG pool.
+  5. **Subagent auth** — one implementer subagent died on a `401` after a ~6h pause (keychain token
+     expiry); re-dispatching worked. Just a note for future long autonomous runs.
 
 **Plans (one per WS, TDD bite-sized, in `docs/superpowers/plans/`):**
 
@@ -105,7 +155,7 @@ so the per-WS `format:check` gate is meaningful (typecheck/test 454/lint were al
 - WS4 activity monitor newest-first → `2026-06-14-ws4-activity-newest-first.md` — ✅ **DONE & merged** (`71aecb0`)
 - WS5 SourcePanel + trust hardening (user-turn, SSE reconnect, durable audit) → `2026-06-14-ws5-sourcepanel-trust-hardening.md` — ✅ **DONE & merged** (`81febc9`)
 - WS6 type-safe declaration (kill magic strings; `PROVIDERS` from the library) → `2026-06-14-ws6-typed-declaration.md` — ✅ **DONE & merged** (`3429320`)
-- WS7 app→library boundary migration → `2026-06-14-ws7-app-to-library-migration.md`
+- WS7 app→library boundary migration → `2026-06-14-ws7-app-to-library-migration.md` — ✅ **DONE & merged** (`59492ba`)
 
 **Order (spec §3):** WS4 → WS3 → WS5 → WS2 → WS6 → WS1 → WS7. (Small/independent first; **WS2 before
 WS6**; **WS7 last** so it relocates server code that WS1/WS5 already settled.) Mostly independent — if
