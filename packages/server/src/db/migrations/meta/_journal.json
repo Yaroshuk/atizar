@@ -29,6 +29,13 @@
       "when": 1781500241985,
       "tag": "0003_classy_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781523542556,
+      "tag": "0004_add_reset_resolution",
+      "breakpoints": true
     }
   ]
 }

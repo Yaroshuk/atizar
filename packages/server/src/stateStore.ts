@@ -14,7 +14,7 @@ import {
   type TraceRow,
   type WorkItem,
 } from './db/schema.js'
-import { ACTIVE } from './transition.js'
+import { ACTIVE, RESETTABLE } from './transition.js'
 
 export interface InsertWorkItemInput {
   id?: string
@@ -188,6 +188,16 @@ export function makeStateStore(db: Db) {
     async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
       return rows.filter((r) => ACTIVE.includes(r.status))
+    },
+
+    // Resettable items = those in a TERMINAL status the `reset` edge accepts (finished / result
+    // / error). A 'closed' item is already retired (skip — re-resetting it is a no-op and the
+    // edge would reject anyway). Scoped to one workflow, or all when workflowId is omitted.
+    async getResettable(workflowId?: string): Promise<WorkItem[]> {
+      const rows = workflowId
+        ? await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
+        : await db.select().from(workItems)
+      return rows.filter((r) => RESETTABLE.includes(r.status))
     },
 
     // The prior FINISHED, parentless scan roots of a given workflow × input-agent — the
