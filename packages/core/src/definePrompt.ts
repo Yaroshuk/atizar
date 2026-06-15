@@ -19,6 +19,7 @@ export interface PromptSpec<T> {
 }
 
 export function definePrompt<T>(spec: PromptSpec<T>): PromptStrategy {
+  const { onResume } = spec
   return {
     buildFirst(input: RunAgentInput): string {
       if (spec.input && spec.onInput) {
@@ -27,9 +28,9 @@ export function definePrompt<T>(spec: PromptSpec<T>): PromptStrategy {
       }
       return spec.onStart()
     },
-    buildResume: spec.onResume
+    buildResume: onResume
       ? (_args: Record<string, unknown>, executedResult?: Record<string, unknown>): string | null =>
-          spec.onResume!(executedResult ?? {})
+          onResume(executedResult ?? {})
       : undefined,
   }
 }
