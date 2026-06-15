@@ -20,8 +20,8 @@ type AppHeaderProps = {
   globalActive: number
   stoppingAll: boolean
   onStopAll: () => void
-  // Reset all — clear every finished item across all workflows (in-progress work is kept;
-  // confirm-gated upstream). Optional: omit to hide the global Reset control.
+  // Reset all — stop and clear EVERYTHING across all workflows (running items included),
+  // confirm-gated upstream (nothing happens until the human confirms). Optional: omit to hide.
   onResetAll?: () => void
   resettingAll?: boolean
   // Activity drawer
