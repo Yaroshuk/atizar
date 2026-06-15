@@ -22,3 +22,14 @@ export type { OAuthProvider } from './oauthProviders.js'
 export { createConnectRoutes } from './connectRoutes.js'
 export type { ConnectRoutesDeps, ConnectionDescriptor } from './connectRoutes.js'
 export { createAuthMiddleware } from './auth.js'
+export {
+  withRecordReplay,
+  CassetteStore,
+  recordReplayMode,
+  encodeLine,
+  parseLine,
+  eventsForStep,
+  dropStep,
+  scanCassette,
+} from './recordReplay.js'
+export type { Finding, RecordReplayMode } from './recordReplay.js'

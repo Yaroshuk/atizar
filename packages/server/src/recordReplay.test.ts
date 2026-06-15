@@ -13,7 +13,7 @@ import {
   scanCassette,
   CassetteStore,
   withRecordReplay,
-} from './record-replay.js'
+} from './recordReplay.js'
 
 const ev = (delta: string): BaseEvent =>
   ({ type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant', messageId: 'm', delta }) as BaseEvent
