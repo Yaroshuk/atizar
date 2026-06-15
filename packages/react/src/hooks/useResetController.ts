@@ -26,8 +26,10 @@ export function useResetController(activeWorkflowId: string) {
   const setResetting = (kind: 'workflow' | 'all', v: boolean): void =>
     kind === 'workflow' ? setResettingWorkflow(v) : setResettingAll(v)
 
-  // First click: reset the terminal items. If the server reports active/awaiting items remain,
-  // open the confirm gate instead of touching them.
+  // First click: reset the terminal items. This first reset is UNCONDITIONAL — it clears
+  // terminal (finished/result/error) items immediately, with no confirm; the ConfirmDialog gate
+  // only governs whether to ALSO cancel any in-flight / awaiting work the server reports remain.
+  // If the server reports active/awaiting items remain, open the confirm gate instead of touching them.
   const request = async (kind: 'workflow' | 'all'): Promise<void> => {
     setResetting(kind, true)
     try {

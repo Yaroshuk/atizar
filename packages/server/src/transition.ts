@@ -58,10 +58,11 @@ const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected' | 'supersed
 // Statuses that count as an active child (block a parent's auto-finish).
 const ACTIVE: WorkItemStatus[] = ['queued', 'running', 'awaiting_approval', 'awaiting_input']
 
-// Statuses the `reset` edge accepts (kept in sync with EDGES.reset.from). A board RESET only
-// retires items already in one of these terminal statuses; active/awaiting work must be
-// cancelled first (I12). Exported so the service/store classify resettable items in one place.
-const RESETTABLE: WorkItemStatus[] = ['finished', 'result', 'error']
+// Statuses the `reset` edge accepts, DERIVED from the edge table so the two can't drift. A
+// board RESET only retires items already in one of these terminal statuses; active/awaiting
+// work must be cancelled first (I12). Exported so the service/store classify resettable items
+// in one place.
+const RESETTABLE: WorkItemStatus[] = EDGES.reset.from
 
 // Terminal statuses an edge can land a work item in. Any of these frees the item's parent for
 // the auto-finish walk — not just a clean `finish` (a rejected / cancelled / failed child must
@@ -136,5 +137,5 @@ export async function transition(
 }
 
 // Re-exported (the auto-finish walk reuses the active-child predicate; the store classifies
-// resettable items against RESETTABLE — kept in sync with EDGES.reset.from).
+// resettable items against RESETTABLE, which is derived from EDGES.reset.from).
 export { ACTIVE, RESETTABLE }

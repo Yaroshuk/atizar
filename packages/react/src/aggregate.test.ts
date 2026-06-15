@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateAgent, aggregateLabel, isBusy } from './aggregate'
+import { aggregateAgent, aggregateLabel } from './aggregate'
 import type { Status } from './status'
 
 describe('aggregateAgent', () => {
@@ -27,26 +27,30 @@ describe('aggregateAgent', () => {
   })
 })
 
-describe('isBusy (START gating — Unit 4.2)', () => {
-  it('an agent whose only instance is error is NOT busy (START stays available)', () => {
+// START visibility on the type card is gated by `aggregateLabel(agg) === ''` (see AgentGrid):
+// an empty headline means no BUSY instance is holding a slot, so START shows. Unit 4.2: an
+// error-only agent reads 0 active → empty label → START shows, with the error badge alongside.
+describe('START gating via aggregateLabel (Unit 4.2)', () => {
+  it('an agent whose only instance is error shows START (empty label) AND the error badge', () => {
     const a = aggregateAgent(['error'])
-    expect(a.status).toBe('error')
-    expect(isBusy(a)).toBe(false)
-    // The error still surfaces as a badge alongside START — the headline label is empty so it
-    // does not masquerade as a live "N active" summary that would hide the button.
+    // Empty headline ⇒ AgentGrid exposes START (the gate is aggregateLabel === '').
     expect(aggregateLabel(a)).toBe('')
+    // The error still surfaces as a badge alongside START via the aggregate status.
+    expect(a.status).toBe('error')
   })
-  it('a running instance IS busy', () => {
-    expect(isBusy(aggregateAgent(['running']))).toBe(true)
+  it('a running instance has a non-empty label (START hidden)', () => {
+    expect(aggregateLabel(aggregateAgent(['running']))).toBe('1 active')
   })
-  it('an awaiting_approval instance IS busy', () => {
-    expect(isBusy(aggregateAgent(['awaiting_approval']))).toBe(true)
+  it('an awaiting_approval instance has a non-empty label (START hidden)', () => {
+    expect(aggregateLabel(aggregateAgent(['awaiting_approval']))).toBe(
+      '1 active · 1 awaiting approval'
+    )
   })
-  it('an error alongside a running instance is still busy (the run holds the slot)', () => {
-    expect(isBusy(aggregateAgent(['error', 'running']))).toBe(true)
+  it('an error alongside a running instance keeps a non-empty label (the run holds the slot)', () => {
+    expect(aggregateLabel(aggregateAgent(['error', 'running']))).toBe('1 active')
   })
-  it('an idle / done-only agent is not busy', () => {
-    expect(isBusy(aggregateAgent([]))).toBe(false)
-    expect(isBusy(aggregateAgent(['done']))).toBe(false)
+  it('an idle / done-only agent has an empty label (START shows)', () => {
+    expect(aggregateLabel(aggregateAgent([]))).toBe('')
+    expect(aggregateLabel(aggregateAgent(['done']))).toBe('')
   })
 })

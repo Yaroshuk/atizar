@@ -19,11 +19,6 @@ export const aggregateAgent = (statuses: Status[]): AgentAggregate => {
   return { activeCount, awaitingCount, status }
 }
 
-// Whether the agent is occupied — drives START visibility on the type card. An agent is busy
-// while ≥1 instance is running or awaiting approval; an `error`-only agent is NOT busy (its
-// slot is free), so START stays available with the error badge alongside (Unit 4.2).
-export const isBusy = (a: AgentAggregate): boolean => a.activeCount > 0
-
 // The headline text for the type card, e.g. "2 active · 1 awaiting approval". Empty for an
 // idle / done / error-only agent (no BUSY instances) so it never hides the START button.
 export const aggregateLabel = (a: AgentAggregate): string => {

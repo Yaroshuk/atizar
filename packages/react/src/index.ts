@@ -26,7 +26,7 @@ export { useResetController, type ResetController } from './hooks/useResetContro
 export { lookups } from './lookups.js'
 export { buildPipeline } from './pipelineModel.js'
 export { toPInstances, queuedByAgent, statusesOf } from './boardModel.js'
-export { aggregateAgent, aggregateLabel, isBusy } from './aggregate.js'
+export { aggregateAgent, aggregateLabel } from './aggregate.js'
 export { isDevMode } from './devMode.js'
 export type { WorkflowsConfig } from './workflowsContext.js'
 export type { AgentMeta, DeliverFn, RenderSpec, HitlSpec } from './renderSpecs.js'
