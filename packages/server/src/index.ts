@@ -42,3 +42,11 @@ export { makeClaudeSpawn } from './makeClaudeSpawn.js'
 export type { ClaudeSpawnOptions, McpServerSpec } from './makeClaudeSpawn.js'
 export { buildAgentProvider } from './buildAgent.js'
 export type { BuildAgentWrap, BuildAgentArgs } from './buildAgent.js'
+export { createServer } from './createServer.js'
+export type {
+  CreateServerArgs,
+  BuiltServer,
+  BuildProviderFn,
+  WorkflowServerLike,
+  ServerBindingLike,
+} from './createServer.js'
