@@ -14,6 +14,7 @@ import {
 } from '@atizar/core'
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
+import { makeStateStore } from './stateStore.js'
 import type { AgentRuntime } from './runObserver.js'
 import { ACTIVE } from './transition.js'
 
@@ -485,9 +486,12 @@ describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
 
     const status = await svc.getStatus(id)
     expect(status?.status).toBe('closed') // hidden from the live column, not deleted
+    // It has LEFT the live board (closed items are filtered from getBoard)…
     const board = await svc.getBoard()
-    const row = board.items.find((i) => i.id === id)
-    expect(row).toBeDefined() // row preserved (openable via Activity/trace)
+    expect(board.items.some((i) => i.id === id)).toBe(false)
+    // …but the row is preserved in the store with resolution 'reset' (I12 — hidden, not deleted).
+    const row = await makeStateStore(db).getWorkItem(id)
+    expect(row).toBeDefined()
     expect(row?.resolution).toBe('reset')
   })
 
@@ -709,11 +713,13 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     // the prior finished root is now closed + superseded (preserved, not destroyed — I12)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('closed')
+    // it has LEFT the live board (closed is filtered from getBoard)…
     const board = await svc.getBoard()
-    const firstRow = board.items.find((i) => i.id === first.id)
-    expect(firstRow?.resolution).toBe('superseded')
-    // the prior row still exists (openable via Activity/trace) — not deleted
+    expect(board.items.some((i) => i.id === first.id)).toBe(false)
+    // …but the row is preserved in the store with resolution 'superseded' (I12 — not deleted).
+    const firstRow = await makeStateStore(db).getWorkItem(first.id)
     expect(firstRow).toBeDefined()
+    expect(firstRow?.resolution).toBe('superseded')
   })
 
   it('the supersede is recorded in the Activity log', async () => {

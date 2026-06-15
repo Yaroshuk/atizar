@@ -55,6 +55,18 @@ export const ThreadModal = (p: ThreadModalProps) => {
     [config.renders, workflowId, deliver, id]
   )
 
+  // Once the human acts on the gate, the thread has served its purpose — close it (the result
+  // stays on the board/history, I12). Without this the resolved card lingered and the human had
+  // to close it by hand.
+  const approveAndClose = async (form: Record<string, unknown>) => {
+    await approve(form)
+    p.onClose()
+  }
+  const rejectAndClose = async (comment?: string) => {
+    await reject(comment)
+    p.onClose()
+  }
+
   // Render the workflow's approval card from the authoritative gate (only while awaiting).
   const gateSlot =
     awaiting &&
@@ -67,8 +79,8 @@ export const ThreadModal = (p: ThreadModalProps) => {
         formRev: gate.formRev,
         status,
         source,
-        approve,
-        reject,
+        approve: approveAndClose,
+        reject: rejectAndClose,
       })
     })()
 

@@ -695,6 +695,30 @@ button {
   }
 }
 
+/* Exit animation (mirror of the open) — the modal adds `.closing` for ~190ms before it unmounts
+   (useDismiss), so closing feels symmetric to opening instead of vanishing in one frame. */
+.backdrop.closing {
+  animation: fade-out 0.18s ease forwards;
+}
+.modal.closing {
+  animation: modal-out 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
 .modal-head {
   display: flex;
   align-items: center;
