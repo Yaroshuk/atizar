@@ -9,7 +9,15 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 // SELECT … FOR UPDATE the row → check the edge is legal from the current status →
 // UPDATE → COMMIT. The row lock serializes concurrent transitions (design §3.6).
 
-export type Edge = 'start' | 'gate' | 'resume' | 'finish' | 'fail' | 'cancel' | 'reject' | 'supersede'
+export type Edge =
+  | 'start'
+  | 'gate'
+  | 'resume'
+  | 'finish'
+  | 'fail'
+  | 'cancel'
+  | 'reject'
+  | 'supersede'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {

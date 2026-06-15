@@ -576,10 +576,17 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
   it('the supersede is recorded in the Activity log', async () => {
     const svc = makeReRunService()
     const agentId = 'rerun-wf__sorter'
-    const first = await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    const first = await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId,
+      origin: 'human',
+      payload: {},
+    })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
     await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
-    const entry = svc.getActivity().find((e) => e.workItemId === first.id && e.kind === 'superseded')
+    const entry = svc
+      .getActivity()
+      .find((e) => e.workItemId === first.id && e.kind === 'superseded')
     expect(entry).toBeDefined()
   })
 
@@ -596,9 +603,19 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     }
     const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
     const agentId = 'rerun-wf__sorter'
-    const first = await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    const first = await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId,
+      origin: 'human',
+      payload: {},
+    })
     expect(first.rejected).toBeUndefined()
-    const second = await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    const second = await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId,
+      origin: 'human',
+      payload: {},
+    })
     expect(second.rejected).toBe('already_running')
   })
 
