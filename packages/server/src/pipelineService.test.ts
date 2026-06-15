@@ -497,3 +497,136 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
     expect(r.ok).toBe(false)
   })
 })
+
+describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
+  // A provider that finishes immediately (one text chunk, no gate) — the scan goes
+  // queued → running → finished, freeing the singleton slot for a sequential re-START.
+  function quickProvider(): Provider {
+    return {
+      async *run(_input: RunAgentInput) {
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'scanned' })
+      },
+    }
+  }
+
+  const inputWf = defineWorkflow({
+    id: 'rerun-wf',
+    label: 'R',
+    iconName: 'inbox',
+    agents: [
+      {
+        agent: defineAgent({
+          id: 'sorter',
+          name: 's',
+          provider: 'mock',
+          instructions: 'x',
+          tools: ['t'],
+          approvals: [],
+          renders: {},
+        }),
+        role: 'input',
+      },
+    ],
+    entryAgentId: 'sorter',
+    inputs: [],
+  })
+
+  function makeReRunService() {
+    const runtime: AgentRuntime = {
+      provider: quickProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+  }
+
+  it('a sequential human re-START supersedes the prior finished root and mints a new one', async () => {
+    const svc = makeReRunService()
+    const agentId = 'rerun-wf__sorter'
+    const first = await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId,
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+
+    const second = await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId,
+      origin: 'human',
+      payload: {},
+    })
+    expect(second.rejected).toBeUndefined()
+    expect(second.id).not.toBe(first.id)
+
+    // the prior finished root is now closed + superseded (preserved, not destroyed — I12)
+    const firstStatus = await svc.getStatus(first.id)
+    expect(firstStatus?.status).toBe('closed')
+    const board = await svc.getBoard()
+    const firstRow = board.items.find((i) => i.id === first.id)
+    expect(firstRow?.resolution).toBe('superseded')
+    // the prior row still exists (openable via Activity/trace) — not deleted
+    expect(firstRow).toBeDefined()
+  })
+
+  it('the supersede is recorded in the Activity log', async () => {
+    const svc = makeReRunService()
+    const agentId = 'rerun-wf__sorter'
+    const first = await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+    await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    const entry = svc.getActivity().find((e) => e.workItemId === first.id && e.kind === 'superseded')
+    expect(entry).toBeDefined()
+  })
+
+  it('a 2nd CONCURRENT human START of the singleton input still 409s (supersede does not change concurrency)', async () => {
+    // blockingProvider keeps the first scan RUNNING (slot occupied) — the concurrency guard fires
+    // before any supersede; the prior root is not finished, so there is nothing to supersede.
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const agentId = 'rerun-wf__sorter'
+    const first = await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    expect(first.rejected).toBeUndefined()
+    const second = await svc.dispatch({ workflowId: 'rerun-wf', agentId, origin: 'human', payload: {} })
+    expect(second.rejected).toBe('already_running')
+  })
+
+  it('a non-input agent human START does NOT supersede (only input roots refresh)', async () => {
+    // dispatch a worker-role agent directly (origin human) twice; finishing the first should
+    // NOT close it — refresh applies only to input agents.
+    const runtime: AgentRuntime = {
+      provider: quickProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const first = await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId: 'rerun-wf__worker-x', // not a declared input agent in inputWf
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+    await svc.dispatch({
+      workflowId: 'rerun-wf',
+      agentId: 'rerun-wf__worker-x',
+      origin: 'human',
+      payload: {},
+    })
+    expect((await svc.getStatus(first.id))?.status).toBe('finished') // NOT closed
+  })
+})

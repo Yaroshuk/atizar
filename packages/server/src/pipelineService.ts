@@ -2,6 +2,7 @@ import type { BaseEvent } from '@ag-ui/client'
 import {
   resolveDelivery,
   deliveryKey,
+  instanceId,
   type Destination,
   type GateResolution,
   type WorkflowDescriptor,
@@ -159,6 +160,37 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     }
   }
 
+  // True when `agentId` (= wf__agent) is the runtime key of a role:'input' agent in some loaded
+  // descriptor. The set of input runtime keys is derived once from deps.descriptors; refresh
+  // applies ONLY to input roots (a worker re-START is an ordinary new dispatch, never a refresh).
+  const inputAgentKeys = new Set<string>(
+    deps.descriptors.flatMap((wf) =>
+      wf.agents.filter((a) => a.role === 'input').map((a) => instanceId(wf.id, a.agent.id))
+    )
+  )
+  const isInputAgent = (agentId: string): boolean => inputAgentKeys.has(agentId)
+
+  // 'refresh' re-run (WS1, I1/I8/I12): on a human START of an input agent, retire each prior
+  // FINISHED root of the same workflow × input-agent into the preserved Done bucket (status
+  // 'closed', resolution 'superseded') via transition() — children are NOT touched (durable).
+  // BRANCH POINT for rerun:'history' (reserved, NOT wired in the beta): when a workflow declares
+  // rerun:'history', skip this supersede entirely — every finished scan stays current and the
+  // human chooses. Look up the descriptor's `rerun` here and early-return before superseding.
+  async function supersedePriorRoots(workflowId: string, agentId: string): Promise<void> {
+    const roots = await store.getFinishedInputRoots(workflowId, agentId)
+    for (const root of roots) {
+      await transition(db, root.id, 'supersede').catch(() => {})
+      activity.record({
+        ts: Date.now(),
+        workflowId: root.workflowId,
+        agentId: root.agentId,
+        workItemId: root.id,
+        kind: 'superseded',
+        summary: 'superseded by re-run',
+      })
+    }
+  }
+
   return {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
@@ -168,6 +200,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // Machine dispatch (origin 'agent') is unaffected — the chokepoint handles its own cap/queue.
       if (req.origin === 'human' && maxInstances === 1 && pool.activeCount(req.agentId) >= 1) {
         return { id: '', deduped: false, rejected: 'already_running' }
+      }
+      // WS1 'refresh': a human START of an input agent supersedes its prior finished root(s)
+      // BEFORE minting the new one — I1 (the START always does something visible: a fresh root
+      // appears AND the prior moves to history). Concurrency is unchanged: the 409 guard above
+      // already short-circuited a concurrent START, so we only ever reach here for a sequential
+      // re-run (prior root already finished, slot free).
+      if (req.origin === 'human' && isInputAgent(req.agentId)) {
+        await supersedePriorRoots(req.workflowId, req.agentId)
       }
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
       activity.record({
