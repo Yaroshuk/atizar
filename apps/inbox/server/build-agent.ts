@@ -1,20 +1,16 @@
 import type { AgentDefinition, ProviderRegistry, PromptStrategy, Provider } from '@atizar/core'
+import { buildAgentProvider, isDemo } from '@atizar/server'
 import {
   withRecordReplay,
   recordReplayMode,
   cassettesDir,
   demoCassettesDir,
 } from './record-replay.js'
-import { isDemo } from '@atizar/server'
 
-// Resolves the provider FACTORY for an agent passport and constructs the provider from
-// the passport (approvals/tools) + this agent's prompt strategy, then wraps it in the
-// dev record/replay decorator when DEV_RECORD_REPLAY is set (unset ⇒ byte-identical
-// production path). `instanceKey` (wf__agent) is the cassette key. The RunObserver spine
-// is the sole consumer (the CopilotKit transport was dropped at step 6).
-// `composedInstructions` carries the fully composed string (workflow prompt + agent
-// instructions) built by the caller — falls back to def.instructions when absent so
-// existing callers are unaffected.
+// App wrapper over @atizar/server's buildAgentProvider (WS7 move 8). It injects the dev
+// record/replay decorator built from the APP's cassette directories — DEV_RECORD_REPLAY unset ⇒
+// no wrap ⇒ byte-identical production path. Signature unchanged so index.ts + eval/runner.ts are
+// unaffected.
 export function buildProvider(
   def: AgentDefinition,
   prompts: PromptStrategy,
@@ -23,25 +19,22 @@ export function buildProvider(
   instanceKey: string,
   composedInstructions?: string
 ): Provider {
-  const makeProvider = registry.resolve(def.provider)
-  let provider = makeProvider({
-    approvalNames: def.approvals,
-    surfaceTools: def.tools,
-    allowedTools,
-    prompts,
-    instructions: composedInstructions ?? def.instructions,
-    agentId: instanceKey,
-  })
-
   const mode = isDemo() ? 'demo' : recordReplayMode()
-  if (mode) {
-    provider = withRecordReplay(provider, {
-      key: instanceKey,
-      approvalNames: def.approvals,
-      dir: mode === 'demo' ? demoCassettesDir() : cassettesDir(),
-      mode,
-    })
-  }
-
-  return provider
+  return buildAgentProvider({
+    def,
+    prompts,
+    registry,
+    allowedTools,
+    instanceKey,
+    composedInstructions,
+    wrap: mode
+      ? (provider, ctx) =>
+          withRecordReplay(provider, {
+            key: ctx.instanceKey,
+            approvalNames: ctx.approvalNames,
+            dir: mode === 'demo' ? demoCassettesDir() : cassettesDir(),
+            mode,
+          })
+      : undefined,
+  })
 }
