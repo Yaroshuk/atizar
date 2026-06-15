@@ -14,8 +14,11 @@ const isQueued = (w: WorkItem): boolean => w.status === 'queued'
 // (running/awaiting), an input agent (the pipeline root, kept after it finishes), errored,
 // or carrying a result to show (a card, or a cancelled/rejected marker). A plain finished
 // leaf worker with nothing to show drops out — matches the old "done workers torn down".
+// A superseded root (WS1: status 'closed', resolution 'superseded') drops out of the LIVE
+// column entirely — it lives on in Activity/trace (preserved, not destroyed — I12).
 const isVisible = (w: WorkItem, isInput: boolean): boolean => {
   if (isQueued(w)) return false
+  if (w.resolution === 'superseded') return false
   if (w.status !== 'finished' && w.status !== 'closed') return true
   return isInput || w.card !== null || w.resolution !== null
 }

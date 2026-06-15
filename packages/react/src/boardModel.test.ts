@@ -56,3 +56,21 @@ describe('statusesOf', () => {
     expect(statusesOf(items, 'lead-inbox', 'qualifier')).toEqual(['running'])
   })
 })
+
+describe('toPInstances superseded roots (WS1)', () => {
+  const withSuperseded: WorkItem[] = [
+    wi({ id: 'Q1', agentId: 'lead-inbox__qualifier', status: 'closed', resolution: 'superseded' }),
+    wi({ id: 'Q2', agentId: 'lead-inbox__qualifier', status: 'running' }),
+  ]
+  it('hides a closed+superseded input root, keeps the current running one', () => {
+    const out = toPInstances(withSuperseded, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
+    expect(out.map((p) => p.localId)).toEqual(['Q2'])
+  })
+  it('still keeps a plain finished input root (not superseded)', () => {
+    const finishedRoot: WorkItem[] = [
+      wi({ id: 'Q3', agentId: 'lead-inbox__qualifier', status: 'finished' }),
+    ]
+    const out = toPInstances(finishedRoot, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
+    expect(out.map((p) => p.localId)).toEqual(['Q3'])
+  })
+})
