@@ -77,18 +77,17 @@ via a **proper control**, not by editing free-text and hoping the model parses i
   model receives it, it does not infer it. (This is also a natural extension point for the
   consumer-view edit surface.)
 
-### B. Cassettes — finish the real-flow set
+### B. Cassettes — DONE (full real-flow set recorded + replay-verified, 2026-06-15)
 
-Gmail OAuth was **re-authed by the user (now connected — `/api/connections` ok)**, NOT the expired
-state the old note claimed. Recorded so far (real flow, replay-verified, true-replay mtimes):
-`email-inbox__sorter` + `email-inbox__reader`. Missing: `reply` / `spam` / `important` — the live
-inbox held only promotional newsletters (even over a 72h window), which all route to `reader`, so
-nothing exercised those agents. **The user is sending test emails** that need-a-reply / look-spammy /
-are-important; once they land, run `email-inbox` (`DEV_RECORD_REPLAY=record`, server is up) so the
-sorter routes to those agents and their cassettes record. Approving a reply creates a real Gmail
-draft; approving spam trashes — warn before each. Cassettes are gitignored + hold real data — **never
-commit/share without the `scanCassette` ritual** (CLAUDE.md HARD RULE). Stale draft to delete:
-`r7666524379648912752`.
+Gmail OAuth re-authed by the user (connected). With test emails covering all four paths, recorded
+a **complete real `email-inbox` run** — all 5 cassettes: `sorter` (4-way routing: reply/reader/spam/
+important = 1 each) + `reply` + `reader` + `spam` + `important`, each proposal **and** resume turn.
+Replay-verified under `=1`: full 4-way routing reproduced instantly, **true-replay (mtimes unchanged,
+no claude/Gmail calls)**. Cassettes are gitignored (confirmed not tracked) + hold real captured data —
+**never commit/share without the `scanCassette` ritual** (CLAUDE.md HARD RULE). Approvals during
+recording created a real Gmail draft (reply), starred (important), marked-read (reader), trashed
+(spam) on the user's test emails. Old stale draft to delete: `r7666524379648912752` (+ the new test
+draft from this run, if unwanted).
 
 ### C. Push
 
