@@ -133,6 +133,10 @@ A workflow (`apps/inbox/workflows/<id>/`) is **structure → descriptor, words �
   agent (`{ input?, onInput?, onStart, onResume? }`); shared shapes use a single factory
   (e.g. `batchPrompt(defaultAction)`), never copy-paste. Prompts are **TURN-ONLY**: they
   carry the words for the current turn and nothing else.
+- **Prompts: `definePrompt` is the default, a raw `PromptStrategy` is the escape hatch.** Use
+  `definePrompt` for the common 3-hook lifecycle (onInput/onStart/onResume). When you need the resume
+  tool-call `args`, multiple input shapes, or other branching, pass a raw `PromptStrategy`
+  (`{ buildFirst, buildResume }`) directly into the agent's `prompts` — no flexibility is lost.
 - **Identity belongs to the descriptor, not the prompts.** `defineAgent.instructions`
   (composed with the workflow-level `prompt`) is the agent's identity; the provider
   **prepends** it to the turn-only `definePrompt` output at run time. Never re-bake
