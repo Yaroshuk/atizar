@@ -282,6 +282,64 @@ describe('createClaudeCliProvider', () => {
   })
 })
 
+describe('createClaudeCliProvider — identity prepend', () => {
+  // A turn-only strategy: buildFirst returns just the turn steps, no baked identity.
+  const turnOnlyPrompts = (): PromptStrategy => ({
+    buildFirst: () => 'TURN STEPS',
+  })
+
+  it('prepends config.instructions to the first-turn prompt', async () => {
+    const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('ok')] }])
+    const provider = createClaudeCliProvider({
+      approvalNames: [],
+      surfaceTools: [],
+      allowedTools: [],
+      instructions: 'HOUSE RULES',
+      prompts: turnOnlyPrompts(),
+      spawn,
+    })
+    await drain(provider.run(runInput([])))
+    expect(calls[0].prompt).toBe('HOUSE RULES\n\nTURN STEPS')
+  })
+
+  it('emits just the turn prompt when instructions are empty (no leading separator)', async () => {
+    const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('ok')] }])
+    const provider = createClaudeCliProvider({
+      approvalNames: [],
+      surfaceTools: [],
+      allowedTools: [],
+      instructions: '',
+      prompts: turnOnlyPrompts(),
+      spawn,
+    })
+    await drain(provider.run(runInput([])))
+    expect(calls[0].prompt).toBe('TURN STEPS')
+  })
+
+  it('prepends config.instructions to the resume prompt too', async () => {
+    const { spawn, calls } = fakeSpawn([{ when: () => true, lines: [textDelta('ok')] }])
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: ['saveDraft'],
+      allowedTools: ['mcp__inbox__saveDraft'],
+      instructions: 'HOUSE RULES',
+      prompts: {
+        buildFirst: () => 'TURN STEPS',
+        buildResume: () => 'RESUME STEPS',
+      },
+      spawn,
+    })
+    const handle: ResumeHandle = { runId: 'r1', input: runInput([]) }
+    const resolution: GateResolution = {
+      gateId: 'g1',
+      decision: 'approved',
+      form: { threadId: 't', body: 'b' },
+    }
+    await drain(provider.resume!(handle, resolution))
+    expect(calls[0].prompt).toBe('HOUSE RULES\n\nRESUME STEPS')
+  })
+})
+
 describe('createClaudeCliProvider — resume()', () => {
   const baseOpts = {
     approvalNames: ['saveDraft'] as const,
