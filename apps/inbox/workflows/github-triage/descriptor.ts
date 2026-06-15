@@ -48,6 +48,7 @@ export const githubTriage = defineWorkflow({
   id: 'github-triage',
   label: 'GitHub triage',
   iconName: 'git',
+  rerun: 'refresh', // human re-START re-reads the board; the prior scan moves to history
   agents: [
     { agent: triageAgent, role: 'input' },
     { agent: featureAgent, role: 'worker' },

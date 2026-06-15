@@ -33,6 +33,7 @@ export const leadInbox = defineWorkflow({
   id: 'lead-inbox',
   label: 'Lead inbox',
   iconName: 'inbox',
+  rerun: 'refresh', // human re-START re-reads the latest email; the prior scan moves to history
   agents: [
     { agent: qualifierAgent, role: 'input' },
     { agent: replyAgent, role: 'worker' },

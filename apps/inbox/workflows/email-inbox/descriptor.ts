@@ -84,6 +84,7 @@ export const emailInbox = defineWorkflow({
   id: 'email-inbox',
   label: 'Email inbox',
   iconName: 'inbox',
+  rerun: 'refresh', // human re-START supersedes the prior finished scan (live-source inbox scan)
   prompt:
     'You are part of an email-inbox automation. Be concise and businesslike. NEVER narrate tool plumbing (no "let me load the tools", no schema talk). The human approves every Gmail action — you only propose. Never send email; drafts only.',
   agents: [
