@@ -57,6 +57,9 @@ export const workItems = pgTable('work_items', {
   origin: originKind('origin').notNull(),
   // Dedup key (deliveryKey-style); null ⇒ never deduped.
   source: text('source'),
+  // Instance identity (spec 2026-06-16). Caller-supplied at dispatch; same key → same instance.
+  // NOT derivable from `source` (reply: key=sender, source=email; spam: key='spam', source=email).
+  key: text('key').notNull(),
   payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
   phase: workItemPhase('phase').notNull(),
   outcome: workItemOutcome('outcome').notNull().default('running'),
