@@ -34,7 +34,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
   it('inserts a queued WorkItem and reads it back', async () => {
     const input = newItem()
     const inserted = await store.insertWorkItem(input)
-    expect(inserted.status).toBe('queued')
+    expect(inserted.phase).toBe('queued')
     expect(inserted.id).toBe(input.id)
 
     const read = await store.getWorkItem(input.id)

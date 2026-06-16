@@ -14,7 +14,7 @@ import {
   type TraceRow,
   type WorkItem,
 } from './db/schema.js'
-import { ACTIVE, RESETTABLE } from './transition.js'
+import { lifecycle, hasLiveDescendant, type Phase } from '@atizar/core'
 
 export interface InsertWorkItemInput {
   id?: string
@@ -184,28 +184,29 @@ export function makeStateStore(db: Db) {
 
     async getActiveChildren(parentId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.parentId, parentId))
-      return rows.filter((r) => ACTIVE.includes(r.status))
+      return rows.filter((r) => lifecycle(r.phase, r.outcome, false, false).isLive)
     },
 
     async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
       const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
-      return rows.filter((r) => ACTIVE.includes(r.status))
+      return rows.filter((r) => lifecycle(r.phase, r.outcome, false, false).isLive)
     },
 
-    // Resettable items = those in a TERMINAL status the `reset` edge accepts (finished / result
-    // / error). A 'closed' item is already retired (skip — re-resetting it is a no-op and the
-    // edge would reject anyway). Scoped to one workflow, or all when workflowId is omitted.
+    // Resettable = TERMINAL items that have NOT already left the board (outcome not
+    // superseded/reset). transition('reset') accepts any terminal phase; we pre-filter to terminal
+    // items still showing so we don't churn already-retired rows.
     async getResettable(workflowId?: string): Promise<WorkItem[]> {
       const rows = workflowId
         ? await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
         : await db.select().from(workItems)
-      return rows.filter((r) => RESETTABLE.includes(r.status))
+      return rows.filter(
+        (r) => r.phase === 'terminal' && r.outcome !== 'superseded' && r.outcome !== 'reset'
+      )
     },
 
     // The prior FINISHED, parentless scan roots of a given workflow × input-agent — the
-    // candidates a fresh human START supersedes (WS1). Finished-but-open only: a 'closed'
-    // (already-superseded) root, or one with a terminal resolution, is excluded. Children
-    // (parentId != null) are never roots and are never superseded (I12 — they stay durable).
+    // candidates a fresh human START supersedes (WS1). Finished-but-open only: phase='terminal'
+    // with outcome='done'. Children (parentId != null) are never roots and are never superseded.
     async getFinishedInputRoots(workflowId: string, agentId: string): Promise<WorkItem[]> {
       return db
         .select()
@@ -215,40 +216,27 @@ export function makeStateStore(db: Db) {
             eq(workItems.workflowId, workflowId),
             eq(workItems.agentId, agentId),
             isNull(workItems.parentId),
-            eq(workItems.status, 'finished'),
-            isNull(workItems.resolution)
+            eq(workItems.phase, 'terminal'),
+            eq(workItems.outcome, 'done')
           )
         )
     },
 
-    // True when this input agent (workflow × agentId) has at least one non-'closed' root whose
-    // tree still contains an ACTIVE node (the root itself, or any transitive descendant). Under
-    // Approach B a root finishes on its own run-end, so a 'finished' root with awaiting-approval
-    // children still counts as a LIVE scan — this is the singleton-START gate's source of truth
-    // (replaces the worker-pool process count, which is freed the moment the run/gate suspends).
+    // True when this input agent has ≥1 non-retired root whose tree still contains a live node.
+    // The ONE tree walk lives in core hasLiveDescendant; a root is "live" if it is itself live OR
+    // has a live descendant (Approach B: a finished root with an awaiting child is a live scan).
     async hasLiveInputScan(workflowId: string, agentId: string): Promise<boolean> {
       const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
-      const childrenOf = new Map<string, WorkItem[]>()
-      for (const r of rows) {
-        if (!r.parentId) continue
-        const arr = childrenOf.get(r.parentId) ?? []
-        arr.push(r)
-        childrenOf.set(r.parentId, arr)
-      }
-      const subtreeLive = (id: string, seen = new Set<string>()): boolean => {
-        if (seen.has(id)) return false
-        seen.add(id)
-        for (const kid of childrenOf.get(id) ?? []) {
-          if (ACTIVE.includes(kid.status) || subtreeLive(kid.id, seen)) return true
-        }
-        return false
-      }
+      const liveAncestors = hasLiveDescendant(
+        rows.map((r) => ({ id: r.id, parentId: r.parentId, phase: r.phase as Phase }))
+      )
       return rows.some(
         (r) =>
           r.agentId === agentId &&
           !r.parentId &&
-          r.status !== 'closed' &&
-          (ACTIVE.includes(r.status) || subtreeLive(r.id))
+          r.outcome !== 'superseded' &&
+          r.outcome !== 'reset' &&
+          (lifecycle(r.phase, r.outcome, false, false).isLive || liveAncestors.has(r.id))
       )
     },
 
