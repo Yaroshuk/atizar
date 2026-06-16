@@ -1,5 +1,6 @@
 import { EventType, type BaseEvent } from '@ag-ui/client'
 import type { AssistantMessage, Message, ToolCall, ToolMessage } from './messages.js'
+import { LIFECYCLE_NOTE_TEXT, type LifecycleNoteValue } from './lifecycleNote.js'
 
 // Fold a stream of AG-UI events into the Message[] the thread renders. This is the
 // reduction CopilotKit's runtime did internally; with the `@copilotkit/*` transport
@@ -95,6 +96,17 @@ export function foldEventsToMessages(events: readonly BaseEvent[]): Message[] {
           toolCallId: callId,
           content: e.content ?? '',
         } as ToolMessage)
+        break
+      }
+
+      case EventType.CUSTOM: {
+        // A server-authored note (I14). Only the typed 'lifecycle' note becomes a message; other
+        // CUSTOM events (e.g. dispatch_rejected) stay non-message, as before.
+        const named = event as BaseEvent & { name?: string; value?: LifecycleNoteValue }
+        if (named.name !== 'lifecycle' || !named.value) break
+        const text = LIFECYCLE_NOTE_TEXT[named.value.outcome] || named.value.outcome
+        const id = `lifecycle-${named.value.at}`
+        byId.set(id, { id, role: 'system', content: text } as Message)
         break
       }
 

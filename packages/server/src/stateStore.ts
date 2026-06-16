@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, count, eq, gte, isNull } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
-import type { Db } from './db/client.js'
+import type { Db, Tx } from './db/client.js'
 import {
   actionLedger,
   auditLog,
@@ -71,9 +71,10 @@ export function makeStateStore(db: Db) {
       workItemId: string,
       seq: number,
       event: BaseEvent,
-      surfaced = true
+      surfaced = true,
+      tx?: Db | Tx
     ): Promise<void> {
-      await db.insert(trace).values({ workItemId, seq, event, surfaced })
+      await (tx ?? db).insert(trace).values({ workItemId, seq, event, surfaced })
     },
 
     async getTrace(workItemId: string, from: number): Promise<TraceRow[]> {
@@ -85,8 +86,8 @@ export function makeStateStore(db: Db) {
     },
 
     // Total trace rows for a WorkItem = the next seq (rows are contiguous 0..n-1).
-    async countTrace(workItemId: string): Promise<number> {
-      const [row] = await db
+    async countTrace(workItemId: string, tx?: Db | Tx): Promise<number> {
+      const [row] = await (tx ?? db)
         .select({ c: count() })
         .from(trace)
         .where(eq(trace.workItemId, workItemId))
@@ -252,16 +253,19 @@ export function makeStateStore(db: Db) {
     },
 
     // Append-only durable audit. One INSERT per recorded human decision / server effect.
-    async appendAudit(input: {
-      workItemId: string
-      gateId: string | null
-      workflowId: string
-      agentId: string
-      kind: string
-      summary: string
-      actor: string | null
-    }): Promise<void> {
-      await db.insert(auditLog).values({
+    async appendAudit(
+      input: {
+        workItemId: string
+        gateId: string | null
+        workflowId: string
+        agentId: string
+        kind: string
+        summary: string
+        actor: string | null
+      },
+      tx?: Db | Tx
+    ): Promise<void> {
+      await (tx ?? db).insert(auditLog).values({
         id: randomUUID(),
         workItemId: input.workItemId,
         gateId: input.gateId,

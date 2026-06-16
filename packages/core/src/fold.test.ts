@@ -3,6 +3,7 @@ import { EventType, type BaseEvent } from '@ag-ui/client'
 import { gateOpened } from './gate.js'
 import { foldEventsToMessages } from './fold.js'
 import { isAssistant, isToolMessage, pairToolResults } from './messages.js'
+import { lifecycleNote } from './lifecycleNote.js'
 
 const text = (messageId: string, delta: string): BaseEvent =>
   ({ type: EventType.TEXT_MESSAGE_CHUNK, role: 'assistant', messageId, delta }) as BaseEvent
@@ -105,5 +106,18 @@ describe('foldEventsToMessages', () => {
 
   it('silently ignores TOOL_CALL_ARGS with no preceding START', () => {
     expect(foldEventsToMessages([tcArgs('ghost_id', '{"x":1}')])).toEqual([])
+  })
+})
+
+describe('foldEventsToMessages — LifecycleNote', () => {
+  it('renders a lifecycle CUSTOM event as a trailing system note message', () => {
+    const events = [
+      { type: 'TEXT_MESSAGE_CHUNK', messageId: 'm1', delta: 'work' },
+      lifecycleNote({ kind: 'lifecycle', outcome: 'stopped', actor: null, at: 1 }),
+    ] as any
+    const msgs = foldEventsToMessages(events)
+    const note = msgs.find((m) => m.role === 'system')
+    expect(note).toBeTruthy()
+    expect(String(note?.content)).toContain('Stopped — cancelled')
   })
 })
