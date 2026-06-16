@@ -61,20 +61,20 @@ describe('worker cap (F1)', () => {
 
     // wait until the pool has started the 2 admitted runs
     const startedAt = Date.now()
-    while (service.stats(AGENT).active < 2 && Date.now() - startedAt < 5000) await sleep(10)
+    while ((await service.stats(AGENT)).active < 2 && Date.now() - startedAt < 5000) await sleep(10)
 
-    expect(service.stats(AGENT)).toEqual({ active: 2, queued: 1 })
+    expect(await service.stats(AGENT)).toEqual({ active: 2, queued: 1 })
 
     release()
 
     // the parked runs finish, freeing slots; the queued 3rd auto-starts and (also released) finishes
     const drainAt = Date.now()
-    while (
-      service.stats(AGENT).active + service.stats(AGENT).queued > 0 &&
-      Date.now() - drainAt < 5000
-    )
+    while (Date.now() - drainAt < 5000) {
+      const s = await service.stats(AGENT)
+      if (s.active + s.queued === 0) break
       await sleep(10)
+    }
 
-    expect(service.stats(AGENT)).toEqual({ active: 0, queued: 0 })
+    expect(await service.stats(AGENT)).toEqual({ active: 0, queued: 0 })
   })
 })

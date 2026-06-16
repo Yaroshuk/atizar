@@ -10,7 +10,7 @@ import type { PipelineService } from './pipelineService.js'
 // resolve + cancel are the step-4 production surface; GET /api/board + /api/board/stream feed the
 // server-driven board.
 
-const TERMINAL = new Set(['finished', 'error', 'closed'])
+const TERMINAL = new Set(['terminal'])
 
 // Messages on the `workitem:<id>` topic are either a trace event or a status change.
 type WorkItemMsg = { seq: number; event: BaseEvent } | { kind: 'status'; status: string }
@@ -35,7 +35,6 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       origin: 'human',
       payload: payload ?? {},
     })
-    if (result.rejected) return c.json({ error: 'already running' }, 409)
     return c.json({ id: result.id })
   })
 
@@ -195,18 +194,18 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json({ ok: true })
   })
 
-  // RESET a workflow — clear its TERMINAL items from the live board (hidden, not deleted, I12).
-  // Active/awaiting items are NOT closed here; `active` is their count so the client can confirm
-  // + cancel them separately before a follow-up reset.
+  // RESET a workflow — the wipe primitive: stop every active item, then retire every terminal
+  // item from the live board (hidden, not deleted, I12). One server op (U7); returns how many
+  // were retired.
   app.post('/api/workflows/:id/reset', async (c) => {
-    const { reset, active } = await service.resetWorkflow(c.req.param('id'))
-    return c.json({ ok: true, reset, active })
+    const { reset } = await service.resetWorkflow(c.req.param('id'))
+    return c.json({ ok: true, reset })
   })
 
-  // RESET every workflow ("reset all"). Same contract as the per-workflow reset.
+  // RESET every workflow ("reset all"). Same wipe contract as the per-workflow reset.
   app.post('/api/reset-all', async (c) => {
-    const { reset, active } = await service.resetAll()
-    return c.json({ ok: true, reset, active })
+    const { reset } = await service.resetAll()
+    return c.json({ ok: true, reset })
   })
 
   // CREDENTIAL HEALTH — explicit on-demand refresh: re-runs every agent's credential/provider

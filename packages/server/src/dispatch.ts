@@ -32,8 +32,6 @@ export interface DispatchInput {
 export interface DispatchResult {
   id: string
   deduped: boolean
-  /** Present only when a human START is rejected because the singleton cap is already full. */
-  rejected?: 'already_running'
 }
 
 // Count ancestors of `parentId` (a root parent = 1, its parent = 2 …). Stops early once it

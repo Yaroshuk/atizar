@@ -1,10 +1,18 @@
-import { instanceId, composeInstructions } from '@atizar/core'
+import { instanceId, composeInstructions, lifecycle, type Phase, type Outcome } from '@atizar/core'
 import { db, makePipelineService, type AgentRuntime } from '@atizar/server'
 import { providerRegistry } from '../server/providers.js'
 import { buildProvider } from '../server/build-agent.js'
 import { workflowServers } from '../server/workflows.js'
 
-const DONE = new Set(['finished', 'error', 'closed'])
+// The eval facts speak the legacy status word so the golden scenarios stay readable. Map the
+// row's (phase, outcome) to that word: a terminal item reports its outcome (done→'finished',
+// reset/superseded→'closed', else the outcome itself); a live item reports its phase word.
+function legacyStatus(phase: Phase, outcome: Outcome): string {
+  if (phase !== 'terminal') return phase === 'awaiting_human' ? 'awaiting_approval' : phase
+  if (outcome === 'done') return 'finished'
+  if (outcome === 'reset' || outcome === 'superseded') return 'closed'
+  return outcome // stopped | rejected | error
+}
 
 export type GateFacts = {
   workItemId: string
@@ -147,15 +155,15 @@ export async function runGolden(scenario: GoldenScenario): Promise<RunFacts> {
       continue
     }
 
-    const active = items.filter((i) => !DONE.has(i.status))
+    const active = items.filter((i) => lifecycle(i.phase, i.outcome, false, false).isLive)
     if (active.length === 0) {
       return {
         items: items.map((i) => ({
           id: i.id,
           agentId: i.agentId,
           parentId: i.parentId,
-          status: i.status,
-          resolution: i.resolution,
+          status: legacyStatus(i.phase, i.outcome),
+          resolution: i.outcome,
           card: (i.card as Record<string, unknown> | null) ?? null,
         })),
         gates: gatesSeen,
