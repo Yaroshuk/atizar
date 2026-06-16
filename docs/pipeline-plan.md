@@ -30,8 +30,8 @@ gaps below.
   `agentId = localId`) + the open modal is wrapped in `<CopilotChatConfigurationProvider>`.
 - **Result surfacing**: render tools draw cards; a data tool's raw result reaches cards via
   `ThreadResultsContext`. Only registered render/HITL tool names show in the consumer thread.
-- **Dedup** (new): a delivery carries a `deliveryKey` (source-item identity); a repeated one-time
-  delivery is a no-op.
+- **Dedup** (new): a delivery carries a dedup `source` (source-item identity, app-supplied via
+  `sourceOf` at dispatch); a repeated one-time delivery is a no-op.
 
 ---
 
@@ -73,8 +73,8 @@ no-op — but the UI gives no feedback, so it looks broken/repeatable.
 **Options:** disable / relabel the button ("Reply drafted ↗", links to the spawned instance) once a
 delivery for that source item exists.
 - **OPEN Q:** where does the card learn "already delivered"? It needs the delivery state keyed by
-  `deliveryKey` — lift that to a context the card reads (the `deliver` layer already computes the
-  key; expose "live deliveries by key").
+  the dedup `source` — lift that to a context the card reads (the `deliver` layer already computes
+  the key; expose "live deliveries by key").
 
 ---
 
@@ -100,12 +100,12 @@ For each path: **trigger → payload → target → result presentation → life
    `done-without-result` is torn down. This single change fixes **P1** and gives **P3** a clean
    "this item has been acted on" signal. — **OPEN, recommended starting point.**
 2. **Where does delivery/action state live** so a source card can reflect "already acted" (P3) and
-   so the pipeline can show "→ produced result X"? Probably a deliveries-by-`deliveryKey` map lifted
+   so the pipeline can show "→ produced result X"? Probably a deliveries-by-`source` map lifted
    beside the instance list.
 3. **Intro vs description split** (P2) — small, can land independently.
 4. **Cross-workflow result visibility** (path 4): always navigate, or preview the produced result in
    the origin (a "peek")?
-5. **Dedup/idempotency policy** (path 2/3): today every delivery with a `deliveryKey` dedupes. Which
+5. **Dedup/idempotency policy** (path 2/3): today every delivery with a dedup `source` dedupes. Which
    deliveries are genuinely one-time vs legitimately repeatable (e.g. "re-analyze")? Make it explicit
    per destination rather than implicit-by-key.
 

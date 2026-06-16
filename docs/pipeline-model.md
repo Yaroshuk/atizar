@@ -17,7 +17,7 @@ left out — a fresh agent should read this, understand the model, and work out 
 
 | Entity | What it is | Lifetime |
 | --- | --- | --- |
-| **Source** | The external thing being processed (email, GitHub issue, lead) — an **identity / address**, not data. Stream-level (inbox, board) for readers; item-level (one email, one issue) for workers. Today's `deliveryKey`. | External |
+| **Source** | The external thing being processed (email, GitHub issue, lead) — an **identity / address**, not data. Stream-level (inbox, board) for readers; item-level (one email, one issue) for workers. Today the app-supplied dedup source (`sourceOf` at dispatch; the core `deliveryKey` helper was removed). | External |
 | **WorkItem** (node) | The **durable unit of work** the human acts on. Holds status, result, gates, trace. **Pinned to its owning agent — it does not migrate** (see "Work does not flow"). | Durable (survives run teardown within the session) |
 | **Run** | An **ephemeral compute segment**: an agent runs `running` → emits/asks → detaches. With claude-cli a run is killed at the approval tool call and re-primed on resume, so one WorkItem crossing several gates = several runs. | Ephemeral |
 | **Executor** | The live `claude` / proxied-agent process attached to a WorkItem **while it is `running`**. Not stored. | Attached only while running |
@@ -32,7 +32,7 @@ left out — a fresh agent should read this, understand the model, and work out 
 WorkItem {
   id
   agentId      // owner: which agent produced it (wf__agent). The node is pinned here; it does not migrate.
-  source       // identity of the external thing (deliveryKey): gh:#5 / an email Message-ID / board:8
+  source       // identity of the external thing (app-supplied sourceOf): gh:#5 / an email Message-ID / board:8
   parentId?    // node it came from; null = human-started (case root)
   origin?      // thin label "where it came from" (parent / other workflow / human)
   status       // running | awaiting_approval | awaiting_input | result | finished | error | closed
@@ -196,8 +196,9 @@ Message-ID; lead → CRM id; stream → container id). No natural id → a deter
 **stable** fields only. At a box boundary → a new key in the receiver's namespace embedding the
 origin (`feedback:from:gh:#5`), deterministic so re-delivery dedups. The key must be
 **deterministic from the external thing** or dedup breaks. Computed at the **edge** (the
-integration adapter that knows the external id) and stamped on the node at birth. This is today's
-`deliveryKey`.
+integration adapter that knows the external id) and stamped on the node at birth. This is today
+the app-supplied dedup source (`sourceOf` at dispatch; the core `deliveryKey` helper was removed
+once the policy moved to the app).
 
 ## Node → node handoff
 

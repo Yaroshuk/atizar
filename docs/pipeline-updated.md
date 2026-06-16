@@ -55,7 +55,7 @@ WorkItem {
   id            // deterministic, assigned AT DISPATCH (not at render)
   accountId     // tenancy seam — on every row
   agentId       // owner (wf__agent); node is pinned, does not migrate
-  source        // identity of the external thing (was deliveryKey): gh:#5 / Message-ID / board:8
+  source        // identity of the external thing (app-supplied sourceOf): gh:#5 / Message-ID / board:8
   parentId?     // node it came from; null = human-started (case root)
   origin?       // thin label: parent / other-workflow / human
   status        // queued | running | awaiting_approval | awaiting_input

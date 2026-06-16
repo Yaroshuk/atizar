@@ -56,7 +56,7 @@ app-readable version; drizzle-kit's own journal tracks migration application).
 | `agent_id` | text | the `wf__agent` instance id |
 | `parent_id` | uuid null | self-FK; the dispatch tree |
 | `origin` | text | `'human' \| 'agent' \| 'inbound'` (inbound reserved, no producer in beta) |
-| `source` | text null | dedup key (deliveryKey-style); null ⇒ never deduped |
+| `source` | text null | dedup key (app-supplied via `sourceOf` at dispatch); null ⇒ never deduped |
 | `payload` | jsonb | the handoff payload / input seed |
 | `status` | text | §5 union — see below |
 | `resolution` | text null | `'cancelled' \| 'rejected'` marker (NOT a status) |
