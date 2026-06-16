@@ -76,23 +76,42 @@ process — the server is now the executor, so the seam is local).
 
 ### 1.2 State machine completeness
 
-- **Cancel edges** from `queued` / `running` / `awaiting_approval` / `awaiting_input` →
-  `finished` with `resolution: cancelled` (honest audit trail: who/when). Commands:
-  `POST /workitems/:id/cancel` and a workflow-level cancel (cancels every active WorkItem of
-  that workflow's case/tree, in canonical lock order). Reuses the existing HITL kill path.
-- **Startup reconciliation sweep:** on boot, every `running` row without a live executor →
-  `error` ("executor lost", retryable via the existing retry edge); every `queued` row re-fed
-  to the pool in `createdAt` order. Without this, the advertised "survives `tsx watch`
+The work-item lifecycle is expressed as a `(phase, outcome)` pair. The single classifier lives
+in `@atizar/core` (`lifecycle.ts`); every consumer (server cancel-cascade / START guard / dedup,
+board, pipeline column, aggregate, display) imports `lifecycle()` / `hasLiveDescendant` so the
+views cannot physically disagree.
+
+**Vocabulary:**
+- `phase` = `queued | active | awaiting_human | terminal`
+  (`awaiting_human` merges the old `awaiting_approval` + `awaiting_input` — both pause on a human)
+- `outcome` = `running | done | stopped | rejected | error | superseded | reset`
+  (`running` = not-yet-terminal; the other six are the terminal flavours)
+
+The one terminal writer is `settle.ts` (server): every terminal edge (finish / fail / cancel /
+reject / supersede / reset) routes through `applyEdge` — typed `LifecycleNote` trace + audit,
+one transaction, note-before-status, pool reconcile.
+
+Pool occupancy is DB-derived (`countActiveByAgent`); the in-memory counter is gone. The pool
+owns the `queued → active` flip at admission.
+
+Start-over is a confirm-modal wipe — the old 409 reject path is gone.
+
+- **Cancel edges** from `queued` / `active` / `awaiting_human` → `terminal/stopped`
+  (honest audit trail: who/when). Commands: `POST /workitems/:id/cancel` and a workflow-level
+  cancel (cancels every active WorkItem of that workflow's case/tree, in canonical lock order).
+  Reuses the existing HITL kill path.
+- **Startup reconciliation sweep:** on boot, every `active` row without a live executor →
+  `terminal/error` ("executor lost", retryable via the existing retry edge); every `queued` row
+  re-fed to the pool in `createdAt` order. Without this, the advertised "survives `tsx watch`
   restart" produces zombie running-forever cards.
-- **`finished` entry guard is an invariant of the state**, checked in the same transaction on
+- **`terminal` entry guard is an invariant of the state**, checked in the same transaction on
   EVERY inbound edge (result/reject/timeout/drop/archive), not a property of one edge.
   Reject/timeout with live children: default policy = cascade cancel (uses the cancel edge).
-  `finished → closed` re-checks children too.
 - **Reject does not poison the source:** the one-time/"already acted" check counts only
-  children that executed an effect (ledger entry) or finished approved. A rejected WorkItem
-  carries a `rejected` outcome marker + optional reject comment, and offers an explicit
+  children that executed an effect (ledger entry) or finished with outcome `done`. A rejected
+  WorkItem carries `terminal/rejected` + optional reject comment, and offers an explicit
   re-run affordance.
-- **Budget edge:** `budgetExceeded → error` + a per-agent cost ceiling in `defineAgent`.
+- **Budget edge:** `budgetExceeded → terminal/error` + a per-agent cost ceiling in `defineAgent`.
 
 ### 1.3 Gate record (revised)
 
@@ -102,7 +121,7 @@ Gate {
   kind            // approval | choice | rate
   capabilities    // declared per-gate in defineAgent: can_edit / can_respond / can_ignore
                   // (Agent Inbox precedent; not every artifact may be editable)
-  status          // open | resolved
+  status          // open | resolved   (Gate status, not WorkItem phase)
   form            // decision data — editable per capabilities
   formRev         // int/hash; resolve MUST carry the rev the approver rendered; mismatch → 409
   proposedArtifact // the agent's original proposal — kept ALONGSIDE the edited form (audit)
@@ -139,8 +158,8 @@ mitigation only if the UI shows what the input was).
 ### 1.5 RunObserver (the unnamed component, now named)
 
 A server-side consumer of `provider.run()` that runs for **every** dispatch, browser or not:
-appends Trace rows; reacts to `GATE_OPENED` (opens the Gate record, transitions to
-`awaiting_approval`, kills/suspends via the provider); reacts to a registered render tool
+appends Trace rows; reacts to `GATE_OPENED` (opens the Gate record, transitions phase to
+`awaiting_human`, kills/suspends via the provider); reacts to a registered render tool
 (fills `card`, state `result`); finalizes status; republishes live events on a per-WorkItem
 channel for any attached viewer. **Week-0 spike:** browser attach to a running WorkItem —
 trace snapshot from `seq` + SSE tail. If the spike fails, the design changes in week 0, not
@@ -234,15 +253,16 @@ it later), Tailwind preset.
 human edits at the gate → approve → server creates the Gmail draft); zero-credential demo as
 the default first run (`git clone && docker compose up` → live board on the mock provider +
 synthetic cassettes; real Gmail = the documented one-hour step 2); the server spine of §1
-(Postgres, StateStore, chokepoint, transition(), WorkerPool, board SSE, RunObserver);
+(Postgres, StateStore, chokepoint, `settle()` + `applyEdge`, WorkerPool, board SSE, RunObserver);
 server Gate HITL with the editable form; server-executed effects; cancel + sweep + guards;
+lifecycle unified in `@atizar/core` (`lifecycle.ts`, `settle.ts`);
 **Mastra provider as the production path beside claude-cli (dev)**; cost/latency/tokens
 fields on the card; packaging (README with the 10-minute demo, LICENSE, `@atizar/*` rename,
 scanCassette CI gate, golden-set eval harness per workflow).
 
 **Out (safe deferrals, seams in place):** OTel span export (fields stay); auto-timeout
 sweeper (column + edge stay); accountId/auth/RBAC beyond the bearer token; chat
-`awaiting_input` producer; graph/cycles (depth cap + chokepoint stay); cross-process pub/sub;
+`awaiting_human` (input-style) producer; graph/cycles (depth cap + chokepoint stay); cross-process pub/sub;
 GitHub-triage in the onboarding critical path (stays as a second "bring your own board"
 example). Note (decision #7): package extraction (`@atizar/server` + `@atizar/react`) is
 IN the beta as step 7; whether the packages also go to npm at launch or ship via the monorepo
@@ -266,8 +286,8 @@ crash window (drafts are reversible; even Stripe can't close it).
    SSE tail).
 3. **Server spine on Postgres:** StateStore (drizzle-kit + schema_version), dispatch
    chokepoint, `transition()` API with guards, WorkerPool, board SSE.
-4. **Server-executed effects + Stop** (cancel edges, sweep, finished guards, Gate fields:
-   formRev / assignee / comment / both artifact versions).
+4. **Server-executed effects + Stop** (cancel edges, sweep, `terminal` entry guards via `settle()`,
+   Gate fields: formRev / assignee / comment / both artifact versions).
 5. **Mastra provider** (production path) beside claude-cli (dev); re-key record/replay.
 6. **Re-point the UI** (board + thread from server state); delete `@copilotkit/*` deps.
 7. **Extraction + packaging (decision #7):** move `server/pipeline/` → `@atizar/server`
