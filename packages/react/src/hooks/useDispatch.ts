@@ -91,5 +91,16 @@ export const useDispatch = () => {
     return { reset }
   }, [authToken])
 
-  return { start, deliver, cancel, cancelWorkflow, cancelAll, resetWorkflow, resetAll }
+  const cancelInstance = useCallback(
+    async (workflowId: string, agentId: string, key: string): Promise<void> => {
+      await fetch('/api/instances/cancel', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...authHeaders(authToken) },
+        body: JSON.stringify({ workflowId, agentId, key }),
+      })
+    },
+    [authToken]
+  )
+
+  return { start, deliver, cancel, cancelWorkflow, cancelAll, resetWorkflow, resetAll, cancelInstance }
 }

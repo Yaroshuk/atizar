@@ -464,6 +464,21 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       await cancelWorkflowImpl(workflowId)
     },
 
+    // Stop a whole instance: cancel every LIVE Run sharing (workflowId, agentId, key). Each
+    // cancelItem cascades to that Run's descendants, so stopping ANY spawning instance stops every
+    // instance it spawned, transitively. Reuses the ONE cancel primitive (no duplicated cascade).
+    async cancelInstance(workflowId: string, agentId: string, key: string): Promise<void> {
+      const snap = await store.getBoardSnapshot()
+      const live = snap.items.filter(
+        (w) =>
+          w.workflowId === workflowId &&
+          w.agentId === agentId &&
+          w.key === key &&
+          lifecycle(w.phase, w.outcome, false, false).isLive
+      )
+      for (const w of live.sort((a, b) => a.id.localeCompare(b.id))) await cancelItem(w.id)
+    },
+
     // Stop every active work item across ALL workflows. Public alias for cancelAllImpl.
     async cancelAll(): Promise<void> {
       await cancelAllImpl()

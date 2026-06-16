@@ -993,6 +993,56 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
   })
 })
 
+
+describe.skipIf(!reachable)('PipelineService.cancelInstance (B2)', () => {
+  it('cancelInstance stops every live Run of one (agentId, key) + cascades to children', async () => {
+    // instanceKeyOf reads the `k` field from payload; falls back to agentId (for other tests).
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 3, // allow two concurrent Runs for the same agentId
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const wf = `cancel-instance-${randomUUID().slice(0, 8)}`
+    const agentId = `${wf}__reply`
+    const service = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (a, p) => ((p as Record<string, unknown>).k as string | undefined) ?? a,
+    })
+
+    // Two reply Runs for the SAME sender key 'alice', each with a distinct payload so the
+    // dedup-by-source chokepoint lets both through (source is null when deliveryKey finds
+    // nothing, so two null-source items are BOTH accepted by the chokepoint). Use
+    // origin='agent' so the human Start-over path does not interfere.
+    const r1 = await service.dispatch({
+      workflowId: wf,
+      agentId,
+      origin: 'agent',
+      payload: { k: 'alice' },
+    })
+    const r2 = await service.dispatch({
+      workflowId: wf,
+      agentId,
+      origin: 'agent',
+      payload: { k: 'alice', seq: 2 }, // distinct payload → still same key 'alice'
+    })
+
+    // Wait for both to become active (blockingProvider keeps them running).
+    await waitFor(async () => (await service.getStatus(r1.id))?.status === 'active')
+    await waitFor(async () => (await service.getStatus(r2.id))?.status === 'active')
+
+    // Cancel every Run sharing (wf, wf__reply, 'alice').
+    await service.cancelInstance(wf, agentId, 'alice')
+
+    expect((await service.getStatus(r1.id))?.outcome).toBe('stopped')
+    expect((await service.getStatus(r2.id))?.outcome).toBe('stopped')
+  }, 10_000)
+})
+
 describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', () => {
   // A provider that opens a gate then ends — the input root suspends at the gate (awaiting_human)
   // and its pool slot is released. Approach-B steady state for a single-agent input scan: the scan

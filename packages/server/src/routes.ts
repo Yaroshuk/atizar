@@ -194,6 +194,15 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json({ ok: true })
   })
 
+  // STOP a whole instance — cancel every LIVE Run sharing (workflowId, agentId, key).
+  app.post('/api/instances/cancel', async (c) => {
+    const { workflowId, agentId, key } = await c.req.json<{
+      workflowId: string; agentId: string; key: string
+    }>()
+    await service.cancelInstance(workflowId, agentId, key)
+    return c.json({ ok: true })
+  })
+
   // RESET a workflow — the wipe primitive: stop every active item, then retire every terminal
   // item from the live board (hidden, not deleted, I12). One server op (U7); returns how many
   // were retired.
