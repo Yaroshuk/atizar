@@ -2,17 +2,9 @@
 // consumes from `@atizar/server`'s db schema — kept as a hand-written copy so
 // the client never imports server/Node code (and stays bundler-clean).
 
-export type ServerStatus =
-  | 'queued'
-  | 'running'
-  | 'awaiting_approval'
-  | 'awaiting_input'
-  | 'result'
-  | 'finished'
-  | 'error'
-  | 'closed'
+import type { Phase, Outcome } from '@atizar/core'
 
-export type Resolution = 'cancelled' | 'rejected' | 'superseded' | 'reset' | null
+export type { Phase, Outcome }
 
 export type WorkItem = {
   id: string
@@ -22,8 +14,8 @@ export type WorkItem = {
   origin: 'human' | 'agent' | 'inbound'
   source: string | null
   payload: Record<string, unknown>
-  status: ServerStatus
-  resolution: Resolution
+  phase: Phase
+  outcome: Outcome
   card: { tool: string; props: Record<string, unknown> } | null
   error: string | null
 }
