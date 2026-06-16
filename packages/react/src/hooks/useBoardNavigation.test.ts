@@ -211,4 +211,64 @@ describe('useBoardNavigation', () => {
       expect(result.current.openId).toBe(returnedId)
     })
   })
+
+  // U8: starting a LIVE singleton input agent wipes its prior scan, so startInput defers to a
+  // Start-over confirm instead of dispatching. confirmStartOver dispatches; cancel changes nothing.
+  describe('Start-over confirm-gate', () => {
+    // qualifier is a singleton input agent (maxInstances 1, role input) with a live root scan.
+    const singletonDef: any = { id: 'qualifier', name: 'Qualifier', maxInstances: 1 }
+    const liveRoot = {
+      id: 'a__qualifier#1',
+      workflowId: 'a',
+      agentId: 'a__qualifier',
+      parentId: null,
+      phase: 'active',
+      status: 'running',
+      payload: {},
+    }
+
+    it('startInput on a LIVE singleton sets startOver and does NOT dispatch', () => {
+      items = [liveRoot]
+      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+      act(() => result.current.startInput(singletonDef))
+      expect(result.current.startOver).toEqual({ def: singletonDef })
+      expect(start).not.toHaveBeenCalled()
+    })
+
+    it('confirmStartOver dispatches the start and clears startOver', async () => {
+      items = [liveRoot]
+      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+      act(() => result.current.startInput(singletonDef))
+      await act(async () => {
+        result.current.confirmStartOver()
+      })
+      expect(start).toHaveBeenCalledWith(instanceId('a', 'qualifier'))
+      expect(result.current.startOver).toBeNull()
+    })
+
+    it('cancelStartOver clears startOver WITHOUT dispatching', () => {
+      items = [liveRoot]
+      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+      act(() => result.current.startInput(singletonDef))
+      act(() => result.current.cancelStartOver())
+      expect(result.current.startOver).toBeNull()
+      expect(start).not.toHaveBeenCalled()
+    })
+
+    it('a singleton with NO live scan dispatches directly (no confirm)', () => {
+      items = []
+      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+      act(() => result.current.startInput(singletonDef))
+      expect(result.current.startOver).toBeNull()
+      expect(start).toHaveBeenCalledWith(instanceId('a', 'qualifier'))
+    })
+
+    it('a terminal-only scan does NOT gate — dispatches directly', () => {
+      items = [{ ...liveRoot, phase: 'terminal', status: 'done' }]
+      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+      act(() => result.current.startInput(singletonDef))
+      expect(result.current.startOver).toBeNull()
+      expect(start).toHaveBeenCalled()
+    })
+  })
 })

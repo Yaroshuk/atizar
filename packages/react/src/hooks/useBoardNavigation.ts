@@ -35,6 +35,10 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   )
   const [openTypeId, setOpenTypeId] = useState<string | null>(null)
   const [openPickerId, setOpenPickerId] = useState<string | null>(null)
+  // U8: a pending Start-over confirm. Starting a live singleton input agent WIPES + supersedes
+  // its prior scan (U7, server-side) — a destructive gesture, so the public startInput defers to
+  // a confirm modal instead of dispatching straight away.
+  const [startOver, setStartOver] = useState<{ def: AgentDefinition } | null>(null)
 
   // WorkflowBoard.tsx:79-84: persist the open id into the URL so a reload re-attaches
   // (survives the SSE re-subscribe).
@@ -53,12 +57,44 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   const canStart = (agentId: string) => roleOf(agentId) === 'input'
 
   // WorkflowBoard.tsx:126-131: launch an input agent — dispatch a fresh run, open its thread.
-  const startInput = (agentDef: AgentDefinition): void => {
+  const doStart = (agentDef: AgentDefinition): void => {
     void start(instanceId(workflow.id, agentDef.id)).then((id) => {
       setOpenTypeId(null)
       setOpenId(id)
     })
   }
+
+  // A singleton input agent has a LIVE scan in the active workflow when a NON-terminal ROOT
+  // work item for it already exists. The same predicate AgentGrid used for the old (dead)
+  // singletonBusy disable — now it gates the Start-over confirm instead of blocking START.
+  const hasLiveScan = (agentDef: AgentDefinition): boolean =>
+    board.items.some(
+      (w) =>
+        w.workflowId === workflow.id &&
+        stripAgent(w) === agentDef.id &&
+        w.parentId === null &&
+        w.phase !== 'terminal'
+    )
+
+  // U8 confirm-gate: the single start entry point. Starting a live singleton input agent wipes
+  // the prior scan, so route it through a Start-over confirm; everything else dispatches directly.
+  const startInput = (agentDef: AgentDefinition): void => {
+    const isSingletonInput = agentDef.maxInstances === 1 && roleOf(agentDef.id) === 'input'
+    if (isSingletonInput && hasLiveScan(agentDef)) {
+      setStartOver({ def: agentDef })
+      return
+    }
+    doStart(agentDef)
+  }
+
+  // Confirmed: dispatch the fresh run (the server supersedes the prior scan), close the confirm.
+  const confirmStartOver = (): void => {
+    if (!startOver) return
+    doStart(startOver.def)
+    setStartOver(null)
+  }
+  // Cancel: close the confirm, change NOTHING (the current run keeps running).
+  const cancelStartOver = (): void => setStartOver(null)
 
   // WorkflowBoard.tsx:135-143: open an agent by count of its visible items.
   //   0 → type view (intro + START)
@@ -128,6 +164,9 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
     canStart,
     openAgent,
     startInput,
+    startOver,
+    confirmStartOver,
+    cancelStartOver,
     reset,
     notesFor,
     // Re-exported lookups the consuming blocks need.

@@ -104,8 +104,6 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
         <AgentGrid
           agents={nav.workflow.agents.map((a) => a.agent)}
           meta={config.meta}
-          items={board.items}
-          activeWorkflowId={sel.activeWorkflowId}
           aggOf={aggOf}
           healthOf={healthOf}
           canStart={nav.canStart}
@@ -208,6 +206,19 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
           }
           onConfirm={() => void stop.confirmStop()}
           onCancel={stop.cancelConfirm}
+        />
+      )}
+
+      {nav.startOver && (
+        <ConfirmDialog
+          title='Start over?'
+          message={
+            `This stops the current run in ${nav.workflow.label} and starts a fresh one. ` +
+            'The current work moves to Activity (nothing is deleted).'
+          }
+          confirmLabel='Start over'
+          onConfirm={() => void nav.confirmStartOver()}
+          onCancel={nav.cancelStartOver}
         />
       )}
 

@@ -4,13 +4,11 @@ import { CompHeader } from '../../primitives/CompHeader/CompHeader'
 import { aggregateLabel } from '../../aggregate'
 import type { AgentAggregate } from '../../aggregate'
 import type { AgentMeta } from '../../renderSpecs'
-import type { AgentHealth, WorkItem } from '../../serverTypes'
+import type { AgentHealth } from '../../serverTypes'
 
 export const AgentGrid = ({
   agents,
   meta,
-  items,
-  activeWorkflowId,
   aggOf,
   healthOf,
   canStart,
@@ -19,8 +17,6 @@ export const AgentGrid = ({
 }: {
   agents: AgentDefinition[]
   meta: Record<string, AgentMeta>
-  items: WorkItem[]
-  activeWorkflowId: string
   aggOf: (agentId: string) => AgentAggregate
   healthOf: (agentId: string) => AgentHealth | undefined
   canStart: (agentId: string) => boolean
@@ -52,14 +48,9 @@ export const AgentGrid = ({
       <div className='agent-grid'>
         {agents.map((agent) => {
           const agg = aggOf(agent.id)
-          const singletonBusy =
-            agent.maxInstances === 1 &&
-            items.some(
-              (w) =>
-                w.workflowId === activeWorkflowId &&
-                w.agentId.slice(w.workflowId.length + 2) === agent.id &&
-                w.phase !== 'terminal'
-            )
+          // A busy singleton no longer blocks START here — tapping its card opens the live
+          // thread, where "Start over" runs the confirm-gated wipe+restart (U8). The only
+          // remaining START block is credential health, handled inside AgentCard.
           return (
             <AgentCard
               key={agent.id}
@@ -70,8 +61,6 @@ export const AgentGrid = ({
               aggregateLabel={aggregateLabel(agg)}
               canStart={canStart(agent.id)}
               health={healthOf(agent.id)}
-              startDisabled={singletonBusy}
-              startDisabledReason={singletonBusy ? 'Already running' : undefined}
               onStart={() => onStart(agent)}
               onOpen={() => onOpen(agent.id)}
             />

@@ -270,12 +270,21 @@ export const AgentModal = ({
           const active = status === 'running' || status === 'awaiting_approval'
           const showStop = active && onStop
           const showStart = canStart && !active
-          if (!showStop && !showStart) return null
+          // While live, START isn't shown — but a launchable (input) agent can still START OVER:
+          // the confirm-gated onStart wipes the current scan and runs a fresh one (U8). Without
+          // this affordance the Start-over feature the server delivers is unreachable from the UI.
+          const showStartOver = canStart && active
+          if (!showStop && !showStart && !showStartOver) return null
           return (
             <div className='modal-foot'>
               {showStart && (
                 <button className='btn btn-primary' onClick={onStart}>
                   START
+                </button>
+              )}
+              {showStartOver && (
+                <button className='btn btn-ghost' onClick={onStart}>
+                  Start over
                 </button>
               )}
               {showStop && (

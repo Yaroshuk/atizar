@@ -18,9 +18,6 @@ type AgentCardProps = {
   canStart: boolean
   // Credential health (from the board snapshot). !ok → a warning line + START blocked.
   health?: AgentHealth
-  // START is disabled (e.g. a singleton already running) with this reason as the title.
-  startDisabled?: boolean
-  startDisabledReason?: string
   onStart: () => void
   onOpen: () => void
 }
@@ -43,8 +40,6 @@ export const AgentCard = ({
   aggregateLabel,
   canStart,
   health,
-  startDisabled = false,
-  startDisabledReason,
   onStart,
   onOpen,
 }: AgentCardProps) => {
@@ -55,8 +50,8 @@ export const AgentCard = ({
 
   const unhealthy = health && !health.ok
   // A missing credential blocks a launch; surface the hint and disable START.
-  const blocked = startDisabled || !!unhealthy
-  const blockedReason = unhealthy ? health.hint : startDisabledReason
+  const blocked = !!unhealthy
+  const blockedReason = unhealthy ? health.hint : undefined
 
   const renderFoot = () => {
     if (aggregateLabel) {
