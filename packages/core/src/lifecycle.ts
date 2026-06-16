@@ -10,14 +10,7 @@ export type Phase = 'queued' | 'active' | 'awaiting_human' | 'terminal'
 // outcome: was `resolution`, now first-class. running = not-yet-terminal; the other six are the
 // terminal flavours. done = a clean finish (incl. an approved gate, which is `done` + an audit
 // marker, so approved is distinguishable in the thread/audit, not in the outcome value).
-export type Outcome =
-  | 'running'
-  | 'done'
-  | 'stopped'
-  | 'rejected'
-  | 'error'
-  | 'superseded'
-  | 'reset'
+export type Outcome = 'running' | 'done' | 'stopped' | 'rejected' | 'error' | 'superseded' | 'reset'
 
 export interface Lifecycle {
   phase: Phase
@@ -73,9 +66,9 @@ export function lifecycle(
 // The ONE tree walk over phase-liveness: the set of ids that have ≥1 transitively-live descendant.
 // Used by board/pipeline (kept parent) AND the server START guard (a finished input root with an
 // awaiting child is still a live scan — Approach B). Cycle-safe via the seen guard.
-export function hasLiveDescendant<
-  T extends { id: string; parentId: string | null; phase: Phase },
->(rows: readonly T[]): Set<string> {
+export function hasLiveDescendant<T extends { id: string; parentId: string | null; phase: Phase }>(
+  rows: readonly T[]
+): Set<string> {
   const childrenOf = new Map<string, T[]>()
   for (const r of rows) {
     if (!r.parentId) continue
