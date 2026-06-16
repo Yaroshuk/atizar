@@ -28,7 +28,10 @@ import { makeActivityLog, type ActivityEntry } from './activity.js'
 // The provider lookup is injected (the same buildProvider the spike used), so the service
 // has no knowledge of CopilotKit or the registry.
 
-export type DispatchRequest = Omit<DispatchInput, 'maxInstances'>
+// The public dispatch contract: a caller (routes/tests/evals) supplies neither `maxInstances`
+// (the service resolves it from the runtime) nor `key` (the service computes it via the app's
+// instanceKeyOf at the chokepoint — the ONE place a key originates).
+export type DispatchRequest = Omit<DispatchInput, 'maxInstances' | 'key'>
 
 export interface TraceSnapshot {
   id: string
@@ -50,6 +53,9 @@ export interface PipelineServiceDeps {
   // can omit them without any wiring overhead.
   getAgentHealth?: () => Record<string, HealthCheck>
   refreshHealth?: () => Promise<Record<string, HealthCheck>>
+  // The app's instance-key policy (spec 2026-06-16). REQUIRED — the framework never invents a key.
+  // Same key → same instance. e.g. reply → payload.email.from; spam/sorter → the agent id.
+  instanceKeyOf: (agentId: string, payload: Record<string, unknown>) => string
 }
 
 export function makePipelineService(deps: PipelineServiceDeps) {
@@ -82,6 +88,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       origin: 'agent',
       payload: req.payload,
       source: deliveryKey(req.payload) ?? null,
+      key: deps.instanceKeyOf(r.instanceId, req.payload),
       parentId: req.parentId,
       maxInstances,
     })
@@ -261,7 +268,11 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
         await wipeWorkflowImpl(req.workflowId)
       }
-      const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
+      const result = await dispatchChokepoint(db, pool, {
+        ...req,
+        key: deps.instanceKeyOf(req.agentId, req.payload),
+        maxInstances,
+      })
       activity.record({
         ts: Date.now(),
         workflowId: req.workflowId,

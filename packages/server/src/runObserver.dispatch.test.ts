@@ -63,6 +63,7 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
       agentId: 'wf__sorter',
       origin: 'human',
       payload: {},
+      key: 'wf__sorter',
     })
 
     const delivered: Parameters<Parameters<typeof makeRunObserver>[0]['deliver']>[0][] = []
@@ -113,6 +114,7 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
       agentId: 'wf__sorter',
       origin: 'human',
       payload: {},
+      key: 'wf__sorter',
     })
 
     const delivered: unknown[] = []

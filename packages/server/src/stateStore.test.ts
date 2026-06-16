@@ -29,6 +29,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
     agentId: 'lead-inbox__reply',
     origin: 'human' as const,
     payload: { hello: 'world' },
+    key: 'lead-inbox__reply',
   })
 
   it('inserts a queued WorkItem and reads it back', async () => {
@@ -86,6 +87,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
       agentId: 'wf__a',
       origin: 'human',
       payload: {},
+      key: 'wf__a',
     })
     const gateId = randomUUID()
     const key = `${wi.id}:${gateId}`
@@ -104,6 +106,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
       agentId: 'wf__a',
       origin: 'human',
       payload: {},
+      key: 'wf__a',
     })
     const gate = await store.insertGate({
       workItemId: wi.id,
@@ -125,6 +128,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
           agentId: a,
           origin: 'human',
           payload: {},
+          key: a,
         })
       ).id
     const id1 = await mk()
@@ -144,6 +148,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
       agentId,
       origin: 'human',
       payload: {},
+      key: agentId,
     })
     const child = await store.insertWorkItem({
       workflowId,
@@ -151,6 +156,7 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
       origin: 'agent',
       parentId: root.id,
       payload: {},
+      key: `${workflowId}__reply`,
     })
     // root finished (Approach B: finishes on its own run-end), child still awaiting → scan is LIVE
     await transition(db, root.id, 'start')

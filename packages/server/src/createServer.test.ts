@@ -64,6 +64,7 @@ describe('createServer (start: false)', () => {
       buildProvider,
       connections: [],
       scopesFor: () => [],
+      instanceKeyOf: (agentId) => agentId,
       enabledWorkflows: null,
       start: false,
     })
@@ -80,6 +81,7 @@ describe('createServer (start: false)', () => {
       buildProvider,
       connections: [],
       scopesFor: () => [],
+      instanceKeyOf: (agentId) => agentId,
       enabledWorkflows: ['nonexistent'],
       start: false,
     })

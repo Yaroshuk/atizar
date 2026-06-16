@@ -18,6 +18,7 @@ const newQueued = (over: Partial<{ parentId: string | null }> = {}) =>
     agentId: 'lead-inbox__reply',
     origin: 'human',
     payload: {},
+    key: 'lead-inbox__reply',
     parentId: over.parentId ?? null,
   })
 

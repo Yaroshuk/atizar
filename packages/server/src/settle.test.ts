@@ -20,6 +20,7 @@ const newActive = async () => {
     agentId: 'lead-inbox__reply',
     origin: 'human',
     payload: {},
+    key: 'lead-inbox__reply',
   })
   const { transition } = await import('./transition.js')
   await transition(db, row.id, 'start')

@@ -108,6 +108,7 @@ export function buildEvalService(): {
     db,
     resolveAgent: (id) => runtimes[id],
     descriptors: workflowServers.map((w) => w.descriptor),
+    instanceKeyOf: (agentId) => agentId,
   })
   return { service, effectCalls }
 }

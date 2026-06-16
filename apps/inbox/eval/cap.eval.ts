@@ -44,6 +44,7 @@ describe('worker cap (F1)', () => {
       db,
       resolveAgent: (id) => (id === AGENT ? runtime : undefined),
       descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
     })
 
     const dispatch = () =>

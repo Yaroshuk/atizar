@@ -16,6 +16,17 @@ void createServer({
   connections: connectionList,
   scopesFor,
   enabledWorkflows: ENABLED_WORKFLOWS,
+  // The email-inbox instance-key policy (the framework declares the seam; the literals live HERE):
+  // reply correlates per sender (one reply instance per email address); the sorter + batch agents
+  // (reader/spam/important) each collapse to a single constant instance (the agent id).
+  instanceKeyOf: (agentId, payload) => {
+    const bare = agentId.includes('__') ? agentId.slice(agentId.indexOf('__') + 2) : agentId
+    if (bare === 'reply') {
+      const email = (payload as { email?: { from?: string } }).email
+      return email?.from ?? agentId // a malformed reply payload falls back to one instance per agent
+    }
+    return agentId // sorter + batch agents (reader/spam/important) = one constant instance each
+  },
   start: true,
 }).catch((err) => {
   console.error('[server] boot failed:', err)

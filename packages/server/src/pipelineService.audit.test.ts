@@ -66,7 +66,12 @@ describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () 
       dispatchToolNames: [],
       handoffs: [],
     }
-    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const service = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
 
     const { id } = await service.dispatch(freshBase())
     await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')

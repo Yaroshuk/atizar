@@ -89,7 +89,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const service = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
 
     const { id } = await service.dispatch(freshBase())
     await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
@@ -118,7 +123,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       handoffs: [],
     }
     const wf = `closed-board-${randomUUID().slice(0, 8)}`
-    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const service = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
 
     const { id } = await service.dispatch({ ...base, workflowId: wf, agentId: `${wf}__reply` })
     await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
@@ -148,7 +158,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const service = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
 
     await service.dispatch({ ...base, agentId: 'cap-agent' })
     await service.dispatch({ ...base, agentId: 'cap-agent' })
@@ -194,7 +209,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [inputWf],
+      instanceKeyOf: (agentId) => agentId,
+    })
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
@@ -220,6 +240,48 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const stats = await svc.stats(agentId)
     expect(stats.active).toBe(1)
     expect(stats.queued).toBe(0)
+  })
+
+  it('stamps the instanceKeyOf result on a human START', async () => {
+    const wf = `keyed-${randomUUID().slice(0, 8)}`
+    const agentId = `${wf}__sorter`
+    const inputWf = defineWorkflow({
+      id: wf,
+      label: 'S',
+      iconName: 'inbox',
+      agents: [
+        {
+          agent: defineAgent({
+            id: 'sorter',
+            name: 's',
+            provider: 'mock',
+            instructions: 'x',
+            tools: ['t'],
+            approvals: [],
+            renders: {},
+          }),
+          role: 'input',
+        },
+      ],
+      entryAgentId: 'sorter',
+      inputs: [],
+    })
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const service = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [inputWf],
+      instanceKeyOf: (id) => `key:${id}`,
+    })
+    const { id } = await service.dispatch({ workflowId: wf, agentId, origin: 'human', payload: {} })
+    expect((await makeStateStore(db).getWorkItem(id))?.key).toBe(`key:${agentId}`)
   })
 
   it('machine dispatch (origin=agent) to a saturated singleton queues (not wiped by Start-over)', async () => {
@@ -250,7 +312,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    return makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
   }
 
   async function seedGate(
@@ -373,7 +440,12 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
     const req = { ...base, agentId: 'lead-inbox__qualifier', origin: 'human' as const }
     const { id } = await svc.dispatch(req)
     const entries = svc.getActivity()
@@ -400,6 +472,7 @@ describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       getAgentHealth: () => agentHealth,
+      instanceKeyOf: (agentId) => agentId,
     })
     const board = await svc.getBoard()
     expect(board.agentHealth).toEqual(agentHealth)
@@ -418,6 +491,7 @@ describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {
       db,
       resolveAgent: () => runtime,
       descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
       // getAgentHealth intentionally omitted
     })
     const board = await svc.getBoard()
@@ -435,7 +509,12 @@ describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
 
     // Dispatch two items into two different workflows (agent key = wf__agent).
     // Items are written to DB as 'queued' synchronously inside dispatch().
@@ -489,7 +568,12 @@ describe.skipIf(!reachable)('PipelineService reset/wipe (Unit 4.3)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    return makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
   }
 
   it('resetWorkflow retires a finished item (outcome reset), preserving the row (I12)', async () => {
@@ -527,7 +611,12 @@ describe.skipIf(!reachable)('PipelineService reset/wipe (Unit 4.3)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
     const wf = `wipe-active-${randomUUID().slice(0, 8)}`
     const { id } = await svc.dispatch({
       workflowId: wf,
@@ -620,7 +709,12 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
   })
 
   it('intra-workflow deliver dispatches a CHILD with parentId, source, origin=agent', async () => {
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
     const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
     const threadId = `t-${randomUUID()}`
     const r = await svc.deliver({
@@ -642,7 +736,12 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
   })
 
   it('a repeated deliver on the same source dedups (no second child)', async () => {
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+    })
     const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
     const threadId = `t-${randomUUID()}`
     const payload = { threadId, from: 'a@b.com', subject: 'Hi' }
@@ -665,7 +764,12 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
   })
 
   it('a cross-workflow payload that fails the contract schema returns ok:false', async () => {
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [crossWf] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [crossWf],
+      instanceKeyOf: (agentId) => agentId,
+    })
     const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
     const r = await svc.deliver({
       origin: 'github-triage',
@@ -722,7 +826,12 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
       dispatchToolNames: [],
       handoffs: [],
     }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [inputWf],
+      instanceKeyOf: (agentId) => agentId,
+    })
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
@@ -845,7 +954,12 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
       dispatchToolNames: [],
       handoffs: [],
     }
-    const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [inputWf] })
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [inputWf],
+      instanceKeyOf: (agentId) => agentId,
+    })
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 

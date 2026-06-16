@@ -57,6 +57,10 @@ export interface CreateServerArgs {
   scopesFor: (integration: string) => string[]
   // null = all workflows; an array = the demo filter (only these ids enabled).
   enabledWorkflows: string[] | null
+  // The app's instance-key policy (spec 2026-06-16): given a runtime agent id (wf__agent) and the
+  // dispatch payload, return the correlation key. Same key → same instance. The framework declares
+  // this SEAM but never the policy — the body (reply→sender, others→constant) lives in the app.
+  instanceKeyOf: (agentId: string, payload: Record<string, unknown>) => string
   // When false, assemble + register but do NOT serve/migrate/sweep (the unit-test path).
   start?: boolean
 }
@@ -160,6 +164,7 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
     descriptors: activeWorkflowServers.map((w) => w.descriptor),
     getAgentHealth: () => agentHealthCache,
     refreshHealth,
+    instanceKeyOf: args.instanceKeyOf,
   })
 
   const app = new Hono()

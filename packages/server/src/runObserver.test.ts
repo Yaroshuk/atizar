@@ -60,6 +60,7 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
       agentId: 'lead-inbox__reply',
       origin: 'human',
       payload: {},
+      key: 'lead-inbox__reply',
     })
     const { pool, reconcile } = fakePool()
     const observer = makeRunObserver({
