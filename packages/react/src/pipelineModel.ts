@@ -131,7 +131,7 @@ export function buildPipeline(
     const kids = (
       members
         ? members.flatMap((m) => childrenOf.get(m.localId) ?? [])
-        : childrenOf.get(parent.localId) ?? []
+        : (childrenOf.get(parent.localId) ?? [])
     ).filter(isShownChild)
     // group children by agentId, preserving first-seen order
     const order: string[] = []

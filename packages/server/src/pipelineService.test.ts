@@ -962,7 +962,12 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
 
   it('a fresh input START supersedes the prior FINISHED scan root', async () => {
     const { svc, workflowId, sorterId } = makeInputService()
-    const first = await svc.dispatch({ workflowId, agentId: sorterId, origin: 'human', payload: {} })
+    const first = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
     // Drive the first scan to a clean finish (quickProvider → terminal/done).
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
 
@@ -979,7 +984,12 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
   it('a second START while a scan is LIVE returns the live scan (no second scan)', async () => {
     // blockingProvider keeps the first scan ACTIVE (slot occupied → live).
     const { svc, workflowId, sorterId } = makeInputService(blockingProvider())
-    const first = await svc.dispatch({ workflowId, agentId: sorterId, origin: 'human', payload: {} })
+    const first = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
 
     const second = await svc.dispatch({
@@ -992,7 +1002,6 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
     expect(second.deduped).toBe(true)
   })
 })
-
 
 describe.skipIf(!reachable)('PipelineService.cancelInstance (B2)', () => {
   it('cancelInstance stops every live Run of one (agentId, key) + cascades to children', async () => {

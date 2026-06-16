@@ -92,7 +92,9 @@ describe('statusesOf', () => {
 
 describe('toPInstances key propagation', () => {
   it('carries the work item key onto the PInstance', () => {
-    const keyed = [wi({ id: 'r1', agentId: 'lead-inbox__reply', phase: 'active', key: 'alice@x.com' })]
+    const keyed = [
+      wi({ id: 'r1', agentId: 'lead-inbox__reply', phase: 'active', key: 'alice@x.com' }),
+    ]
     const [p] = toPInstances(keyed, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
     expect(p.key).toBe('alice@x.com')
   })

@@ -102,5 +102,14 @@ export const useDispatch = () => {
     [authToken]
   )
 
-  return { start, deliver, cancel, cancelWorkflow, cancelAll, resetWorkflow, resetAll, cancelInstance }
+  return {
+    start,
+    deliver,
+    cancel,
+    cancelWorkflow,
+    cancelAll,
+    resetWorkflow,
+    resetAll,
+    cancelInstance,
+  }
 }

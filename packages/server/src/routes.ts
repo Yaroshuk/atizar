@@ -197,7 +197,9 @@ export function createPipelineRoutes(service: PipelineService): Hono {
   // STOP a whole instance — cancel every LIVE Run sharing (workflowId, agentId, key).
   app.post('/api/instances/cancel', async (c) => {
     const { workflowId, agentId, key } = await c.req.json<{
-      workflowId: string; agentId: string; key: string
+      workflowId: string
+      agentId: string
+      key: string
     }>()
     if (!workflowId || !agentId || !key) return c.json({ error: 'missing fields' }, 400)
     await service.cancelInstance(workflowId, agentId, key)
