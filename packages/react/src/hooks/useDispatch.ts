@@ -67,28 +67,28 @@ export const useDispatch = () => {
     await fetch('/api/cancel-all', { method: 'POST', headers: authHeaders(authToken) })
   }, [authToken])
 
-  // Clear a workflow's TERMINAL items from the live board (hidden, not deleted). Returns how
-  // many were cleared and how many ACTIVE/awaiting items were left untouched (`active`) so the
-  // caller can confirm + cancel those separately before a follow-up reset.
+  // WIPE a workflow: a single server op that cancels every active item AND clears every kept/
+  // terminal one, moving them all to history (hidden, never deleted — I12). Returns how many rows
+  // were wiped. (The old two-step cancel+reset composition is gone — the server does it atomically.)
   const resetWorkflow = useCallback(
-    async (id: string): Promise<{ reset: number; active: number }> => {
+    async (id: string): Promise<{ reset: number }> => {
       const res = await fetch(`/api/workflows/${id}/reset`, {
         method: 'POST',
         headers: authHeaders(authToken),
       })
       if (!res.ok) throw new Error(`reset failed: ${res.status}`)
-      const { reset, active } = (await res.json()) as { reset: number; active: number }
-      return { reset, active }
+      const { reset } = (await res.json()) as { reset: number }
+      return { reset }
     },
     [authToken]
   )
 
-  // Clear TERMINAL items across ALL workflows ("reset all"). Same contract as resetWorkflow.
-  const resetAll = useCallback(async (): Promise<{ reset: number; active: number }> => {
+  // Wipe ALL workflows ("reset all"). Same contract as resetWorkflow.
+  const resetAll = useCallback(async (): Promise<{ reset: number }> => {
     const res = await fetch('/api/reset-all', { method: 'POST', headers: authHeaders(authToken) })
     if (!res.ok) throw new Error(`reset-all failed: ${res.status}`)
-    const { reset, active } = (await res.json()) as { reset: number; active: number }
-    return { reset, active }
+    const { reset } = (await res.json()) as { reset: number }
+    return { reset }
   }, [authToken])
 
   return { start, deliver, cancel, cancelWorkflow, cancelAll, resetWorkflow, resetAll }

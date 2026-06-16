@@ -13,17 +13,17 @@ export type ResetController = ReturnType<typeof useResetController>
 
 export function useResetController(activeWorkflowId: string) {
   const board = useBoard()
-  const { resetWorkflow, resetAll, cancelWorkflow, cancelAll } = useDispatch()
+  const { resetWorkflow, resetAll } = useDispatch()
   const [confirm, setConfirm] = useState<ResetConfirm>(null)
   const [resettingWorkflow, setResettingWorkflow] = useState(false)
   const [resettingAll, setResettingAll] = useState(false)
 
-  // Items a reset will stop + clear: everything in scope that has not already left the board
-  // (status !== 'closed'). Reset is a full wipe, so this counts ACTIVE/running items too.
+  // Items a wipe will stop + clear: every row in scope. The board carries only NON-RETIRED rows
+  // (the server drops superseded/reset — U7c), so a plain in-scope count is the right number; no
+  // 'closed'/retired predicate is needed. This includes queued rows, which is correct — a wipe
+  // cancels them too.
   const affected = (kind: 'workflow' | 'all'): number =>
-    board.items.filter(
-      (w) => w.status !== 'closed' && (kind === 'all' || w.workflowId === activeWorkflowId)
-    ).length
+    board.items.filter((w) => kind === 'all' || w.workflowId === activeWorkflowId).length
 
   // A click only OPENS the confirm — it never touches the board. An empty scope is a no-op.
   const request = (kind: 'workflow' | 'all'): void => {
@@ -37,7 +37,8 @@ export function useResetController(activeWorkflowId: string) {
   // Cancel: close the confirm, change NOTHING.
   const cancelConfirm = () => setConfirm(null)
 
-  // Confirmed: stop every active item in scope, then clear the now-terminal items — a full wipe.
+  // Confirmed: one server wipe op (cancel + clear, atomically server-side) — no client-side
+  // cancel-then-reset composition.
   const confirmReset = async (): Promise<void> => {
     if (!confirm) return
     const { kind } = confirm
@@ -45,13 +46,8 @@ export function useResetController(activeWorkflowId: string) {
     const setResetting = kind === 'workflow' ? setResettingWorkflow : setResettingAll
     setResetting(true)
     try {
-      if (kind === 'workflow') {
-        await cancelWorkflow(activeWorkflowId)
-        await resetWorkflow(activeWorkflowId)
-      } else {
-        await cancelAll()
-        await resetAll()
-      }
+      if (kind === 'workflow') await resetWorkflow(activeWorkflowId)
+      else await resetAll()
     } finally {
       setResetting(false)
     }

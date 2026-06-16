@@ -32,7 +32,8 @@ describe('AgentGrid', () => {
     const activeItem: any = {
       workflowId: 'a',
       agentId: 'a__qualifier',
-      status: 'running',
+      phase: 'active',
+      outcome: 'running',
     }
 
     // aggregateLabel returns '' when activeCount === 0, which lets AgentCard render the START button.
@@ -57,8 +58,8 @@ describe('AgentGrid', () => {
       expect((btn as HTMLButtonElement).title).toBe('Already running')
     })
 
-    it('leaves START enabled when singleton item is finished (not in ACTIVE_SERVER)', () => {
-      const finishedItem: any = { ...activeItem, status: 'finished' }
+    it('leaves START enabled when singleton item is terminal (not active)', () => {
+      const finishedItem: any = { ...activeItem, phase: 'terminal', outcome: 'done' }
       render(
         <AgentGrid
           agents={singletonAgents}
