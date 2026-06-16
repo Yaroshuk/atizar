@@ -147,14 +147,17 @@ export const PipelineColumn = ({
                   <ConnectorDown />
                   <div className={s.plCont}>
                     {block.groups.map((g) => {
-                      const nested = g.instances.length >= 2 || g.queued > 0
-                      if (!nested) {
-                        const inst = g.instances[0]
+                      // A single instance of this agent with a single Run → the flat `pl-single`
+                      // row. Anything else (≥2 instances, a queue, OR one instance with ≥2 Runs)
+                      // → the nested group treatment so every Run stays visible.
+                      const single = g.instances.length === 1 && g.instances[0].runs.length === 1
+                      if (single) {
+                        const head = g.instances[0].head
                         return (
                           <div
                             key={g.agentId}
-                            className={`pl-single ${pillTint(inst.status, inst.outcome)}${stopClasses(inst)}`}
-                            onClick={() => onOpen(inst.localId)}
+                            className={`pl-single ${pillTint(head.status, head.outcome)}${stopClasses(head)}`}
+                            onClick={() => onOpen(head.localId)}
                           >
                             <div className='m-icon'>
                               <Icon name={g.iconName} size={15} />
@@ -162,10 +165,10 @@ export const PipelineColumn = ({
                             <div className='m-text'>
                               <span className='m-name'>
                                 {g.name}
-                                {inst.label ? ` · ${inst.label}` : ''}
+                                {head.label ? ` · ${head.label}` : ''}
                               </span>
                             </div>
-                            {stateAndStop(inst)}
+                            {stateAndStop(head)}
                           </div>
                         )
                       }
@@ -179,18 +182,51 @@ export const PipelineColumn = ({
                             <span className={s.plAcount}>{g.instances.length} active</span>
                           </div>
                           <div className={s.plKids}>
-                            {g.instances.map((inst) => (
-                              <div key={inst.localId} className={s.plKid}>
-                                <span className={s.plHstub} />
+                            {g.instances.map((inst) => {
+                              // The instance is represented by its `head` (single-source status,
+                              // computed via PRIORITY in pipelineModel — never re-derived here).
+                              const { head } = inst
+                              const instRow = (
                                 <div
-                                  className={`pl-inst ${pillTint(inst.status, inst.outcome)}${stopClasses(inst)}`}
-                                  onClick={() => onOpen(inst.localId)}
+                                  className={`pl-inst ${pillTint(head.status, head.outcome)}${stopClasses(head)}`}
+                                  onClick={() => onOpen(head.localId)}
                                 >
-                                  <span className='pl-iname'>{inst.label || inst.name}</span>
-                                  {stateAndStop(inst)}
+                                  <span className='pl-iname'>{head.label || head.name}</span>
+                                  {stateAndStop(head)}
                                 </div>
-                              </div>
-                            ))}
+                              )
+                              // One Run → just the instance row. Multiple Runs (e.g. one sender,
+                              // two drafts) → the instance row as a sub-header, with each Run
+                              // nested under it (same L-connector treatment as the group level).
+                              if (inst.runs.length === 1) {
+                                return (
+                                  <div key={inst.key} className={s.plKid}>
+                                    <span className={s.plHstub} />
+                                    {instRow}
+                                  </div>
+                                )
+                              }
+                              return (
+                                <div key={inst.key} className={s.plKid}>
+                                  <span className={s.plHstub} />
+                                  {instRow}
+                                  <div className={s.plKids}>
+                                    {inst.runs.map((run) => (
+                                      <div key={run.localId} className={s.plKid}>
+                                        <span className={s.plHstub} />
+                                        <div
+                                          className={`pl-inst ${pillTint(run.status, run.outcome)}${stopClasses(run)}`}
+                                          onClick={() => onOpen(run.localId)}
+                                        >
+                                          <span className='pl-iname'>{run.label || run.name}</span>
+                                          {stateAndStop(run)}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                           {g.queued > 0 && <p className={s.plQueued}>queued: {g.queued}</p>}
                         </div>
