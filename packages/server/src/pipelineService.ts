@@ -270,6 +270,11 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // STAYS — it backs the explicit Clear button.)
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
         if (await store.hasLiveInputScan(req.workflowId, req.agentId)) {
+          // The gate dedups only a live SCAN itself. `hasLiveInputScan` is Approach-B (also true when
+          // a finished root has a live DESCENDANT), but the lookup matches only a self-live root — so
+          // a `done` scan whose only live thing is a child draft yields `live === undefined`, falls
+          // through, and is superseded + re-scanned. That is intended: the gate blocks two concurrent
+          // scans, NOT a re-scan while child drafts run ("done → re-runnable; live → sequential").
           const live = (await store.getActiveByWorkflow(req.workflowId)).find(
             (w) => w.agentId === req.agentId && !w.parentId
           )
