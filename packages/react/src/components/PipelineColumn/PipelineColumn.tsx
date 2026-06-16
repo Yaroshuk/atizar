@@ -150,7 +150,11 @@ export const PipelineColumn = ({
                       // A single instance of this agent with a single Run → the flat `pl-single`
                       // row. Anything else (≥2 instances, a queue, OR one instance with ≥2 Runs)
                       // → the nested group treatment so every Run stays visible.
-                      const single = g.instances.length === 1 && g.instances[0].runs.length === 1
+                      // g.queued > 0 also forces the nested treatment so the `queued: N` badge shows.
+                      const single =
+                        g.instances.length === 1 &&
+                        g.instances[0].runs.length === 1 &&
+                        g.queued === 0
                       if (single) {
                         const head = g.instances[0].head
                         return (
