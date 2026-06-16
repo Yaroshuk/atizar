@@ -218,25 +218,22 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
-  it('a second human START of a singleton input agent WIPES the prior live root and starts fresh', async () => {
+  it('a second human START while a singleton input scan is LIVE returns the live scan (one-open gate)', async () => {
     const { svc, workflowId, agentId } = makeSingletonInputService('singleton')
 
     // First human START: should succeed and (with blockingProvider) stay running → tree live.
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
 
-    // Second human START: Start-over wipes the prior live root (cancelled → stopped) and starts a
-    // fresh one. No rejection.
+    // Second human START while the scan is LIVE: no second scan — the live scan is returned
+    // (one-open gate; B1 supersede-prior + one-live-gate, replacing wipe-on-START).
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.id).not.toBe(first.id)
+    expect(second.id).toBe(first.id)
+    expect(second.deduped).toBe(true)
 
-    // Prior root is wiped (cancelled → reset, hidden from the board); exactly the new root is live.
+    // The prior root is untouched (still live) and holds the sole singleton slot.
     const firstStatus = await svc.getStatus(first.id)
-    expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('reset')
-
-    // The new root holds the sole singleton slot.
-    await waitFor(async () => (await svc.stats(agentId)).active === 1)
+    expect(firstStatus?.status).toBe('active')
     const stats = await svc.stats(agentId)
     expect(stats.active).toBe(1)
     expect(stats.queued).toBe(0)
@@ -835,7 +832,7 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
-  it('a sequential human re-START wipes the prior finished root and mints a new one', async () => {
+  it('a sequential human re-START supersedes the prior finished root and mints a new one', async () => {
     const { svc, workflowId, agentId } = makeReRunService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
@@ -843,40 +840,31 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.id).not.toBe(first.id)
 
-    // the prior finished root is now reset (retired by the Start-over wipe; preserved, not
+    // the prior finished root is now superseded (retired by B1 supersede-prior; preserved, not
     // destroyed — I12)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('reset')
-    // it has LEFT the live board (reset is filtered from getBoard)…
+    expect(firstStatus?.outcome).toBe('superseded')
+    // it has LEFT the live board (superseded is filtered from getBoard)…
     const board = await svc.getBoard()
     expect(board.items.some((i) => i.id === first.id)).toBe(false)
     // …but the row is preserved in the store (I12 — not deleted).
     const firstRow = await makeStateStore(db).getWorkItem(first.id)
     expect(firstRow).toBeDefined()
-    expect(firstRow?.outcome).toBe('reset')
+    expect(firstRow?.outcome).toBe('superseded')
   })
 
-  it('the wipe is recorded in the Activity log', async () => {
-    const { svc, workflowId, agentId } = makeReRunService()
-    const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
-    await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    const entry = svc.getActivity().find((e) => e.workItemId === first.id && e.kind === 'reset')
-    expect(entry).toBeDefined()
-  })
-
-  it('a 2nd human START while the prior scan is RUNNING wipes it (Start-over) and starts fresh', async () => {
-    // blockingProvider keeps the first scan ACTIVE (slot occupied). The Start-over wipe cancels it
-    // (→ stopped) then resets it (→ reset, hidden) before minting the fresh root — no rejection.
+  it('a 2nd human START while the prior scan is RUNNING returns the live scan (one-open gate)', async () => {
+    // blockingProvider keeps the first scan ACTIVE (slot occupied → live). B1 one-live-gate: no
+    // second scan — the live scan is returned (deduped). The prior root is untouched.
     const { svc, workflowId, agentId } = makeReRunService(blockingProvider())
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.id).not.toBe(first.id)
+    expect(second.id).toBe(first.id)
+    expect(second.deduped).toBe(true)
     const firstStatus = await svc.getStatus(first.id)
-    expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('reset')
+    expect(firstStatus?.status).toBe('active')
   })
 
   it('a non-input agent human START does NOT wipe (only input roots refresh)', async () => {
@@ -899,6 +887,109 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     const status = await svc.getStatus(first.id)
     expect(status?.status).toBe('terminal')
     expect(status?.outcome).toBe('done') // NOT wiped — refresh applies only to input agents
+  })
+})
+
+describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-gate (B1)', () => {
+  // A provider that finishes immediately (one text chunk, no gate): a scan goes
+  // queued → active → terminal/done, leaving a FINISHED root to supersede.
+  function quickProvider(): Provider {
+    return {
+      async *run(_input: RunAgentInput) {
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'scanned' })
+      },
+    }
+  }
+
+  // A workflow with ONE input agent (sorter) so `<wf>__sorter` is recognized as an input agent
+  // (isInputAgent). The runtime is shared for every agentId in this service.
+  function makeInputService(provider: Provider = quickProvider()) {
+    const wf = `b1-${randomUUID().slice(0, 8)}`
+    const inputWf = defineWorkflow({
+      id: wf,
+      label: 'B',
+      iconName: 'inbox',
+      agents: [
+        {
+          agent: defineAgent({
+            id: 'sorter',
+            name: 's',
+            provider: 'mock',
+            instructions: 'x',
+            tools: ['t'],
+            approvals: [],
+            renders: {},
+          }),
+          role: 'input',
+        },
+      ],
+      entryAgentId: 'sorter',
+      inputs: [],
+    })
+    const runtime: AgentRuntime = {
+      provider,
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [inputWf],
+      instanceKeyOf: (agentId) => agentId,
+    })
+    return { svc, workflowId: wf, sorterId: `${wf}__sorter` }
+  }
+
+  it('re-START does NOT wipe sibling worker runs (no wipe-on-START)', async () => {
+    const { svc, workflowId, sorterId } = makeInputService()
+    // A worker run dispatched by the machine (origin=agent) — a sibling of the input scan.
+    const draft = await svc.dispatch({
+      workflowId,
+      agentId: `${workflowId}__reply`, // worker, not a declared input agent
+      origin: 'agent',
+      payload: {},
+    })
+    // A human START of the INPUT agent must not touch the worker run.
+    await svc.dispatch({ workflowId, agentId: sorterId, origin: 'human', payload: {} })
+    const worker = await makeStateStore(db).getWorkItem(draft.id)
+    expect(worker?.outcome).not.toBe('stopped')
+    expect(worker?.outcome).not.toBe('reset')
+    expect(worker?.outcome).not.toBe('superseded')
+  })
+
+  it('a fresh input START supersedes the prior FINISHED scan root', async () => {
+    const { svc, workflowId, sorterId } = makeInputService()
+    const first = await svc.dispatch({ workflowId, agentId: sorterId, origin: 'human', payload: {} })
+    // Drive the first scan to a clean finish (quickProvider → terminal/done).
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
+
+    const second = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
+    expect(second.id).not.toBe(first.id)
+    expect((await makeStateStore(db).getWorkItem(first.id))?.outcome).toBe('superseded')
+  })
+
+  it('a second START while a scan is LIVE returns the live scan (no second scan)', async () => {
+    // blockingProvider keeps the first scan ACTIVE (slot occupied → live).
+    const { svc, workflowId, sorterId } = makeInputService(blockingProvider())
+    const first = await svc.dispatch({ workflowId, agentId: sorterId, origin: 'human', payload: {} })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
+
+    const second = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
+    expect(second.id).toBe(first.id)
+    expect(second.deduped).toBe(true)
   })
 })
 
@@ -963,7 +1054,7 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
-  it('a second human START while the prior scan is awaiting approval WIPES it and starts fresh', async () => {
+  it('a second human START while the prior scan is awaiting approval returns the live scan (one-open gate)', async () => {
     const { svc, workflowId, agentId } = makeGateInputService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
 
@@ -972,15 +1063,15 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
     expect((await svc.stats(agentId)).active).toBe(0) // slot freed at the gate
 
-    // Start-over: the live (awaiting) root is wiped (cancelled → reset), a fresh root is minted.
+    // B1 one-live-gate: an awaiting scan is still LIVE, so the second START returns it (no second
+    // scan) — the live root is untouched (still awaiting_human).
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.id).not.toBe(first.id)
-    const firstStatus = await svc.getStatus(first.id)
-    expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('reset')
+    expect(second.id).toBe(first.id)
+    expect(second.deduped).toBe(true)
+    expect((await svc.getStatus(first.id))?.status).toBe('awaiting_human')
   })
 
-  it('a sequential re-START once the prior scan fully settles (gate resolved → finished) wipes it', async () => {
+  it('a sequential re-START once the prior scan fully settles (gate resolved → finished) supersedes it', async () => {
     const { svc, workflowId, agentId } = makeGateInputService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
@@ -991,12 +1082,12 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
     await svc.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
 
-    // A fresh human START now wipes the prior finished root (→ reset, hidden).
+    // A fresh human START now supersedes the prior finished root (→ superseded, hidden).
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.id).not.toBe(first.id)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('reset')
+    expect(firstStatus?.outcome).toBe('superseded')
   })
 
   it('machine dispatch (origin=agent) to a live input scan is NOT wiped by the START path', async () => {

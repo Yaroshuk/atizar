@@ -256,17 +256,31 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
-      // Start-over = full WIPE + start (I1/I8/I12): a human re-START of an input agent retires the
-      // ENTIRE prior scan so exactly ONE fresh instance of each agent runs and nothing from the
-      // last pass lingers on the board. We cancel every active item in the workflow (→ stopped),
-      // then reset every terminal item (→ outcome 'reset', hidden) — so the whole prior tree LEAVES
-      // the live board (reachable in Activity/history; nothing is deleted — I12). This replaces the
-      // old supersede-prior + cancel-live-roots path, which left the prior scan's children visible
-      // (a Stopped reader sitting next to the fresh one) — wrong for a maxInstances=1 agent the
-      // operator expects to show a single instance. The 409 singleton guard is GONE; the client
-      // shows a Start-over confirm before calling this (U8).
+      // START = safe re-scan (spec 2026-06-16, instance model). A human re-START of an input agent:
+      //  1. if a scan is already LIVE, do NOT start a second — return the live scan (one-open gate).
+      //  2. otherwise supersede the prior FINISHED scan ROOT(s) so only the latest scan shows
+      //     (reuse-on-closed), then dispatch a fresh scan Run below. Worker children (drafts) are
+      //     NEVER touched — they are independent Runs and dedup by source.
+      // The view now groups Runs by (agentId, key) into ONE card; an input agent's key is a CONSTANT,
+      // so the superseded prior scan Run and the new scan Run share the same key and COLLAPSE into one
+      // card. The old "supersede left the prior scan's children visible (a Stopped reader beside the
+      // fresh one)" criticism no longer applies under the instance model — that was a per-instance-card
+      // artifact, gone now that one card aggregates a key's Runs. So we revert from wipe to
+      // supersede-prior-finished-scan + one-live-gate. No wipe, no Start-over confirm. (wipeWorkflowImpl
+      // STAYS — it backs the explicit Clear button.)
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
-        await wipeWorkflowImpl(req.workflowId)
+        if (await store.hasLiveInputScan(req.workflowId, req.agentId)) {
+          const live = (await store.getActiveByWorkflow(req.workflowId)).find(
+            (w) => w.agentId === req.agentId && !w.parentId
+          )
+          if (live) return { id: live.id, deduped: true }
+        }
+        const prior = await store.getFinishedInputRoots(req.workflowId, req.agentId)
+        for (const root of prior) {
+          await settleEdge(root.id, 'supersede', null, { summary: 'superseded by re-scan' }).catch(
+            () => {}
+          )
+        }
       }
       const result = await dispatchChokepoint(db, pool, {
         ...req,
