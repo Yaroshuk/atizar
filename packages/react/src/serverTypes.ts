@@ -13,6 +13,8 @@ export type WorkItem = {
   parentId: string | null
   origin: 'human' | 'agent' | 'inbound'
   source: string | null
+  // Instance identity (spec 2026-06-16). Server column is NOT NULL — always a string, never null.
+  key: string
   payload: Record<string, unknown>
   phase: Phase
   outcome: Outcome

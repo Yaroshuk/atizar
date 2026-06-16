@@ -7,6 +7,7 @@ const wi = (over: Partial<WorkItem> & Pick<WorkItem, 'id' | 'agentId' | 'phase'>
   parentId: null,
   origin: 'human',
   source: null,
+  key: '',
   payload: {},
   outcome: 'running',
   card: null,
@@ -86,6 +87,14 @@ describe('statusesOf', () => {
       wi({ id: 'F', agentId: 'lead-inbox__qualifier', phase: 'terminal', outcome: 'done' }),
     ]
     expect(statusesOf(mixed, 'lead-inbox', 'qualifier')).toEqual(['done'])
+  })
+})
+
+describe('toPInstances key propagation', () => {
+  it('carries the work item key onto the PInstance', () => {
+    const keyed = [wi({ id: 'r1', agentId: 'lead-inbox__reply', phase: 'active', key: 'alice@x.com' })]
+    const [p] = toPInstances(keyed, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
+    expect(p.key).toBe('alice@x.com')
   })
 })
 

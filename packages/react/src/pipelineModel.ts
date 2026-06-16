@@ -6,6 +6,7 @@ export type PInstance = {
   localId: string
   runtimeKey: string
   agentId: string
+  key: string
   name: string
   iconName: IconName
   label: string

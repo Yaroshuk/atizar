@@ -5,6 +5,7 @@ const i = (over: Partial<PInstance>): PInstance => ({
   localId: 'x',
   runtimeKey: 'wf__a',
   agentId: 'a',
+  key: '',
   name: 'A',
   iconName: 'inbox',
   label: '',

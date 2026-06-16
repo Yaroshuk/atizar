@@ -34,6 +34,7 @@ export const toPInstances = (
       localId: w.id,
       runtimeKey: w.agentId,
       agentId,
+      key: w.key,
       name: nameOf(agentId),
       iconName: metaIcon(agentId) as IconName,
       label: labelOf(w),
