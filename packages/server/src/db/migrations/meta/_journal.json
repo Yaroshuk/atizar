@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1781082729280,
-      "tag": "0000_fine_joshua_kane",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1781183338007,
-      "tag": "0001_fantastic_red_ghost",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1781464458728,
-      "tag": "0002_opposite_network",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1781500241985,
-      "tag": "0003_classy_toro",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1781523542556,
-      "tag": "0004_add_reset_resolution",
+      "when": 1781600735238,
+      "tag": "0000_faithful_cerise",
       "breakpoints": true
     }
   ]

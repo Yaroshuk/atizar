@@ -14,26 +14,24 @@ import type { BaseEvent } from '@ag-ui/client'
 // The ONLY place the pipeline DDL is expressed (design §3). drizzle-kit reads this to
 // generate migrations. Postgres is THE backend, dev included (docs/pipeline-updated-3.md §1.7).
 
-// WorkItem status — the full §5 union. Step 3 wires only
-// queued → running → awaiting_approval → running → finished | error; the rest
-// (awaiting_input, result, closed) are defined for forward-compat (step 4 / P1).
-export const workItemStatus = pgEnum('work_item_status', [
+// WorkItem phase — the collapsed 4-value lifecycle (spec 2026-06-16). awaiting_human merges
+// the old awaiting_approval + awaiting_input; queued/active/terminal complete the alphabet.
+// The classifier lives in @atizar/core (lifecycle.ts) — this enum is just its persisted form.
+export const workItemPhase = pgEnum('work_item_phase', [
   'queued',
-  'running',
-  'awaiting_approval',
-  'awaiting_input',
-  'result',
-  'finished',
-  'error',
-  'closed',
+  'active',
+  'awaiting_human',
+  'terminal',
 ])
 
-// A terminal *outcome* marker, orthogonal to status (NOT a status — honest audit trail).
-// 'reset' (Unit 4.4): a human cleared the board — a TERMINAL item moved to 'closed' so it
-// leaves the live column (preserved in Activity/history, I12; never deleted).
-export const resolutionKind = pgEnum('resolution_kind', [
-  'cancelled',
+// WorkItem outcome — first-class now (was the orthogonal `resolution`). `running` = not yet
+// terminal; the six terminal flavours match @atizar/core Outcome exactly.
+export const workItemOutcome = pgEnum('work_item_outcome', [
+  'running',
+  'done',
+  'stopped',
   'rejected',
+  'error',
   'superseded',
   'reset',
 ])
@@ -60,8 +58,8 @@ export const workItems = pgTable('work_items', {
   // Dedup key (deliveryKey-style); null ⇒ never deduped.
   source: text('source'),
   payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
-  status: workItemStatus('status').notNull(),
-  resolution: resolutionKind('resolution'),
+  phase: workItemPhase('phase').notNull(),
+  outcome: workItemOutcome('outcome').notNull().default('running'),
   // Filled by a registered render tool (the generative-UI card the consumer acts on).
   card: jsonb('card').$type<Record<string, unknown>>(),
   // The provider runId (the workItemId ↔ runId map; belief #2 — engine step-state stays
@@ -166,8 +164,8 @@ export type NewCredential = typeof credentials.$inferInsert
 export type Gate = typeof gates.$inferSelect
 export type NewGate = typeof gates.$inferInsert
 export type TraceRow = typeof trace.$inferSelect
-export type WorkItemStatus = WorkItem['status']
-export type ResolutionKind = (typeof resolutionKind.enumValues)[number]
+export type WorkItemPhase = WorkItem['phase']
+export type WorkItemOutcome = (typeof workItemOutcome.enumValues)[number]
 export type OriginKind = (typeof originKind.enumValues)[number]
 export type AuditRow = typeof auditLog.$inferSelect
 export type NewAuditRow = typeof auditLog.$inferInsert

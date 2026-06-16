@@ -1,14 +1,37 @@
 CREATE TYPE "public"."gate_kind" AS ENUM('approval');--> statement-breakpoint
 CREATE TYPE "public"."gate_status" AS ENUM('open', 'resolved');--> statement-breakpoint
 CREATE TYPE "public"."origin_kind" AS ENUM('human', 'agent', 'inbound');--> statement-breakpoint
-CREATE TYPE "public"."resolution_kind" AS ENUM('cancelled', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."work_item_status" AS ENUM('queued', 'running', 'awaiting_approval', 'awaiting_input', 'result', 'finished', 'error', 'closed');--> statement-breakpoint
+CREATE TYPE "public"."work_item_outcome" AS ENUM('running', 'done', 'stopped', 'rejected', 'error', 'superseded', 'reset');--> statement-breakpoint
+CREATE TYPE "public"."work_item_phase" AS ENUM('queued', 'active', 'awaiting_human', 'terminal');--> statement-breakpoint
 CREATE TABLE "action_ledger" (
 	"key" text PRIMARY KEY NOT NULL,
 	"work_item_id" uuid NOT NULL,
 	"gate_id" uuid NOT NULL,
 	"result" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "audit_log" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"work_item_id" uuid NOT NULL,
+	"gate_id" uuid,
+	"workflow_id" text NOT NULL,
+	"agent_id" text NOT NULL,
+	"kind" text NOT NULL,
+	"summary" text NOT NULL,
+	"actor" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "credentials" (
+	"connection_id" text NOT NULL,
+	"integration" text NOT NULL,
+	"kind" text NOT NULL,
+	"secret" text NOT NULL,
+	"expires_at" timestamp with time zone,
+	"connected_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "credentials_connection_id_integration_pk" PRIMARY KEY("connection_id","integration")
 );
 --> statement-breakpoint
 CREATE TABLE "gates" (
@@ -51,8 +74,8 @@ CREATE TABLE "work_items" (
 	"origin" "origin_kind" NOT NULL,
 	"source" text,
 	"payload" jsonb NOT NULL,
-	"status" "work_item_status" NOT NULL,
-	"resolution" "resolution_kind",
+	"phase" "work_item_phase" NOT NULL,
+	"outcome" "work_item_outcome" DEFAULT 'running' NOT NULL,
 	"card" jsonb,
 	"run_id" text,
 	"error" text,

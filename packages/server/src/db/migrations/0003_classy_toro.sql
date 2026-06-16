@@ -1,1 +1,0 @@
-ALTER TYPE "public"."resolution_kind" ADD VALUE 'superseded';
