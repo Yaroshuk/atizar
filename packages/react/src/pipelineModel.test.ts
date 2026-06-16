@@ -271,4 +271,16 @@ describe('buildPipeline', () => {
     const blocks = buildPipeline([s1, s2], {})
     expect(blocks).toHaveLength(1) // one card, not two
   })
+
+  it('collapsed same-(agentId,key) roots keep children from ALL members (no drop)', () => {
+    const s1 = i({ localId: 's1', agentId: 'sorter', key: 'sorter', isInput: true, status: 'running' })
+    const s2 = i({ localId: 's2', agentId: 'sorter', key: 'sorter', isInput: true, status: 'running' })
+    const c1 = i({ localId: 'c1', agentId: 'reply', key: 'alice', parentLocalId: 's1', status: 'running' })
+    const c2 = i({ localId: 'c2', agentId: 'reply', key: 'bob', parentLocalId: 's2', status: 'running' })
+    const blocks = buildPipeline([s1, s2, c1, c2], {})
+    expect(blocks).toHaveLength(1) // one collapsed root card
+    const replyGroup = blocks[0].groups.find((g) => g.agentId === 'reply')!
+    // BOTH children survive — alice (from s1) AND bob (from s2)
+    expect(replyGroup.instances.map((inst) => inst.key).sort()).toEqual(['alice', 'bob'])
+  })
 })

@@ -107,12 +107,16 @@ export function buildPipeline(
   // distinct root instances (collapse same-(agentId,key) roots). Keep first-seen order.
   const rootRuns = instances.filter((x) => shown.has(x.localId) && (x.isInput || !x.parentLocalId))
   const rootInstances: PInstance[] = []
+  const rootMembers = new Map<string, PInstance[]>() // head.localId -> all member root Runs (same agentId,key)
   const seenRoot = new Set<string>()
   for (const r of rootRuns) {
-    const ik = `${r.agentId} ${r.key}`
+    const ik = `${r.agentId}\0${r.key}`
     if (seenRoot.has(ik)) continue
     seenRoot.add(ik)
-    rootInstances.push(pickHead(rootRuns.filter((x) => x.agentId === r.agentId && x.key === r.key)))
+    const members = rootRuns.filter((x) => x.agentId === r.agentId && x.key === r.key)
+    const head = pickHead(members)
+    rootInstances.push(head)
+    rootMembers.set(head.localId, members)
   }
 
   const blocks: PipelineBlock[] = []
@@ -123,7 +127,12 @@ export function buildPipeline(
     if (emitted.has(parent.localId)) continue
     emitted.add(parent.localId)
 
-    const kids = (childrenOf.get(parent.localId) ?? []).filter(isShownChild)
+    const members = rootMembers.get(parent.localId)
+    const kids = (
+      members
+        ? members.flatMap((m) => childrenOf.get(m.localId) ?? [])
+        : childrenOf.get(parent.localId) ?? []
+    ).filter(isShownChild)
     // group children by agentId, preserving first-seen order
     const order: string[] = []
     const groups = new Map<string, AgentGroup>()
