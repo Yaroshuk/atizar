@@ -7,6 +7,7 @@ import { db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
 import { makeRunObserver } from './runObserver.js'
 import type { WorkerPool } from './workerPool.js'
+import { transition } from './transition.js'
 
 const store = makeStateStore(db)
 const reachable = await db
@@ -40,16 +41,15 @@ function fakeProvider(): Provider {
 }
 
 function fakePool() {
-  const release = vi.fn<(agentId: string) => void>()
+  const reconcile = vi.fn<(agentId: string) => void>()
   const pool: WorkerPool = {
     enqueue: vi.fn(),
     dequeue: vi.fn(),
-    release,
-    resumeAcquire: vi.fn(),
-    activeCount: () => 0,
+    reconcile,
+    activeCount: async () => 0,
     queuedCount: () => 0,
   }
-  return { pool, release }
+  return { pool, reconcile }
 }
 
 describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => {
@@ -61,7 +61,7 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
       origin: 'human',
       payload: {},
     })
-    const { pool, release } = fakePool()
+    const { pool, reconcile } = fakePool()
     const observer = makeRunObserver({
       db,
       store,
@@ -76,12 +76,18 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
         handoffs: [],
       }),
       deliver: vi.fn().mockResolvedValue({ ok: true, id: 'child', deduped: false }),
+      settle: async (sid, edge, _actor, opts) => {
+        await transition(db, sid, edge, opts)
+      },
+      reconcile,
     })
 
+    // The pool OWNS the queued→active flip (U7) before run() — pre-flip the row here.
+    await transition(db, id, 'start')
     await observer.run(id)
 
     const afterRun = await store.getWorkItem(id)
-    expect(afterRun?.status).toBe('awaiting_approval')
+    expect(afterRun?.phase).toBe('awaiting_human')
     expect(afterRun?.card).toEqual({ tool: 'renderLead', props: { name: 'Acme' } })
 
     const trace = await store.getTrace(id, 0)
@@ -90,13 +96,13 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
 
     const gate = await store.getOpenGate(id)
     expect(gate?.proposedArtifact).toEqual({ to: 'a@b.c', body: 'hi' })
-    expect(release).toHaveBeenCalledWith('lead-inbox__reply')
+    expect(reconcile).toHaveBeenCalledWith('lead-inbox__reply')
 
     // Resume across the gate.
     await observer.resume(id, { gateId: gate!.id, decision: 'approved' })
 
     const afterResume = await store.getWorkItem(id)
-    expect(afterResume?.status).toBe('finished')
+    expect(afterResume?.phase).toBe('terminal')
     expect(await store.getOpenGate(id)).toBeUndefined()
 
     const stitched = await store.getTrace(id, 0)

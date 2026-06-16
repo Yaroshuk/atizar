@@ -7,6 +7,7 @@ import { db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
 import { makeRunObserver } from './runObserver.js'
 import type { WorkerPool } from './workerPool.js'
+import { transition } from './transition.js'
 
 const store = makeStateStore(db)
 const reachable = await db
@@ -33,16 +34,24 @@ function fakeDispatchProvider(toolName: string, args: Record<string, unknown>): 
 }
 
 function fakePool() {
-  const release = vi.fn<(agentId: string) => void>()
+  const reconcile = vi.fn<(agentId: string) => void>()
   const pool: WorkerPool = {
     enqueue: vi.fn(),
     dequeue: vi.fn(),
-    release,
-    resumeAcquire: vi.fn(),
-    activeCount: () => 0,
+    reconcile,
+    activeCount: async () => 0,
     queuedCount: () => 0,
   }
-  return { pool, release }
+  return { pool, reconcile }
+}
+
+const settleViaTransition = async (
+  id: string,
+  edge: 'finish' | 'fail',
+  _actor: string | null,
+  opts?: { error?: string }
+) => {
+  await transition(db, id, edge, opts)
 }
 
 describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)', () => {
@@ -79,8 +88,11 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
         delivered.push(req)
         return { ok: true, id: 'child-id', deduped: false }
       },
+      settle: settleViaTransition,
+      reconcile: () => {},
     })
 
+    await transition(db, id, 'start')
     await observer.run(id)
 
     expect(delivered).toHaveLength(1)
@@ -132,8 +144,11 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
         delivered.push(req)
         return { ok: true, id: 'x', deduped: false }
       },
+      settle: settleViaTransition,
+      reconcile: () => {},
     })
 
+    await transition(db, id, 'start')
     await observer.run(id)
 
     expect(delivered).toHaveLength(0)

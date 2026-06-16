@@ -50,6 +50,16 @@ export interface RunObserverDeps {
   }) => Promise<unknown>
   // F4 activity feed — optional so tests that omit it stay zero-overhead.
   activity?: ActivityLog
+  // The one terminal writer (U7). RunObserver calls it for its own finish/fail so the trace note
+  // + audit + pool reconcile happen identically to the human-driven terminal edges.
+  settle: (
+    id: string,
+    edge: 'finish' | 'fail',
+    actor: string | null,
+    opts?: { error?: string }
+  ) => Promise<void>
+  // Re-derive pool occupancy after a gate suspend (replaces pool.release(agentId)).
+  reconcile: (agentId: string) => void
 }
 
 export interface RunObserver {
@@ -65,7 +75,7 @@ type ToolEvent = BaseEvent & {
 }
 
 export function makeRunObserver(deps: RunObserverDeps): RunObserver {
-  const { db, store, pool, bus } = deps
+  const { db, store, bus } = deps
 
   // Live executor iterators, so Stop can interrupt a running stream: iterator.return()
   // runs the provider generator's finally → child.kill(). Keyed by workItemId.
@@ -182,7 +192,7 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
             proposedArtifact: gate.proposedArtifact,
           })
           await transition(db, id, 'gate')
-          publishStatus(id, 'awaiting_approval')
+          publishStatus(id, 'awaiting_human')
           deps.activity?.record({
             ts: Date.now(),
             workflowId: wi.workflowId,
@@ -196,19 +206,17 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       }
 
       if (gateOpened) {
-        // Suspended at a gate — provider process is dead (claude-cli kill); free the slot.
-        pool.release(wi.agentId)
+        // Suspended at a gate — provider process is dead (claude-cli kill); re-derive occupancy.
+        deps.reconcile(wi.agentId)
         return
       }
-      const current = (await store.getWorkItem(id))?.status
-      if (current === 'finished' || current === 'error' || current === 'closed') {
-        // A concurrent cancel already finalized this item — do not override it.
-        pool.release(wi.agentId)
+      const current = await store.getWorkItem(id)
+      if (current && current.phase === 'terminal') {
+        // A concurrent cancel/settle already finalized this item — do not override it.
+        deps.reconcile(wi.agentId)
         return
       }
-      await transition(db, id, 'finish')
-      const final = (await store.getWorkItem(id))?.status ?? 'finished'
-      publishStatus(id, final)
+      await deps.settle(id, 'finish', null)
       deps.activity?.record({
         ts: Date.now(),
         workflowId: wi.workflowId,
@@ -217,12 +225,10 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
         kind: 'finished',
         summary: 'finished',
       })
-      pool.release(wi.agentId)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      await transition(db, id, 'fail', { error: message }).catch(() => {})
       await store.setError(id, message)
-      publishStatus(id, 'error')
+      await deps.settle(id, 'fail', null, { error: message }).catch(() => {})
       deps.activity?.record({
         ts: Date.now(),
         workflowId: wi.workflowId,
@@ -231,7 +237,6 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
         kind: 'error',
         summary: message.slice(0, 80),
       })
-      pool.release(wi.agentId)
     } finally {
       live.delete(id)
     }
@@ -243,18 +248,19 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       if (!wi) return
       const runtime = deps.resolveAgent(wi.agentId)
       if (!runtime) {
-        await transition(db, id, 'start').catch(() => {})
-        await transition(db, id, 'fail', { error: `no runtime for agent ${wi.agentId}` }).catch(
-          () => {}
-        )
+        // The row is already `active` (the pool flipped it via activate before run()); settle
+        // does the fail transition + publish + reconcile.
         await store.setError(id, `no runtime for agent ${wi.agentId}`)
-        publishStatus(id, 'error')
-        pool.release(wi.agentId)
+        await deps
+          .settle(id, 'fail', null, { error: `no runtime for agent ${wi.agentId}` })
+          .catch(() => {})
         return
       }
 
-      await transition(db, id, 'start')
-      publishStatus(id, 'running')
+      // The pool OWNS the queued→active flip (via injected activate) BEFORE run() — the row is
+      // already `active`. Do NOT transition('start') again (illegal from active). A defensive
+      // re-publish of the live phase is fine.
+      publishStatus(id, 'active')
       deps.activity?.record({
         ts: Date.now(),
         workflowId: wi.workflowId,
@@ -284,9 +290,11 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
         await store.resolveGateRow(gate.id, { comment: resolution.comment, form: resolution.form })
       }
 
+      // Resume (awaiting_human→active) is its OWN edge, distinct from pool admission. Keep the
+      // raw transition here, then re-derive pool occupancy (no resumeAcquire counter anymore).
       await transition(db, id, 'resume')
-      publishStatus(id, 'running')
-      pool.resumeAcquire(id, wi.agentId)
+      publishStatus(id, 'active')
+      deps.reconcile(wi.agentId)
 
       const input = buildInput(wi)
       const handle = { runId: wi.runId ?? input.runId, input }
