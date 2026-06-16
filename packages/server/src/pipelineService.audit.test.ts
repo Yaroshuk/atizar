@@ -71,6 +71,7 @@ describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () 
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
 
     const { id } = await service.dispatch(freshBase())

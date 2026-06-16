@@ -1,7 +1,6 @@
 import type { BaseEvent } from '@ag-ui/client'
 import {
   resolveDelivery,
-  deliveryKey,
   instanceId,
   lifecycle,
   hasLiveDescendant,
@@ -58,6 +57,9 @@ export interface PipelineServiceDeps {
   // The app's instance-key policy (spec 2026-06-16). REQUIRED — the framework never invents a key.
   // Same key → same instance. e.g. reply → payload.email.from; spam/sorter → the agent id.
   instanceKeyOf: (agentId: string, payload: Record<string, unknown>) => string
+  // The app's dedup-source policy (Pass-1.5). REQUIRED — the framework never guesses a source.
+  // Returns the dedup key for this work (null ⇒ never deduped). e.g. reply → the email id.
+  sourceOf: (agentId: string, payload: Record<string, unknown>) => string | null
 }
 
 export function makePipelineService(deps: PipelineServiceDeps) {
@@ -89,7 +91,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       agentId: r.instanceId,
       origin: 'agent',
       payload: req.payload,
-      source: deliveryKey(req.payload) ?? null,
+      source: deps.sourceOf(r.instanceId, req.payload),
       key: deps.instanceKeyOf(r.instanceId, req.payload),
       parentId: req.parentId,
       maxInstances,

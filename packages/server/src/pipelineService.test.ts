@@ -95,6 +95,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
 
     const { id } = await service.dispatch(freshBase())
@@ -129,6 +130,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
 
     const { id } = await service.dispatch({ ...base, workflowId: wf, agentId: `${wf}__reply` })
@@ -164,6 +166,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
 
     await service.dispatch({ ...base, agentId: 'cap-agent' })
@@ -215,6 +218,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [inputWf],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
@@ -277,6 +281,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [inputWf],
       instanceKeyOf: (id) => `key:${id}`,
+      sourceOf: () => null,
     })
     const { id } = await service.dispatch({ workflowId: wf, agentId, origin: 'human', payload: {} })
     expect((await makeStateStore(db).getWorkItem(id))?.key).toBe(`key:${agentId}`)
@@ -315,6 +320,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
   }
 
@@ -443,6 +449,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     const req = { ...base, agentId: 'lead-inbox__qualifier', origin: 'human' as const }
     const { id } = await svc.dispatch(req)
@@ -471,6 +478,7 @@ describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {
       descriptors: [],
       getAgentHealth: () => agentHealth,
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     const board = await svc.getBoard()
     expect(board.agentHealth).toEqual(agentHealth)
@@ -490,6 +498,7 @@ describe.skipIf(!reachable)('PipelineService.getBoard agentHealth', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
       // getAgentHealth intentionally omitted
     })
     const board = await svc.getBoard()
@@ -512,6 +521,7 @@ describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
 
     // Dispatch two items into two different workflows (agent key = wf__agent).
@@ -571,6 +581,7 @@ describe.skipIf(!reachable)('PipelineService reset/wipe (Unit 4.3)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
   }
 
@@ -614,6 +625,7 @@ describe.skipIf(!reachable)('PipelineService reset/wipe (Unit 4.3)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     const wf = `wipe-active-${randomUUID().slice(0, 8)}`
     const { id } = await svc.dispatch({
@@ -706,12 +718,18 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
     inputs: [{ name: 'lead', schema: z.object({ threadId: z.string() }), agentId: 'qualifier' }],
   })
 
-  it('intra-workflow deliver dispatches a CHILD with parentId, source, origin=agent', async () => {
+  // The app's dedup-source policy (Pass-1.5): the framework stamps whatever sourceOf returns onto
+  // the work item's `source` column and dedups by it. Here the test policy reads payload.threadId.
+  const sourceOf = (_agentId: string, p: Record<string, unknown>): string | null =>
+    typeof p.threadId === 'string' ? `thread:${p.threadId}` : null
+
+  it('stamps the app sourceOf result on a delivered CHILD (with parentId, origin=agent)', async () => {
     const svc = makePipelineService({
       db,
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf,
     })
     const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
     const threadId = `t-${randomUUID()}`
@@ -733,12 +751,13 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
     expect(child?.origin).toBe('agent')
   })
 
-  it('a repeated deliver on the same source dedups (no second child)', async () => {
+  it('two deliveries with the SAME sourceOf result dedup (app source drives dedup)', async () => {
     const svc = makePipelineService({
       db,
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf,
     })
     const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
     const threadId = `t-${randomUUID()}`
@@ -767,6 +786,7 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
       resolveAgent: () => runtime,
       descriptors: [crossWf],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf,
     })
     const parentId = (await svc.dispatch({ ...base, agentId: 'lead-inbox__qualifier' })).id
     const r = await svc.deliver({
@@ -829,6 +849,7 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
       resolveAgent: () => runtime,
       descriptors: [inputWf],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
@@ -940,6 +961,7 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
       resolveAgent: () => runtime,
       descriptors: [inputWf],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     return { svc, workflowId: wf, sorterId: `${wf}__sorter` }
   }
@@ -1071,11 +1093,12 @@ describe.skipIf(!reachable)('PipelineService.cancelInstance (B2)', () => {
       resolveAgent: () => runtime,
       descriptors: [],
       instanceKeyOf: (a, p) => ((p as Record<string, unknown>).k as string | undefined) ?? a,
+      sourceOf: () => null,
     })
 
     // Two reply Runs for the SAME sender key 'alice', each with a distinct payload so the
-    // dedup-by-source chokepoint lets both through (source is null when deliveryKey finds
-    // nothing, so two null-source items are BOTH accepted by the chokepoint). Use
+    // dedup-by-source chokepoint lets both through (this service's sourceOf returns null — the
+    // default stub below — so two null-source items are BOTH accepted by the chokepoint). Use
     // origin='agent' so the human Start-over path does not interfere.
     const r1 = await service.dispatch({
       workflowId: wf,
@@ -1159,6 +1182,7 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
       resolveAgent: () => runtime,
       descriptors: [inputWf],
       instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
     })
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }

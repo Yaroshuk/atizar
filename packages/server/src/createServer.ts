@@ -61,6 +61,11 @@ export interface CreateServerArgs {
   // dispatch payload, return the correlation key. Same key → same instance. The framework declares
   // this SEAM but never the policy — the body (reply→sender, others→constant) lives in the app.
   instanceKeyOf: (agentId: string, payload: Record<string, unknown>) => string
+  // The app's dedup-source policy (Pass-1.5): given a runtime agent id (wf__agent) and the dispatch
+  // payload, return the dedup key (null ⇒ never deduped). Same seam shape as instanceKeyOf — the
+  // framework declares it but never the policy; the body (reply→email id, batch→sorted ids) lives
+  // in the app. This is what dedups a re-scan so already-handled mail doesn't double-draft.
+  sourceOf: (agentId: string, payload: Record<string, unknown>) => string | null
   // When false, assemble + register but do NOT serve/migrate/sweep (the unit-test path).
   start?: boolean
 }
@@ -165,6 +170,7 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
     getAgentHealth: () => agentHealthCache,
     refreshHealth,
     instanceKeyOf: args.instanceKeyOf,
+    sourceOf: args.sourceOf,
   })
 
   const app = new Hono()

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 import { defineAgent, defineWorkflow } from './index.js'
-import { resolveDelivery, deliveryKey } from './delivery.js'
+import { resolveDelivery } from './delivery.js'
 
 const mk = (id: string, role: 'input' | 'worker', handoffs: string[] = []) => ({
   agent: defineAgent({
@@ -65,25 +65,5 @@ describe('resolveDelivery', () => {
       { x: 123 }
     )
     expect(r.ok).toBe(false)
-  })
-})
-
-describe('deliveryKey', () => {
-  it('keys an email parcel by its threadId', () => {
-    expect(deliveryKey({ threadId: 'abc', from: 'a@b.com', subject: 'Hi' })).toBe('thread:abc')
-  })
-  it('keys a ticket parcel by its issue number', () => {
-    expect(deliveryKey({ number: 42, title: 'Bug' })).toBe('number:42')
-  })
-  it('prefers threadId over number when both are present', () => {
-    expect(deliveryKey({ threadId: 'abc', number: 42 })).toBe('thread:abc')
-  })
-  it('falls back to from+subject when there is no id', () => {
-    expect(deliveryKey({ from: 'a@b.com', subject: 'Hello' })).toBe('email:a@b.com|Hello')
-  })
-  it('returns undefined when the payload has no usable identity', () => {
-    expect(deliveryKey({ summary: 'no id here' })).toBeUndefined()
-    expect(deliveryKey(null)).toBeUndefined()
-    expect(deliveryKey('nope')).toBeUndefined()
   })
 })
