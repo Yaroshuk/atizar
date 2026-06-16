@@ -114,6 +114,27 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
     expect((await store.getGate(gate.id))?.id).toBe(gate.id)
   })
 
+  it('countActiveByAgent counts only active-phase rows of that agent', async () => {
+    const store = makeStateStore(db)
+    // Unique per run so parallel/re-runs don't accumulate stale rows (shared DB, no truncate).
+    const a = `lead-inbox__countA-${randomUUID()}`
+    const mk = async () =>
+      (
+        await store.insertWorkItem({
+          workflowId: 'lead-inbox',
+          agentId: a,
+          origin: 'human',
+          payload: {},
+        })
+      ).id
+    const id1 = await mk()
+    await transition(db, id1, 'start') // active
+    const id2 = await mk()
+    await transition(db, id2, 'start')
+    await transition(db, id2, 'finish') // terminal
+    expect(await store.countActiveByAgent(a)).toBe(1)
+  })
+
   it('hasLiveInputScan: true when a root has an awaiting-approval descendant, false when all settled', async () => {
     const store = makeStateStore(db)
     const workflowId = `wf-${randomUUID()}`

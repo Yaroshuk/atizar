@@ -284,6 +284,17 @@ export function makeStateStore(db: Db) {
         .where(eq(auditLog.workItemId, workItemId))
         .orderBy(asc(auditLog.createdAt))
     },
+
+    // Pool occupancy, derived from the DB (replaces the in-memory counter — U5). Counts rows of
+    // this agent whose phase occupies a slot: only 'active' counts ('awaiting_human' already
+    // released its slot — claude-cli is killed at the gate).
+    async countActiveByAgent(agentId: string): Promise<number> {
+      const [row] = await db
+        .select({ c: count() })
+        .from(workItems)
+        .where(and(eq(workItems.agentId, agentId), eq(workItems.phase, 'active')))
+      return row?.c ?? 0
+    },
   }
 }
 

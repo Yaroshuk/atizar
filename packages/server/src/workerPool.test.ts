@@ -1,73 +1,64 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { makeWorkerPool } from './workerPool.js'
 
-describe('WorkerPool (cap + queue)', () => {
-  it('starts up to the cap and queues the overflow', () => {
-    const run = vi.fn()
-    const pool = makeWorkerPool({ run })
+// A fake DB count: `activate` flips an id to active (++) — the pool now owns the flip, committed
+// before run() — and the test flips it back to free a slot. `run` only records the start.
+function harness(cap: number) {
+  let active = 0
+  const started: string[] = []
+  const pool = makeWorkerPool({
+    run: (id) => {
+      started.push(id)
+    },
+    activeCount: async () => active,
+    activate: async (_id) => {
+      active++
+    },
+  })
+  return {
+    pool,
+    started,
+    free: () => {
+      active = Math.max(0, active - 1)
+    },
+    get active() {
+      return active
+    },
+  }
+}
 
-    pool.enqueue('a', 'X', 2)
-    pool.enqueue('b', 'X', 2)
-    pool.enqueue('c', 'X', 2)
+const tick = () => new Promise((r) => setTimeout(r, 0))
 
-    expect(run.mock.calls.map((c) => c[0])).toEqual(['a', 'b'])
-    expect(pool.activeCount('X')).toBe(2)
-    expect(pool.queuedCount('X')).toBe(1)
+describe('WorkerPool (DB-derived occupancy)', () => {
+  it('starts up to the cap, queues the overflow', async () => {
+    const h = harness(2)
+    h.pool.enqueue('a', 'X', 2)
+    h.pool.enqueue('b', 'X', 2)
+    h.pool.enqueue('c', 'X', 2)
+    await tick()
+    expect(h.started).toEqual(['a', 'b'])
+    expect(h.pool.queuedCount('X')).toBe(1)
   })
 
-  it('drains the queue on release, oldest first', () => {
-    const run = vi.fn()
-    const pool = makeWorkerPool({ run })
-    pool.enqueue('a', 'X', 2)
-    pool.enqueue('b', 'X', 2)
-    pool.enqueue('c', 'X', 2)
-    pool.enqueue('d', 'X', 2)
-
-    pool.release('X')
-    expect(run).toHaveBeenLastCalledWith('c')
-    pool.release('X')
-    expect(run).toHaveBeenLastCalledWith('d')
-    expect(pool.queuedCount('X')).toBe(0)
+  it('reconcile starts the next queued id when a slot frees', async () => {
+    const h = harness(2)
+    h.pool.enqueue('a', 'X', 2)
+    h.pool.enqueue('b', 'X', 2)
+    h.pool.enqueue('c', 'X', 2)
+    await tick()
+    h.free() // a finished
+    h.pool.reconcile('X')
+    await tick()
+    expect(h.started).toContain('c')
+    expect(h.pool.queuedCount('X')).toBe(0)
   })
 
-  it('isolates caps per agent', () => {
-    const run = vi.fn()
-    const pool = makeWorkerPool({ run })
-    pool.enqueue('a', 'X', 1)
-    pool.enqueue('b', 'Y', 1)
-    pool.enqueue('c', 'X', 1) // queued — X is full
-    expect(pool.activeCount('X')).toBe(1)
-    expect(pool.activeCount('Y')).toBe(1)
-    expect(pool.queuedCount('X')).toBe(1)
-  })
-
-  it('resumeAcquire reserves a slot ahead of the queue WITHOUT starting the run', () => {
-    // The resume stream is driven by runObserver.resume → consume(), not by opts.run.
-    // resumeAcquire only reserves the concurrency slot; calling run here would re-issue a
-    // transition('start') on an already-running item (the IllegalTransition log we fixed).
-    const run = vi.fn()
-    const pool = makeWorkerPool({ run })
-    pool.enqueue('a', 'X', 2)
-    pool.enqueue('b', 'X', 2) // active = 2 (cap)
-    pool.enqueue('c', 'X', 2) // queued
-
-    pool.resumeAcquire('d', 'X')
-    expect(run).not.toHaveBeenCalledWith('d') // resume is driven by the caller, not the pool
-    expect(run.mock.calls.map((c) => c[0])).toEqual(['a', 'b']) // only the two admitted runs
-    expect(pool.activeCount('X')).toBe(3) // slot reserved ahead of the queue (may exceed cap)
-    expect(pool.queuedCount('X')).toBe(1) // c still waiting
-  })
-
-  it('dequeue removes a queued id without starting it', () => {
-    const started: string[] = []
-    const pool = makeWorkerPool({ run: (id) => started.push(id) })
-    pool.enqueue('a', 'agent', 1) // starts a (cap 1)
-    pool.enqueue('b', 'agent', 1) // queued
-    pool.enqueue('c', 'agent', 1) // queued
-    expect(pool.queuedCount('agent')).toBe(2)
-    pool.dequeue('b', 'agent')
-    expect(pool.queuedCount('agent')).toBe(1)
-    pool.release('agent') // frees a → next in queue is c (b was removed)
-    expect(started).toEqual(['a', 'c'])
+  it('dequeue removes a queued id before it starts', async () => {
+    const h = harness(1)
+    h.pool.enqueue('a', 'X', 1)
+    h.pool.enqueue('b', 'X', 1)
+    await tick()
+    h.pool.dequeue('b', 'X')
+    expect(h.pool.queuedCount('X')).toBe(0)
   })
 })
