@@ -4,6 +4,7 @@ import { providerRegistry } from './providers.js'
 import { buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
 import { scopesFor, connectionList } from './connections.js'
+import { ReplyPayloadSchema } from '../workflows/email-inbox/descriptor.js'
 
 // In demo mode only the flagship email-inbox workflow is enabled (zero-cred showcase); otherwise
 // all workflows are active (null = all).
@@ -18,12 +19,16 @@ void createServer({
   enabledWorkflows: ENABLED_WORKFLOWS,
   // The email-inbox instance-key policy (the framework declares the seam; the literals live HERE):
   // reply correlates per sender (one reply instance per email address); the sorter + batch agents
-  // (reader/spam/important) each collapse to a single constant instance (the agent id).
+  // (reader/spam/important) each collapse to a single constant instance (the agent id). NOTE: this
+  // correlation `key` is distinct from the runtime `instanceKey` (the `wf__agent` id passed to
+  // buildProvider) — they only happen to coincide in value for the constant-key agents.
   instanceKeyOf: (agentId, payload) => {
     const bare = agentId.includes('__') ? agentId.slice(agentId.indexOf('__') + 2) : agentId
     if (bare === 'reply') {
-      const email = (payload as { email?: { from?: string } }).email
-      return email?.from ?? agentId // a malformed reply payload falls back to one instance per agent
+      // Reuse the single source for the reply payload shape; a malformed payload falls back to
+      // one instance per agent rather than throwing.
+      const parsed = ReplyPayloadSchema.safeParse(payload)
+      return parsed.success ? parsed.data.email.from : agentId
     }
     return agentId // sorter + batch agents (reader/spam/important) = one constant instance each
   },
