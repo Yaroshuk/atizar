@@ -4,8 +4,11 @@ import { renderHook, act } from '@testing-library/react'
 const cancel = vi.fn(async () => {})
 const cancelWorkflow = vi.fn(async () => {})
 const cancelAll = vi.fn(async () => {})
+const cancelInstance = vi.fn(async () => {})
+let items: any[] = []
+vi.mock('./useBoard', () => ({ useBoard: () => ({ items }) }))
 vi.mock('./useDispatch', () => ({
-  useDispatch: () => ({ cancel, cancelWorkflow, cancelAll }),
+  useDispatch: () => ({ cancel, cancelWorkflow, cancelAll, cancelInstance }),
 }))
 import { useStopController } from './useStopController'
 
@@ -14,6 +17,8 @@ describe('useStopController', () => {
     cancel.mockClear()
     cancelWorkflow.mockClear()
     cancelAll.mockClear()
+    cancelInstance.mockClear()
+    items = []
   })
 
   it('starts with confirm=null and no stopping flags', () => {
@@ -60,15 +65,29 @@ describe('useStopController', () => {
     expect(cancelAll).not.toHaveBeenCalled()
   })
 
-  // --- item scope ---
-  it('requesting an item scope and confirming calls cancel(id) and clears confirm', async () => {
+  // --- item scope (= the whole INSTANCE) ---
+  it('confirming an item resolves it to (workflowId, agentId, key) and calls cancelInstance', async () => {
+    items = [{ id: 'w1', workflowId: 'a', agentId: 'a__reply', key: 'alice' }]
     const { result } = renderHook(() => useStopController('wf-a'))
     act(() => result.current.requestStopItem('w1'))
     expect(result.current.confirm).toEqual({ kind: 'item', id: 'w1' })
     await act(async () => {
       await result.current.confirmStop()
     })
+    expect(cancelInstance).toHaveBeenCalledWith('a', 'a__reply', 'alice')
+    expect(cancel).not.toHaveBeenCalled()
+    expect(result.current.confirm).toBeNull()
+  })
+
+  it('falls back to cancel(id) when the item id cannot be resolved on the board', async () => {
+    items = [] // 'w1' not on the board
+    const { result } = renderHook(() => useStopController('wf-a'))
+    act(() => result.current.requestStopItem('w1'))
+    await act(async () => {
+      await result.current.confirmStop()
+    })
     expect(cancel).toHaveBeenCalledWith('w1')
+    expect(cancelInstance).not.toHaveBeenCalled()
     expect(result.current.confirm).toBeNull()
   })
 

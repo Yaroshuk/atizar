@@ -37,26 +37,59 @@ describe('useBoardNavigation', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('openAgent: 0 live → type view, 1 → its thread, ≥2 → picker', () => {
+  it('openAgent counts INSTANCES by key: 0 → type view, 1 instance → its head, ≥2 → picker', () => {
     const { result, rerender } = renderHook(() => useBoardNavigation(cfg, 'a'))
     act(() => result.current.openAgent('reply'))
     expect(result.current.openTypeId).toBe('reply')
 
-    // Use the item id as 'a__reply#1' so toPInstances maps localId = 'a__reply#1'
+    // One instance (key 'alice'), even with TWO Runs sharing that key → open the head run.
     items = [
-      { id: 'a__reply#1', workflowId: 'a', agentId: 'a__reply', status: 'running', payload: {} },
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        status: 'running',
+        payload: {},
+      },
+      {
+        id: 'a__reply#2',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        status: 'running',
+        payload: {},
+      },
     ]
     rerender()
     act(() => result.current.openAgent('reply'))
-    expect(result.current.openId).toBe('a__reply#1')
+    // 1 distinct instance → openId is a head Run's localId (one of the two Runs of key 'alice').
+    expect(['a__reply#1', 'a__reply#2']).toContain(result.current.openId)
+    expect(result.current.openPickerId).toBeNull()
 
+    // Two distinct instances (keys 'alice' + 'bob') → picker.
     items = [
-      { id: 'a__reply#1', workflowId: 'a', agentId: 'a__reply', status: 'running', payload: {} },
-      { id: 'a__reply#2', workflowId: 'a', agentId: 'a__reply', status: 'running', payload: {} },
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        status: 'running',
+        payload: {},
+      },
+      {
+        id: 'a__reply#2',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'bob',
+        status: 'running',
+        payload: {},
+      },
     ]
     rerender()
     act(() => result.current.openAgent('reply'))
     expect(result.current.openPickerId).toBe('reply')
+    expect(result.current.pickerInstances).toHaveLength(2) // one row per distinct key
   })
 
   it('writes the open id into the ?open= URL', () => {
@@ -190,6 +223,9 @@ describe('useBoardNavigation', () => {
     })
   })
 
+  // START is a plain dispatch now — no client-side wipe/Start-over confirm (the server handles
+  // re-scan safety: supersede-prior + one-live gate). Even a live singleton input agent dispatches
+  // straight away.
   describe('startInput', () => {
     it('calls start with the correct instanceId and sets openId to the returned id', async () => {
       const returnedId = 'a__qualifier#42'
@@ -210,65 +246,24 @@ describe('useBoardNavigation', () => {
       expect(result.current.openTypeId).toBeNull()
       expect(result.current.openId).toBe(returnedId)
     })
-  })
 
-  // U8: starting a LIVE singleton input agent wipes its prior scan, so startInput defers to a
-  // Start-over confirm instead of dispatching. confirmStartOver dispatches; cancel changes nothing.
-  describe('Start-over confirm-gate', () => {
-    // qualifier is a singleton input agent (maxInstances 1, role input) with a live root scan.
-    const singletonDef: any = { id: 'qualifier', name: 'Qualifier', maxInstances: 1 }
-    const liveRoot = {
-      id: 'a__qualifier#1',
-      workflowId: 'a',
-      agentId: 'a__qualifier',
-      parentId: null,
-      phase: 'active',
-      status: 'running',
-      payload: {},
-    }
-
-    it('startInput on a LIVE singleton sets startOver and does NOT dispatch', () => {
-      items = [liveRoot]
+    it('a LIVE singleton input agent dispatches directly — no Start-over confirm', () => {
+      const singletonDef: any = { id: 'qualifier', name: 'Qualifier', maxInstances: 1 }
+      items = [
+        {
+          id: 'a__qualifier#1',
+          workflowId: 'a',
+          agentId: 'a__qualifier',
+          key: 'inbox',
+          parentId: null,
+          phase: 'active',
+          status: 'running',
+          payload: {},
+        },
+      ]
       const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
       act(() => result.current.startInput(singletonDef))
-      expect(result.current.startOver).toEqual({ def: singletonDef })
-      expect(start).not.toHaveBeenCalled()
-    })
-
-    it('confirmStartOver dispatches the start and clears startOver', async () => {
-      items = [liveRoot]
-      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
-      act(() => result.current.startInput(singletonDef))
-      await act(async () => {
-        result.current.confirmStartOver()
-      })
       expect(start).toHaveBeenCalledWith(instanceId('a', 'qualifier'))
-      expect(result.current.startOver).toBeNull()
-    })
-
-    it('cancelStartOver clears startOver WITHOUT dispatching', () => {
-      items = [liveRoot]
-      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
-      act(() => result.current.startInput(singletonDef))
-      act(() => result.current.cancelStartOver())
-      expect(result.current.startOver).toBeNull()
-      expect(start).not.toHaveBeenCalled()
-    })
-
-    it('a singleton with NO live scan dispatches directly (no confirm)', () => {
-      items = []
-      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
-      act(() => result.current.startInput(singletonDef))
-      expect(result.current.startOver).toBeNull()
-      expect(start).toHaveBeenCalledWith(instanceId('a', 'qualifier'))
-    })
-
-    it('a terminal-only scan does NOT gate — dispatches directly', () => {
-      items = [{ ...liveRoot, phase: 'terminal', status: 'done' }]
-      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
-      act(() => result.current.startInput(singletonDef))
-      expect(result.current.startOver).toBeNull()
-      expect(start).toHaveBeenCalled()
     })
   })
 })

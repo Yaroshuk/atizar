@@ -35,7 +35,7 @@ export type AgentGroup = {
 
 // The Run whose status represents the instance: worst-meaningful first (an awaiting approval must
 // surface over a finished Run). Uses the SAME PRIORITY order as the agent aggregate — one source.
-const pickHead = (runs: PInstance[]): PInstance =>
+export const pickHead = (runs: PInstance[]): PInstance =>
   PRIORITY.map((s) => runs.find((r) => r.status === s)).find(Boolean) ?? runs[runs.length - 1]
 
 export type PipelineBlock = {

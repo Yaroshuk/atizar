@@ -40,7 +40,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const board = useBoard()
   const boardConnection = useBoardConnection()
   const health = useHealth()
-  const { deliver, cancel } = useDispatch()
+  const { deliver, cancel, cancelInstance } = useDispatch()
 
   const sel = useWorkflowSelection(config)
   const nav = useBoardNavigation(config, sel.activeWorkflowId)
@@ -123,7 +123,13 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
             renderableToolNames={renderableToolNames}
             notes={nav.notesFor(nav.openItem.id)}
             deliver={deliver}
-            onStop={(cid) => void cancel(cid)}
+            onStop={(cid) => {
+              // Thread Stop halts the whole instance (every Run of this (workflowId, agentId, key)),
+              // consistent with the pipeline item Stop. Fall back to the single Run if unresolved.
+              const item = board.items.find((w) => w.id === cid)
+              if (item) void cancelInstance(item.workflowId, item.agentId, item.key)
+              else void cancel(cid)
+            }}
             onOpenWorkflow={onSelectWorkflow}
             onOpenInstance={nav.setOpenId}
             onStart={() => {
@@ -188,37 +194,24 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
               ? 'Stop all workflows?'
               : stop.confirm.kind === 'workflow'
                 ? 'Stop this workflow?'
-                : 'Stop this item?'
+                : 'Stop this instance?'
           }
           message={
             stop.confirm.kind === 'all'
               ? 'This halts every active item across all workflows. In-flight work is cancelled.'
               : stop.confirm.kind === 'workflow'
                 ? `This halts every active item in ${nav.workflow.label}. In-flight work is cancelled.`
-                : 'This halts this work item. In-flight work is cancelled.'
+                : 'This halts this instance and everything it spawned. In-flight work is cancelled.'
           }
           confirmLabel={
             stop.confirm.kind === 'all'
               ? 'Stop all'
               : stop.confirm.kind === 'workflow'
                 ? 'Stop workflow'
-                : 'Stop item'
+                : 'Stop instance'
           }
           onConfirm={() => void stop.confirmStop()}
           onCancel={stop.cancelConfirm}
-        />
-      )}
-
-      {nav.startOver && (
-        <ConfirmDialog
-          title='Start over?'
-          message={
-            `This stops the current run in ${nav.workflow.label} and starts a fresh one. ` +
-            'The current work moves to Activity (nothing is deleted).'
-          }
-          confirmLabel='Start over'
-          onConfirm={() => void nav.confirmStartOver()}
-          onCancel={nav.cancelStartOver}
         />
       )}
 

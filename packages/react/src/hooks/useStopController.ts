@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useBoard } from './useBoard'
 import { useDispatch } from './useDispatch'
 
 // Every Stop scope confirms before halting in-flight work.
@@ -9,7 +10,8 @@ export type StopController = ReturnType<typeof useStopController>
 
 // Extracts WorkflowBoard.tsx:62-68 (confirm + stopping state) and :156-181 (confirmStop).
 export function useStopController(activeWorkflowId: string) {
-  const { cancel, cancelWorkflow, cancelAll } = useDispatch()
+  const board = useBoard()
+  const { cancel, cancelWorkflow, cancelAll, cancelInstance } = useDispatch()
   const [confirm, setConfirm] = useState<Confirm>(null)
   // In-flight Stop state (per item + the two bulk scopes), for the stopping… spinner.
   const [stoppingItems, setStoppingItems] = useState<Record<string, boolean>>({})
@@ -29,7 +31,12 @@ export function useStopController(activeWorkflowId: string) {
       const { id } = confirm
       setStoppingItems((m) => ({ ...m, [id]: true }))
       setConfirm(null)
-      await cancel(id)
+      // The unit of Stop is the INSTANCE: resolve this Run's work item to its
+      // (workflowId, agentId, key) and cancel every Run of that instance (the server cascades to
+      // children). If the item can't be resolved, fall back to stopping just this Run.
+      const item = board.items.find((w) => w.id === id)
+      if (item) await cancelInstance(item.workflowId, item.agentId, item.key)
+      else await cancel(id)
       setStoppingItems((m) => {
         const rest = { ...m }
         delete rest[id]

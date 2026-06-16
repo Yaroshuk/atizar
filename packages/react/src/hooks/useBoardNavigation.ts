@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { instanceId, hasLiveDescendant, type AgentDefinition, type Phase } from '@atizar/core'
+import { instanceId, type AgentDefinition } from '@atizar/core'
 import { useBoard } from './useBoard'
 import { useDispatch } from './useDispatch'
 import { lookups } from '../lookups'
 import { toPInstances } from '../boardModel'
+import { pickHead, type PInstance } from '../pipelineModel'
 import type { WorkItem } from '../serverTypes'
 import type { WorkflowsConfig } from '../workflowsContext'
 
@@ -35,10 +36,6 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   )
   const [openTypeId, setOpenTypeId] = useState<string | null>(null)
   const [openPickerId, setOpenPickerId] = useState<string | null>(null)
-  // U8: a pending Start-over confirm. Starting a live singleton input agent WIPES + supersedes
-  // its prior scan (U7, server-side) — a destructive gesture, so the public startInput defers to
-  // a confirm modal instead of dispatching straight away.
-  const [startOver, setStartOver] = useState<{ def: AgentDefinition } | null>(null)
 
   // WorkflowBoard.tsx:79-84: persist the open id into the URL so a reload re-attaches
   // (survives the SSE re-subscribe).
@@ -64,59 +61,34 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
     })
   }
 
-  // A singleton input agent has a LIVE scan in the active workflow when a NON-terminal ROOT
-  // work item for it already exists. The same predicate AgentGrid used for the old (dead)
-  // singletonBusy disable — now it gates the Start-over confirm instead of blocking START.
-  // A live scan = a non-retired root for this agent that is itself live OR has a live descendant.
-  // Mirrors the server's hasLiveInputScan via the SAME core hasLiveDescendant walk (Approach B) —
-  // root-phase-only would miss a finished sorter whose dispatched children are still awaiting, so
-  // a re-START would silently skip the confirm and accumulate a duplicate scan.
-  const hasLiveScan = (agentDef: AgentDefinition): boolean => {
-    const rows = board.items.filter((w) => w.workflowId === workflow.id)
-    const liveAncestors = hasLiveDescendant(
-      rows.map((w) => ({ id: w.id, parentId: w.parentId, phase: w.phase as Phase }))
-    )
-    return rows.some(
-      (w) =>
-        stripAgent(w) === agentDef.id &&
-        w.parentId === null &&
-        w.outcome !== 'superseded' &&
-        w.outcome !== 'reset' &&
-        (w.phase !== 'terminal' || liveAncestors.has(w.id))
-    )
-  }
+  // START = a plain dispatch. The server handles re-scan safety (supersede-prior + one-live gate);
+  // no client-side wipe confirm. (Clear stays separate, via useResetController.)
+  const startInput = (agentDef: AgentDefinition): void => doStart(agentDef)
 
-  // U8 confirm-gate: the single start entry point. Starting a live singleton input agent wipes
-  // the prior scan, so route it through a Start-over confirm; everything else dispatches directly.
-  const startInput = (agentDef: AgentDefinition): void => {
-    const isSingletonInput = agentDef.maxInstances === 1 && roleOf(agentDef.id) === 'input'
-    if (isSingletonInput && hasLiveScan(agentDef)) {
-      setStartOver({ def: agentDef })
-      return
+  // Distinct visible instances of an agent = one head Run per unique key among its shown Runs.
+  // Identity is the stored `key`; the representative Run is the SAME head-selection the pipeline
+  // uses (pickHead — one source, no second priority derivation).
+  const instancesOf = (agentId: string): PInstance[] => {
+    const byKey = new Map<string, PInstance[]>()
+    for (const p of liveOf(agentId)) {
+      const arr = byKey.get(p.key) ?? []
+      arr.push(p)
+      byKey.set(p.key, arr)
     }
-    doStart(agentDef)
+    return [...byKey.values()].map(pickHead)
   }
 
-  // Confirmed: dispatch the fresh run (the server supersedes the prior scan), close the confirm.
-  const confirmStartOver = (): void => {
-    if (!startOver) return
-    doStart(startOver.def)
-    setStartOver(null)
-  }
-  // Cancel: close the confirm, change NOTHING (the current run keeps running).
-  const cancelStartOver = (): void => setStartOver(null)
-
-  // WorkflowBoard.tsx:135-143: open an agent by count of its visible items.
+  // Open an agent by count of its distinct INSTANCES (grouped by key).
   //   0 → type view (intro + START)
-  //   1 → its thread
-  //  ≥2 → instance picker (the human picks a copy)
+  //   1 → the single instance's head run
+  //  ≥2 → instance list (variant B — one row per instance)
   const openAgent = (agentId: string): void => {
-    const live = liveOf(agentId)
     setOpenTypeId(null)
     setOpenPickerId(null)
     setOpenId(null)
-    if (live.length === 0) setOpenTypeId(agentId)
-    else if (live.length === 1) setOpenId(live[0].localId)
+    const insts = instancesOf(agentId)
+    if (insts.length === 0) setOpenTypeId(agentId)
+    else if (insts.length === 1) setOpenId(insts[0].localId)
     else setOpenPickerId(agentId)
   }
 
@@ -157,7 +129,8 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   // WorkflowBoard.tsx:212-214: resolve what the open id / type / picker points at.
   const openItem = openId ? itemById(openId) : undefined
   const openTypeAgent = openTypeId ? defOf(workflow.id, openTypeId) : undefined
-  const pickerInstances = openPickerId ? liveOf(openPickerId) : []
+  // ≥2 → one row per distinct instance (variant B), each represented by its head Run.
+  const pickerInstances = openPickerId ? instancesOf(openPickerId) : []
 
   return {
     openId,
@@ -174,9 +147,6 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
     canStart,
     openAgent,
     startInput,
-    startOver,
-    confirmStartOver,
-    cancelStartOver,
     reset,
     notesFor,
     // Re-exported lookups the consuming blocks need.
