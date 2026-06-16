@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { instanceId, type AgentDefinition } from '@atizar/core'
+import { instanceId, hasLiveDescendant, type AgentDefinition, type Phase } from '@atizar/core'
 import { useBoard } from './useBoard'
 import { useDispatch } from './useDispatch'
 import { lookups } from '../lookups'
@@ -67,14 +67,24 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   // A singleton input agent has a LIVE scan in the active workflow when a NON-terminal ROOT
   // work item for it already exists. The same predicate AgentGrid used for the old (dead)
   // singletonBusy disable — now it gates the Start-over confirm instead of blocking START.
-  const hasLiveScan = (agentDef: AgentDefinition): boolean =>
-    board.items.some(
+  // A live scan = a non-retired root for this agent that is itself live OR has a live descendant.
+  // Mirrors the server's hasLiveInputScan via the SAME core hasLiveDescendant walk (Approach B) —
+  // root-phase-only would miss a finished sorter whose dispatched children are still awaiting, so
+  // a re-START would silently skip the confirm and accumulate a duplicate scan.
+  const hasLiveScan = (agentDef: AgentDefinition): boolean => {
+    const rows = board.items.filter((w) => w.workflowId === workflow.id)
+    const liveAncestors = hasLiveDescendant(
+      rows.map((w) => ({ id: w.id, parentId: w.parentId, phase: w.phase as Phase }))
+    )
+    return rows.some(
       (w) =>
-        w.workflowId === workflow.id &&
         stripAgent(w) === agentDef.id &&
         w.parentId === null &&
-        w.phase !== 'terminal'
+        w.outcome !== 'superseded' &&
+        w.outcome !== 'reset' &&
+        (w.phase !== 'terminal' || liveAncestors.has(w.id))
     )
+  }
 
   // U8 confirm-gate: the single start entry point. Starting a live singleton input agent wipes
   // the prior scan, so route it through a Start-over confirm; everything else dispatches directly.

@@ -6,7 +6,15 @@ import { lifecycle, hasLiveDescendant, type Phase, type Outcome } from './lifecy
 // unit test would diverge from this table. (The consumers import lifecycle() directly, so this
 // guards against a future copy-paste reintroducing a parallel derivation.)
 const PHASES: Phase[] = ['queued', 'active', 'awaiting_human', 'terminal']
-const OUTCOMES: Outcome[] = ['running', 'done', 'stopped', 'rejected', 'error', 'superseded', 'reset']
+const OUTCOMES: Outcome[] = [
+  'running',
+  'done',
+  'stopped',
+  'rejected',
+  'error',
+  'superseded',
+  'reset',
+]
 
 describe('lifecycle drift guard', () => {
   it('is a pure function of its inputs (idempotent)', () => {

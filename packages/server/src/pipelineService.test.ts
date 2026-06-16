@@ -210,10 +210,10 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.id).not.toBe(first.id)
 
-    // Prior root is now terminal/stopped; exactly the new root is live.
+    // Prior root is wiped (cancelled → reset, hidden from the board); exactly the new root is live.
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('stopped')
+    expect(firstStatus?.outcome).toBe('reset')
 
     // The new root holds the sole singleton slot.
     await waitFor(async () => (await svc.stats(agentId)).active === 1)
@@ -726,7 +726,7 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
-  it('a sequential human re-START supersedes the prior finished root and mints a new one', async () => {
+  it('a sequential human re-START wipes the prior finished root and mints a new one', async () => {
     const { svc, workflowId, agentId } = makeReRunService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
@@ -734,33 +734,32 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.id).not.toBe(first.id)
 
-    // the prior finished root is now superseded (preserved, not destroyed — I12)
+    // the prior finished root is now reset (retired by the Start-over wipe; preserved, not
+    // destroyed — I12)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('superseded')
-    // it has LEFT the live board (superseded is filtered from getBoard)…
+    expect(firstStatus?.outcome).toBe('reset')
+    // it has LEFT the live board (reset is filtered from getBoard)…
     const board = await svc.getBoard()
     expect(board.items.some((i) => i.id === first.id)).toBe(false)
     // …but the row is preserved in the store (I12 — not deleted).
     const firstRow = await makeStateStore(db).getWorkItem(first.id)
     expect(firstRow).toBeDefined()
-    expect(firstRow?.outcome).toBe('superseded')
+    expect(firstRow?.outcome).toBe('reset')
   })
 
-  it('the supersede is recorded in the Activity log', async () => {
+  it('the wipe is recorded in the Activity log', async () => {
     const { svc, workflowId, agentId } = makeReRunService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
     await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    const entry = svc
-      .getActivity()
-      .find((e) => e.workItemId === first.id && e.kind === 'superseded')
+    const entry = svc.getActivity().find((e) => e.workItemId === first.id && e.kind === 'reset')
     expect(entry).toBeDefined()
   })
 
   it('a 2nd human START while the prior scan is RUNNING wipes it (Start-over) and starts fresh', async () => {
     // blockingProvider keeps the first scan ACTIVE (slot occupied). The Start-over wipe cancels it
-    // (→ stopped) before minting the fresh root — no rejection.
+    // (→ stopped) then resets it (→ reset, hidden) before minting the fresh root — no rejection.
     const { svc, workflowId, agentId } = makeReRunService(blockingProvider())
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
@@ -768,10 +767,10 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     expect(second.id).not.toBe(first.id)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('stopped')
+    expect(firstStatus?.outcome).toBe('reset')
   })
 
-  it('a non-input agent human START does NOT supersede (only input roots refresh)', async () => {
+  it('a non-input agent human START does NOT wipe (only input roots refresh)', async () => {
     // dispatch a worker-role agent directly (origin human) twice; finishing the first should
     // NOT retire it — refresh applies only to input agents.
     const { svc, workflowId } = makeReRunService()
@@ -790,7 +789,7 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     })
     const status = await svc.getStatus(first.id)
     expect(status?.status).toBe('terminal')
-    expect(status?.outcome).toBe('done') // NOT superseded
+    expect(status?.outcome).toBe('done') // NOT wiped — refresh applies only to input agents
   })
 })
 
@@ -859,15 +858,15 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
     expect((await svc.stats(agentId)).active).toBe(0) // slot freed at the gate
 
-    // Start-over: the live (awaiting) root is cancelled (→ stopped), a fresh root is minted.
+    // Start-over: the live (awaiting) root is wiped (cancelled → reset), a fresh root is minted.
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.id).not.toBe(first.id)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('stopped')
+    expect(firstStatus?.outcome).toBe('reset')
   })
 
-  it('a sequential re-START once the prior scan fully settles (gate resolved → finished) supersedes', async () => {
+  it('a sequential re-START once the prior scan fully settles (gate resolved → finished) wipes it', async () => {
     const { svc, workflowId, agentId } = makeGateInputService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
@@ -878,12 +877,12 @@ describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', ()
     await svc.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
     await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
 
-    // A fresh human START now supersedes the prior finished root.
+    // A fresh human START now wipes the prior finished root (→ reset, hidden).
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     expect(second.id).not.toBe(first.id)
     const firstStatus = await svc.getStatus(first.id)
     expect(firstStatus?.status).toBe('terminal')
-    expect(firstStatus?.outcome).toBe('superseded')
+    expect(firstStatus?.outcome).toBe('reset')
   })
 
   it('machine dispatch (origin=agent) to a live input scan is NOT wiped by the START path', async () => {

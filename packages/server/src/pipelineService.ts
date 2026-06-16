@@ -222,6 +222,19 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     return { reset }
   }
 
+  // The ONE wipe primitive (cancel every active item, then retire every terminal one). Every caller
+  // — the reset routes, the public wipe*/reset* methods, and the Start-over re-START path — goes
+  // through this, so "cancel + reset" lives in exactly one place (no copy-paste).
+  async function wipeWorkflowImpl(workflowId: string): Promise<{ reset: number }> {
+    await cancelWorkflowImpl(workflowId)
+    return resetImpl(workflowId)
+  }
+
+  async function wipeAllImpl(): Promise<{ reset: number }> {
+    await cancelAllImpl()
+    return resetImpl()
+  }
+
   // True when `agentId` (= wf__agent) is the runtime key of a role:'input' agent in some loaded
   // descriptor. The set of input runtime keys is derived once from deps.descriptors; refresh
   // applies ONLY to input roots (a worker re-START is an ordinary new dispatch, never a refresh).
@@ -232,62 +245,21 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   )
   const isInputAgent = (agentId: string): boolean => inputAgentKeys.has(agentId)
 
-  // Workflows that opt into clear-on-START (resetOnStart, config-as-data I7) — derived once.
-  const resetOnStartWorkflows = new Set<string>(
-    deps.descriptors.filter((wf) => wf.resetOnStart).map((wf) => wf.id)
-  )
-
-  // 'refresh' re-run (WS1, I1/I8/I12): on a human START of an input agent, retire each prior
-  // FINISHED root of the same workflow × input-agent into the preserved Done bucket (status
-  // 'closed', resolution 'superseded') via transition() — children are NOT touched (durable).
-  // BRANCH POINT for rerun:'history' (reserved, NOT wired in the beta): when a workflow declares
-  // rerun:'history', skip this supersede entirely — every finished scan stays current and the
-  // human chooses. Look up the descriptor's `rerun` here and early-return before superseding.
-  async function supersedePriorRoots(workflowId: string, agentId: string): Promise<void> {
-    const roots = await store.getFinishedInputRoots(workflowId, agentId)
-    for (const root of roots) {
-      try {
-        await settleEdge(root.id, 'supersede', null, { summary: 'superseded by re-run' })
-      } catch (e) {
-        // Tolerate a lost race: a concurrent finish/cancel could move the root out of
-        // 'finished' between the read above and here (IllegalTransition) — skip it. Re-throw
-        // anything else (e.g. a real DB error) rather than silently leaving two current roots.
-        if (e instanceof IllegalTransition) continue
-        throw e
-      }
-      activity.record({
-        ts: Date.now(),
-        workflowId: root.workflowId,
-        agentId: root.agentId,
-        workItemId: root.id,
-        kind: 'superseded',
-        summary: 'superseded by re-run',
-      })
-    }
-  }
-
   return {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
-      // WS1 'refresh' / Start-over (I1/I8/I12): a human START of an input agent first WIPES any
-      // LIVE scan of the same agent (cancel its tree — settle → outcome 'stopped' COVERS, so no
-      // phantom twin), then supersedes prior FINISHED roots, so exactly one fresh root runs. The
-      // old 409 singleton guard is GONE: a re-START never rejects — it Starts-over (the client
-      // shows a confirm modal before calling this — U8).
+      // Start-over = full WIPE + start (I1/I8/I12): a human re-START of an input agent retires the
+      // ENTIRE prior scan so exactly ONE fresh instance of each agent runs and nothing from the
+      // last pass lingers on the board. We cancel every active item in the workflow (→ stopped),
+      // then reset every terminal item (→ outcome 'reset', hidden) — so the whole prior tree LEAVES
+      // the live board (reachable in Activity/history; nothing is deleted — I12). This replaces the
+      // old supersede-prior + cancel-live-roots path, which left the prior scan's children visible
+      // (a Stopped reader sitting next to the fresh one) — wrong for a maxInstances=1 agent the
+      // operator expects to show a single instance. The 409 singleton guard is GONE; the client
+      // shows a Start-over confirm before calling this (U8).
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
-        const live = await store.getActiveByWorkflow(req.workflowId)
-        for (const item of live
-          .filter((w) => !w.parentId && w.agentId === req.agentId)
-          .sort((a, b) => a.id.localeCompare(b.id))) {
-          await cancelItem(item.id)
-        }
-        await supersedePriorRoots(req.workflowId, req.agentId)
-        // resetOnStart (I7): clear this workflow's terminal items so the board starts clean for
-        // the new scan. Only TERMINAL items move (settle('reset')); rows are hidden, never deleted
-        // (I12). Runs after the supersede so a just-superseded prior root is excluded by the
-        // resettable filter.
-        if (resetOnStartWorkflows.has(req.workflowId)) await resetImpl(req.workflowId)
+        await wipeWorkflowImpl(req.workflowId)
       }
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
       activity.record({
@@ -468,27 +440,24 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     },
 
     // Wipe = the full Start-over primitive: stop every active item in scope, then retire every
-    // terminal item (hide, not delete — I12). One server op behind the reset routes (U7/U8).
+    // terminal item (hide, not delete — I12). One server op (wipeWorkflowImpl) behind the reset
+    // routes (U7/U8) AND the Start-over re-START path — no duplicated cancel+reset.
     async wipeWorkflow(workflowId: string): Promise<{ reset: number }> {
-      await cancelWorkflowImpl(workflowId)
-      return resetImpl(workflowId)
+      return wipeWorkflowImpl(workflowId)
     },
 
     async wipeAll(): Promise<{ reset: number }> {
-      await cancelAllImpl()
-      return resetImpl()
+      return wipeAllImpl()
     },
 
-    // resetWorkflow/resetAll are thin aliases to the wipe primitives (the routes call these; the
+    // resetWorkflow/resetAll are thin aliases to the wipe primitive (the routes call these; the
     // route contract drops the `active` field — U7d).
     async resetWorkflow(workflowId: string): Promise<{ reset: number }> {
-      await cancelWorkflowImpl(workflowId)
-      return resetImpl(workflowId)
+      return wipeWorkflowImpl(workflowId)
     },
 
     async resetAll(): Promise<{ reset: number }> {
-      await cancelAllImpl()
-      return resetImpl()
+      return wipeAllImpl()
     },
 
     async getStatus(
