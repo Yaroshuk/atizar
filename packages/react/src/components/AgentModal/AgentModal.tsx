@@ -271,8 +271,8 @@ export const AgentModal = ({
           const showStop = active && onStop
           const showStart = canStart && !active
           // While live, START isn't shown — but a launchable (input) agent can still START OVER:
-          // the confirm-gated onStart wipes the current scan and runs a fresh one (U8). Without
-          // this affordance the Start-over feature the server delivers is unreachable from the UI.
+          // START/Start-over is a plain dispatch; the server handles safe re-scan (supersede-prior
+          // + one-live gate) — no client confirm. Without this affordance the affordance is lost.
           const showStartOver = canStart && active
           if (!showStop && !showStart && !showStartOver) return null
           return (

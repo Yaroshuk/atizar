@@ -49,8 +49,8 @@ export const AgentGrid = ({
         {agents.map((agent) => {
           const agg = aggOf(agent.id)
           // A busy singleton no longer blocks START here — tapping its card opens the live
-          // thread, where "Start over" runs the confirm-gated wipe+restart (U8). The only
-          // remaining START block is credential health, handled inside AgentCard.
+          // thread, where START/Start-over is a plain dispatch (server handles safe re-scan,
+          // no client confirm). The only remaining START block is credential health (AgentCard).
           return (
             <AgentCard
               key={agent.id}

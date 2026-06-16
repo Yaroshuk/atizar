@@ -119,6 +119,29 @@ describe('useStopController', () => {
     expect(done).toBe(true)
   })
 
+  // --- stopInstance (immediate, no confirm gate) ---
+  it('stopInstance resolves to cancelInstance when the item is on the board', async () => {
+    items = [{ id: 'w1', workflowId: 'a', agentId: 'a__reply', key: 'alice' }]
+    const { result } = renderHook(() => useStopController('wf-a'))
+    await act(async () => {
+      await result.current.stopInstance('w1')
+    })
+    expect(cancelInstance).toHaveBeenCalledWith('a', 'a__reply', 'alice')
+    expect(cancel).not.toHaveBeenCalled()
+    // no confirm modal was involved
+    expect(result.current.confirm).toBeNull()
+  })
+
+  it('stopInstance falls back to cancel(id) when the item is not on the board', async () => {
+    items = []
+    const { result } = renderHook(() => useStopController('wf-a'))
+    await act(async () => {
+      await result.current.stopInstance('w99')
+    })
+    expect(cancel).toHaveBeenCalledWith('w99')
+    expect(cancelInstance).not.toHaveBeenCalled()
+  })
+
   // --- workflow scope ---
   it('confirming workflow scope calls cancelWorkflow with activeWorkflowId', async () => {
     const { result } = renderHook(() => useStopController('wf-a'))

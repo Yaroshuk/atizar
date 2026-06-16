@@ -23,6 +23,14 @@ export function useStopController(activeWorkflowId: string) {
   const requestStopAll = () => setConfirm({ kind: 'all' })
   const cancelConfirm = () => setConfirm(null)
 
+  // Resolve a Run's localId to its instance and stop the WHOLE instance (server cascades to
+  // children); fall back to a per-Run cancel if the item isn't on the board (raced eviction).
+  const stopInstanceById = async (id: string): Promise<void> => {
+    const w = board.items.find((x) => x.id === id)
+    if (w) await cancelInstance(w.workflowId, w.agentId, w.key)
+    else await cancel(id)
+  }
+
   // --- Stop (all three scopes confirm first via the modal) ---
   // Matches WorkflowBoard.tsx:156-181 exactly.
   const confirmStop = async (): Promise<void> => {
@@ -31,12 +39,7 @@ export function useStopController(activeWorkflowId: string) {
       const { id } = confirm
       setStoppingItems((m) => ({ ...m, [id]: true }))
       setConfirm(null)
-      // The unit of Stop is the INSTANCE: resolve this Run's work item to its
-      // (workflowId, agentId, key) and cancel every Run of that instance (the server cascades to
-      // children). If the item can't be resolved, fall back to stopping just this Run.
-      const item = board.items.find((w) => w.id === id)
-      if (item) await cancelInstance(item.workflowId, item.agentId, item.key)
-      else await cancel(id)
+      await stopInstanceById(id)
       setStoppingItems((m) => {
         const rest = { ...m }
         delete rest[id]
@@ -56,6 +59,10 @@ export function useStopController(activeWorkflowId: string) {
     setConfirm(null)
   }
 
+  // Asymmetry: pipeline/grid item-Stop is confirm-gated (requestStopItem → confirm → confirmStop);
+  // the open-thread Stop fires immediately via stopInstance (an already-open thread needs no second confirm).
+  const stopInstance = (id: string): Promise<void> => stopInstanceById(id)
+
   return {
     confirm,
     stoppingItems,
@@ -66,5 +73,6 @@ export function useStopController(activeWorkflowId: string) {
     requestStopAll,
     cancelConfirm,
     confirmStop,
+    stopInstance,
   }
 }

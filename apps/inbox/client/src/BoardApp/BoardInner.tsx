@@ -40,7 +40,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const board = useBoard()
   const boardConnection = useBoardConnection()
   const health = useHealth()
-  const { deliver, cancel, cancelInstance } = useDispatch()
+  const { deliver } = useDispatch()
 
   const sel = useWorkflowSelection(config)
   const nav = useBoardNavigation(config, sel.activeWorkflowId)
@@ -123,13 +123,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
             renderableToolNames={renderableToolNames}
             notes={nav.notesFor(nav.openItem.id)}
             deliver={deliver}
-            onStop={(cid) => {
-              // Thread Stop halts the whole instance (every Run of this (workflowId, agentId, key)),
-              // consistent with the pipeline item Stop. Fall back to the single Run if unresolved.
-              const item = board.items.find((w) => w.id === cid)
-              if (item) void cancelInstance(item.workflowId, item.agentId, item.key)
-              else void cancel(cid)
-            }}
+            onStop={(cid) => void stop.stopInstance(cid)}
             onOpenWorkflow={onSelectWorkflow}
             onOpenInstance={nav.setOpenId}
             onStart={() => {
