@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { WorkItem } from './serverTypes'
 import { toPInstances, queuedByAgent, statusesOf } from './boardModel'
 
-const wi = (
-  over: Partial<WorkItem> & Pick<WorkItem, 'id' | 'agentId' | 'phase'>
-): WorkItem => ({
+const wi = (over: Partial<WorkItem> & Pick<WorkItem, 'id' | 'agentId' | 'phase'>): WorkItem => ({
   workflowId: 'lead-inbox',
   parentId: null,
   origin: 'human',

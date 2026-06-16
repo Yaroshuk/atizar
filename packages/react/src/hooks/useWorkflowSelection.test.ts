@@ -12,16 +12,16 @@ describe('useWorkflowSelection', () => {
     items.length = 0
   })
   it('defaults to the first workflow and counts active items', () => {
-    items.push({ id: '1', workflowId: 'a', status: 'running' })
-    items.push({ id: '2', workflowId: 'b', status: 'finished' })
+    items.push({ id: '1', workflowId: 'a', phase: 'active', outcome: 'running' })
+    items.push({ id: '2', workflowId: 'b', phase: 'terminal', outcome: 'done' })
     const { result } = renderHook(() => useWorkflowSelection(cfg))
     expect(result.current.activeWorkflowId).toBe('a')
     expect(result.current.globalActive).toBe(1)
     expect(result.current.workflowActiveCount).toBe(1)
   })
   it('badges unseen cross-workflow children, clears them on switch', () => {
-    items.push({ id: 'p', workflowId: 'a', status: 'finished' })
-    items.push({ id: 'c', workflowId: 'b', status: 'running', parentId: 'p' })
+    items.push({ id: 'p', workflowId: 'a', phase: 'terminal', outcome: 'done' })
+    items.push({ id: 'c', workflowId: 'b', phase: 'active', outcome: 'running', parentId: 'p' })
     const { result } = renderHook(() => useWorkflowSelection(cfg))
     expect(result.current.unread.b).toBe(1)
     act(() => result.current.switchWorkflow('b'))

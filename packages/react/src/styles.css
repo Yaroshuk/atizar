@@ -1279,6 +1279,22 @@ button {
 .mini.err .m-state {
   color: #c0392b;
 }
+/* terminal Stopped — muted/grey (a frozen-and-kept run); distinct from a clean Done's neutral run tint */
+.mini.stopped {
+  background: #f6f6f7;
+  border-color: var(--border);
+}
+.mini.stopped .m-state {
+  color: var(--muted);
+}
+/* terminal Rejected — amber/red warning so a rejected draft never reads as a clean Done */
+.mini.rejected {
+  background: rgba(214, 69, 58, 0.07);
+  border-color: rgba(214, 69, 58, 0.32);
+}
+.mini.rejected .m-state {
+  color: #c0392b;
+}
 .mini.run .m-icon,
 .mini.await .m-icon,
 .mini.err .m-icon {
@@ -2308,6 +2324,20 @@ button {
 .pl-single.err .m-state {
   color: var(--red-ink);
 }
+.pl-single.stopped {
+  background: #f6f6f7;
+  border-color: var(--border);
+}
+.pl-single.stopped .m-state {
+  color: var(--muted);
+}
+.pl-single.rejected {
+  background: rgba(214, 69, 58, 0.07);
+  border-color: rgba(214, 69, 58, 0.32);
+}
+.pl-single.rejected .m-state {
+  color: var(--red-ink);
+}
 /* .pl-group / .pl-ahead / .pl-aname / .pl-acount / .pl-kids / .pl-kid / .pl-hstub
    moved → components/PipelineColumn.module.scss (the `.pl-ahead .m-icon` rule
    reaches the still-global `.m-icon` via `:global(.m-icon)` there) */
@@ -2359,6 +2389,20 @@ button {
   border-color: rgba(214, 69, 58, 0.32);
 }
 .pl-inst.err .m-state {
+  color: var(--red-ink);
+}
+.pl-inst.stopped {
+  background: #f6f6f7;
+  border-color: var(--border);
+}
+.pl-inst.stopped .m-state {
+  color: var(--muted);
+}
+.pl-inst.rejected {
+  background: rgba(214, 69, 58, 0.07);
+  border-color: rgba(214, 69, 58, 0.32);
+}
+.pl-inst.rejected .m-state {
   color: var(--red-ink);
 }
 .pl-iname {

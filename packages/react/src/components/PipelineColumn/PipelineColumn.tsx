@@ -1,6 +1,6 @@
 import type { PInstance, PipelineBlock } from '../../pipelineModel'
 import type { Status } from '../../status'
-import { TINT, STATE_WORD } from '../../statusDisplay'
+import { pillLabel, pillTint } from '../../statusDisplay'
 import { Icon } from '../Icon/Icon'
 import { CompHeader } from '../../primitives/CompHeader/CompHeader'
 import { StopButton } from '../../primitives/StopButton/StopButton'
@@ -63,7 +63,7 @@ export const PipelineColumn = ({
       <>
         <span className='m-state'>
           <span className={`dot ${inst.status}`} />
-          {STATE_WORD[inst.status]}
+          {pillLabel(inst.status, inst.outcome)}
         </span>
         {stoppable && (
           <StopButton
@@ -127,7 +127,7 @@ export const PipelineColumn = ({
           blocks.map((block) => (
             <div className={s.plBlock} key={block.parent.localId}>
               <div
-                className={`mini ${TINT[block.parent.status]}${stopClasses(block.parent)}`}
+                className={`mini ${pillTint(block.parent.status, block.parent.outcome)}${stopClasses(block.parent)}`}
                 onClick={() => onOpen(block.parent.localId)}
               >
                 <div className='m-icon'>
@@ -153,7 +153,7 @@ export const PipelineColumn = ({
                         return (
                           <div
                             key={g.agentId}
-                            className={`pl-single ${TINT[inst.status]}${stopClasses(inst)}`}
+                            className={`pl-single ${pillTint(inst.status, inst.outcome)}${stopClasses(inst)}`}
                             onClick={() => onOpen(inst.localId)}
                           >
                             <div className='m-icon'>
@@ -183,7 +183,7 @@ export const PipelineColumn = ({
                               <div key={inst.localId} className={s.plKid}>
                                 <span className={s.plHstub} />
                                 <div
-                                  className={`pl-inst ${TINT[inst.status]}${stopClasses(inst)}`}
+                                  className={`pl-inst ${pillTint(inst.status, inst.outcome)}${stopClasses(inst)}`}
                                   onClick={() => onOpen(inst.localId)}
                                 >
                                   <span className='pl-iname'>{inst.label || inst.name}</span>

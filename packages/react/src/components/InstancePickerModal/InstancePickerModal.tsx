@@ -1,6 +1,7 @@
 import clsx from 'clsx'
+import type { Outcome } from '@atizar/core'
 import type { Status } from '../../status'
-import { TINT, STATE_WORD } from '../../statusDisplay'
+import { pillLabel, pillTint } from '../../statusDisplay'
 import { useDismiss } from '../../hooks/useDismiss'
 import { Icon, type IconName } from '../Icon/Icon'
 import s from './InstancePickerModal.module.scss'
@@ -13,6 +14,7 @@ export type PickerInstance = {
   label: string
   name: string
   status: Status
+  outcome: Outcome
 }
 
 type InstancePickerModalProps = {
@@ -61,7 +63,7 @@ export const InstancePickerModal = ({
           {instances.map((inst) => (
             <div
               key={inst.localId}
-              className={`pl-single ${TINT[inst.status]}`}
+              className={`pl-single ${pillTint(inst.status, inst.outcome)}`}
               onClick={() => onOpenInstance(inst.localId)}
             >
               <div className='m-icon'>
@@ -72,7 +74,7 @@ export const InstancePickerModal = ({
               </div>
               <span className='m-state'>
                 <span className={`dot ${inst.status}`} />
-                {STATE_WORD[inst.status]}
+                {pillLabel(inst.status, inst.outcome)}
               </span>
             </div>
           ))}

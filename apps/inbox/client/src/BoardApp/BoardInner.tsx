@@ -164,6 +164,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
               label: x.label,
               name: x.name,
               status: x.status,
+              outcome: x.outcome,
             }))}
             onOpenInstance={(localId) => {
               nav.setOpenPickerId(null)
