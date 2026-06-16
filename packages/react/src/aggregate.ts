@@ -4,8 +4,9 @@ import type { Status } from './status'
 // `error` is deliberately NOT busy (Unit 4.2): an agent whose only instance errored has a
 // FREE slot, so START must stay available — the error shows as a badge alongside the button.
 const BUSY: ReadonlySet<Status> = new Set(['running', 'awaiting_approval'])
-// Worst-meaningful-first; the human must not miss an approval.
-const PRIORITY: Status[] = ['awaiting_approval', 'error', 'running', 'done', 'idle']
+// Worst-meaningful-first; the human must not miss an approval. The ONE status-priority order —
+// reused by the pipeline model's pickHead (do NOT redeclare elsewhere).
+export const PRIORITY: Status[] = ['awaiting_approval', 'error', 'running', 'done', 'idle']
 
 export type AgentAggregate = { activeCount: number; awaitingCount: number; status: Status }
 

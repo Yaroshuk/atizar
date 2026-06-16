@@ -1,6 +1,7 @@
 import type { Outcome } from '@atizar/core'
 import type { Status } from './status'
 import type { IconName } from './components/Icon/Icon'
+import { PRIORITY } from './aggregate'
 
 export type PInstance = {
   localId: string
@@ -16,13 +17,26 @@ export type PInstance = {
   isInput: boolean
 }
 
+// An Instance is the identity unit: ≥1 Runs sharing (agentId, key). Identity is the stored `key`.
+export type Instance = {
+  agentId: string
+  key: string
+  runs: PInstance[] // ≥1 Run, all sharing (agentId, key); newest last
+  head: PInstance // the Run whose status represents the instance (worst-meaningful — see pickHead)
+}
+
 export type AgentGroup = {
   agentId: string
   name: string
   iconName: IconName
-  instances: PInstance[] // ≥1, all the same agentId, all shown
+  instances: Instance[] // ≥1 instance, all the same agentId
   queued: number
 }
+
+// The Run whose status represents the instance: worst-meaningful first (an awaiting approval must
+// surface over a finished Run). Uses the SAME PRIORITY order as the agent aggregate — one source.
+const pickHead = (runs: PInstance[]): PInstance =>
+  PRIORITY.map((s) => runs.find((r) => r.status === s)).find(Boolean) ?? runs[runs.length - 1]
 
 export type PipelineBlock = {
   parent: PInstance // the header instance
@@ -89,11 +103,21 @@ export function buildPipeline(
       : x
 
   const isShownChild = (x: PInstance) => shown.has(x.localId)
-  const roots = instances.filter((x) => shown.has(x.localId) && (x.isInput || !x.parentLocalId))
+
+  // distinct root instances (collapse same-(agentId,key) roots). Keep first-seen order.
+  const rootRuns = instances.filter((x) => shown.has(x.localId) && (x.isInput || !x.parentLocalId))
+  const rootInstances: PInstance[] = []
+  const seenRoot = new Set<string>()
+  for (const r of rootRuns) {
+    const ik = `${r.agentId} ${r.key}`
+    if (seenRoot.has(ik)) continue
+    seenRoot.add(ik)
+    rootInstances.push(pickHead(rootRuns.filter((x) => x.agentId === r.agentId && x.key === r.key)))
+  }
 
   const blocks: PipelineBlock[] = []
   const emitted = new Set<string>()
-  const queue = [...roots]
+  const queue = [...rootInstances]
   while (queue.length) {
     const parent = queue.shift()!
     if (emitted.has(parent.localId)) continue
@@ -114,7 +138,16 @@ export function buildPipeline(
           queued: queued[k.agentId] ?? 0,
         })
       }
-      groups.get(k.agentId)!.instances.push(view(k))
+      // group Runs by (agentId, key) into one instance node
+      const g = groups.get(k.agentId)!
+      const inst = g.instances.find((iv) => iv.key === k.key)
+      const run = view(k)
+      if (inst) {
+        inst.runs.push(run)
+        inst.head = pickHead(inst.runs)
+      } else {
+        g.instances.push({ agentId: k.agentId, key: k.key, runs: [run], head: run })
+      }
       // a child that is itself a parent of shown instances gets its own block later
       if ((childrenOf.get(k.localId) ?? []).some(isShownChild)) queue.push(k)
     }

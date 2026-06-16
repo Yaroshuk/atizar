@@ -62,7 +62,7 @@ describe('buildPipeline', () => {
       {}
     )
     expect(blocks[0].groups).toHaveLength(1)
-    expect(blocks[0].groups[0].instances.map((x) => x.localId)).toEqual(['c1'])
+    expect(blocks[0].groups[0].instances.map((x) => x.head.localId)).toEqual(['c1'])
   })
 
   it('two instances of the same agent group together under that agent', () => {
@@ -73,6 +73,7 @@ describe('buildPipeline', () => {
           localId: 'r1',
           runtimeKey: 'wf__reply',
           agentId: 'reply',
+          key: '142',
           name: 'REPLY',
           parentLocalId: 'in',
           label: '#142',
@@ -82,6 +83,7 @@ describe('buildPipeline', () => {
           localId: 'r2',
           runtimeKey: 'wf__reply',
           agentId: 'reply',
+          key: '143',
           name: 'REPLY',
           parentLocalId: 'in',
           label: '#143',
@@ -156,7 +158,7 @@ describe('buildPipeline', () => {
     const parentIds = blocks.map((bl) => bl.parent.localId)
     expect(parentIds).toContain('r1')
     const r1Block = blocks.find((bl) => bl.parent.localId === 'r1')!
-    expect(r1Block.groups[0].instances[0].localId).toBe('b1')
+    expect(r1Block.groups[0].instances[0].head.localId).toBe('b1')
   })
 
   it('a kept input root WITH a live child still shows Working', () => {
@@ -195,5 +197,78 @@ describe('buildPipeline', () => {
     // 'in' has a live descendant (b1 under r1) so it shows Working; r1 also shows Working.
     expect(blocks.find((bl) => bl.parent.localId === 'in')!.parent.status).toBe('running')
     expect(blocks.find((bl) => bl.parent.localId === 'r1')!.parent.status).toBe('running')
+  })
+
+  it('collapses two Runs sharing (agentId, key) into ONE instance node', () => {
+    const sorter = i({
+      localId: 's',
+      agentId: 'sorter',
+      key: 'sorter',
+      isInput: true,
+      status: 'running',
+    })
+    const r1 = i({
+      localId: 'r1',
+      agentId: 'reply',
+      key: 'alice',
+      parentLocalId: 's',
+      status: 'running',
+    })
+    const r2 = i({
+      localId: 'r2',
+      agentId: 'reply',
+      key: 'alice',
+      parentLocalId: 's',
+      status: 'running',
+    })
+    const [block] = buildPipeline([sorter, r1, r2], {})
+    const replyGroup = block.groups.find((g) => g.agentId === 'reply')!
+    expect(replyGroup.instances).toHaveLength(1) // one instance for sender 'alice'
+    expect(replyGroup.instances[0].runs).toHaveLength(2) // two Runs under it
+  })
+
+  it('keeps two different keys as two instances', () => {
+    const sorter = i({
+      localId: 's',
+      agentId: 'sorter',
+      key: 'sorter',
+      isInput: true,
+      status: 'running',
+    })
+    const a = i({
+      localId: 'a',
+      agentId: 'reply',
+      key: 'alice',
+      parentLocalId: 's',
+      status: 'running',
+    })
+    const b = i({
+      localId: 'b',
+      agentId: 'reply',
+      key: 'bob',
+      parentLocalId: 's',
+      status: 'running',
+    })
+    const [block] = buildPipeline([sorter, a, b], {})
+    expect(block.groups.find((g) => g.agentId === 'reply')!.instances).toHaveLength(2)
+  })
+
+  it('two scan Runs of the input agent (same key) collapse to one instance', () => {
+    const s1 = i({
+      localId: 's1',
+      agentId: 'sorter',
+      key: 'sorter',
+      isInput: true,
+      status: 'running',
+    })
+    const s2 = i({
+      localId: 's2',
+      agentId: 'sorter',
+      key: 'sorter',
+      isInput: true,
+      status: 'running',
+    })
+    const blocks = buildPipeline([s1, s2], {})
+    expect(blocks).toHaveLength(1) // one card, not two
   })
 })
