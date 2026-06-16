@@ -3,6 +3,7 @@ import {
   resolveDelivery,
   deliveryKey,
   instanceId,
+  lifecycle,
   type Destination,
   type GateResolution,
   type WorkflowDescriptor,
@@ -18,21 +19,21 @@ import {
   type DispatchInput,
   type DispatchResult,
 } from './dispatch.js'
-import { transition, IllegalTransition, ACTIVE } from './transition.js'
-import type { Gate, WorkItem, WorkItemStatus } from './db/schema.js'
+import { transition, IllegalTransition } from './transition.js'
+import { settle, type TerminalEdge } from './settle.js'
+import type { Gate, WorkItem, WorkItemPhase, WorkItemOutcome } from './db/schema.js'
 import { makeActivityLog, type ActivityEntry } from './activity.js'
 
 // Wires StateStore + EventBus + WorkerPool + RunObserver into one façade the routes call.
 // The provider lookup is injected (the same buildProvider the spike used), so the service
 // has no knowledge of CopilotKit or the registry.
 
-const DONE: ReadonlySet<WorkItemStatus> = new Set(['finished', 'error', 'closed'])
-
 export type DispatchRequest = Omit<DispatchInput, 'maxInstances'>
 
 export interface TraceSnapshot {
   id: string
-  status: WorkItemStatus
+  status: WorkItemPhase
+  outcome: WorkItemOutcome
   done: boolean
   nextSeq: number
   events: { seq: number; event: BaseEvent }[]
@@ -104,7 +105,22 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     run: (id) => {
       void observer.run(id).catch((e) => console.error('[pipeline] run failed', id, e))
     },
+    activeCount: (agentId) => store.countActiveByAgent(agentId),
+    // The pool OWNS the queued→active flip (U5): commit it before run() so the cap holds against a
+    // same-tick burst. run() (the observer) no longer does transition('start').
+    activate: (id) => transition(db, id, 'start'),
   })
+
+  // settle() needs db+store+bus+reconcile — bind once and pass to the observer + reuse for the
+  // human-driven terminal edges (cancel/reject/supersede/reset).
+  const settleDeps = { db, store, bus, reconcile: (agentId: string) => pool.reconcile(agentId) }
+  const settleEdge = (
+    id: string,
+    edge: TerminalEdge,
+    actor: string | null,
+    opts?: { error?: string; summary?: string }
+  ) => settle(settleDeps, id, edge, actor, opts)
+
   observer = makeRunObserver({
     db,
     store,
@@ -113,6 +129,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     resolveAgent: deps.resolveAgent,
     deliver: deliverImpl,
     activity,
+    settle: (id, edge, actor, opts) => settleEdge(id, edge, actor, opts),
+    reconcile: (agentId) => pool.reconcile(agentId),
   })
 
   // Coarse board cursor (Last-Event-ID); reconnect = snapshot refetch (spec §1.6).
@@ -123,32 +141,32 @@ export function makePipelineService(deps: PipelineServiceDeps) {
 
   const publishBoard = (): void => bus.publish('board', { kind: 'refresh' })
 
-  // Stop a work item + cascade to active descendants. Parent first (it leaves `running`,
-  // so a child's terminal edge can't auto-finish it), then descendants ascending-id.
-  async function cancelItem(workItemId: string): Promise<void> {
+  // Stop a work item + cascade to active descendants. The terminal edge goes through settle()
+  // (the one terminal writer). The child cascade runs OUTSIDE the isLive guard — even an
+  // already-terminal parent may have a live child mid-cascade; safe because a cancelled
+  // (stopped) item COVERS, so a re-scan won't phantom-twin.
+  async function cancelItem(workItemId: string, actor: string | null = null): Promise<void> {
     const wi = await store.getWorkItem(workItemId)
     if (!wi) return
-    if (!ACTIVE.includes(wi.status)) return // already terminal — nothing to cancel
-    if (wi.status === 'queued') pool.dequeue(workItemId, wi.agentId)
-    if (wi.status === 'running') observer.cancel(workItemId)
-    const open = await store.getOpenGate(workItemId)
-    if (open) await store.resolveGateRow(open.id, { comment: 'cancelled' })
-    await transition(db, workItemId, 'cancel').catch(() => {})
-    // No pool.release here: a queued item never held a slot (dequeue is enough); a running
-    // item's slot is released by its own consume loop when iterator.return() ends the stream;
-    // an awaiting_approval item's slot was already released at the gate. Releasing here would
-    // double-free → over-admit queued work past the cap.
-    activity.record({
-      ts: Date.now(),
-      workflowId: wi.workflowId,
-      agentId: wi.agentId,
-      workItemId,
-      kind: 'cancelled',
-      summary: 'cancelled',
-    })
+    const live = lifecycle(wi.phase, wi.outcome, false, false).isLive
+    if (live) {
+      if (wi.phase === 'queued') pool.dequeue(workItemId, wi.agentId)
+      if (wi.phase === 'active') observer.cancel(workItemId)
+      const open = await store.getOpenGate(workItemId)
+      if (open) await store.resolveGateRow(open.id, { comment: 'cancelled' })
+      await settleEdge(workItemId, 'cancel', actor, { summary: 'cancelled' }).catch(() => {})
+      activity.record({
+        ts: Date.now(),
+        workflowId: wi.workflowId,
+        agentId: wi.agentId,
+        workItemId,
+        kind: 'cancelled',
+        summary: 'cancelled',
+      })
+    }
     const children = await store.getActiveChildren(workItemId)
     for (const child of children.sort((a, b) => a.id.localeCompare(b.id))) {
-      await cancelItem(child.id)
+      await cancelItem(child.id, actor)
     }
     publishBoard()
   }
@@ -160,19 +178,30 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     }
   }
 
-  // Board RESET (Unit 4.4, I8/I12): retire every TERMINAL item (finished/result/error) of the
-  // scope into the preserved Done bucket (status 'closed', resolution 'reset') via transition()
-  // — every status change still goes through the one guarded edge; no row is deleted (hidden,
-  // reachable in Activity/history). ACTIVE / awaiting-approval items are NOT touched here: they
-  // require an explicit human confirm + cancel first (the route returns their count so the client
-  // can confirm), so open work is never silently lost. Returns how many were reset and how many
-  // active items were left untouched.
-  async function resetImpl(workflowId?: string): Promise<{ reset: number; active: number }> {
+  // Stop every LIVE work item across ALL workflows. Reuses the tested cascade by looping
+  // cancelWorkflowImpl over the distinct workflowIds with a live item in the board snapshot.
+  async function cancelAllImpl(): Promise<void> {
+    const snap = await store.getBoardSnapshot()
+    const liveWorkflowIds = [
+      ...new Set(
+        snap.items
+          .filter((i) => lifecycle(i.phase, i.outcome, false, false).isLive)
+          .map((i) => i.workflowId)
+      ),
+    ]
+    for (const workflowId of liveWorkflowIds) await cancelWorkflowImpl(workflowId)
+  }
+
+  // Board RESET (Unit 4.4, I8/I12): retire every TERMINAL item of the scope into the preserved
+  // Done bucket (outcome 'reset') via settle() — every status change still goes through the one
+  // terminal writer; no row is deleted (hidden, reachable in Activity/history). The `wipe`
+  // primitive cancels active items first, so resetImpl only handles already-terminal rows here.
+  async function resetImpl(workflowId?: string): Promise<{ reset: number }> {
     const resettable = await store.getResettable(workflowId)
     let reset = 0
     for (const item of resettable.sort((a, b) => a.id.localeCompare(b.id))) {
       try {
-        await transition(db, item.id, 'reset')
+        await settleEdge(item.id, 'reset', null, { summary: 'cleared from board' })
       } catch (e) {
         // Tolerate a lost race (a concurrent edge moved the item out of a resettable status
         // between the read and here). Re-throw a genuine DB error.
@@ -189,11 +218,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         summary: 'cleared from board',
       })
     }
-    const activeItems = workflowId
-      ? await store.getActiveByWorkflow(workflowId)
-      : (await store.getBoardSnapshot()).items.filter((i) => ACTIVE.includes(i.status))
     if (reset > 0) publishBoard()
-    return { reset, active: activeItems.length }
+    return { reset }
   }
 
   // True when `agentId` (= wf__agent) is the runtime key of a role:'input' agent in some loaded
@@ -221,7 +247,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     const roots = await store.getFinishedInputRoots(workflowId, agentId)
     for (const root of roots) {
       try {
-        await transition(db, root.id, 'supersede')
+        await settleEdge(root.id, 'supersede', null, { summary: 'superseded by re-run' })
       } catch (e) {
         // Tolerate a lost race: a concurrent finish/cancel could move the root out of
         // 'finished' between the read above and here (IllegalTransition) — skip it. Re-throw
@@ -244,31 +270,23 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
       const runtime = deps.resolveAgent(req.agentId)
       const maxInstances = runtime?.maxInstances ?? 1
-      // F6 (revised): a second human START of a SINGLETON input agent is rejected while that agent
-      // still has a LIVE scan — keyed off DB tree-liveness, NOT pool.activeCount. The pool frees a
-      // slot the moment a run ends or suspends at a gate, so the old count read 0 while a scan was
-      // still awaiting the human -> duplicate roots leaked. Tree-liveness counts a 'finished' root
-      // with awaiting-approval children as live (Approach B). Non-singletons still queue overflow;
-      // machine dispatch (origin 'agent') is handled by the chokepoint.
-      if (
-        req.origin === 'human' &&
-        maxInstances === 1 &&
-        isInputAgent(req.agentId) &&
-        (await store.hasLiveInputScan(req.workflowId, req.agentId))
-      ) {
-        return { id: '', deduped: false, rejected: 'already_running' }
-      }
-      // WS1 'refresh': a human START of an input agent supersedes its prior finished root(s)
-      // BEFORE minting the new one — I1 (the START always does something visible: a fresh root
-      // appears AND the prior moves to history). Concurrency is unchanged: the 409 guard above
-      // already short-circuited a concurrent START, so we only ever reach here for a sequential
-      // re-run (prior root already finished, slot free).
+      // WS1 'refresh' / Start-over (I1/I8/I12): a human START of an input agent first WIPES any
+      // LIVE scan of the same agent (cancel its tree — settle → outcome 'stopped' COVERS, so no
+      // phantom twin), then supersedes prior FINISHED roots, so exactly one fresh root runs. The
+      // old 409 singleton guard is GONE: a re-START never rejects — it Starts-over (the client
+      // shows a confirm modal before calling this — U8).
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
+        const live = await store.getActiveByWorkflow(req.workflowId)
+        for (const item of live
+          .filter((w) => !w.parentId && w.agentId === req.agentId)
+          .sort((a, b) => a.id.localeCompare(b.id))) {
+          await cancelItem(item.id)
+        }
         await supersedePriorRoots(req.workflowId, req.agentId)
         // resetOnStart (I7): clear this workflow's terminal items so the board starts clean for
-        // the new scan. Only TERMINAL items move (transition('reset')); active/awaiting work is
-        // left untouched, and rows are hidden, never deleted (I12). Runs after the supersede so a
-        // just-superseded prior root ('closed') is excluded by resetImpl's RESETTABLE filter.
+        // the new scan. Only TERMINAL items move (settle('reset')); rows are hidden, never deleted
+        // (I12). Runs after the supersede so a just-superseded prior root is excluded by the
+        // resettable filter.
         if (resetOnStartWorkflows.has(req.workflowId)) await resetImpl(req.workflowId)
       }
       const result = await dispatchChokepoint(db, pool, { ...req, maxInstances })
@@ -316,7 +334,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
 
       if (resolution.decision === 'rejected') {
         await store.resolveGateRow(gate.id, { comment: resolution.comment })
-        await transition(db, wi.id, 'reject') // sets resolution='rejected', status → finished
+        await settleEdge(wi.id, 'reject', resolution.actor ?? null, { summary: 'rejected' })
         activity.record({
           ts: Date.now(),
           workflowId: wi.workflowId,
@@ -380,8 +398,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           summary: msg.slice(0, 80),
           actor: resolution.actor ?? null,
         })
-        await transition(db, wi.id, 'fail', { error: msg }).catch(() => {})
         await store.setError(wi.id, msg)
+        await settleEdge(wi.id, 'fail', resolution.actor ?? null, { error: msg }).catch(() => {})
         publishBoard()
         return { ok: false, status: 502, error: msg }
       }
@@ -425,7 +443,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       }
 
       publishBoard()
-      // observer.resume() handles transition(resume) + pool.resumeAcquire + the run stream.
+      // observer.resume() handles transition(resume) + reconcile + the run stream.
       void observer
         .resume(wi.id, { ...resolution, gateId: gate.id, form, executedResult })
         .catch((e) => console.error('[pipeline] resume(approve)', wi.id, e))
@@ -444,31 +462,42 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       await cancelWorkflowImpl(workflowId)
     },
 
-    // Stop every active work item across ALL workflows. Reuses the tested cascade by
-    // looping cancelWorkflowImpl over the distinct workflowIds present in the board snapshot.
+    // Stop every active work item across ALL workflows. Public alias for cancelAllImpl.
     async cancelAll(): Promise<void> {
-      const snap = await store.getBoardSnapshot()
-      const activeWorkflowIds = [
-        ...new Set(snap.items.filter((i) => ACTIVE.includes(i.status)).map((i) => i.workflowId)),
-      ]
-      for (const workflowId of activeWorkflowIds) await cancelWorkflowImpl(workflowId)
+      await cancelAllImpl()
     },
 
-    // Clear a workflow's TERMINAL items from the live board (hidden, not deleted — I12). Active /
-    // awaiting items are left untouched; the returned `active` count lets the client confirm +
-    // cancel them first.
-    async resetWorkflow(workflowId: string): Promise<{ reset: number; active: number }> {
+    // Wipe = the full Start-over primitive: stop every active item in scope, then retire every
+    // terminal item (hide, not delete — I12). One server op behind the reset routes (U7/U8).
+    async wipeWorkflow(workflowId: string): Promise<{ reset: number }> {
+      await cancelWorkflowImpl(workflowId)
       return resetImpl(workflowId)
     },
 
-    // Clear TERMINAL items across ALL workflows ("reset all"). Same contract as resetWorkflow.
-    async resetAll(): Promise<{ reset: number; active: number }> {
+    async wipeAll(): Promise<{ reset: number }> {
+      await cancelAllImpl()
       return resetImpl()
     },
 
-    async getStatus(id: string): Promise<{ status: WorkItemStatus; done: boolean } | undefined> {
+    // resetWorkflow/resetAll are thin aliases to the wipe primitives (the routes call these; the
+    // route contract drops the `active` field — U7d).
+    async resetWorkflow(workflowId: string): Promise<{ reset: number }> {
+      await cancelWorkflowImpl(workflowId)
+      return resetImpl(workflowId)
+    },
+
+    async resetAll(): Promise<{ reset: number }> {
+      await cancelAllImpl()
+      return resetImpl()
+    },
+
+    async getStatus(
+      id: string
+    ): Promise<{ status: WorkItemPhase; outcome: WorkItemOutcome; done: boolean } | undefined> {
       const wi = await store.getWorkItem(id)
-      return wi ? { status: wi.status, done: DONE.has(wi.status) } : undefined
+      return wi
+        ? { status: wi.phase, outcome: wi.outcome, done: wi.phase === 'terminal' }
+        : undefined
     },
 
     async getTrace(id: string, from: number): Promise<TraceSnapshot | undefined> {
@@ -477,8 +506,9 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       const rows = await store.getTrace(id, from)
       return {
         id,
-        status: wi.status,
-        done: DONE.has(wi.status),
+        status: wi.phase,
+        outcome: wi.outcome,
+        done: wi.phase === 'terminal',
         nextSeq: await store.countTrace(id),
         events: rows.map((r) => ({ seq: r.seq, event: r.event })),
       }
@@ -491,12 +521,13 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       agentHealth: Record<string, HealthCheck>
     }> {
       const snap = await store.getBoardSnapshot()
-      // The LIVE board never carries retired items. A 'closed' work item (Reset or re-START
-      // supersede) has left the board for good — it lives on only in Activity/history (I12, hidden
-      // not deleted). Shipping it here forced every client derivation to re-filter 'closed'
-      // independently, and a missed filter resurfaced it as a phantom "Done" instance / a stale
-      // "received from" badge on a thread reopened by id. Filter once, at the source.
-      const items = snap.items.filter((w) => w.status !== 'closed')
+      // Ship everything that has NOT left the board (superseded/reset are retired → Activity only).
+      // Do NOT filter on isVisible here — that is the client's card-rendering decision (U8). The
+      // board must keep queued + no-card rows so the client can count queued and walk live
+      // ancestors. This PRESERVES today's transport contract (the old 'closed' == the retired set).
+      const items = snap.items.filter(
+        (w) => w.outcome !== 'superseded' && w.outcome !== 'reset'
+      )
       return {
         items,
         gates: snap.gates,
@@ -518,8 +549,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       return bus.subscribe('board', fn)
     },
 
-    stats(agentId: string): { active: number; queued: number } {
-      return { active: pool.activeCount(agentId), queued: pool.queuedCount(agentId) }
+    async stats(agentId: string): Promise<{ active: number; queued: number }> {
+      return { active: await pool.activeCount(agentId), queued: pool.queuedCount(agentId) }
     },
 
     knows(agentId: string): boolean {

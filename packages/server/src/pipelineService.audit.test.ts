@@ -66,7 +66,7 @@ describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () 
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
     const { id } = await service.dispatch(base)
-    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_approval')
+    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
     const gate = (await service.getBoard()).gates.find((g) => g.workItemId === id)!
 
     await service.resolveGate(gate.id, {
@@ -75,12 +75,14 @@ describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () 
       formRev: 0,
       actor: 'tester',
     })
-    await waitFor(async () => (await service.getStatus(id))?.status === 'finished')
+    await waitFor(async () => (await service.getStatus(id))?.status === 'terminal')
 
     const audit = await service.getAudit(id)
     const kinds = audit.map((a) => a.kind)
     expect(kinds).toContain('resolved')
     expect(kinds).toContain('effect')
-    expect(audit.every((a) => a.actor === 'tester')).toBe(true)
+    // The human-decision rows carry the actor; the observer's own finish note (kind 'lifecycle')
+    // is actor-null (the run, not the human, ends the scan).
+    expect(audit.filter((a) => a.kind === 'resolved' || a.kind === 'effect').every((a) => a.actor === 'tester')).toBe(true)
   })
 })

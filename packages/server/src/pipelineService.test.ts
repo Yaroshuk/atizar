@@ -7,6 +7,7 @@ import {
   defineAgent,
   defineWorkflow,
   gateOpened,
+  lifecycle,
   type EffectFn,
   type GateResolution,
   type Provider,
@@ -16,7 +17,6 @@ import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import { makeStateStore } from './stateStore.js'
 import type { AgentRuntime } from './runObserver.js'
-import { ACTIVE } from './transition.js'
 
 const reachable = await db
   .execute(sql`select 1`)
@@ -82,21 +82,23 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
     const { id } = await service.dispatch(base)
-    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_approval')
+    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
 
     const board = await service.getBoard()
     const gate = board.gates.find((g) => g.workItemId === id)
     expect(gate).toBeDefined()
 
     await service.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
-    await waitFor(async () => (await service.getStatus(id))?.status === 'finished')
+    await waitFor(async () => (await service.getStatus(id))?.status === 'terminal')
 
     const trace = await service.getTrace(id, 0)
-    expect(trace?.nextSeq).toBe(3) // text + gate (run) + text (resume)
+    // text + gate (run) + text (resume) + lifecycle note (settle finish)
+    expect(trace?.nextSeq).toBe(4)
     expect(trace?.done).toBe(true)
+    expect(trace?.outcome).toBe('done')
   })
 
-  it('getBoard excludes closed items — a Reset-retired item leaves the live board', async () => {
+  it('getBoard excludes retired items — a Reset-retired item leaves the live board', async () => {
     const runtime: AgentRuntime = {
       provider: gateProvider(),
       renderToolNames: [],
@@ -109,20 +111,22 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
     const { id } = await service.dispatch({ ...base, workflowId: wf, agentId: `${wf}__reply` })
-    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_approval')
+    await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
     const gate = (await service.getBoard()).gates.find((g) => g.workItemId === id)
     await service.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
-    await waitFor(async () => (await service.getStatus(id))?.status === 'finished')
+    await waitFor(async () => (await service.getStatus(id))?.status === 'terminal')
 
     // Finished item is still on the live board (kept result, I12)…
     expect((await service.getBoard()).items.some((w) => w.id === id)).toBe(true)
-    // …Reset retires it to 'closed' → it must DISAPPEAR from the live board (only in history now).
+    // …Reset retires it (outcome 'reset') → it must DISAPPEAR from the live board (history only).
     await service.resetWorkflow(wf)
     const board = await service.getBoard()
     expect(board.items.some((w) => w.id === id)).toBe(false)
-    expect(board.items.every((w) => w.status !== 'closed')).toBe(true)
+    expect(board.items.every((w) => w.outcome !== 'reset' && w.outcome !== 'superseded')).toBe(true)
     // The item still exists in the store (durable, I12) — just not on the live board.
-    expect((await service.getStatus(id))?.status).toBe('closed')
+    const status = await service.getStatus(id)
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('reset')
   })
 
   it('holds the per-agent cap (3 dispatched, 2 active + 1 queued)', async () => {
@@ -140,15 +144,15 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     await service.dispatch({ ...base, agentId: 'cap-agent' })
     await service.dispatch({ ...base, agentId: 'cap-agent' })
 
-    const stats = service.stats('cap-agent')
+    await waitFor(async () => (await service.stats('cap-agent')).active === 2)
+    const stats = await service.stats('cap-agent')
     expect(stats.active).toBe(2)
     expect(stats.queued).toBe(1)
   })
 
-  // Build a one-input-agent workflow descriptor + a singleton runtime. The START gate now keys
-  // off DB tree-liveness for a SINGLETON INPUT agent, so the agent under test must be a declared
-  // input agent (isInputAgent true) of a loaded descriptor — a bare unregistered agent id no
-  // longer triggers the gate (by design: only input roots get the single-scan refresh/gate).
+  // Build a one-input-agent workflow descriptor + a singleton runtime. The Start-over path applies
+  // to a SINGLETON INPUT agent, so the agent under test must be a declared input agent
+  // (isInputAgent true) of a loaded descriptor.
   function makeSingletonInputService(prefix: string) {
     const wf = `${prefix}-${randomUUID().slice(0, 8)}`
     const inputWf = defineWorkflow({
@@ -184,39 +188,43 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
-  it('rejects a duplicate human START of a singleton input agent (maxInstances=1) with rejected=already_running', async () => {
+  it('a second human START of a singleton input agent WIPES the prior live root and starts fresh', async () => {
     const { svc, workflowId, agentId } = makeSingletonInputService('singleton')
 
     // First human START: should succeed and (with blockingProvider) stay running → tree live.
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(first.rejected).toBeUndefined()
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'running')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
 
-    // Second human START: the input scan is still live → rejected.
+    // Second human START: Start-over wipes the prior live root (cancelled → stopped) and starts a
+    // fresh one. No rejection.
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.rejected).toBe('already_running')
+    expect(second.id).not.toBe(first.id)
 
-    // The second dispatch must NOT have been enqueued.
-    const stats = svc.stats(agentId)
+    // Prior root is now terminal/stopped; exactly the new root is live.
+    const firstStatus = await svc.getStatus(first.id)
+    expect(firstStatus?.status).toBe('terminal')
+    expect(firstStatus?.outcome).toBe('stopped')
+
+    // The new root holds the sole singleton slot.
+    await waitFor(async () => (await svc.stats(agentId)).active === 1)
+    const stats = await svc.stats(agentId)
     expect(stats.active).toBe(1)
     expect(stats.queued).toBe(0)
   })
 
-  it('machine dispatch (origin=agent) to a saturated singleton is NOT rejected by the START guard', async () => {
+  it('machine dispatch (origin=agent) to a saturated singleton queues (not wiped by Start-over)', async () => {
     const { svc, workflowId, agentId } = makeSingletonInputService('singleton-machine')
 
     // First human START occupies the sole slot (running, tree live).
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(first.rejected).toBeUndefined()
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'running')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
 
     // Machine dispatch (origin='agent', e.g. F2 child dispatch) to the same saturated singleton
-    // must NOT be rejected — it goes to the chokepoint cap/queue instead of the human guard.
-    const machine = await svc.dispatch({ workflowId, agentId, origin: 'agent', payload: {} })
-    expect(machine.rejected).toBeUndefined()
+    // goes to the chokepoint cap/queue — it does NOT trigger the human Start-over wipe.
+    await svc.dispatch({ workflowId, agentId, origin: 'agent', payload: {} })
 
-    // The machine dispatch was accepted: 1 active (blocking) + 1 queued.
-    const stats = svc.stats(agentId)
+    // The first run is still active; the machine dispatch was accepted and queued behind it.
+    const stats = await svc.stats(agentId)
     expect(stats.active).toBe(1)
     expect(stats.queued).toBe(1)
   })
@@ -239,7 +247,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     svc: ReturnType<typeof makeService>
   ): Promise<{ workItemId: string; gateId: string }> {
     const { id: workItemId } = await svc.dispatch(base)
-    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'awaiting_approval')
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'awaiting_human')
     const board = await svc.getBoard()
     const gate = board.gates.find((g) => g.workItemId === workItemId)
     if (!gate) throw new Error('seedGate: no open gate found')
@@ -284,7 +292,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect((effect.mock.calls[0] as unknown[])[0]).toEqual({ threadId: 't', body: 'edited' })
   })
 
-  it('reject: no effect, work item finished', async () => {
+  it('reject: no effect, work item terminal/rejected', async () => {
     const effect = vi.fn(async () => ({}))
     const svc = makeService({ effects: { saveDraft: effect } })
     const { gateId, workItemId } = await seedGate(svc)
@@ -296,8 +304,10 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     })
     expect(res.ok).toBe(true)
     expect(effect).not.toHaveBeenCalled()
-    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'finished')
-    expect((await svc.getStatus(workItemId))?.status).toBe('finished')
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'terminal')
+    const status = await svc.getStatus(workItemId)
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('rejected')
   })
 
   it('approve: a failing effect fails the work item and does not resume as success', async () => {
@@ -316,7 +326,9 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       const s = await svc.getStatus(workItemId)
       return s?.done === true
     })
-    expect((await svc.getStatus(workItemId))?.status).toBe('error')
+    const status = await svc.getStatus(workItemId)
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('error')
     expect(effect).toHaveBeenCalledTimes(1)
   })
 
@@ -324,21 +336,22 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
   // deferred to browser E2E flow 3 (Stop button with a queued item visible in the pipeline
   // column). The blockingProvider's `await new Promise(() => {})` cannot be interrupted by
   // iterator.return() in a pure async generator — the pending await never resolves, so the
-  // consume loop never exits and pool.release never fires in the test harness.
-  // In production the provider generator runs a subprocess; iterator.return() triggers the
-  // generator's finally block which calls child.kill(), immediately resolving the pending
-  // read. The code fix (removing pool.release from cancelItem) is the correctness guarantee;
-  // the runtime path is covered by the browser E2E.
+  // consume loop never exits in the test harness. In production the provider generator runs a
+  // subprocess; iterator.return() triggers the generator's finally → child.kill(), resolving the
+  // pending read. The runtime path is covered by the browser E2E.
 
-  it('cancel on an already-finished item is a safe no-op', async () => {
+  it('cancel on an already-terminal item is a safe no-op', async () => {
     const svc = makeService({ effects: { saveDraft: async () => ({}) } })
     const { gateId, workItemId } = await seedGate(svc)
-    // Reject the gate to move the item to finished
+    // Reject the gate to move the item to terminal
     await svc.resolveGate(gateId, { gateId, decision: 'rejected', formRev: 0 })
-    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'finished')
-    // Now cancel a work item that is already finished — must be a no-op
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'terminal')
+    const before = await svc.getStatus(workItemId)
+    // Now cancel a work item that is already terminal — must be a no-op
     await expect(svc.cancel(workItemId)).resolves.toBeUndefined()
-    expect((await svc.getStatus(workItemId))?.status).toBe('finished')
+    const after = await svc.getStatus(workItemId)
+    expect(after?.status).toBe('terminal')
+    expect(after?.outcome).toBe(before?.outcome) // unchanged (still rejected)
   })
 
   it('dispatch records a queued activity entry retrievable via getActivity()', async () => {
@@ -429,10 +442,10 @@ describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
       payload: {},
     })
 
-    // Items are in the DB (queued or running) — cancel everything.
+    // Items are in the DB (queued or active) — cancel everything.
     await svc.cancelAll()
 
-    // Both items must now be terminal (done). cancelItem transitions queued/running → finished.
+    // Both items must now be terminal (stopped). cancelItem settles queued/active → terminal.
     const s1 = await svc.getStatus(id1)
     const s2 = await svc.getStatus(id2)
     expect(s1?.done).toBe(true)
@@ -442,13 +455,13 @@ describe.skipIf(!reachable)('PipelineService.cancelAll', () => {
     const board = await svc.getBoard()
     const stillActive = board.items
       .filter((i) => i.id === id1 || i.id === id2)
-      .filter((i) => ACTIVE.includes(i.status))
+      .filter((i) => lifecycle(i.phase, i.outcome, false, false).isLive)
     expect(stillActive).toHaveLength(0)
   }, 10_000)
 })
 
-describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
-  // A provider that finishes immediately so the item reaches a terminal (finished) status.
+describe.skipIf(!reachable)('PipelineService reset/wipe (Unit 4.3)', () => {
+  // A provider that finishes immediately so the item reaches a terminal (done) status.
   function quickProvider(): Provider {
     return {
       async *run(_input: RunAgentInput) {
@@ -469,7 +482,7 @@ describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
     return makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
   }
 
-  it('resetWorkflow closes a finished item (resolution reset), preserving the row (I12)', async () => {
+  it('resetWorkflow retires a finished item (outcome reset), preserving the row (I12)', async () => {
     const svc = makeResetService()
     const wf = `reset-wf-${randomUUID().slice(0, 8)}`
     const { id } = await svc.dispatch({
@@ -478,26 +491,26 @@ describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
       origin: 'human',
       payload: {},
     })
-    await waitFor(async () => (await svc.getStatus(id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(id))?.status === 'terminal')
 
     const res = await svc.resetWorkflow(wf)
     expect(res.reset).toBe(1)
-    expect(res.active).toBe(0)
 
     const status = await svc.getStatus(id)
-    expect(status?.status).toBe('closed') // hidden from the live column, not deleted
-    // It has LEFT the live board (closed items are filtered from getBoard)…
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('reset') // hidden from the live column, not deleted
+    // It has LEFT the live board (retired items are filtered from getBoard)…
     const board = await svc.getBoard()
     expect(board.items.some((i) => i.id === id)).toBe(false)
-    // …but the row is preserved in the store with resolution 'reset' (I12 — hidden, not deleted).
+    // …but the row is preserved in the store with outcome 'reset' (I12 — hidden, not deleted).
     const row = await makeStateStore(db).getWorkItem(id)
     expect(row).toBeDefined()
-    expect(row?.resolution).toBe('reset')
+    expect(row?.outcome).toBe('reset')
   })
 
-  it('resetWorkflow does NOT close an active item and reports it in `active`', async () => {
+  it('wipeWorkflow stops an active item AND retires terminal items (Start-over)', async () => {
     const runtime: AgentRuntime = {
-      provider: blockingProvider(), // stays running, occupies its slot
+      provider: blockingProvider(), // stays active, occupies its slot
       renderToolNames: [],
       maxInstances: 2,
       effects: {},
@@ -505,21 +518,25 @@ describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
       handoffs: [],
     }
     const svc = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
-    const wf = `reset-active-${randomUUID().slice(0, 8)}`
+    const wf = `wipe-active-${randomUUID().slice(0, 8)}`
     const { id } = await svc.dispatch({
       workflowId: wf,
       agentId: `${wf}__sorter`,
       origin: 'human',
       payload: {},
     })
-    // queued or running — either way it is ACTIVE, so reset must leave it alone.
-    const res = await svc.resetWorkflow(wf)
-    expect(res.reset).toBe(0)
-    expect(res.active).toBe(1)
-    expect((await svc.getStatus(id))?.done).toBe(false)
+    // queued or active — either way it is live; wipe stops it (→ stopped) THEN retires it from the
+    // board (→ reset). The end state is terminal/reset, off the live board.
+    await svc.wipeWorkflow(wf)
+    const status = await svc.getStatus(id)
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('reset')
+    expect(status?.done).toBe(true)
+    const board = await svc.getBoard()
+    expect(board.items.some((i) => i.id === id)).toBe(false)
   })
 
-  it('resetAll closes finished items across multiple workflows', async () => {
+  it('resetAll retires finished items across multiple workflows', async () => {
     const svc = makeResetService()
     const wfA = `reset-all-a-${randomUUID().slice(0, 8)}`
     const wfB = `reset-all-b-${randomUUID().slice(0, 8)}`
@@ -535,13 +552,13 @@ describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
       origin: 'human',
       payload: {},
     })
-    await waitFor(async () => (await svc.getStatus(a.id))?.status === 'finished')
-    await waitFor(async () => (await svc.getStatus(b.id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(a.id))?.status === 'terminal')
+    await waitFor(async () => (await svc.getStatus(b.id))?.status === 'terminal')
 
     const res = await svc.resetAll()
     expect(res.reset).toBeGreaterThanOrEqual(2)
-    expect((await svc.getStatus(a.id))?.status).toBe('closed')
-    expect((await svc.getStatus(b.id))?.status).toBe('closed')
+    expect((await svc.getStatus(a.id))?.outcome).toBe('reset')
+    expect((await svc.getStatus(b.id))?.outcome).toBe('reset')
   }, 15_000)
 
   it('reset records a `reset` activity entry', async () => {
@@ -553,7 +570,7 @@ describe.skipIf(!reachable)('PipelineService reset (Unit 4.3)', () => {
       origin: 'human',
       payload: {},
     })
-    await waitFor(async () => (await svc.getStatus(id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(id))?.status === 'terminal')
     await svc.resetWorkflow(wf)
     const entry = svc.getActivity().find((e) => e.workItemId === id && e.kind === 'reset')
     expect(entry).toBeDefined()
@@ -652,7 +669,7 @@ describe.skipIf(!reachable)('PipelineService.deliver (server-side handoff, real 
 
 describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
   // A provider that finishes immediately (one text chunk, no gate) — the scan goes
-  // queued → running → finished, freeing the singleton slot for a sequential re-START.
+  // queued → active → terminal, freeing the singleton slot for a sequential re-START.
   function quickProvider(): Provider {
     return {
       async *run(_input: RunAgentInput) {
@@ -661,11 +678,9 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     }
   }
 
-  // Each test mints a UNIQUE workflow id. The START gate now reads DB tree-liveness keyed by
-  // workflow×agent, so a shared fixed id would let one test's leftover live/finished root leak
-  // into the next test's gate decision (cross-test DB pollution). A descriptor must carry the
-  // SAME id as the workflow so the input runtime key (`<wf>__sorter`) is recognized as an input
-  // agent (isInputAgent). Returns the service + the matching ids.
+  // Each test mints a UNIQUE workflow id (avoids cross-test DB pollution of the liveness scan).
+  // A descriptor must carry the SAME id as the workflow so the input runtime key (`<wf>__sorter`)
+  // is recognized as an input agent (isInputAgent). Returns the service + the matching ids.
   function makeReRunService(provider: Provider = quickProvider()) {
     const wf = `rerun-wf-${randomUUID().slice(0, 8)}`
     const inputWf = defineWorkflow({
@@ -704,28 +719,28 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
   it('a sequential human re-START supersedes the prior finished root and mints a new one', async () => {
     const { svc, workflowId, agentId } = makeReRunService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
 
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.rejected).toBeUndefined()
     expect(second.id).not.toBe(first.id)
 
-    // the prior finished root is now closed + superseded (preserved, not destroyed — I12)
+    // the prior finished root is now superseded (preserved, not destroyed — I12)
     const firstStatus = await svc.getStatus(first.id)
-    expect(firstStatus?.status).toBe('closed')
-    // it has LEFT the live board (closed is filtered from getBoard)…
+    expect(firstStatus?.status).toBe('terminal')
+    expect(firstStatus?.outcome).toBe('superseded')
+    // it has LEFT the live board (superseded is filtered from getBoard)…
     const board = await svc.getBoard()
     expect(board.items.some((i) => i.id === first.id)).toBe(false)
-    // …but the row is preserved in the store with resolution 'superseded' (I12 — not deleted).
+    // …but the row is preserved in the store (I12 — not deleted).
     const firstRow = await makeStateStore(db).getWorkItem(first.id)
     expect(firstRow).toBeDefined()
-    expect(firstRow?.resolution).toBe('superseded')
+    expect(firstRow?.outcome).toBe('superseded')
   })
 
   it('the supersede is recorded in the Activity log', async () => {
     const { svc, workflowId, agentId } = makeReRunService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
     await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
     const entry = svc
       .getActivity()
@@ -733,19 +748,22 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
     expect(entry).toBeDefined()
   })
 
-  it('a 2nd CONCURRENT human START of the singleton input still 409s (supersede does not change concurrency)', async () => {
-    // blockingProvider keeps the first scan RUNNING (slot occupied) — the concurrency guard fires
-    // before any supersede; the prior root is not finished, so there is nothing to supersede.
+  it('a 2nd human START while the prior scan is RUNNING wipes it (Start-over) and starts fresh', async () => {
+    // blockingProvider keeps the first scan ACTIVE (slot occupied). The Start-over wipe cancels it
+    // (→ stopped) before minting the fresh root — no rejection.
     const { svc, workflowId, agentId } = makeReRunService(blockingProvider())
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(first.rejected).toBeUndefined()
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.rejected).toBe('already_running')
+    expect(second.id).not.toBe(first.id)
+    const firstStatus = await svc.getStatus(first.id)
+    expect(firstStatus?.status).toBe('terminal')
+    expect(firstStatus?.outcome).toBe('stopped')
   })
 
   it('a non-input agent human START does NOT supersede (only input roots refresh)', async () => {
     // dispatch a worker-role agent directly (origin human) twice; finishing the first should
-    // NOT close it — refresh applies only to input agents.
+    // NOT retire it — refresh applies only to input agents.
     const { svc, workflowId } = makeReRunService()
     const first = await svc.dispatch({
       workflowId,
@@ -753,23 +771,23 @@ describe.skipIf(!reachable)('PipelineService re-run supersede (WS1)', () => {
       origin: 'human',
       payload: {},
     })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
     await svc.dispatch({
       workflowId,
       agentId: `${workflowId}__worker-x`,
       origin: 'human',
       payload: {},
     })
-    expect((await svc.getStatus(first.id))?.status).toBe('finished') // NOT closed
+    const status = await svc.getStatus(first.id)
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('done') // NOT superseded
   })
 })
 
-describe.skipIf(!reachable)('PipelineService input START tree-liveness gate (Bug 1)', () => {
-  // A provider that opens a gate then ends — the input root suspends at the gate
-  // (status 'awaiting_approval', still ACTIVE) and its pool slot is RELEASED. This is the
-  // Approach-B steady state for a single-agent input scan: the scan is still LIVE (awaiting the
-  // human) yet the worker pool count reads 0. The OLD gate (pool.activeCount) would let a second
-  // START through here; the new tree-liveness gate must reject it.
+describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', () => {
+  // A provider that opens a gate then ends — the input root suspends at the gate (awaiting_human)
+  // and its pool slot is released. Approach-B steady state for a single-agent input scan: the scan
+  // is still LIVE (awaiting the human) yet the worker pool count reads 0.
   function gateProviderLocal(): Provider {
     return {
       async *run(_input: RunAgentInput) {
@@ -822,45 +840,50 @@ describe.skipIf(!reachable)('PipelineService input START tree-liveness gate (Bug
     return { svc, workflowId: wf, agentId: `${wf}__sorter` }
   }
 
-  it('rejects a second human START of the input agent while the prior scan is still live', async () => {
+  it('a second human START while the prior scan is awaiting approval WIPES it and starts fresh', async () => {
     const { svc, workflowId, agentId } = makeGateInputService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(first.rejected).toBeUndefined()
 
-    // Drive the input root to awaiting_approval: it suspends at the gate (still ACTIVE) and the
-    // worker pool RELEASES its slot — so pool.activeCount(agentId) is now 0 even though the scan
-    // is live. This is the exact condition the old pool-count gate failed on.
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_approval')
-    expect(svc.stats(agentId).active).toBe(0) // slot freed at the gate — old gate would pass a 2nd START
+    // Drive the input root to awaiting_human: it suspends at the gate (still live) and the worker
+    // pool releases its slot — pool.activeCount(agentId) is now 0 even though the scan is live.
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
+    expect((await svc.stats(agentId)).active).toBe(0) // slot freed at the gate
 
+    // Start-over: the live (awaiting) root is cancelled (→ stopped), a fresh root is minted.
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.rejected).toBe('already_running')
+    expect(second.id).not.toBe(first.id)
+    const firstStatus = await svc.getStatus(first.id)
+    expect(firstStatus?.status).toBe('terminal')
+    expect(firstStatus?.outcome).toBe('stopped')
   })
 
-  it('allows a sequential re-START once the prior scan fully settles (gate resolved → finished)', async () => {
+  it('a sequential re-START once the prior scan fully settles (gate resolved → finished) supersedes', async () => {
     const { svc, workflowId, agentId } = makeGateInputService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_approval')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
     const board = await svc.getBoard()
     const gate = board.gates.find((g) => g.workItemId === first.id)
     expect(gate).toBeDefined()
     // Resolve the gate → the run resumes and finishes; the scan is no longer live.
     await svc.resolveGate(gate!.id, { gateId: gate!.id, decision: 'approved', formRev: 0 })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'finished')
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
 
-    // A fresh human START now PROCEEDS (no live scan) and supersedes the prior finished root.
+    // A fresh human START now supersedes the prior finished root.
     const second = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    expect(second.rejected).toBeUndefined()
     expect(second.id).not.toBe(first.id)
-    expect((await svc.getStatus(first.id))?.status).toBe('closed') // superseded
+    const firstStatus = await svc.getStatus(first.id)
+    expect(firstStatus?.status).toBe('terminal')
+    expect(firstStatus?.outcome).toBe('superseded')
   })
 
-  it('machine dispatch (origin=agent) to a live input scan is NOT rejected by the START gate', async () => {
+  it('machine dispatch (origin=agent) to a live input scan is NOT wiped by the START path', async () => {
     const { svc, workflowId, agentId } = makeGateInputService()
     const first = await svc.dispatch({ workflowId, agentId, origin: 'human', payload: {} })
-    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_approval')
-    // origin='agent' bypasses the human START gate entirely — it goes to the chokepoint.
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'awaiting_human')
+    // origin='agent' bypasses the human START Start-over path — it goes to the chokepoint.
     const machine = await svc.dispatch({ workflowId, agentId, origin: 'agent', payload: {} })
-    expect(machine.rejected).toBeUndefined()
+    expect(machine.id).not.toBe('')
+    // The prior awaiting root is untouched (still awaiting_human).
+    expect((await svc.getStatus(first.id))?.status).toBe('awaiting_human')
   })
 })
