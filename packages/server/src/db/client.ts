@@ -11,6 +11,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 export const databaseUrl = atizarEnv.databaseUrl()
 
 export type Db = PostgresJsDatabase<typeof schema>
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 
 let _db: Db
 let _close: () => Promise<void>

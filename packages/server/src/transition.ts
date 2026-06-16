@@ -1,16 +1,17 @@
 import { eq } from 'drizzle-orm'
-import type { Db } from './db/client.js'
-import { workItems, type WorkItemStatus } from './db/schema.js'
+import type { Phase, Outcome } from '@atizar/core'
+import type { Db, Tx } from './db/client.js'
+import { workItems } from './db/schema.js'
 
-// Every `work_items.status` write goes through here. One transaction:
-// SELECT … FOR UPDATE the row → check the edge is legal from the current status →
-// UPDATE → COMMIT. The row lock serializes concurrent transitions (design §3.6).
+// Every `work_items.phase`/`outcome` write goes through ONE edge-writer — applyEdge():
+// SELECT … FOR UPDATE → check the edge is legal from the current phase/outcome → UPDATE.
+// The row lock serializes concurrent transitions (I8). applyEdge runs on ANY executor (db or an
+// open tx), so settle() (U4) composes it into its OWN transaction to keep note+status+audit atomic
+// — one writer, never a duplicated raw update. transition() is the standalone wrapper.
 //
-// Single-responsibility lifecycle (Approach B): every item finishes on its OWN run-end.
-// A finish edge lands `finished` regardless of any live children, and a child reaching a
-// terminal status NEVER touches its parent (no leaf→root auto-finish walk). A parent is shown
-// "Working" purely by the pipeline's live-descendant derivation (pipelineModel.view's
-// hasLiveDescendant), not by its DB status — so the DB status reflects only the item's own run.
+// Single-responsibility lifecycle (Approach B): every item finishes on its OWN run-end. A finish
+// edge lands terminal regardless of any live children, and a child reaching terminal NEVER touches
+// its parent. A parent is shown "Working" purely by the pipeline's live-descendant derivation.
 
 export type Edge =
   | 'start'
@@ -22,6 +23,7 @@ export type Edge =
   | 'reject'
   | 'supersede'
   | 'reset'
+  | 'reopen'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -30,49 +32,71 @@ export class IllegalTransition extends Error {
   }
 }
 
-const EDGES: Record<Edge, { from: WorkItemStatus[]; to: WorkItemStatus }> = {
-  start: { from: ['queued'], to: 'running' },
-  gate: { from: ['running'], to: 'awaiting_approval' },
-  resume: { from: ['awaiting_approval'], to: 'running' },
-  finish: { from: ['running'], to: 'finished' },
-  fail: { from: ['running', 'awaiting_approval'], to: 'error' },
-  cancel: { from: ['queued', 'running', 'awaiting_approval', 'awaiting_input'], to: 'finished' },
-  reject: { from: ['awaiting_approval'], to: 'finished' },
-  // Re-run/refresh (WS1): retire a prior FINISHED scan root into the preserved Done bucket.
-  // supersede/reset never cascade to children — per-item work items stay durable (I12); every
-  // item already finishes on its own run-end, so there is no parent walk to trigger either.
-  supersede: { from: ['finished', 'result'], to: 'closed' },
-  // Board RESET (Unit 4.4): a human cleared the board — retire a TERMINAL item into the
-  // preserved Done bucket so it leaves the live column. Legal ONLY from a terminal status
-  // (finished/result/error); a running/awaiting item must be `cancel`led first (I12 — open
-  // work is never silently lost). Like supersede: no children cascade — every work item row
-  // stays durable (hidden, not deleted).
-  reset: { from: ['finished', 'result', 'error'], to: 'closed' },
+// Each edge declares the phases it is legal FROM (matched against the current `phase`), the phase
+// it moves TO, and the outcome it stamps. `running` keeps the item live; a terminal phase pairs
+// with a terminal outcome. NO `approve` edge — a gate-approved finish IS a `finish` → done; the
+// approval lives in the gate row + audit + LifecycleNote, never in the outcome.
+interface EdgeSpec {
+  from: Phase[]
+  to: Phase
+  outcome: Outcome
 }
 
-// Terminal-outcome marker set by explicit human commands (orthogonal to status).
-const EDGE_RESOLUTION: Partial<Record<Edge, 'cancelled' | 'rejected' | 'superseded' | 'reset'>> = {
-  cancel: 'cancelled',
-  reject: 'rejected',
-  supersede: 'superseded',
-  reset: 'reset',
+const EDGES: Record<Edge, EdgeSpec> = {
+  start: { from: ['queued'], to: 'active', outcome: 'running' },
+  gate: { from: ['active'], to: 'awaiting_human', outcome: 'running' },
+  resume: { from: ['awaiting_human'], to: 'active', outcome: 'running' },
+  finish: { from: ['active'], to: 'terminal', outcome: 'done' },
+  fail: { from: ['active', 'awaiting_human'], to: 'terminal', outcome: 'error' },
+  cancel: { from: ['queued', 'active', 'awaiting_human'], to: 'terminal', outcome: 'stopped' },
+  reject: { from: ['awaiting_human'], to: 'terminal', outcome: 'rejected' },
+  // supersede: retire a prior FINISHED scan root into the preserved Done bucket on a re-START.
+  supersede: { from: ['terminal'], to: 'terminal', outcome: 'superseded' },
+  // reset: a human cleared the board — retire a terminal item so it leaves the live column.
+  reset: { from: ['terminal'], to: 'terminal', outcome: 'reset' },
+  // reopen: a finished parent gained a fresh active child (finish-vs-dispatch race). Legal ONLY
+  // from a clean done (outcome must be 'done') — a stopped/rejected/error item never reopens.
+  reopen: { from: ['terminal'], to: 'active', outcome: 'running' },
 }
-
-// Statuses that count as an active (non-terminal) work item. The store classifies live items
-// against this set (board snapshot / active-children cancel cascade); it no longer gates any
-// parent auto-finish here.
-const ACTIVE: WorkItemStatus[] = ['queued', 'running', 'awaiting_approval', 'awaiting_input']
-
-// Statuses the `reset` edge accepts, DERIVED from the edge table so the two can't drift. A
-// board RESET only retires items already in one of these terminal statuses; active/awaiting
-// work must be cancelled first (I12). Exported so the service/store classify resettable items
-// in one place.
-const RESETTABLE: WorkItemStatus[] = EDGES.reset.from
 
 export interface TransitionOpts {
   error?: string
 }
 
+// The ONE edge-writer. Runs on any executor (db or an open tx) so settle() can enlist it in its own
+// transaction. Throws IllegalTransition on an illegal edge → the surrounding tx rolls back.
+export async function applyEdge(
+  executor: Db | Tx,
+  id: string,
+  edge: Edge,
+  opts: TransitionOpts = {}
+): Promise<void> {
+  const [row] = await executor.select().from(workItems).where(eq(workItems.id, id)).for('update')
+  if (!row) throw new IllegalTransition(`work item ${id} not found`)
+
+  const spec = EDGES[edge]
+  if (!spec.from.includes(row.phase)) {
+    throw new IllegalTransition(`cannot "${edge}" from "${row.phase}" (work item ${id})`)
+  }
+  // reopen only lifts a CLEAN done (not a human-terminal outcome) — a stopped/rejected/error
+  // tree must stay frozen (Option A).
+  if (edge === 'reopen' && row.outcome !== 'done') {
+    throw new IllegalTransition(`cannot "reopen" a "${row.outcome}" item (work item ${id})`)
+  }
+
+  await executor
+    .update(workItems)
+    .set({
+      phase: spec.to,
+      outcome: spec.outcome,
+      updatedAt: new Date(),
+      ...(edge === 'fail' && opts.error ? { error: opts.error } : {}),
+    })
+    .where(eq(workItems.id, id))
+}
+
+// Standalone transition: applyEdge in its OWN transaction (the row lock serializes concurrent
+// callers). settle() does NOT call this — it calls applyEdge inside its own tx for atomicity.
 export async function transition(
   db: Db,
   id: string,
@@ -80,29 +104,6 @@ export async function transition(
   opts: TransitionOpts = {}
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    const [row] = await tx.select().from(workItems).where(eq(workItems.id, id)).for('update')
-    if (!row) throw new IllegalTransition(`work item ${id} not found`)
-
-    const spec = EDGES[edge]
-    if (!spec.from.includes(row.status)) {
-      throw new IllegalTransition(`cannot "${edge}" from "${row.status}" (work item ${id})`)
-    }
-
-    // Single responsibility (Approach B): an item finishes on its OWN run-end. A finish lands
-    // `finished` even with live children, and a terminal child never walks its parent — the
-    // pipeline shows a parent "Working" via its live-descendant derivation, not its DB status.
-    await tx
-      .update(workItems)
-      .set({
-        status: spec.to,
-        updatedAt: new Date(),
-        ...(edge === 'fail' && opts.error ? { error: opts.error } : {}),
-        ...(EDGE_RESOLUTION[edge] ? { resolution: EDGE_RESOLUTION[edge] } : {}),
-      })
-      .where(eq(workItems.id, id))
+    await applyEdge(tx, id, edge, opts)
   })
 }
-
-// Re-exported: the store classifies live items against ACTIVE (board snapshot / cancel cascade)
-// and resettable items against RESETTABLE (derived from EDGES.reset.from).
-export { ACTIVE, RESETTABLE }

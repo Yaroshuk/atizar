@@ -22,123 +22,150 @@ const newQueued = (over: Partial<{ parentId: string | null }> = {}) =>
   })
 
 describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
-  it('walks the happy path queued → running → awaiting_approval → running → finished', async () => {
+  it('walks queued → active → awaiting_human → active → terminal/done', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
-    expect((await store.getWorkItem(id))?.status).toBe('running')
+    expect((await store.getWorkItem(id))?.phase).toBe('active')
     await transition(db, id, 'gate')
-    expect((await store.getWorkItem(id))?.status).toBe('awaiting_approval')
+    expect((await store.getWorkItem(id))?.phase).toBe('awaiting_human')
     await transition(db, id, 'resume')
-    expect((await store.getWorkItem(id))?.status).toBe('running')
+    expect((await store.getWorkItem(id))?.phase).toBe('active')
     await transition(db, id, 'finish')
-    expect((await store.getWorkItem(id))?.status).toBe('finished')
+    const done = await store.getWorkItem(id)
+    expect(done?.phase).toBe('terminal')
+    expect(done?.outcome).toBe('done')
   })
 
-  it('rejects an illegal edge and leaves the status unchanged', async () => {
+  it('rejects an illegal edge and leaves the row unchanged', async () => {
     const { id } = await newQueued()
     await expect(transition(db, id, 'gate')).rejects.toBeInstanceOf(IllegalTransition)
-    expect((await store.getWorkItem(id))?.status).toBe('queued')
+    expect((await store.getWorkItem(id))?.phase).toBe('queued')
   })
 
-  it('fail sets the error column and status', async () => {
+  it('cancel stamps outcome=stopped', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'cancel')
+    const w = await store.getWorkItem(id)
+    expect(w?.phase).toBe('terminal')
+    expect(w?.outcome).toBe('stopped')
+  })
+
+  it('reopen lifts a finished item back to active (finish-vs-dispatch race)', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'finish')
+    await transition(db, id, 'reopen')
+    expect((await store.getWorkItem(id))?.phase).toBe('active')
+  })
+
+  it('reopen is illegal from a human-terminal outcome (only a clean done reopens)', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'cancel') // outcome=stopped
+    await expect(transition(db, id, 'reopen')).rejects.toBeInstanceOf(IllegalTransition)
+  })
+
+  it('fail sets the error column and phase/outcome', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'fail', { error: 'boom' })
     const row = await store.getWorkItem(id)
-    expect(row?.status).toBe('error')
+    expect(row?.phase).toBe('terminal')
+    expect(row?.outcome).toBe('error')
     expect(row?.error).toBe('boom')
   })
 
-  it('cancel from running → finished with resolution cancelled', async () => {
+  it('cancel from active → terminal with outcome stopped', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'cancel')
     const row = await store.getWorkItem(id)
-    expect(row?.status).toBe('finished')
-    expect(row?.resolution).toBe('cancelled')
+    expect(row?.phase).toBe('terminal')
+    expect(row?.outcome).toBe('stopped')
   })
 
-  it('cancel is legal from queued and from awaiting_approval', async () => {
+  it('cancel is legal from queued and from awaiting_human', async () => {
     const { id: qId } = await newQueued()
     await transition(db, qId, 'cancel')
     const qRow = await store.getWorkItem(qId)
-    expect(qRow?.status).toBe('finished')
-    expect(qRow?.resolution).toBe('cancelled')
+    expect(qRow?.phase).toBe('terminal')
+    expect(qRow?.outcome).toBe('stopped')
 
     const { id: gId } = await newQueued()
     await transition(db, gId, 'start')
     await transition(db, gId, 'gate')
     await transition(db, gId, 'cancel')
     const gRow = await store.getWorkItem(gId)
-    expect(gRow?.status).toBe('finished')
-    expect(gRow?.resolution).toBe('cancelled')
+    expect(gRow?.phase).toBe('terminal')
+    expect(gRow?.outcome).toBe('stopped')
   })
 
-  it('reject from awaiting_approval → finished with resolution rejected', async () => {
+  it('reject from awaiting_human → terminal with outcome rejected', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'gate')
     await transition(db, id, 'reject')
     const row = await store.getWorkItem(id)
-    expect(row?.status).toBe('finished')
-    expect(row?.resolution).toBe('rejected')
+    expect(row?.phase).toBe('terminal')
+    expect(row?.outcome).toBe('rejected')
   })
 
-  it('reject is illegal from running', async () => {
+  it('reject is illegal from active', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await expect(transition(db, id, 'reject')).rejects.toThrow(/cannot "reject"/)
   })
 
-  it('supersede from finished → closed with resolution superseded', async () => {
+  it('supersede from terminal → terminal with outcome superseded', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'finish')
     await transition(db, id, 'supersede')
     const row = await store.getWorkItem(id)
-    expect(row?.status).toBe('closed')
-    expect(row?.resolution).toBe('superseded')
+    expect(row?.phase).toBe('terminal')
+    expect(row?.outcome).toBe('superseded')
   })
 
-  it('supersede is illegal from running (only a finished/result root can be superseded)', async () => {
+  it('supersede is illegal from active (only a terminal root can be superseded)', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await expect(transition(db, id, 'supersede')).rejects.toThrow(/cannot "supersede"/)
   })
 
-  it('reset from finished → closed with resolution reset', async () => {
+  it('reset from terminal → terminal with outcome reset', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'finish')
     await transition(db, id, 'reset')
     const row = await store.getWorkItem(id)
-    expect(row?.status).toBe('closed')
-    expect(row?.resolution).toBe('reset')
+    expect(row?.phase).toBe('terminal')
+    expect(row?.outcome).toBe('reset')
   })
 
-  it('reset from error → closed with resolution reset', async () => {
+  it('reset from terminal/error → terminal with outcome reset', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'fail', { error: 'boom' })
     await transition(db, id, 'reset')
     const row = await store.getWorkItem(id)
-    expect(row?.status).toBe('closed')
-    expect(row?.resolution).toBe('reset')
+    expect(row?.phase).toBe('terminal')
+    expect(row?.outcome).toBe('reset')
   })
 
-  it('reset is illegal from running (must cancel first)', async () => {
+  it('reset is illegal from active (must cancel first)', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await expect(transition(db, id, 'reset')).rejects.toThrow(/cannot "reset"/)
-    expect((await store.getWorkItem(id))?.status).toBe('running')
+    expect((await store.getWorkItem(id))?.phase).toBe('active')
   })
 
-  it('reset is illegal from awaiting_approval (must cancel first)', async () => {
+  it('reset is illegal from awaiting_human (must cancel first)', async () => {
     const { id } = await newQueued()
     await transition(db, id, 'start')
     await transition(db, id, 'gate')
     await expect(transition(db, id, 'reset')).rejects.toThrow(/cannot "reset"/)
-    expect((await store.getWorkItem(id))?.status).toBe('awaiting_approval')
+    expect((await store.getWorkItem(id))?.phase).toBe('awaiting_human')
   })
 
   it('a parent finishes on its OWN finish edge regardless of live children (Approach B)', async () => {
@@ -148,18 +175,18 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     await transition(db, child, 'start')
     await transition(db, child, 'gate') // child awaiting
     await transition(db, root, 'finish')
-    expect((await store.getWorkItem(root))?.status).toBe('finished') // NOT deferred to running
-    expect((await store.getWorkItem(child))?.status).toBe('awaiting_approval') // child untouched
+    expect((await store.getWorkItem(root))?.phase).toBe('terminal') // NOT deferred to active
+    expect((await store.getWorkItem(child))?.phase).toBe('awaiting_human') // child untouched
   })
 
   it('a child reaching terminal does NOT change its parent (no auto-finish walk)', async () => {
     const { id: root } = await newQueued()
     const { id: child } = await newQueued({ parentId: root })
-    await transition(db, root, 'start') // parent still running (its own run in flight)
+    await transition(db, root, 'start') // parent still active (its own run in flight)
     await transition(db, child, 'start')
     await transition(db, child, 'gate')
     await transition(db, child, 'reject')
-    expect((await store.getWorkItem(root))?.status).toBe('running') // parent unaffected by the child
+    expect((await store.getWorkItem(root))?.phase).toBe('active') // parent unaffected by the child
   })
 
   it('supersede does NOT cascade to the parent (children stay durable, I12)', async () => {
@@ -171,7 +198,8 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     await transition(db, child, 'start')
     await transition(db, parent, 'supersede')
     // the child is untouched by the parent's supersede
-    expect((await store.getWorkItem(child))?.status).toBe('running')
-    expect((await store.getWorkItem(parent))?.status).toBe('closed')
+    expect((await store.getWorkItem(child))?.phase).toBe('active')
+    expect((await store.getWorkItem(parent))?.phase).toBe('terminal')
+    expect((await store.getWorkItem(parent))?.outcome).toBe('superseded')
   })
 })

@@ -55,7 +55,8 @@ export function makeStateStore(db: Db) {
           payload: input.payload,
           parentId: input.parentId ?? null,
           source: input.source ?? null,
-          status: 'queued',
+          phase: 'queued',
+          outcome: 'running',
         })
         .returning()
       return row
