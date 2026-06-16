@@ -199,6 +199,7 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     const { workflowId, agentId, key } = await c.req.json<{
       workflowId: string; agentId: string; key: string
     }>()
+    if (!workflowId || !agentId || !key) return c.json({ error: 'missing fields' }, 400)
     await service.cancelInstance(workflowId, agentId, key)
     return c.json({ ok: true })
   })
