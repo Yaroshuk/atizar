@@ -69,6 +69,16 @@ const base = {
   payload: {},
 }
 
+// A per-test dispatch request with a UNIQUE workflow id (→ unique `wf__reply` agentId). The
+// per-agent cap is keyed on agentId and the test DB is SHARED across parallel test files, so a
+// shared `lead-inbox__reply` would let concurrent files contend the global cap=2 and starve each
+// other's `waitFor`. A fresh agentId per test isolates the cap. (Tests that assert the literal
+// `lead-inbox` agentId — the deliver/activity cases — keep `base`.)
+function freshBase() {
+  const wf = `pls-${randomUUID().slice(0, 8)}`
+  return { workflowId: wf, agentId: `${wf}__reply`, origin: 'human' as const, payload: {} }
+}
+
 describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
   it('dispatch → gate → resolve → finished, with a stitched trace', async () => {
     const runtime: AgentRuntime = {
@@ -81,7 +91,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
-    const { id } = await service.dispatch(base)
+    const { id } = await service.dispatch(freshBase())
     await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
 
     const board = await service.getBoard()
@@ -246,7 +256,7 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
   async function seedGate(
     svc: ReturnType<typeof makeService>
   ): Promise<{ workItemId: string; gateId: string }> {
-    const { id: workItemId } = await svc.dispatch(base)
+    const { id: workItemId } = await svc.dispatch(freshBase())
     await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'awaiting_human')
     const board = await svc.getBoard()
     const gate = board.gates.find((g) => g.workItemId === workItemId)

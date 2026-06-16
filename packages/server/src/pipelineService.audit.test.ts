@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, it, expect } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
@@ -40,11 +41,13 @@ async function waitFor(pred: () => Promise<boolean>, timeout = 4000): Promise<vo
   throw new Error('waitFor timed out')
 }
 
-const base = {
-  workflowId: 'lead-inbox',
-  agentId: 'lead-inbox__reply',
-  origin: 'human' as const,
-  payload: {},
+// Unique workflow id (→ unique `wf__reply` agentId) per test: the test DB is SHARED across
+// parallel test files and the per-agent cap is keyed on agentId, so a shared `lead-inbox__reply`
+// would contend the global cap=2 with the other pipeline tests and starve this dispatch's
+// `waitFor`. A fresh agentId isolates the cap.
+function freshBase() {
+  const wf = `audit-${randomUUID().slice(0, 8)}`
+  return { workflowId: wf, agentId: `${wf}__reply`, origin: 'human' as const, payload: {} }
 }
 
 describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () => {
@@ -65,7 +68,7 @@ describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () 
     }
     const service = makePipelineService({ db, resolveAgent: () => runtime, descriptors: [] })
 
-    const { id } = await service.dispatch(base)
+    const { id } = await service.dispatch(freshBase())
     await waitFor(async () => (await service.getStatus(id))?.status === 'awaiting_human')
     const gate = (await service.getBoard()).gates.find((g) => g.workItemId === id)!
 
@@ -83,6 +86,10 @@ describe.skipIf(!reachable)('PipelineService durable audit (real Postgres)', () 
     expect(kinds).toContain('effect')
     // The human-decision rows carry the actor; the observer's own finish note (kind 'lifecycle')
     // is actor-null (the run, not the human, ends the scan).
-    expect(audit.filter((a) => a.kind === 'resolved' || a.kind === 'effect').every((a) => a.actor === 'tester')).toBe(true)
+    expect(
+      audit
+        .filter((a) => a.kind === 'resolved' || a.kind === 'effect')
+        .every((a) => a.actor === 'tester')
+    ).toBe(true)
   })
 })

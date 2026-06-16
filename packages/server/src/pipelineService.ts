@@ -525,9 +525,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // Do NOT filter on isVisible here — that is the client's card-rendering decision (U8). The
       // board must keep queued + no-card rows so the client can count queued and walk live
       // ancestors. This PRESERVES today's transport contract (the old 'closed' == the retired set).
-      const items = snap.items.filter(
-        (w) => w.outcome !== 'superseded' && w.outcome !== 'reset'
-      )
+      const items = snap.items.filter((w) => w.outcome !== 'superseded' && w.outcome !== 'reset')
       return {
         items,
         gates: snap.gates,
