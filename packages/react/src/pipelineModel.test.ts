@@ -9,6 +9,7 @@ const i = (over: Partial<PInstance>): PInstance => ({
   iconName: 'inbox',
   label: '',
   status: 'running',
+  outcome: 'running',
   parentLocalId: undefined,
   isInput: false,
   ...over,

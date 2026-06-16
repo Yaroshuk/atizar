@@ -4,14 +4,7 @@ import { CompHeader } from '../../primitives/CompHeader/CompHeader'
 import { aggregateLabel } from '../../aggregate'
 import type { AgentAggregate } from '../../aggregate'
 import type { AgentMeta } from '../../renderSpecs'
-import type { AgentHealth, ServerStatus, WorkItem } from '../../serverTypes'
-
-const ACTIVE_SERVER: ReadonlySet<ServerStatus> = new Set([
-  'queued',
-  'running',
-  'awaiting_approval',
-  'awaiting_input',
-])
+import type { AgentHealth, WorkItem } from '../../serverTypes'
 
 export const AgentGrid = ({
   agents,
@@ -65,7 +58,7 @@ export const AgentGrid = ({
               (w) =>
                 w.workflowId === activeWorkflowId &&
                 w.agentId.slice(w.workflowId.length + 2) === agent.id &&
-                ACTIVE_SERVER.has(w.status)
+                w.phase !== 'terminal'
             )
           return (
             <AgentCard

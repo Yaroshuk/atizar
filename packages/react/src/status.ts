@@ -22,24 +22,3 @@ export const STATUS_LABEL: Record<Status, string> = {
 // The subset that comes from the agent run lifecycle. `awaiting_approval` is
 // derived from message state (hasPendingApproval), never a lifecycle event.
 export type Lifecycle = Exclude<Status, 'awaiting_approval'>
-
-// The server status union (now the single source of truth) reduced to the display Status
-// the cards/pipeline render. `awaiting_input` is shown like `awaiting_approval` (a pause that
-// needs the human); `result`/`finished`/`closed` all read as done; `queued` reads as running
-// (work is admitted, just waiting on a slot).
-export const mapStatus = (s: import('./serverTypes').ServerStatus): Status => {
-  switch (s) {
-    case 'queued':
-    case 'running':
-      return 'running'
-    case 'awaiting_approval':
-    case 'awaiting_input':
-      return 'awaiting_approval'
-    case 'result':
-    case 'finished':
-    case 'closed':
-      return 'done'
-    case 'error':
-      return 'error'
-  }
-}

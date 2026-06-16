@@ -1,15 +1,11 @@
 import { useRef, useState } from 'react'
 import { useBoard } from './useBoard'
-import type { ServerStatus, WorkItem } from '../serverTypes'
+import type { WorkItem } from '../serverTypes'
 import type { WorkflowsConfig } from '../workflowsContext'
 
-// Server statuses that count as "active" (occupy the operator / a worker slot).
-const ACTIVE_SERVER: ReadonlySet<ServerStatus> = new Set([
-  'queued',
-  'running',
-  'awaiting_approval',
-  'awaiting_input',
-])
+// "Active" = the item occupies the operator / a worker slot. The board ships only non-retired
+// rows, so a non-terminal phase (queued / active / awaiting_human) is exactly the live set.
+const isActive = (w: WorkItem): boolean => w.phase !== 'terminal'
 
 // A cross-workflow child = a work item whose parent lives in a DIFFERENT workflow.
 const isCrossWorkflowChild = (w: WorkItem, parentOf: (id: string) => WorkItem | undefined) => {
@@ -31,9 +27,9 @@ export function useWorkflowSelection(config: WorkflowsConfig) {
       unread[w.workflowId] = (unread[w.workflowId] ?? 0) + 1
     }
   }
-  const globalActive = board.items.filter((w) => ACTIVE_SERVER.has(w.status)).length
+  const globalActive = board.items.filter((w) => isActive(w)).length
   const workflowActiveCount = board.items.filter(
-    (w) => w.workflowId === activeWorkflowId && ACTIVE_SERVER.has(w.status)
+    (w) => w.workflowId === activeWorkflowId && isActive(w)
   ).length
 
   // Switch the active workflow; mark its current cross-workflow children seen (clears its badge).

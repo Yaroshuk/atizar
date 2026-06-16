@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BaseEvent } from '@ag-ui/client'
 import { foldEventsToMessages, pairToolResults } from '@atizar/core'
-import type { ServerStatus } from '../serverTypes'
+import type { Phase } from '../serverTypes'
 import type { ConnState } from './useActivity'
 
 // Terminal statuses: the run is over and the server emits no further events. The server CLOSES
@@ -9,15 +9,16 @@ import type { ConnState } from './useActivity'
 // EventSource auto-reconnects on any server close, so without this guard a finished run's stream
 // gets reopened in a tight loop — a reconnect STORM that exhausts the ~6-connections-per-host
 // budget and starves the other streams (the board, and any newly-opened live thread, whose tail
-// events then never arrive → its render cards silently never appear). awaiting_approval /
-// awaiting_input are NOT terminal — the stream stays open to deliver resume events post-gate.
-const TERMINAL: ReadonlySet<ServerStatus> = new Set(['finished', 'error', 'closed'])
+// events then never arrive → its render cards silently never appear). awaiting_human is NOT
+// terminal — the stream stays open to deliver resume events post-gate. The SSE now publishes the
+// PHASE word (U7), so the run is over only at the single terminal phase.
+const TERMINAL: ReadonlySet<Phase> = new Set(['terminal'])
 
 // Attach to a server-side run WITHOUT CopilotKit: snapshot the trace from 0 (so a reload
 // loses nothing), then follow the live SSE tail from nextSeq, ordering/deduping by seq.
 // `foldEventsToMessages` is the reduction CopilotKit's runtime used to do internally.
 export const useWorkItemThread = (id: string | null) => {
-  const [status, setStatus] = useState<ServerStatus>('running')
+  const [status, setStatus] = useState<Phase>('active')
   const [connection, setConnection] = useState<ConnState>('live')
   const [bySeq, setBySeq] = useState<Map<number, BaseEvent>>(new Map())
   const esRef = useRef<EventSource | null>(null)
@@ -37,7 +38,7 @@ export const useWorkItemThread = (id: string | null) => {
     let cancelled = false
     void (async () => {
       const snap = (await (await fetch(`/api/workitems/${id}/trace?from=0`)).json()) as {
-        status: ServerStatus
+        status: Phase
         done: boolean
         nextSeq: number
         events: { seq: number; event: BaseEvent }[]
@@ -65,7 +66,7 @@ export const useWorkItemThread = (id: string | null) => {
       })
       es.onmessage = (m) => setEvent(Number(m.lastEventId), JSON.parse(m.data) as BaseEvent)
       es.addEventListener('status', (m) => {
-        const next = (m as MessageEvent).data as ServerStatus
+        const next = (m as MessageEvent).data as Phase
         setStatus(next)
         if (!TERMINAL.has(next)) return
         // The run just reached a terminal state; the server closes the stream now. Two things:

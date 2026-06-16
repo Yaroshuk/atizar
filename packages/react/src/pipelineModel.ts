@@ -1,3 +1,4 @@
+import type { Outcome } from '@atizar/core'
 import type { Status } from './status'
 import type { IconName } from './components/Icon/Icon'
 
@@ -9,6 +10,7 @@ export type PInstance = {
   iconName: IconName
   label: string
   status: Status
+  outcome: Outcome
   parentLocalId?: string
   isInput: boolean
 }

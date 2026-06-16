@@ -5,7 +5,7 @@ import { useGate } from '../../hooks/useGate'
 import { buildRenderToolCall } from '../../buildRenderToolCall'
 import { useWorkflowsConfig } from '../../workflowsContext'
 import { byWorkflow } from '../../registryScope'
-import { mapStatus } from '../../status'
+import { displayStatus } from '../../lifecycleDisplay'
 import { AgentModal, type HandoffNote } from '../AgentModal/AgentModal'
 import type { IconName } from '../Icon/Icon'
 import { useBoard } from '../../hooks/useBoard'
@@ -37,13 +37,17 @@ export const ThreadModal = (p: ThreadModalProps) => {
   const config = useWorkflowsConfig()
   const hitl = byWorkflow(config.hitl, p.workflowId)
   const { messages, status, connection } = useWorkItemThread(p.id)
-  const display = mapStatus(status)
+  // The board is the shared, server-authoritative snapshot — read this item's (phase, outcome)
+  // for the display Status + the terminal-flavour outcome (Stopped/Rejected on the header). The
+  // thread hook's `status` is the raw phase word published over SSE (gateSlot below passes it on).
+  const board = useBoard()
+  const wi = board.items.find((i) => i.id === p.id)
+  const display = wi ? displayStatus(wi.phase, wi.outcome) : 'running'
   const awaiting = display === 'awaiting_approval'
   const { gate, approve, reject } = useGate(p.id, awaiting)
   // The untrusted source the human must see beside the draft = the open work item's payload
-  // (what the agent received). The board is the shared, server-authoritative snapshot.
-  const board = useBoard()
-  const source = (board.items.find((i) => i.id === p.id)?.payload ?? {}) as Record<string, unknown>
+  // (what the agent received).
+  const source = (wi?.payload ?? {}) as Record<string, unknown>
 
   // The handoff seam: a card's deliver call carries the open work item as the parent.
   const { deliver, id, workflowId } = p
@@ -90,6 +94,7 @@ export const ThreadModal = (p: ThreadModalProps) => {
       title={p.title}
       iconName={p.iconName}
       status={display}
+      outcome={wi?.outcome}
       connection={connection}
       renderToolCall={renderToolCall}
       renderableToolNames={p.renderableToolNames}

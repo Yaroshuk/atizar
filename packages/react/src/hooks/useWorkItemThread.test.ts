@@ -27,7 +27,7 @@ class FakeEventSource {
 }
 
 const snapshot = (over: Partial<{ status: string; done: boolean; nextSeq: number }>) => ({
-  status: 'running',
+  status: 'active',
   done: false,
   nextSeq: 0,
   events: [] as { seq: number; event: unknown }[],
@@ -46,11 +46,11 @@ afterEach(() => {
 describe('useWorkItemThread terminal handling (no reconnect storm)', () => {
   it('does NOT open an SSE when the snapshot is already terminal (done)', async () => {
     globalThis.fetch = vi.fn(async () => ({
-      json: async () => snapshot({ status: 'finished', done: true, nextSeq: 3 }),
+      json: async () => snapshot({ status: 'terminal', done: true, nextSeq: 3 }),
     })) as unknown as typeof fetch
 
     const { result } = renderHook(() => useWorkItemThread('wi-1'))
-    await waitFor(() => expect(result.current.status).toBe('finished'))
+    await waitFor(() => expect(result.current.status).toBe('terminal'))
     // The whole trace came from the snapshot; opening a tail to a finished run would only
     // invite the server's immediate close → auto-reconnect storm.
     expect(FakeEventSource.instances).toHaveLength(0)
@@ -58,7 +58,7 @@ describe('useWorkItemThread terminal handling (no reconnect storm)', () => {
 
   it('opens an SSE for a live run, then CLOSES it when a terminal status arrives', async () => {
     globalThis.fetch = vi.fn(async () => ({
-      json: async () => snapshot({ status: 'running', done: false, nextSeq: 0 }),
+      json: async () => snapshot({ status: 'active', done: false, nextSeq: 0 }),
     })) as unknown as typeof fetch
 
     const { result } = renderHook(() => useWorkItemThread('wi-2'))
@@ -67,21 +67,21 @@ describe('useWorkItemThread terminal handling (no reconnect storm)', () => {
     expect(es.closed).toBe(false)
 
     // Run reaches a terminal state: the server closes the stream; we must close our side too.
-    es.emit('status', 'finished')
-    await waitFor(() => expect(result.current.status).toBe('finished'))
+    es.emit('status', 'terminal')
+    await waitFor(() => expect(result.current.status).toBe('terminal'))
     expect(es.closed).toBe(true)
   })
 
   it('keeps the SSE open on a NON-terminal status (awaiting_approval) for resume events', async () => {
     globalThis.fetch = vi.fn(async () => ({
-      json: async () => snapshot({ status: 'running', done: false, nextSeq: 0 }),
+      json: async () => snapshot({ status: 'active', done: false, nextSeq: 0 }),
     })) as unknown as typeof fetch
 
     renderHook(() => useWorkItemThread('wi-3'))
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
     const es = FakeEventSource.instances[0]
 
-    es.emit('status', 'awaiting_approval')
+    es.emit('status', 'awaiting_human')
     expect(es.closed).toBe(false)
   })
 })
@@ -89,7 +89,7 @@ describe('useWorkItemThread terminal handling (no reconnect storm)', () => {
 describe('useWorkItemThread connection state', () => {
   it('flips to reconnecting on an SSE error and back to live on open', async () => {
     globalThis.fetch = vi.fn(async () => ({
-      json: async () => snapshot({ status: 'running', done: false, nextSeq: 0 }),
+      json: async () => snapshot({ status: 'active', done: false, nextSeq: 0 }),
     })) as unknown as typeof fetch
 
     const { result } = renderHook(() => useWorkItemThread('wi-conn'))
