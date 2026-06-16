@@ -16,6 +16,7 @@ import {
 import { db } from './db/client.js'
 import { makePipelineService } from './pipelineService.js'
 import { makeStateStore } from './stateStore.js'
+import { transition } from './transition.js'
 import type { AgentRuntime } from './runObserver.js'
 
 const reachable = await db
@@ -979,6 +980,55 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
     })
     expect(second.id).not.toBe(first.id)
     expect((await makeStateStore(db).getWorkItem(first.id))?.outcome).toBe('superseded')
+  })
+
+  it('a re-START does NOT supersede a prior finished scan that still has a live (awaiting) child', async () => {
+    // The B1 regression: a prior scan FINISHED (terminal/done) but dispatched a worker child that is
+    // still LIVE (e.g. a reply draft awaiting approval). Superseding the finished root orphans the
+    // live child (its parent leaves the board), so the draft vanishes from the pipeline. The finished
+    // scan with a live descendant must be KEPT (it collapses with the new scan by the input agent's
+    // constant key); only a childless finished scan is superseded.
+    // Use blockingProvider for the scan so the test drives its lifecycle manually (no auto-finish
+    // racing the manual transitions): scan stays active until we `finish` it ourselves.
+    const { svc, workflowId, sorterId } = makeInputService(blockingProvider())
+    const first = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
+
+    // While the scan is active it dispatches a worker child (a reply draft). Drive the child to
+    // active so it is LIVE, then finish the scan — leaving a terminal/done root WITH a live child
+    // (the exact bug state: the draft is awaiting while its parent scan has already finished).
+    const child = await svc.dispatch({
+      workflowId,
+      agentId: `${workflowId}__reply`,
+      origin: 'agent',
+      payload: {},
+      parentId: first.id,
+    })
+    await transition(db, child.id, 'start')
+    expect((await svc.getStatus(child.id))?.status).toBe('active')
+    await transition(db, first.id, 'finish')
+    expect((await svc.getStatus(first.id))?.status).toBe('terminal')
+    expect((await svc.getStatus(first.id))?.outcome).toBe('done')
+
+    // Re-START the input agent. Scan 1 has a LIVE descendant, so it must NOT be superseded (it stays
+    // terminal/done); a NEW scan is dispatched (scan 1's ROOT is not itself live, so the one-live-gate
+    // falls through to dispatch a fresh scan).
+    const second = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
+    expect(second.id).not.toBe(first.id)
+    expect((await makeStateStore(db).getWorkItem(first.id))?.outcome).not.toBe('superseded')
+    expect((await svc.getStatus(first.id))?.outcome).toBe('done')
+    // The live child is untouched.
+    expect((await svc.getStatus(child.id))?.status).toBe('active')
   })
 
   it('a second START while a scan is LIVE returns the live scan (no second scan)', async () => {

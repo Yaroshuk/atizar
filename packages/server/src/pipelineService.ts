@@ -4,8 +4,10 @@ import {
   deliveryKey,
   instanceId,
   lifecycle,
+  hasLiveDescendant,
   type Destination,
   type GateResolution,
+  type Phase,
   type WorkflowDescriptor,
   type HealthCheck,
 } from '@atizar/core'
@@ -281,10 +283,25 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           if (live) return { id: live.id, deduped: true }
         }
         const prior = await store.getFinishedInputRoots(req.workflowId, req.agentId)
-        for (const root of prior) {
-          await settleEdge(root.id, 'supersede', null, { summary: 'superseded by re-scan' }).catch(
-            () => {}
+        if (prior.length) {
+          const snap = await store.getBoardSnapshot()
+          // The SAME core tree-walk stateStore/board use — one liveness source. Set of ids whose
+          // tree still contains a live node.
+          const liveAnc = hasLiveDescendant(
+            snap.items.map((w) => ({ id: w.id, parentId: w.parentId, phase: w.phase as Phase }))
           )
+          for (const root of prior) {
+            // KEEP a finished scan that still has live descendants (e.g. reply drafts awaiting
+            // approval): superseding it would orphan those children (the board filters superseded
+            // roots, so the client's root-collapse can no longer reach them and the drafts vanish).
+            // It collapses with the new scan by the input agent's CONSTANT key — one card, children
+            // unioned, nothing duplicated. Only a TRULY finished scan (no live descendant — a stale
+            // empty done scan) is superseded, which still prevents done-scan pile-up.
+            if (liveAnc.has(root.id)) continue
+            await settleEdge(root.id, 'supersede', null, {
+              summary: 'superseded by re-scan',
+            }).catch(() => {})
+          }
         }
       }
       const result = await dispatchChokepoint(db, pool, {
