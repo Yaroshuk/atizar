@@ -1123,6 +1123,77 @@ describe.skipIf(!reachable)('PipelineService.cancelInstance (B2)', () => {
     expect((await service.getStatus(r1.id))?.outcome).toBe('stopped')
     expect((await service.getStatus(r2.id))?.outcome).toBe('stopped')
   }, 10_000)
+
+  it('cancelInstance on a TERMINAL spawning root still cascades to its live children', async () => {
+    // The bug: cancelInstance pre-filtered the snapshot to live items only, so a spawning root
+    // whose OWN Run already FINISHED (terminal/done) was dropped — and its live children (a
+    // different agentId/key) never got the cascade. cancelItem already handles per-item liveness
+    // (no-ops a terminal item) AND cascades to its active children, so matching by identity alone
+    // is correct. Mirrors the B1 'finished scan with a live descendant' state.
+    const inputWf = defineWorkflow({
+      id: `cancel-terminal-${randomUUID().slice(0, 8)}`,
+      label: 'B',
+      iconName: 'inbox',
+      agents: [
+        {
+          agent: defineAgent({
+            id: 'sorter',
+            name: 's',
+            provider: 'mock',
+            instructions: 'x',
+            tools: ['t'],
+            approvals: [],
+            renders: {},
+          }),
+          role: 'input',
+        },
+      ],
+      entryAgentId: 'sorter',
+      inputs: [],
+    })
+    const wf = inputWf.id
+    const sorterId = `${wf}__sorter`
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 1,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [inputWf],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+    })
+
+    // Drive the input scan to active, then dispatch a child (different agentId/key) under it and
+    // drive THAT to active. Finish the scan so the ROOT is terminal/done while the child stays live.
+    const root = await svc.dispatch({ workflowId: wf, agentId: sorterId, origin: 'human', payload: {} })
+    await waitFor(async () => (await svc.getStatus(root.id))?.status === 'active')
+
+    const child = await svc.dispatch({
+      workflowId: wf,
+      agentId: `${wf}__reply`,
+      origin: 'agent',
+      payload: {},
+      parentId: root.id,
+    })
+    await transition(db, child.id, 'start')
+    expect((await svc.getStatus(child.id))?.status).toBe('active')
+
+    await transition(db, root.id, 'finish')
+    expect((await svc.getStatus(root.id))?.status).toBe('terminal')
+    expect((await svc.getStatus(root.id))?.outcome).toBe('done')
+
+    // Stop the whole instance by the ROOT's (agentId, key). The root is terminal (cancelItem
+    // no-ops it) but its live child must be cascaded to stopped.
+    await svc.cancelInstance(wf, sorterId, sorterId)
+
+    expect((await svc.getStatus(child.id))?.outcome).toBe('stopped')
+  }, 10_000)
 })
 
 describe.skipIf(!reachable)('PipelineService input START Start-over (Bug 1)', () => {

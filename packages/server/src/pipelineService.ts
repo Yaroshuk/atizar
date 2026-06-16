@@ -483,21 +483,22 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       await cancelWorkflowImpl(workflowId)
     },
 
-    // Stop a whole instance: cancel every LIVE Run sharing (workflowId, agentId, key). Each
-    // cancelItem cascades to that Run's descendants, so stopping ANY spawning instance stops every
-    // instance it spawned, transitively. Reuses the ONE cancel primitive (no duplicated cascade).
-    // The target set is the snapshot at call time (same pattern as cancelAllImpl); a Run dispatched
-    // concurrently AFTER the snapshot may not be caught — acceptable for a deliberate human Stop.
+    // Stop a whole instance: cancel every Run sharing (workflowId, agentId, key). Each cancelItem
+    // cascades to that Run's descendants, so stopping ANY spawning instance stops every instance it
+    // spawned, transitively. Reuses the ONE cancel primitive (no duplicated cascade).
+    // We match by IDENTITY ONLY — NOT pre-filtered by liveness — because a spawning Run whose OWN
+    // run already finished (terminal/done) may still have LIVE children: cancelItem no-ops the
+    // terminal item itself (its `if (live)` guard) but STILL cascades to that item's active children
+    // (the cascade is outside the guard), so pre-filtering by isLive would drop the terminal root and
+    // its live children would never be stopped. The target set is the snapshot at call time (same
+    // pattern as cancelAllImpl); a Run dispatched concurrently AFTER the snapshot may not be caught —
+    // acceptable for a deliberate human Stop.
     async cancelInstance(workflowId: string, agentId: string, key: string): Promise<void> {
       const snap = await store.getBoardSnapshot()
-      const live = snap.items.filter(
-        (w) =>
-          w.workflowId === workflowId &&
-          w.agentId === agentId &&
-          w.key === key &&
-          lifecycle(w.phase, w.outcome, false, false).isLive
+      const matching = snap.items.filter(
+        (w) => w.workflowId === workflowId && w.agentId === agentId && w.key === key
       )
-      for (const w of live.sort((a, b) => a.id.localeCompare(b.id))) await cancelItem(w.id)
+      for (const w of matching.sort((a, b) => a.id.localeCompare(b.id))) await cancelItem(w.id)
     },
 
     // Stop every active work item across ALL workflows. Public alias for cancelAllImpl.
