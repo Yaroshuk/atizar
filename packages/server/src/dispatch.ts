@@ -77,10 +77,7 @@ export async function dispatch(
   const ancestors = await countAncestors(db, input.parentId ?? null)
   if (ancestors >= DEPTH_CAP) throw new DepthExceeded(ancestors)
 
-  // 3. Insert `queued`. If the parent auto-finished concurrently, reopen it — a fresh active child
-  //    can't hang off a terminal parent (finish-vs-dispatch race). transition('reopen') is a
-  //    no-op-or-throw if the parent isn't a clean done (already active, or stopped/rejected) —
-  //    swallow the IllegalTransition.
+  // 3. Insert `queued`, then reopen the parent if it auto-finished concurrently (see below).
   const id = randomUUID()
   await db.transaction(async (tx) => {
     await tx.insert(workItems).values({
@@ -96,8 +93,8 @@ export async function dispatch(
     })
   })
   // A parent that finished concurrently must reopen — a fresh active child can't hang off a
-  // terminal parent (finish-vs-dispatch race). transition('reopen') is a no-op-or-throw if the
-  // parent isn't a clean done (already active, or stopped/rejected) — swallow the IllegalTransition.
+  // terminal parent (finish-vs-dispatch race). transition('reopen') throws IllegalTransition if the
+  // parent isn't a clean done (already active, or stopped/rejected) — swallow it.
   if (input.parentId) {
     await transition(db, input.parentId, 'reopen').catch(() => {})
   }
