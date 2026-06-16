@@ -11,8 +11,8 @@ finishes, its detail belongs in BUILD-LOG / git, and this file shrinks back to "
 
 ## ✅ Where we are (2026-06-15)
 
-The framework **beta is built.** `master` is **ahead of `origin/master` by the cleanup track (NOT
-pushed yet — push is the user's call).** Packages:
+The framework **beta is built.** `master` is **ahead of `origin/master` by the cleanup track + the
+pipeline-lifecycle fixes (NOT pushed yet — push is the user's call).** Packages:
 
 - `@atizar/core` — isomorphic contract (`defineAgent`/`defineWorkflow`, `definePrompt`, messages,
   providers contract, `aggregateHealth`, gate/fold helpers). No React, no Node.
@@ -47,6 +47,20 @@ Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workfl
   Reset/Stop in the narrow Pipeline header are now icon-only so they stop overflowing into "Your agents".
 - **Cassettes recorded + replay-verified** — full real `email-inbox` run, all 5 `wf__agent` cassettes
   (4-way routing), true-replay confirmed. Gitignored, real data (see NEXT §B).
+- **Pipeline lifecycle fixes — 7 tasks** (autonomous subagent-driven run; spec/plan
+  `docs/superpowers/{specs,plans}/2026-06-15-pipeline-lifecycle-fixes.md`): **Approach B** — a work
+  item finishes on its OWN run-end (removed the finish-deferral guard + `autoFinishParent` walk; the
+  pipeline still shows a parent "Working" via `pipelineModel.view()`'s `hasLiveDescendant`) → **Bug 4**
+  (sorter thread no longer shows "Working…/typing" once its turn ends) gone for free · **Bug 1** the
+  human-START singleton gate now keys off DB tree-liveness (`stateStore.hasLiveInputScan`), not
+  `pool.activeCount` → no duplicate input roots / worker accumulation · **Bug 5** `SourcePanel`
+  flattens a nested payload one level (from/subject/snippet) and hides ids · **Change A** `defineAgent`
+  default `maxInstances` 2→1 (reply opts into 2) · **Change B** `definePrompt` raw-`PromptStrategy`
+  escape-hatch doc. `check-foundation` CLEAR (I8 single-owner transition preserved, I1 strengthened,
+  I12 intact). Each task: TDD → two-stage review → final integration review (MERGE) → merged to
+  `master`. **Browser-verified (replay, true-replay confirmed):** Bug 1 (2nd START → 409, one root),
+  Bug 4 (thread "Done" / pipeline "Working"), Bug 5 (flattened source panel), no-accumulation
+  (settle → re-START → exactly 1 live scan, 1 active per worker), reject, reset-all cancel.
 - (Earlier: 7c packaging tail; the 7-WS re-run/trust-UX/library-boundary track. Detail in git.)
 
 **Green gate (HEAD):** `yarn typecheck && yarn test` (**530 passed**) `&& yarn lint && yarn format:check
@@ -56,7 +70,8 @@ Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workfl
 
 ## ⏭️ NEXT
 
-The cleanup → minimal-demo → extensibility track is **DONE on `master`** (6 units above), plus a
+The cleanup → minimal-demo → extensibility track (6 units) **and** the pipeline lifecycle fixes
+(Bug 1/4/5 + maxInstances default + definePrompt doc, Approach B) are **DONE on `master`**, plus a
 board-fix follow-up (Reset→Idle + compact Pipeline-header buttons). What remains:
 
 ### A. Tunables must be PARAMETERS, not prose (design gap — fix + audit + document)
@@ -96,8 +111,33 @@ draft from this run, if unwanted).
 
 ### C. Push
 
-`master` is ahead of `origin/master` (the 6-unit track + the spec/plan doc + the board-fix follow-up).
-**Not pushed** — push when ready (`git push origin master`).
+`master` is ahead of `origin/master` (the 6-unit track + the board-fix follow-up + the
+pipeline-lifecycle fixes + their spec/plan doc). **Not pushed** — push when ready
+(`git push origin master`).
+
+## ▶ Next — pipeline UX fixes (spec: `docs/superpowers/specs/2026-06-15-pipeline-ux-fixes-handoff.md`)
+
+Six developer-locked fixes on the `email-inbox` lifecycle (read the spec for decisions + `file:line`):
+
+1. **Wipe consolidation** — one server op `wipeWorkflow`/`wipeAll` (cancel active + reset terminal);
+   client calls it once (drop the client-side cancel+reset composition); keep `cancel*` (STOP) separate.
+2. **Start over a running workflow** = confirm modal → wipe + start (remove the 409 reject guard +
+   `rejected` plumbing; rewrite the reject-semantic tests).
+3. **maxInstances — DO NOT TOUCH.**
+4. **Reject leaves no thread message** — approve resumes the agent (text → trace); reject only
+   transitions. Append a synthetic `Rejected — no action taken.` trace event on reject.
+5. **STOP must cancel children** — `cancelItem` cascade fix. **Do NOT ship alone — pair with 1+2.**
+   Applied + browser-tested + REVERTED this session: alone it makes phantom duplicate spam cards
+   (cancelled child no longer dedup-shadows, so a fresh START re-creates it while the dead card lingers
+   → 2 instances). Wipe-on-start closes the old card first → only 1. Working tree is back to committed.
+6. **Mark source email read on every approved action** (Gmail = source of truth → markRead is the
+   dedup; no ledger): reply/`saveDraft` → markRead source; important/`star` → markRead too;
+   spam/trash → not needed; `keep` → open question. Reject = nothing (re-surfaces, correct).
+
+The spec also has a **"To discuss"** section (NOT decided — developer reviews with agents first):
+pool-reconcile on wipe; effect-identity idempotency ledger as a gate before any real send; markRead
+failure handling; a stopped card reads as "Done" with no cancelled marker; + the optional larger
+reconcile-on-scan direction.
 
 ## ⚠ Open tails (none block the work above except where noted)
 
@@ -106,7 +146,7 @@ draft from this run, if unwanted).
 - **Flaky test under concurrent Postgres load** — `packages/server/src/pipelineService.test.ts`
   ("supersede is recorded in the Activity log", and now the Unit-4 `resetAll` case) can intermittently
   time out when `@mastra/pg` + the Drizzle client contend for the test DB; passes in isolation and on
-  retry. The full `yarn test` was green on final `master` (529 passed). Consider bounding the test-PG pool.
+  retry. The full `yarn test` was green on final `master` (530 passed). Consider bounding the test-PG pool.
 - **`defineAgent` optional generic** (over the tool-name union) still skipped — optional; the
   per-workflow const discipline + the drift-guard test (U3) cover the same ground.
 - **Subagent auth note** (long autonomous runs): a subagent can die on a `401` after a long keychain
