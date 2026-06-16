@@ -1,7 +1,14 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '@atizar/core'
+import {
+  pairToolResults,
+  type Message,
+  type Outcome,
+  type ToolCall,
+  type ToolMessage,
+} from '@atizar/core'
 import { STATUS_LABEL, type Status } from '../../status'
+import { OUTCOME_LABEL } from '../../lifecycleDisplay'
 import { isDevMode } from '../../devMode'
 import { useDismiss } from '../../hooks/useDismiss'
 import { ThreadResultsContext } from '../../threadResults'
@@ -31,6 +38,10 @@ export type AgentModalProps = {
   title: string
   iconName: IconName
   status: Status
+  // The terminal flavour (done/stopped/rejected/…) of the run, when known. The display `status`
+  // collapses stopped/rejected/superseded/reset into the 'done' lane; `outcome` recovers the
+  // distinct header word (Stopped/Rejected) so a stopped run never reads as a clean Done.
+  outcome?: Outcome
   // SSE connection of the underlying thread stream. 'reconnecting' shows a chip in the header so
   // a dropped stream never reads as a live-but-frozen thread. Optional: a static type view omits it.
   connection?: 'live' | 'reconnecting'
@@ -68,6 +79,7 @@ export const AgentModal = ({
   title,
   iconName,
   status,
+  outcome,
   connection,
   renderToolCall,
   renderableToolNames,
@@ -121,6 +133,17 @@ export const AgentModal = ({
   const incomingText = incoming && typeof incoming.content === 'string' ? incoming.content : ''
 
   const thread = agent.messages.flatMap((msg: Message, i: number) => {
+    // The typed lifecycle note (a role:'system' message from foldEventsToMessages, U4) renders as
+    // a muted banner so the human always sees how/why a run ended (stopped, rejected, etc.). This
+    // branch is BEFORE the assistant-only guard below, which would otherwise drop the system note.
+    if (msg.role === 'system' && typeof msg.content === 'string' && msg.content.length > 0) {
+      const note: ReactNode[] = [
+        <div className={clsx(s.threadNote, s.lifecycle)} key={`sys-${i}`}>
+          {msg.content}
+        </div>,
+      ]
+      return note
+    }
     if (msg.role !== 'assistant') return []
     const nodes: ReactNode[] = []
 
@@ -169,7 +192,7 @@ export const AgentModal = ({
             <span className='modal-title'>{title}</span>
             <span className={`modal-status status s-${status}`}>
               <span className={`dot ${status}`} />
-              {STATUS_LABEL[status]}
+              {status === 'done' && outcome ? OUTCOME_LABEL[outcome] : STATUS_LABEL[status]}
             </span>
             {connection === 'reconnecting' && (
               <span className={s.reconnectChip}>

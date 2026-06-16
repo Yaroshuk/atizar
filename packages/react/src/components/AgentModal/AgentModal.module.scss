@@ -148,6 +148,11 @@
   &.received {
     border-left: 3px solid #f0c000;
   }
+  /* the typed lifecycle note (stopped/rejected/superseded reason) — a muted, emphasised banner */
+  &.lifecycle {
+    font-weight: 600;
+    opacity: 0.8;
+  }
 }
 .note-link {
   margin-left: 8px;
