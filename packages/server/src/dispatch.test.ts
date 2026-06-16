@@ -18,9 +18,8 @@ function fakePool() {
   const pool: WorkerPool = {
     enqueue,
     dequeue: vi.fn(),
-    release: vi.fn(),
-    resumeAcquire: vi.fn(),
-    activeCount: () => 0,
+    reconcile: vi.fn(),
+    activeCount: async () => 0,
     queuedCount: () => 0,
   }
   return { pool, enqueue }
@@ -40,7 +39,7 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
     const source = `thread:${randomUUID()}`
     const { id, deduped } = await dispatch(db, pool, { ...base, source })
     expect(deduped).toBe(false)
-    expect((await store.getWorkItem(id))?.status).toBe('queued')
+    expect((await store.getWorkItem(id))?.phase).toBe('queued')
     expect(enqueue).toHaveBeenCalledWith(id, 'lead-inbox__reply', 2)
   })
 
@@ -89,16 +88,16 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
         dispatch(db, pool, { ...base, origin: 'agent', parentId: parent }),
       ])
 
-      // The parent must NOT be finished — a freshly dispatched child is active under it.
-      expect((await store.getWorkItem(parent))?.status).not.toBe('finished')
+      // The parent must NOT be terminal — a freshly dispatched child is active under it.
+      expect((await store.getWorkItem(parent))?.phase).not.toBe('terminal')
     }
   })
 
-  it('re-surfaces a source whose prior item is closed/superseded (open-scoped dedup)', async () => {
+  it('re-surfaces a source whose prior item is superseded (un-actioned terminal)', async () => {
     const { pool } = fakePool()
     const source = `thread:${randomUUID()}`
     const first = await dispatch(db, pool, { ...base, source })
-    // drive the first item to closed+superseded (a stale scan's leaf)
+    // drive the first item to terminal+superseded (a stale scan's leaf)
     await transition(db, first.id, 'start')
     await transition(db, first.id, 'finish')
     await transition(db, first.id, 'supersede')
@@ -108,7 +107,7 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
     expect(second.id).not.toBe(first.id)
   })
 
-  it('still dedups a source whose prior item is FINISHED-but-open (not closed)', async () => {
+  it('still dedups a source whose prior item is DONE (terminal/done covers)', async () => {
     const { pool } = fakePool()
     const source = `thread:${randomUUID()}`
     const first = await dispatch(db, pool, { ...base, source })
@@ -126,5 +125,28 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
     await transition(db, first.id, 'start')
     const second = await dispatch(db, pool, { ...base, source })
     expect(second).toEqual({ id: first.id, deduped: true })
+  })
+
+  it('a stopped same-source item COVERS (no phantom twin)', async () => {
+    const { pool } = fakePool()
+    const src = `cover-${randomUUID()}`
+    const first = await dispatch(db, pool, { ...base, source: src })
+    await transition(db, first.id, 'start')
+    await transition(db, first.id, 'cancel') // outcome=stopped → covers
+    const second = await dispatch(db, pool, { ...base, source: src })
+    expect(second.deduped).toBe(true)
+    expect(second.id).toBe(first.id)
+  })
+
+  it('a rejected same-source item does NOT cover (re-scan re-surfaces)', async () => {
+    const { pool } = fakePool()
+    const src = `nocover-${randomUUID()}`
+    const first = await dispatch(db, pool, { ...base, source: src })
+    await transition(db, first.id, 'start')
+    await transition(db, first.id, 'gate')
+    await transition(db, first.id, 'reject') // outcome=rejected → does NOT cover
+    const second = await dispatch(db, pool, { ...base, source: src })
+    expect(second.deduped).toBe(false)
+    expect(second.id).not.toBe(first.id)
   })
 })

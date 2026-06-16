@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, ne, or, isNull, notInArray } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
+import { lifecycle } from '@atizar/core'
 import type { Db } from './db/client.js'
 import { workItems, type OriginKind } from './db/schema.js'
+import { transition } from './transition.js'
 import type { WorkerPool } from './workerPool.js'
 
 // The ONE chokepoint every dispatch goes through (spec §1.8): mint the id, one-time dedup
@@ -56,52 +58,31 @@ export async function dispatch(
   pool: WorkerPool,
   input: DispatchInput
 ): Promise<DispatchResult> {
-  // 1. One-time dedup, scoped to OPEN/unclosed items only (WS1): a same-source WorkItem that is
-  //    still queued|running|awaiting_approval|awaiting_input, OR finished-but-not-yet-closed,
-  //    already covers this source. A 'closed' item (a superseded scan's leaf), or one resolved
-  //    'rejected' / 'cancelled' / 'superseded', does NOT shadow — a re-scan re-surfaces the
-  //    un-actioned source. The `workItemId+gateId` effect ledger (I9) is the real guard against
-  //    a double irreversible action; this dedup only prevents a duplicate OPEN card.
+  // 1. One-time dedup via the SINGLE classifier (Option A): a same-source item that COVERS shadows
+  //    this dispatch (live OR a freeze-and-keep terminal — done/stopped). An un-actioned terminal
+  //    (rejected/superseded/reset/error) does NOT cover, so a re-scan re-surfaces the source. This
+  //    is the exhaustive replacement for the old SQL ne/notInArray block (which silently omitted
+  //    'reset' — the latent bug this closes). The card-keeps-it dimension is irrelevant to dedup,
+  //    so hasCard/hasLiveDescendant are passed false here.
   if (input.source) {
-    const [existing] = await db
-      .select({ id: workItems.id })
+    const rows = await db
+      .select({ id: workItems.id, phase: workItems.phase, outcome: workItems.outcome })
       .from(workItems)
-      .where(
-        and(
-          eq(workItems.source, input.source),
-          ne(workItems.status, 'error'),
-          ne(workItems.status, 'closed'),
-          or(
-            isNull(workItems.resolution),
-            notInArray(workItems.resolution, ['rejected', 'cancelled', 'superseded'])
-          )
-        )
-      )
-      .limit(1)
-    if (existing) return { id: existing.id, deduped: true }
+      .where(eq(workItems.source, input.source))
+    const covering = rows.find((r) => lifecycle(r.phase, r.outcome, false, false).covers)
+    if (covering) return { id: covering.id, deduped: true }
   }
 
   // 2. Depth cap.
   const ancestors = await countAncestors(db, input.parentId ?? null)
   if (ancestors >= DEPTH_CAP) throw new DepthExceeded(ancestors)
 
-  // 3. Insert `queued`. If the parent auto-finished concurrently, reopen it FOR UPDATE —
-  //    a parent with a fresh active child must not stay finished (finish-vs-dispatch race).
+  // 3. Insert `queued`. If the parent auto-finished concurrently, reopen it — a fresh active child
+  //    can't hang off a terminal parent (finish-vs-dispatch race). transition('reopen') is a
+  //    no-op-or-throw if the parent isn't a clean done (already active, or stopped/rejected) —
+  //    swallow the IllegalTransition.
   const id = randomUUID()
   await db.transaction(async (tx) => {
-    if (input.parentId) {
-      const [parent] = await tx
-        .select()
-        .from(workItems)
-        .where(eq(workItems.id, input.parentId))
-        .for('update')
-      if (parent && parent.status === 'finished' && parent.resolution === null) {
-        await tx
-          .update(workItems)
-          .set({ status: 'running', updatedAt: new Date() })
-          .where(eq(workItems.id, input.parentId))
-      }
-    }
     await tx.insert(workItems).values({
       id,
       workflowId: input.workflowId,
@@ -110,9 +91,16 @@ export async function dispatch(
       payload: input.payload,
       source: input.source ?? null,
       parentId: input.parentId ?? null,
-      status: 'queued',
+      phase: 'queued',
+      outcome: 'running',
     })
   })
+  // A parent that finished concurrently must reopen — a fresh active child can't hang off a
+  // terminal parent (finish-vs-dispatch race). transition('reopen') is a no-op-or-throw if the
+  // parent isn't a clean done (already active, or stopped/rejected) — swallow the IllegalTransition.
+  if (input.parentId) {
+    await transition(db, input.parentId, 'reopen').catch(() => {})
+  }
 
   // 4. Enqueue (the pool starts it on a free slot).
   pool.enqueue(id, input.agentId, input.maxInstances)
