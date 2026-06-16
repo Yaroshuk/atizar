@@ -73,7 +73,11 @@ export function makeWorkerPool(deps: WorkerPoolDeps): WorkerPool {
           deps.run(next)
         }
       })
-      .catch(() => {}) // keep the per-agent chain alive even if a pump body throws
+      .catch((e) => {
+        // Keep the per-agent chain alive even if a pump body throws (e.g. a transient DB error in
+        // activeCount/activate) — but surface it; a silent stall would be undiagnosable.
+        console.error('[workerPool] pump failed for', agentId, e)
+      })
   }
 
   return {
