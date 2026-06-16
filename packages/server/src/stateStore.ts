@@ -24,6 +24,7 @@ export interface InsertWorkItemInput {
   payload: Record<string, unknown>
   parentId?: string | null
   source?: string | null
+  key: string
 }
 
 export interface InsertGateInput {
@@ -55,6 +56,7 @@ export function makeStateStore(db: Db) {
           payload: input.payload,
           parentId: input.parentId ?? null,
           source: input.source ?? null,
+          key: input.key,
           phase: 'queued',
           outcome: 'running',
         })

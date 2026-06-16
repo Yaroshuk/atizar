@@ -31,6 +31,7 @@ const base = {
   origin: 'human' as const,
   payload: {},
   maxInstances: 2,
+  key: 'lead-inbox__reply',
 }
 
 describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
@@ -148,5 +149,11 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
     const second = await dispatch(db, pool, { ...base, source: src })
     expect(second.deduped).toBe(false)
     expect(second.id).not.toBe(first.id)
+  })
+
+  it('stores the caller-supplied key on the work item', async () => {
+    const { pool } = fakePool()
+    const { id } = await dispatch(db, pool, { ...base, key: 'alice@example.com' })
+    expect((await store.getWorkItem(id))?.key).toBe('alice@example.com')
   })
 })

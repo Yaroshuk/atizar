@@ -25,6 +25,7 @@ export interface DispatchInput {
   origin: OriginKind
   payload: Record<string, unknown>
   source?: string | null
+  key: string
   parentId?: string | null
   maxInstances: number
 }
@@ -85,6 +86,7 @@ export async function dispatch(
       origin: input.origin,
       payload: input.payload,
       source: input.source ?? null,
+      key: input.key,
       parentId: input.parentId ?? null,
       phase: 'queued',
       outcome: 'running',
