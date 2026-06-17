@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import type { Outcome } from '@atizar/core'
 import type { Status } from '../../status'
+import { isBusy } from '../../liveness'
 import { pillLabel, pillTint } from '../../statusDisplay'
 import { useDismiss } from '../../hooks/useDismiss'
 import { Icon, type IconName } from '../Icon/Icon'
@@ -33,12 +34,9 @@ export const InstancePickerModal = ({
   onClose,
 }: InstancePickerModalProps) => {
   const { closing, dismiss } = useDismiss(onClose)
-  // "Live" = instances actually occupying the human (running / awaiting approval); a finished/kept
-  // result is shown but is NOT counted as active, so the header reads "2 active" honestly instead
-  // of the raw list length.
-  const liveCount = instances.filter(
-    (i) => i.status === 'running' || i.status === 'awaiting_approval'
-  ).length
+  // "Active" = busy (running / awaiting approval). Shared isBusy — one source with the card
+  // aggregate, so the header never disagrees with the count the agent type card shows.
+  const liveCount = instances.filter((i) => isBusy(i.status)).length
   return (
     <div className={clsx('backdrop', closing && 'closing')} onClick={dismiss}>
       <div className='modal' onClick={(e) => e.stopPropagation()}>
