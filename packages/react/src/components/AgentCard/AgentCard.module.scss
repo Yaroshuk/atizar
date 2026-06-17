@@ -110,6 +110,11 @@
   &.s-awaiting_approval {
     color: var(--amber-ink);
   }
+  // distinct terminals (stopped/rejected) read in a muted grey, not the teal done lane
+  &.s-stopped,
+  &.s-rejected {
+    color: #8a8f94;
+  }
 }
 
 // dot colour by status string
@@ -128,6 +133,11 @@
   }
   &.error {
     background: #e0483c;
+  }
+  // distinct terminals (stopped/rejected) — muted grey, inert (no pulse)
+  &.stopped,
+  &.rejected {
+    background: #b6bbc0;
   }
 
   // pulsing ring for active states

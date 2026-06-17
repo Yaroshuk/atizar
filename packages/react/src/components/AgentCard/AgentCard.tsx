@@ -13,9 +13,8 @@ type AgentCardProps = {
   iconName: IconName
   status: Status
   // The representative terminal outcome when nothing is live (status === 'done'). A distinct
-  // terminal (stopped/rejected) makes the badge read "Stopped"/"Rejected" instead of "Done";
-  // `null` / clean done → the status label. The dot/pill colour stays status-keyed (the card
-  // scss has no stopped/rejected variants — the label is the meaningful signal here).
+  // terminal (stopped/rejected) makes the badge read "Stopped"/"Rejected" instead of "Done"
+  // AND keys its own muted-grey dot/pill colour; `null` / clean done → the status label + colour.
   outcome?: Outcome | null
   // Headline for the type card, e.g. "2 active · 1 awaiting approval" ('' = none live).
   // When set it replaces the START / hint footer with the live-instance summary.
@@ -36,8 +35,12 @@ type AgentCardProps = {
 const camelize = (input: string): string =>
   input.replace(/[-_]([a-z])/g, (_m, c: string) => c.toUpperCase())
 
-const statusClass = (status: Status): string | undefined => s[camelize(status)]
-const pillClass = (status: Status): string | undefined => s[camelize(`s-${status}`)]
+// Dot + pill colour: a distinct terminal outcome (stopped/rejected) keys its own muted-grey
+// class; otherwise status-keyed. Falls back to the status class when no outcome variant exists.
+const dotClass = (status: Status, outcome: Outcome | null): string | undefined =>
+  (outcome ? s[camelize(outcome)] : undefined) ?? s[camelize(status)]
+const pillClass = (status: Status, outcome: Outcome | null): string | undefined =>
+  (outcome ? s[camelize(`s-${outcome}`)] : undefined) ?? s[camelize(`s-${status}`)]
 
 export const AgentCard = ({
   name,
@@ -96,8 +99,8 @@ export const AgentCard = ({
         <div className={s.cardIcon}>
           <Icon name={iconName} size={20} />
         </div>
-        <span className={clsx(s.status, pillClass(status))}>
-          <span className={clsx(s.dot, statusClass(status))} />
+        <span className={clsx(s.status, pillClass(status, outcome))}>
+          <span className={clsx(s.dot, dotClass(status, outcome))} />
           {cardLabel(status, outcome)}
         </span>
       </div>
