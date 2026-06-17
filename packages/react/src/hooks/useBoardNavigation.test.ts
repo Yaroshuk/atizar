@@ -169,8 +169,8 @@ describe('useBoardNavigation', () => {
     act(() => result.current.openAgent('reply'))
     // stopped is board-visible; without the isLive filter instancesOf would return 2 items
     // and trigger the picker — the filter is load-bearing here.
-    expect(result.current.openId).toBe('a__reply#1')      // single LIVE thread
-    expect(result.current.openPickerId).toBeNull()         // no picker
+    expect(result.current.openId).toBe('a__reply#1') // single LIVE thread
+    expect(result.current.openPickerId).toBeNull() // no picker
     // pickerInstances (if it were opened) would also exclude the stopped instance
     expect(result.current.instancesOf('reply')).toHaveLength(1)
     expect(result.current.instancesOf('reply')[0].localId).toBe('a__reply#1')

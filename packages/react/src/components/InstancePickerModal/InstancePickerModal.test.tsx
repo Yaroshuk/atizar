@@ -4,8 +4,20 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { InstancePickerModal, type PickerInstance } from './InstancePickerModal'
 
 const instances: PickerInstance[] = [
-  { localId: 'reply#1', label: 'Reply · alice', name: 'Reply', status: 'running', outcome: 'running' },
-  { localId: 'reply#2', label: 'Reply · bob', name: 'Reply', status: 'awaiting_approval', outcome: 'running' },
+  {
+    localId: 'reply#1',
+    label: 'Reply · alice',
+    name: 'Reply',
+    status: 'running',
+    outcome: 'running',
+  },
+  {
+    localId: 'reply#2',
+    label: 'Reply · bob',
+    name: 'Reply',
+    status: 'awaiting_approval',
+    outcome: 'running',
+  },
   { localId: 'reply#3', label: 'Reply · carol', name: 'Reply', status: 'done', outcome: 'stopped' },
 ]
 
