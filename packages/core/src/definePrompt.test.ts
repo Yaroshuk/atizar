@@ -31,10 +31,27 @@ describe('definePrompt', () => {
     const p = definePrompt({ onStart: () => 'read the inbox' })
     expect(p.buildFirst(emptyInput)).toBe('read the inbox')
   })
-  it('buildResume passes the server effect result', () => {
-    const p = definePrompt({ onStart: () => 's', onResume: ({ draftId }) => `saved ${draftId}` })
-    expect(p.buildResume?.({}, { draftId: 'd1' })).toBe('saved d1')
+  it('buildResume wraps onResume into a prompt-mode ResumeOutcome', () => {
+    const p = definePrompt({
+      onStart: () => 's',
+      onResume: ({ draftId }) => ({ kind: 'prompt', text: `saved ${draftId}` }),
+    })
+    expect(p.buildResume?.({}, { draftId: 'd1' })).toEqual({ kind: 'prompt', text: 'saved d1' })
   })
+
+  it('onResume may return message mode (server-appended, no model spawn)', () => {
+    const p = definePrompt({
+      onStart: () => 's',
+      onResume: () => ({ kind: 'message', text: 'Draft saved' }),
+    })
+    expect(p.buildResume?.({}, {})).toEqual({ kind: 'message', text: 'Draft saved' })
+  })
+
+  it('onResume may return null (silent settle)', () => {
+    const p = definePrompt({ onStart: () => 's', onResume: () => null })
+    expect(p.buildResume?.({}, {})).toBeNull()
+  })
+
   it('no onResume → buildResume is undefined', () => {
     const p = definePrompt({ onStart: () => 's' })
     expect(p.buildResume).toBeUndefined()

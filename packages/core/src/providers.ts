@@ -33,18 +33,25 @@ export interface GateResolution {
   executedResult?: Record<string, unknown>
 }
 
+// The resume result of a gated agent — a discriminated union (I14 provider/core contract). The
+// SERVER decides what to do from `kind`; the provider only ever runs `prompt`. `message` lets an
+// approval resolve with a canned confirmation (no LLM round-trip); `null` is a clean silent finish.
+export type ResumeOutcome =
+  | { kind: 'prompt'; text: string } // spawn the model with `text` as the resume prompt
+  | { kind: 'message'; text: string } // server appends `text` verbatim, NO model spawn
+  | null // clean silent settle, no turn
+
 // A per-agent prompt strategy: how this agent turns a run into CLI prompts.
 // buildFirst handles turn 1 (standalone OR handoff-seeded). buildResume handles a
 // resumed run after a human approval (null = no usable resume → the provider errors).
 // Lives at the seam so claude-cli stays generic; a Mastra provider would ignore it.
 export interface PromptStrategy {
   buildFirst(input: RunAgentInput): string
-  // `args` is the approved/edited artifact; `executedResult` is the server's effect result
-  // (present at step 4+). Returns null when no usable resume → the provider errors.
+  // Returns a ResumeOutcome: prompt → spawn the model; message → server appends text; null → silent.
   buildResume?(
     args: Record<string, unknown>,
     executedResult?: Record<string, unknown>
-  ): string | null
+  ): ResumeOutcome
 }
 
 // Everything a provider needs to run ONE agent, derived from its passport.
