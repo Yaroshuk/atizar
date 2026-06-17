@@ -1171,7 +1171,12 @@ describe.skipIf(!reachable)('PipelineService.cancelInstance (B2)', () => {
 
     // Drive the input scan to active, then dispatch a child (different agentId/key) under it and
     // drive THAT to active. Finish the scan so the ROOT is terminal/done while the child stays live.
-    const root = await svc.dispatch({ workflowId: wf, agentId: sorterId, origin: 'human', payload: {} })
+    const root = await svc.dispatch({
+      workflowId: wf,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
     await waitFor(async () => (await svc.getStatus(root.id))?.status === 'active')
 
     const child = await svc.dispatch({
