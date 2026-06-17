@@ -16,13 +16,16 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
   reset: 'Cleared',
 }
 
-// Tint class suffix per outcome (consumed where a terminal card needs a distinct colour). done =
-// the neutral "run" tint; stopped/rejected/error read as muted/warning.
+// Tint class suffix per outcome (consumed where a terminal card needs a distinct colour).
+// COLOR CANON (spec 2026-06-17 §3/§7): only `error` is the danger/red tint (`err`). Every
+// user-terminal outcome — done/stopped/rejected/superseded/reset — is NEUTRAL: `done` is the
+// neutral "run" tint, the rest share the muted-grey `stopped` tint. (rejected keeps its distinct
+// LABEL via OUTCOME_LABEL; only its COLOR is neutralised — a declined draft is not a crash.)
 export const OUTCOME_TINT: Record<Outcome, string> = {
   running: 'run',
   done: 'run',
   stopped: 'stopped',
-  rejected: 'rejected',
+  rejected: 'stopped',
   error: 'err',
   superseded: 'stopped',
   reset: 'stopped',

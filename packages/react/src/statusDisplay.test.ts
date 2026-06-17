@@ -17,6 +17,16 @@ describe('pillLabel / pillTint (outcome-aware list surfaces)', () => {
   })
 })
 
+describe('pillTint color semantics (rejected/stopped neutral, error red)', () => {
+  it('a rejected item tints neutral — same as stopped, NOT the error tint', () => {
+    expect(pillTint('done', 'rejected')).toBe(pillTint('done', 'stopped'))
+    expect(pillTint('done', 'rejected')).not.toBe(pillTint('error', 'error'))
+  })
+  it('the distinct LABEL is kept even though the color is neutral', () => {
+    expect(pillLabel('done', 'rejected')).toBe('Rejected') // unchanged
+  })
+})
+
 // The type card uses STATUS_LABEL for live/idle (e.g. "Awaiting approval"), but a distinct
 // terminal outcome must show its OUTCOME_LABEL word ("Stopped"/"Rejected") instead of "Done".
 describe('cardLabel (type-card badge, outcome-aware)', () => {

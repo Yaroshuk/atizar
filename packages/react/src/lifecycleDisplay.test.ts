@@ -23,3 +23,22 @@ describe('lifecycleDisplay', () => {
     expect(displayStatus('terminal', 'error')).toBe('error')
   })
 })
+
+describe('OUTCOME_TINT color semantics (only error is danger)', () => {
+  it('rejected uses the neutral terminal tint, not the danger tint', () => {
+    // user-terminal: a declined draft is an intentional ending, not a crash
+    expect(OUTCOME_TINT.rejected).toBe('stopped') // the shared neutral-terminal class
+    expect(OUTCOME_TINT.rejected).not.toBe(OUTCOME_TINT.error)
+  })
+  it('stopped is the neutral terminal tint too', () => {
+    expect(OUTCOME_TINT.stopped).toBe('stopped')
+    expect(OUTCOME_TINT.stopped).not.toBe(OUTCOME_TINT.error)
+  })
+  it('error stays the danger (err) tint', () => {
+    expect(OUTCOME_TINT.error).toBe('err')
+  })
+  it('superseded/reset stay neutral (regression)', () => {
+    expect(OUTCOME_TINT.superseded).toBe('stopped')
+    expect(OUTCOME_TINT.reset).toBe('stopped')
+  })
+})
