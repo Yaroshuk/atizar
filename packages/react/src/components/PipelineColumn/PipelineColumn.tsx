@@ -2,7 +2,6 @@ import { useRef } from 'react'
 import type { AgentGroup, Instance, PInstance, PipelineBlock } from '../../pipelineModel'
 import type { Status } from '../../status'
 import { pillLabel, pillTint } from '../../statusDisplay'
-import { testIds } from '../../testIds'
 import { LINGER_MS, useLingerSet } from '../../pipelineLinger'
 import { Icon } from '../Icon/Icon'
 import { CompHeader } from '../../primitives/CompHeader/CompHeader'
@@ -174,7 +173,6 @@ export const PipelineColumn = ({
   const renderMiniRow = (parent: PInstance, leaving: boolean) => (
     <div
       className={`mini ${pillTint(parent.status, parent.outcome)}${stopClasses(parent)}${leaving ? ' ' + s.leaving : ''}`}
-      data-testid={testIds.pipelineRow(parent.agentId)}
       onClick={() => onOpen(parent.localId)}
     >
       <div className='m-icon'>
@@ -194,9 +192,8 @@ export const PipelineColumn = ({
     const head = inst.head
     return (
       <div
-        key={`${g.agentId}${leaving ? '-leaving' : ''}`}
+        key={g.agentId}
         className={`pl-single ${pillTint(head.status, head.outcome)}${stopClasses(head)}${leaving ? ' ' + s.leaving : ''}`}
-        data-testid={testIds.pipelineRow(head.agentId)}
         onClick={() => onOpen(head.localId)}
       >
         <div className='m-icon'>
@@ -217,11 +214,10 @@ export const PipelineColumn = ({
   const renderInstRow = (inst: Instance, leaving: boolean) => {
     const head = inst.head
     return (
-      <div key={`${inst.key}${leaving ? '-leaving' : ''}`} className={s.plKid}>
+      <div key={inst.key} className={s.plKid}>
         <span className={s.plHstub} />
         <div
           className={`pl-inst ${pillTint(head.status, head.outcome)}${stopClasses(head)}${leaving ? ' ' + s.leaving : ''}`}
-          data-testid={testIds.pipelineRow(head.agentId)}
           onClick={() => onOpen(head.localId)}
         >
           <span className='pl-iname'>
@@ -258,7 +254,7 @@ export const PipelineColumn = ({
     const lingeringKids = lingeringChildrenByParent.get(parent.localId) ?? []
 
     return (
-      <div className={s.plBlock} key={`${parent.localId}${blockIsLeaving ? '-leaving' : ''}`}>
+      <div className={s.plBlock} key={parent.localId}>
         {renderMiniRow(parent, blockIsLeaving && block.groups.length === 0)}
 
         {(block.groups.length > 0 || lingeringKids.length > 0) && (
