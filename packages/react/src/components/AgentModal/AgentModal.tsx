@@ -14,6 +14,7 @@ import { useDismiss } from '../../hooks/useDismiss'
 import { ThreadResultsContext } from '../../threadResults'
 import { Icon, type IconName } from '../Icon/Icon'
 import { Markdown } from '../../primitives/Markdown/Markdown'
+import { buildThreadItems } from '../../buildThreadItems.js'
 import s from './AgentModal.module.scss'
 // HandoffNote's single canonical definition lives in useBoardNavigation (so a hook consumer
 // can type notes without importing a React component); re-export it here for back-compat.
@@ -132,53 +133,43 @@ export const AgentModal = ({
   )
   const incomingText = incoming && typeof incoming.content === 'string' ? incoming.content : ''
 
-  const thread = agent.messages.flatMap((msg: Message, i: number) => {
-    // The typed lifecycle note (a role:'system' message from foldEventsToMessages, U4) renders as
-    // a muted banner so the human always sees how/why a run ended (stopped, rejected, etc.). This
-    // branch is BEFORE the assistant-only guard below, which would otherwise drop the system note.
-    if (msg.role === 'system' && typeof msg.content === 'string' && msg.content.length > 0) {
-      const note: ReactNode[] = [
-        <div className={clsx(s.threadNote, s.lifecycle)} key={`sys-${i}`}>
-          {msg.content}
-        </div>,
-      ]
-      return note
+  // Project messages → ordered ThreadItem[] (pure, no React), then map to JSX.
+  const threadItems = buildThreadItems(agent.messages, {
+    renderableToolNames,
+    devMode: isDevMode,
+  })
+  const thread = threadItems.map((item) => {
+    if (item.kind === 'lifecycle') {
+      return (
+        <div className={clsx(s.threadNote, s.lifecycle)} key={item.id}>
+          {item.text}
+        </div>
+      )
     }
-    if (msg.role !== 'assistant') return []
-    const nodes: ReactNode[] = []
-
-    // Assistant text content -> chat bubble.
-    if (typeof msg.content === 'string' && msg.content.length > 0) {
-      nodes.push(
-        <div className={clsx(s.threadItem, s.bubbleRow)} key={`text-${i}`}>
+    if (item.kind === 'text') {
+      return (
+        <div className={clsx(s.threadItem, s.bubbleRow)} key={item.id}>
           <span className={s.agentGlyph}>
             <Icon name='sparkle' size={15} />
           </span>
           <div className={s.bubble}>
-            <Markdown>{msg.content}</Markdown>
+            <Markdown>{item.text}</Markdown>
           </div>
         </div>
       )
     }
-
-    // Assistant tool calls -> generative UI (LeadCard / VerdictCard / ApprovalDialog).
-    // Hide internal plumbing (unregistered data-fetch tools) unless dev mode is on.
-    if (Array.isArray(msg.toolCalls)) {
-      for (const toolCall of msg.toolCalls) {
-        const name = toolCall.function?.name ?? ''
-        if (!isDevMode && !renderableToolNames.has(name)) continue
-        nodes.push(
-          <div className={s.threadItem} key={`tc-${toolCall.id}`}>
-            {renderToolCall({
-              toolCall,
-              toolMessage: toolMessageByCallId.get(toolCall.id),
-            })}
-          </div>
-        )
-      }
+    if (item.kind === 'toolCall') {
+      return (
+        <div className={s.threadItem} key={item.id}>
+          {renderToolCall({
+            toolCall: item.toolCall,
+            toolMessage: toolMessageByCallId.get(item.toolCall.id),
+          })}
+        </div>
+      )
     }
-
-    return nodes
+    // kind === 'handoff' — rendered by Task 4; skip for now.
+    return null
   })
 
   return (
