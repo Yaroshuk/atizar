@@ -89,6 +89,8 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
       effects: { saveDraft: async () => ({}) },
       dispatchToolNames: [],
       handoffs: [],
+      // prompt mode: resume must spawn the provider and append its text chunk.
+      buildResume: () => ({ kind: 'prompt', text: 'continue' }),
     }
     const service = makePipelineService({
       db,

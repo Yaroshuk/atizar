@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { describe, it, expect, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@atizar/core'
+import {
+  gateOpened,
+  type GateResolution,
+  type Provider,
+  type ResumeHandle,
+  type ResumeOutcome,
+} from '@atizar/core'
 import { db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
 import { makeRunObserver } from './runObserver.js'
@@ -40,6 +46,25 @@ function fakeProvider(): Provider {
   }
 }
 
+// A gate-opening provider with a spy on resume() — for message/null/prompt mode tests.
+// run() opens a gate; resume() sets spy.resumed = true and yields one text chunk.
+function fakeProviderWithResumeSpy(spy: { resumed: boolean }): Provider {
+  return {
+    async *run(_input: RunAgentInput) {
+      yield gateOpened({
+        gateKind: 'approval',
+        toolName: 'saveDraft',
+        toolCallId: 'toolu_g',
+        proposedArtifact: { body: 'hi' },
+      })
+    },
+    async *resume(_handle: ResumeHandle, _resolution: GateResolution) {
+      spy.resumed = true
+      yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm3', delta: 'spawned' })
+    },
+  }
+}
+
 function fakePool() {
   const reconcile = vi.fn<(agentId: string) => void>()
   const pool: WorkerPool = {
@@ -52,8 +77,51 @@ function fakePool() {
   return { pool, reconcile }
 }
 
+// Helper: insert a WorkItem, pre-flip to active, run to the gate, return { id, gate, observer }.
+async function runToGate(
+  provider: Provider,
+  buildResume:
+    | ((args: Record<string, unknown>, executedResult?: Record<string, unknown>) => ResumeOutcome)
+    | undefined
+) {
+  const agentId = `ro-test__${randomUUID().slice(0, 8)}`
+  const { id } = await store.insertWorkItem({
+    id: randomUUID(),
+    workflowId: 'ro-test',
+    agentId,
+    origin: 'human',
+    payload: {},
+    key: agentId,
+  })
+  const { pool, reconcile } = fakePool()
+  const observer = makeRunObserver({
+    db,
+    store,
+    pool,
+    bus: { publish: vi.fn(), subscribe: () => () => {} },
+    resolveAgent: () => ({
+      provider,
+      renderToolNames: ['renderLead'],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+      buildResume,
+    }),
+    deliver: vi.fn().mockResolvedValue({ ok: true, id: 'child', deduped: false }),
+    settle: async (sid, edge, _actor, opts) => {
+      await transition(db, sid, edge, opts)
+    },
+    reconcile,
+  })
+  await transition(db, id, 'start')
+  await observer.run(id)
+  const gate = await store.getOpenGate(id)
+  return { id, gate, observer }
+}
+
 describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => {
-  it('runs to a gate, fills the card, then resumes to finished', async () => {
+  it('runs to a gate, fills the card, then resumes to finished (prompt mode — regression)', async () => {
     const { id } = await store.insertWorkItem({
       id: randomUUID(),
       workflowId: 'lead-inbox',
@@ -75,6 +143,8 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
         effects: {},
         dispatchToolNames: [],
         handoffs: [],
+        // prompt mode: the observer must call provider.resume()
+        buildResume: () => ({ kind: 'prompt', text: 'continue' }),
       }),
       deliver: vi.fn().mockResolvedValue({ ok: true, id: 'child', deduped: false }),
       settle: async (sid, edge, _actor, opts) => {
@@ -108,5 +178,54 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
 
     const stitched = await store.getTrace(id, 0)
     expect(stitched.map((r) => r.seq)).toEqual([0, 1, 2, 3, 4, 5, 6]) // seq continues
+  })
+
+  it('prompt mode: spawns the provider as today', async () => {
+    const spy = { resumed: false }
+    const { id, gate, observer } = await runToGate(fakeProviderWithResumeSpy(spy), () => ({
+      kind: 'prompt',
+      text: 'please continue',
+    }))
+    await observer.resume(id, { gateId: gate!.id, decision: 'approved' })
+    expect(spy.resumed).toBe(true)
+    expect((await store.getWorkItem(id))?.phase).toBe('terminal')
+  })
+
+  it('message mode: appends verbatim text + finishes, WITHOUT spawning the provider', async () => {
+    const spy = { resumed: false }
+    const { id, gate, observer } = await runToGate(fakeProviderWithResumeSpy(spy), () => ({
+      kind: 'message',
+      text: 'Draft saved ✓',
+    }))
+    // Record trace length before resume (after gate open)
+    const beforeLen = (await store.getTrace(id, 0)).length
+
+    await observer.resume(id, { gateId: gate!.id, decision: 'approved' })
+
+    expect(spy.resumed).toBe(false) // provider.resume NOT called
+    expect((await store.getWorkItem(id))?.phase).toBe('terminal')
+    const trace = await store.getTrace(id, 0)
+    expect(trace.length).toBe(beforeLen + 1) // exactly ONE new event appended
+    const last = trace[trace.length - 1].event as Record<string, unknown>
+    expect(last['type']).toBe(EventType.TEXT_MESSAGE_CHUNK)
+    expect(last['delta']).toBe('Draft saved ✓')
+  })
+
+  it('null mode: silent finish, no extra trace event, no provider spawn', async () => {
+    const spy = { resumed: false }
+    const { id, gate, observer } = await runToGate(fakeProviderWithResumeSpy(spy), () => null)
+    const beforeLen = (await store.getTrace(id, 0)).length
+
+    await observer.resume(id, { gateId: gate!.id, decision: 'approved' })
+
+    expect(spy.resumed).toBe(false)
+    expect((await store.getWorkItem(id))?.phase).toBe('terminal')
+    const afterTrace = await store.getTrace(id, 0)
+    expect(afterTrace.length).toBe(beforeLen) // NO new event appended
+    expect(
+      afterTrace.some((r) =>
+        String((r.event as Record<string, unknown>)['delta'] ?? '').includes('Resume failed')
+      )
+    ).toBe(false)
   })
 })

@@ -6,7 +6,9 @@ import {
   readGateOpened,
   type EffectFn,
   type GateResolution,
+  type PromptStrategy,
   type Provider,
+  type ResumeOutcome,
 } from '@atizar/core'
 import type { Db } from './db/client.js'
 import type { StateStore } from './stateStore.js'
@@ -32,6 +34,13 @@ export interface AgentRuntime {
   dispatchToolNames: string[]
   // F2 machine dispatch: the allowed child agent ids (from defineAgent.handoffs).
   handoffs: string[]
+  // F3 resume branching: the PromptStrategy's buildResume, bound at wiring time (buildAgent).
+  // When present, the observer calls it to get the ResumeOutcome and branches accordingly:
+  //   prompt  → consume(provider.resume(…))       — unchanged path
+  //   message → append one TEXT_MESSAGE_CHUNK, then settle('finish')
+  //   null    → settle('finish') silently, no event, no provider call
+  // Absent (legacy/no-approval agents) defaults to null mode (silent settle).
+  buildResume?: PromptStrategy['buildResume']
 }
 
 export interface RunObserverDeps {
@@ -296,8 +305,8 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       const wi = await store.getWorkItem(id)
       if (!wi) return
       const runtime = deps.resolveAgent(wi.agentId)
-      if (!runtime?.provider.resume) {
-        await store.setError(id, 'provider has no resume')
+      if (!runtime) {
+        await store.setError(id, `no runtime for agent ${wi.agentId}`)
         return
       }
 
@@ -314,6 +323,40 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       publishStatus(id, 'active')
       deps.reconcile(wi.agentId)
 
+      // Branch on the ResumeOutcome so the SERVER (not the provider) decides how to resume.
+      // Option A: buildResume is carried on the runtime (wired at buildAgent time).
+      // Absent → null (no-approval agents silently settle; they should never reach resume).
+      const args = resolution.form ?? {}
+      const outcome: ResumeOutcome = runtime.buildResume?.(args, resolution.executedResult) ?? null
+
+      if (!outcome) {
+        // null mode — clean silent finish: no turn, no event, no provider call.
+        await deps.settle(id, 'finish', null)
+        return
+      }
+
+      if (outcome.kind === 'message') {
+        // Server appends the verbatim canned line — NO provider spawn, no LLM round-trip.
+        // Uses the exact same appendTrace/bus.publish seam that consume() uses (lines 130-131),
+        // so foldEventsToMessages renders it as a normal assistant text bubble.
+        const seq = await store.countTrace(id)
+        const event = {
+          type: EventType.TEXT_MESSAGE_CHUNK,
+          role: 'assistant',
+          messageId: randomUUID(),
+          delta: outcome.text,
+        } as unknown as BaseEvent
+        await store.appendTrace(id, seq, event)
+        bus.publish(`workitem:${id}`, { seq, event })
+        await deps.settle(id, 'finish', null)
+        return
+      }
+
+      // prompt mode — unchanged path: consume the provider's resume stream.
+      if (!runtime.provider.resume) {
+        await store.setError(id, 'provider has no resume')
+        return
+      }
       const input = buildInput(wi)
       const handle = { runId: wi.runId ?? input.runId, input }
       await consume(id, wi, runtime, runtime.provider.resume(handle, resolution))
