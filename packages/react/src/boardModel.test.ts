@@ -8,6 +8,7 @@ const wi = (over: Partial<WorkItem> & Pick<WorkItem, 'id' | 'agentId' | 'phase'>
   origin: 'human',
   source: null,
   key: '',
+  episodeSeq: 1,
   payload: {},
   outcome: 'running',
   card: null,
@@ -70,6 +71,14 @@ describe('toPInstances key propagation', () => {
     ]
     const [p] = toPInstances(keyed, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
     expect(p.key).toBe('alice@x.com')
+  })
+
+  it('carries episodeSeq from the work item onto the PInstance', () => {
+    const keyed = [
+      wi({ id: 'r1', agentId: 'lead-inbox__reply', phase: 'active', key: 's@x', episodeSeq: 2 }),
+    ]
+    const [p] = toPInstances(keyed, 'lead-inbox', roleOf, metaIcon, nameOf, labelOf)
+    expect(p.episodeSeq).toBe(2)
   })
 })
 

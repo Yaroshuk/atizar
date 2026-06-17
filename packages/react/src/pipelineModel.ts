@@ -9,6 +9,10 @@ export type PInstance = {
   runtimeKey: string
   agentId: string
   key: string
+  // Episode of the keyed instance this Run belongs to (server-stamped, surfaced via the board).
+  // openRuns filters to the latest episode (currentEpisode) so a reactivated instance does not
+  // resurrect a prior episode's done runs.
+  episodeSeq: number
   name: string
   iconName: IconName
   label: string

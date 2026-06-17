@@ -34,6 +34,7 @@ export const toPInstances = (
       runtimeKey: w.agentId,
       agentId,
       key: w.key,
+      episodeSeq: w.episodeSeq,
       name: nameOf(agentId),
       iconName: metaIcon(agentId) as IconName,
       label: labelOf(w),
@@ -53,4 +54,3 @@ export const queuedByAgent = (items: WorkItem[], workflowId: string): Record<str
   }
   return out
 }
-

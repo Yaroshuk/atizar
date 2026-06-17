@@ -15,6 +15,10 @@ export type WorkItem = {
   source: string | null
   // Instance identity (spec 2026-06-16). Server column is NOT NULL — always a string, never null.
   key: string
+  // Episode = a contiguous live span of a keyed instance (server-stamped at dispatch). The open
+  // thread shows only the latest episode's runs (see currentEpisode) so a reactivated keyed
+  // instance does not resurrect a prior episode's done runs.
+  episodeSeq: number
   payload: Record<string, unknown>
   phase: Phase
   outcome: Outcome
