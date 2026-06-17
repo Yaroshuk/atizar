@@ -396,7 +396,14 @@ export function makePipelineService(deps: PipelineServiceDeps) {
         // Stamp the approved form on the gate row (audit). observer.resume() will find no open
         // gate (already resolved) and skip its own resolveGateRow call — clean handoff.
         await store.resolveGateRow(gate.id, { form })
-        executedResult = await effect(form, { workItemId: wi.id, gateId: gate.id })
+        // A throwing effect (a client that throws instead of returning {error}) must FAIL the run,
+        // not hang it in awaiting_approval with the gate already resolved — route the throw into the
+        // same {error} path below. (FINDING F1.)
+        try {
+          executedResult = await effect(form, { workItemId: wi.id, gateId: gate.id })
+        } catch (e) {
+          executedResult = { error: e instanceof Error ? e.message : String(e) }
+        }
         await store.setLedgerResult(key, executedResult)
       }
 
@@ -473,6 +480,16 @@ export function makePipelineService(deps: PipelineServiceDeps) {
 
     async getOpenGate(workItemId: string): Promise<Gate | undefined> {
       return store.getOpenGate(workItemId)
+    },
+
+    // Acknowledge an errored run ("OK / Got it"): settle it to terminal/dismissed so it leaves
+    // the live UI (symmetric with approve→done / reject→rejected). No child cascade — an errored
+    // leaf has nothing live to stop; the error-only guard in applyEdge rejects a non-error item.
+    async acknowledge(workItemId: string, actor: string | null = null): Promise<void> {
+      await settleEdge(workItemId, 'acknowledge', actor, { summary: 'acknowledged' }).catch(
+        () => {}
+      )
+      publishBoard()
     },
 
     async cancel(workItemId: string): Promise<void> {

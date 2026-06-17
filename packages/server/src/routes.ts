@@ -176,6 +176,16 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json(await service.getAudit(c.req.param('id')))
   })
 
+  // ACKNOWLEDGE an errored work item ("OK / Got it") — settle it off `error` to `dismissed` so it
+  // recedes from the live UI (the error-analogue of a gate resolve). The error-only edge guard
+  // makes a non-error id a no-op (settleEdge swallows the IllegalTransition).
+  app.post('/api/workitems/:id/acknowledge', async (c) => {
+    const authz = c.req.header('Authorization') ?? ''
+    const actor = authz.startsWith('Bearer ') ? 'shared-token' : null
+    await service.acknowledge(c.req.param('id'), actor)
+    return c.json({ ok: true })
+  })
+
   // STOP a work item (and its active descendants).
   app.post('/api/workitems/:id/cancel', async (c) => {
     await service.cancel(c.req.param('id'))

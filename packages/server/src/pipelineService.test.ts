@@ -435,6 +435,134 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect(after?.outcome).toBe(before?.outcome) // unchanged (still rejected)
   })
 
+  // ── §16/§17 service-level additions (transition+dispatch layers cover the rest) ───────────
+
+  it('GE4: two concurrent approvals on distinct gates each fire their effect exactly once', async () => {
+    const effect = vi.fn(async () => ({ draftId: 'd' }))
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const g1 = await seedGate(svc)
+    const g2 = await seedGate(svc)
+    const [r1, r2] = await Promise.all([
+      svc.resolveGate(g1.gateId, {
+        gateId: g1.gateId,
+        decision: 'approved',
+        formRev: 0,
+        form: { threadId: 't1', body: 'b1' },
+      }),
+      svc.resolveGate(g2.gateId, {
+        gateId: g2.gateId,
+        decision: 'approved',
+        formRev: 0,
+        form: { threadId: 't2', body: 'b2' },
+      }),
+    ])
+    expect(r1.ok && r2.ok).toBe(true)
+    expect(effect).toHaveBeenCalledTimes(2)
+    await waitFor(async () => (await svc.getStatus(g1.workItemId))?.status === 'terminal')
+    await waitFor(async () => (await svc.getStatus(g2.workItemId))?.status === 'terminal')
+    expect((await svc.getStatus(g1.workItemId))?.outcome).toBe('done')
+    expect((await svc.getStatus(g2.workItemId))?.outcome).toBe('done')
+  })
+
+  // RED until FINDING F1 is fixed (docs/superpowers/plans/2026-06-17-e2e-test-findings.md): the
+  // effect call at pipelineService.ts:399 has no try/catch, so a THROWING effect leaves the run stuck
+  // in awaiting_approval (gate already closed) instead of failing it. Stays red until the fix lands.
+  it('GE2: an effect that THROWS fails the work item (terminal/error), no resume-as-success', async () => {
+    const effect = vi.fn(async () => {
+      throw new Error('gmail boom')
+    })
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const { gateId, workItemId } = await seedGate(svc)
+    await svc
+      .resolveGate(gateId, {
+        gateId,
+        decision: 'approved',
+        formRev: 0,
+        form: { threadId: 't', body: 'b' },
+      })
+      .catch(() => undefined)
+    await waitFor(async () => (await svc.getStatus(workItemId))?.done === true, 1500)
+    expect((await svc.getStatus(workItemId))?.outcome).toBe('error')
+  })
+
+  it('CN2: cancel a QUEUED (capped) item settles it stopped without ever starting', async () => {
+    const runtime: AgentRuntime = {
+      provider: blockingProvider(),
+      renderToolNames: [],
+      maxInstances: 2,
+      effects: {},
+      dispatchToolNames: [],
+      handoffs: [],
+    }
+    const svc = makePipelineService({
+      db,
+      resolveAgent: () => runtime,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+    })
+    const agentId = `cn2-${randomUUID().slice(0, 8)}`
+    await svc.dispatch({ ...base, agentId })
+    await svc.dispatch({ ...base, agentId })
+    const third = await svc.dispatch({ ...base, agentId })
+    await waitFor(async () => (await svc.stats(agentId)).queued === 1)
+    expect((await svc.getStatus(third.id))?.status).toBe('queued')
+
+    await svc.cancel(third.id)
+    const after = await svc.getStatus(third.id)
+    expect(after?.status).toBe('terminal')
+    expect(after?.outcome).toBe('stopped')
+    expect((await svc.stats(agentId)).active).toBe(2)
+  }, 10_000)
+
+  it('EA1: acknowledge moves an errored work item to terminal/dismissed', async () => {
+    const effect = vi.fn(async () => ({ error: 'gmail boom' }))
+    const svc = makeService({ effects: { saveDraft: effect } })
+    const { gateId, workItemId } = await seedGate(svc)
+    // Drive the item to terminal/error via a failing effect (mirrors the 'approve: failing effect' test).
+    await svc.resolveGate(gateId, {
+      gateId,
+      decision: 'approved',
+      formRev: 0,
+      form: { threadId: 't', body: 'b' },
+    })
+    await waitFor(async () => (await svc.getStatus(workItemId))?.done === true)
+    expect((await svc.getStatus(workItemId))?.outcome).toBe('error')
+
+    // Now acknowledge: the errored run should settle to terminal/dismissed.
+    await svc.acknowledge(workItemId, 'tester')
+
+    const status = await svc.getStatus(workItemId)
+    expect(status?.status).toBe('terminal')
+    expect(status?.outcome).toBe('dismissed')
+  })
+
+  it('EA2: acknowledge on a non-error item is a safe no-op (guard rejects, swallowed)', async () => {
+    const svc = makeService({ effects: { saveDraft: async () => ({}) } })
+    const { gateId, workItemId } = await seedGate(svc)
+    // Reject the gate → terminal/rejected (not an error item).
+    await svc.resolveGate(gateId, { gateId, decision: 'rejected', formRev: 0 })
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'terminal')
+    const before = await svc.getStatus(workItemId)
+    expect(before?.outcome).toBe('rejected')
+
+    // acknowledge on a rejected item must be a no-op (edge guard rejects it, service swallows).
+    await expect(svc.acknowledge(workItemId, 'tester')).resolves.toBeUndefined()
+    const after = await svc.getStatus(workItemId)
+    expect(after?.outcome).toBe('rejected') // unchanged
+  })
+
+  it('CN3: cancel an awaiting-approval item stops it and clears its open gate', async () => {
+    const svc = makeService({ effects: { saveDraft: async () => ({}) } })
+    const { gateId, workItemId } = await seedGate(svc)
+    expect((await svc.getBoard()).gates.some((g) => g.id === gateId)).toBe(true)
+
+    await svc.cancel(workItemId)
+    await waitFor(async () => (await svc.getStatus(workItemId))?.status === 'terminal')
+    expect((await svc.getStatus(workItemId))?.outcome).toBe('stopped')
+    expect((await svc.getBoard()).gates.some((g) => g.id === gateId)).toBe(false)
+  })
+
   it('dispatch records a queued activity entry retrievable via getActivity()', async () => {
     const runtime: AgentRuntime = {
       provider: blockingProvider(),
