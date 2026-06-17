@@ -157,6 +157,57 @@ describe.skipIf(!reachable)('RunObserver dispatch (real Postgres, fake provider)
     })
   })
 
+  it('appends a handoff event with deduped:true when the delivery was a dedup hit', async () => {
+    const id = randomUUID()
+    await store.insertWorkItem({
+      id,
+      workflowId: 'wf',
+      agentId: 'wf__sorter',
+      origin: 'human',
+      payload: {},
+      key: 'wf__sorter',
+    })
+
+    const delivered: unknown[] = []
+    const { pool } = fakePool()
+    const observer = makeRunObserver({
+      db,
+      store,
+      pool,
+      bus: { publish: vi.fn(), subscribe: () => () => {} },
+      resolveAgent: () => ({
+        provider: fakeDispatchProvider('route', { to: 'wf__reply', x: 1 }),
+        renderToolNames: [],
+        maxInstances: 1,
+        effects: {},
+        dispatchToolNames: ['route'],
+        handoffs: ['wf__reply'],
+      }),
+      deliver: async (req) => {
+        delivered.push(req)
+        return { ok: true, id: 'child-existing', deduped: true }
+      },
+      settle: settleViaTransition,
+      reconcile: () => {},
+    })
+
+    await transition(db, id, 'start')
+    await observer.run(id)
+
+    const trace = await store.getTrace(id, 0)
+    const handoff = trace.find(
+      (r) =>
+        (r.event as Record<string, unknown>).type === 'CUSTOM' &&
+        (r.event as Record<string, unknown>).name === 'handoff'
+    )
+    expect(handoff).toBeDefined()
+    expect((handoff!.event as Record<string, unknown>).value).toMatchObject({
+      targetAgentId: 'wf__reply',
+      childWorkItemId: 'child-existing',
+      deduped: true,
+    })
+  })
+
   it('records a trace warning and does not deliver when the dispatch target is not in handoffs', async () => {
     const id = randomUUID()
     await store.insertWorkItem({
