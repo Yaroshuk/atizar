@@ -1,6 +1,7 @@
 import { EventType, type BaseEvent } from '@ag-ui/client'
 import type { AssistantMessage, Message, ToolCall, ToolMessage } from './messages.js'
 import { LIFECYCLE_NOTE_TEXT, type LifecycleNoteValue } from './lifecycleNote.js'
+import { type HandoffNoteValue } from './handoffNote.js'
 
 // Fold a stream of AG-UI events into the Message[] the thread renders. This is the
 // reduction CopilotKit's runtime did internally; with the `@copilotkit/*` transport
@@ -100,13 +101,34 @@ export function foldEventsToMessages(events: readonly BaseEvent[]): Message[] {
       }
 
       case EventType.CUSTOM: {
-        // A server-authored note (I14). Only the typed 'lifecycle' note becomes a message; other
-        // CUSTOM events (e.g. dispatch_rejected) stay non-message, as before.
-        const named = event as BaseEvent & { name?: string; value?: LifecycleNoteValue }
-        if (named.name !== 'lifecycle' || !named.value) break
-        const text = LIFECYCLE_NOTE_TEXT[named.value.outcome] || named.value.outcome
-        const id = `lifecycle-${named.value.at}`
-        byId.set(id, { id, role: 'system', content: text } as Message)
+        // Server-authored notes (I14). Named 'lifecycle' and 'handoff' become messages;
+        // other CUSTOM events (e.g. dispatch_rejected, GATE_OPENED) stay non-message.
+        const named = event as BaseEvent & {
+          name?: string
+          value?: LifecycleNoteValue | HandoffNoteValue
+        }
+        if (named.name === 'lifecycle') {
+          const v = named.value as LifecycleNoteValue | undefined
+          if (v) {
+            const text = LIFECYCLE_NOTE_TEXT[v.outcome] || v.outcome
+            const id = `lifecycle-${v.at}`
+            byId.set(id, { id, role: 'system', content: text } as Message)
+          }
+          break
+        }
+        const handoff = event as BaseEvent & { name?: string; value?: HandoffNoteValue }
+        if (handoff.name === 'handoff' && handoff.value) {
+          const v = handoff.value
+          const id = `handoff-${v.childWorkItemId}`
+          byId.set(id, {
+            id,
+            role: 'handoff',
+            targetAgentId: v.targetAgentId,
+            childWorkItemId: v.childWorkItemId,
+            deduped: v.deduped,
+          } as unknown as Message)
+          break
+        }
         break
       }
 

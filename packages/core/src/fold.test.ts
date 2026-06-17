@@ -121,3 +121,29 @@ describe('foldEventsToMessages — LifecycleNote', () => {
     expect(String(note?.content)).toContain('Stopped — cancelled')
   })
 })
+
+import { handoffNote } from './handoffNote.js'
+
+it('folds a handoff CUSTOM event into a role:handoff message at its position', () => {
+  const events = [
+    { type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'sorting' },
+    handoffNote({
+      kind: 'handoff',
+      targetAgentId: 'wf__reply',
+      childWorkItemId: 'child-1',
+      deduped: false,
+      at: 1,
+    }),
+  ] as unknown as BaseEvent[]
+
+  const messages = foldEventsToMessages(events) as Array<Record<string, unknown>>
+
+  expect(messages).toHaveLength(2)
+  expect(messages[0].role).toBe('assistant') // the text comes first…
+  expect(messages[1]).toMatchObject({
+    role: 'handoff', // …the handoff lands AFTER it, at its event position
+    targetAgentId: 'wf__reply',
+    childWorkItemId: 'child-1',
+    deduped: false,
+  })
+})
