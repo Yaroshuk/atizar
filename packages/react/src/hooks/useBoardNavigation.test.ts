@@ -522,6 +522,28 @@ describe('useBoardNavigation', () => {
     expect(result.current.openRuns.map((r) => r.localId).sort()).toEqual(['d1', 'd2'])
   })
 
+  it('input agent: a DONE scan is still openable from the card (not the type view)', () => {
+    items = [
+      {
+        id: 'a__qualifier#1',
+        workflowId: 'a',
+        agentId: 'a__qualifier',
+        key: 'qualifier', // input agent's CONSTANT key
+        episodeSeq: 1,
+        phase: 'terminal',
+        status: 'done',
+        outcome: 'done',
+        card: { tool: 'renderSort', props: {} }, // has a card → isVisible
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.openAgent('qualifier'))
+    expect(result.current.openId).toBe('a__qualifier#1') // opens the scan instance…
+    expect(result.current.openTypeId).toBeNull() // …NOT the idle type view
+  })
+
   describe('startInput', () => {
     it('calls start with the correct instanceId and sets openId to the returned id', async () => {
       const returnedId = 'a__qualifier#42'

@@ -92,6 +92,20 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
     setOpenTypeId(null)
     setOpenPickerId(null)
     setOpenId(null)
+    // INPUT agent: its current scan is the persistent root + the card's content — reachable from the
+    // card even when its run is terminal (parity with the pipeline row, kept via hasLiveDescendant).
+    // instancesOf is isLive-filtered (correctly keeps the card aggregate/count live-only), so it
+    // drops a done scan; open the current-episode scan directly from the raw visible slice. Type
+    // view only when no scan exists yet.
+    if (roleOf(agentId) === 'input') {
+      const scans = currentEpisode(liveOf(agentId))
+      if (scans.length > 0) {
+        setOpenId(pickHead(scans).localId)
+        return
+      }
+      setOpenTypeId(agentId)
+      return
+    }
     const insts = instancesOf(agentId)
     if (insts.length === 0) setOpenTypeId(agentId)
     else if (insts.length === 1) setOpenId(insts[0].localId)
