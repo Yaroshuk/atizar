@@ -52,9 +52,12 @@ const RETIRED: ReadonlySet<Outcome> = new Set(['superseded', 'reset', 'dismissed
 // Terminal outcomes the human must always see, even with no card.
 const HUMAN_TERMINAL: ReadonlySet<Outcome> = new Set(['stopped', 'rejected', 'error'])
 
-// Terminal outcomes that COVER a same-source re-dispatch (Option A: stopped freezes & keeps, so
-// it covers; done covers too — the finished result still occupies the source).
-const COVERING_TERMINAL: ReadonlySet<Outcome> = new Set(['done', 'stopped'])
+// Terminal outcomes that COVER a same-source re-dispatch. The human has TRIAGED the source: `done`
+// (applied), `stopped` (abandoned), or `rejected` (declined the proposed action). All three mean
+// "handled — do not re-surface on the next scan." rejected covers exactly like the others: reject is
+// an ordinary cancel of the action, not a request to re-offer. (error/superseded/reset/dismissed do
+// NOT cover — a re-scan re-surfaces a crash or a retired source.)
+const COVERING_TERMINAL: ReadonlySet<Outcome> = new Set(['done', 'stopped', 'rejected'])
 
 export function lifecycle(
   phase: Phase,

@@ -22,7 +22,7 @@ const TABLE: Row[] = [
   // terminal outcomes
   { phase: 'terminal', outcome: 'done', isLive: false, baseVisible: false, covers: true },
   { phase: 'terminal', outcome: 'stopped', isLive: false, baseVisible: true, covers: true },
-  { phase: 'terminal', outcome: 'rejected', isLive: false, baseVisible: true, covers: false },
+  { phase: 'terminal', outcome: 'rejected', isLive: false, baseVisible: true, covers: true },
   { phase: 'terminal', outcome: 'error', isLive: false, baseVisible: true, covers: false },
   { phase: 'terminal', outcome: 'superseded', isLive: false, baseVisible: false, covers: false },
   { phase: 'terminal', outcome: 'reset', isLive: false, baseVisible: false, covers: false },
