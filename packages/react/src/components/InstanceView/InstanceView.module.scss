@@ -1,0 +1,27 @@
+// InstanceView — the instance thread overlay. Chrome (.backdrop/.modal/.modal-head/.modal-x/
+// .modal-foot/.status) is the kept-global modal primitive; the thread item/bubble styles come
+// from AgentModal's module (via ThreadItems). Only the single scroll container, the run separator
+// and the run-count chip are scoped here.
+
+// ONE scroll container for the whole instance — every run's messages flow inside it (no nested
+// scroll). Mirrors AgentModal's `.thread` layout so bubbles/cards space identically.
+.thread {
+  padding: 22px 20px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// A thin rule between consecutive runs (drafts) — a soft boundary, not a frame.
+.run-sep {
+  border-top: 1px dashed var(--border);
+  margin: 4px 0;
+}
+
+.run-count {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}

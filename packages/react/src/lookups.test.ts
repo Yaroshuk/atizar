@@ -28,7 +28,7 @@ const wi = (over: Partial<WorkItem>): WorkItem =>
     ...over,
   }) as WorkItem
 
-// Mirrors the resolveHandoff extraction in ThreadModal.tsx: given a handoff event whose
+// Mirrors the resolveHandoff extraction in RunView.tsx: given a handoff event whose
 // targetAgentId is a BARE id (as set by runObserver.ts `targetAgentId: to`), the bare-agent
 // extraction must yield the correct agent id so defOf returns the display name.
 describe('resolveHandoff bare-agent extraction', () => {

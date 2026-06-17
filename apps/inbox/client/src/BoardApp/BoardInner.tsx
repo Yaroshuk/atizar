@@ -4,7 +4,7 @@ import {
   AppHeader,
   PipelineColumn,
   AgentGrid,
-  ThreadModal,
+  InstanceView,
   AgentModal,
   InstancePickerModal,
   ActivityPanel,
@@ -114,25 +114,31 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
           onOpen={nav.openAgent}
         />
 
+        {/* Opening any work item opens its INSTANCE (all runs sharing agentId+key) — one
+            InstanceView with one RunView per run, whether 1 or N. No count-based branching. */}
         {nav.openItem && (
-          <ThreadModal
-            key={nav.openItem.id}
-            id={nav.openItem.id}
-            workflowId={nav.openItem.workflowId}
+          <InstanceView
+            key={`inst-${nav.stripAgent(nav.openItem)}-${nav.openItem.key}`}
             title={nav.nameOf(nav.stripAgent(nav.openItem))}
             iconName={nav.metaIcon(nav.stripAgent(nav.openItem))}
-            intro={config.meta[nav.stripAgent(nav.openItem)]?.intro ?? ''}
-            canStart={nav.canStart(nav.stripAgent(nav.openItem))}
+            status={nav.openHead?.status ?? 'running'}
+            outcome={nav.openHead?.outcome}
+            description={config.meta[nav.stripAgent(nav.openItem)]?.intro ?? ''}
+            workflowId={nav.openItem.workflowId}
             renderableToolNames={renderableToolNames}
-            notes={nav.notesFor(nav.openItem.id)}
+            runs={nav.openRuns.map((r) => ({
+              id: r.localId,
+              notes: nav.notesFor(r.localId),
+            }))}
             deliver={deliver}
-            onStop={(cid) => void stop.stopInstance(cid)}
+            onStop={() =>
+              nav.openRuns.forEach((r) => {
+                if (r.status === 'running' || r.status === 'awaiting_approval')
+                  void stop.stopInstance(r.localId)
+              })
+            }
             onOpenWorkflow={onSelectWorkflow}
             onOpenInstance={nav.setOpenId}
-            onStart={() => {
-              const def = nav.defOf(nav.workflow.id, nav.stripAgent(nav.openItem!))
-              if (def) nav.startInput(def)
-            }}
             onClose={() => nav.setOpenId(null)}
           />
         )}

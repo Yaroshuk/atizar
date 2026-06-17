@@ -3,7 +3,7 @@ import type { WorkflowDescriptor } from '@atizar/core'
 import type { AgentMeta, RenderSpec, HitlSpec } from './renderSpecs'
 
 // The userland-supplied bundle: descriptors + per-agent chrome meta + render/HITL specs.
-// Injected once at the board root; ThreadModal + buildRenderToolCall read it from context.
+// Injected once at the board root; RunView + buildRenderToolCall read it from context.
 export type WorkflowsConfig = {
   workflows: WorkflowDescriptor[]
   meta: Record<string, AgentMeta>

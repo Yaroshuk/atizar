@@ -147,16 +147,14 @@ export const PipelineColumn = ({
                   <ConnectorDown />
                   <div className={s.plCont}>
                     {block.groups.map((g) => {
-                      // A single instance of this agent with a single Run → the flat `pl-single`
-                      // row. Anything else (≥2 instances, a queue, OR one instance with ≥2 Runs)
-                      // → the nested group treatment so every Run stays visible.
-                      // g.queued > 0 also forces the nested treatment so the `queued: N` badge shows.
-                      const single =
-                        g.instances.length === 1 &&
-                        g.instances[0].runs.length === 1 &&
-                        g.queued === 0
+                      // We group by INSTANCES, not Runs. A single instance of this agent → the
+                      // flat `pl-single` row (its Run count is shown as a `· N` badge, never as
+                      // nesting). The group treatment (mini-header + nested instance rows) is ONLY
+                      // for ≥2 instances. g.queued > 0 also forces it so the `queued: N` badge shows.
+                      const single = g.instances.length === 1 && g.queued === 0
                       if (single) {
-                        const head = g.instances[0].head
+                        const inst = g.instances[0]
+                        const head = inst.head
                         return (
                           <div
                             key={g.agentId}
@@ -170,6 +168,9 @@ export const PipelineColumn = ({
                               <span className='m-name'>
                                 {g.name}
                                 {head.label ? ` · ${head.label}` : ''}
+                                {inst.runs.length > 1 && (
+                                  <span className={s.plRunCount}> · {inst.runs.length}</span>
+                                )}
                               </span>
                             </div>
                             {stateAndStop(head)}
@@ -187,46 +188,26 @@ export const PipelineColumn = ({
                           </div>
                           <div className={s.plKids}>
                             {g.instances.map((inst) => {
-                              // The instance is represented by its `head` (single-source status,
-                              // computed via PRIORITY in pipelineModel — never re-derived here).
+                              // The pipeline draws INSTANCES, never Runs. One instance = one row,
+                              // represented by its `head` (single-source status, via PRIORITY in
+                              // pipelineModel — never re-derived here). An instance holding several
+                              // Runs (one sender, several drafts) shows a `· N` count; opening the
+                              // row loads ALL its Runs in one InstanceView. No Run is nested.
                               const { head } = inst
-                              const instRow = (
-                                <div
-                                  className={`pl-inst ${pillTint(head.status, head.outcome)}${stopClasses(head)}`}
-                                  onClick={() => onOpen(head.localId)}
-                                >
-                                  <span className='pl-iname'>{head.label || head.name}</span>
-                                  {stateAndStop(head)}
-                                </div>
-                              )
-                              // One Run → just the instance row. Multiple Runs (e.g. one sender,
-                              // two drafts) → the instance row as a sub-header, with each Run
-                              // nested under it (same L-connector treatment as the group level).
-                              if (inst.runs.length === 1) {
-                                return (
-                                  <div key={inst.key} className={s.plKid}>
-                                    <span className={s.plHstub} />
-                                    {instRow}
-                                  </div>
-                                )
-                              }
                               return (
                                 <div key={inst.key} className={s.plKid}>
                                   <span className={s.plHstub} />
-                                  {instRow}
-                                  <div className={s.plKids}>
-                                    {inst.runs.map((run) => (
-                                      <div key={run.localId} className={s.plKid}>
-                                        <span className={s.plHstub} />
-                                        <div
-                                          className={`pl-inst ${pillTint(run.status, run.outcome)}${stopClasses(run)}`}
-                                          onClick={() => onOpen(run.localId)}
-                                        >
-                                          <span className='pl-iname'>{run.label || run.name}</span>
-                                          {stateAndStop(run)}
-                                        </div>
-                                      </div>
-                                    ))}
+                                  <div
+                                    className={`pl-inst ${pillTint(head.status, head.outcome)}${stopClasses(head)}`}
+                                    onClick={() => onOpen(head.localId)}
+                                  >
+                                    <span className='pl-iname'>
+                                      {head.label || head.name}
+                                      {inst.runs.length > 1 && (
+                                        <span className={s.plRunCount}> · {inst.runs.length}</span>
+                                      )}
+                                    </span>
+                                    {stateAndStop(head)}
                                   </div>
                                 </div>
                               )

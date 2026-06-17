@@ -124,6 +124,14 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   // ≥2 → one row per distinct instance (variant B), each represented by its head Run.
   const pickerInstances = openPickerId ? instancesOf(openPickerId) : []
 
+  // All visible Runs of the OPEN item's instance (same agentId + key). One sender with several
+  // drafts → several Runs here; InstanceView stacks them. The head is the worst-meaningful Run
+  // (pickHead — the same one-source priority the pipeline/aggregate use) → the instance status.
+  const openRuns: PInstance[] = openItem
+    ? pInstances.filter((p) => p.agentId === stripAgent(openItem) && p.key === openItem.key)
+    : []
+  const openHead: PInstance | undefined = openRuns.length ? pickHead(openRuns) : undefined
+
   return {
     openId,
     setOpenId,
@@ -134,6 +142,8 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
     openItem,
     openTypeAgent,
     pickerInstances,
+    openRuns,
+    openHead,
     pInstances,
     liveOf,
     instancesOf,

@@ -14,7 +14,7 @@ export { PipelineColumn } from './components/PipelineColumn/PipelineColumn.js'
 export { AgentCard } from './components/AgentCard/AgentCard.js'
 export { AgentGrid } from './components/AgentGrid/AgentGrid.js'
 export { AgentModal } from './components/AgentModal/AgentModal.js'
-export { ThreadModal } from './components/ThreadModal/ThreadModal.js'
+export { InstanceView, type InstanceRun } from './components/InstanceView/InstanceView.js'
 export { InstancePickerModal } from './components/InstancePickerModal/InstancePickerModal.js'
 export { WorkflowSwitcher } from './components/WorkflowSwitcher/WorkflowSwitcher.js'
 // Orchestration hooks (board selection / navigation / stop) + pure helpers — extracted

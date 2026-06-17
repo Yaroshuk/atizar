@@ -125,6 +125,12 @@
   color: var(--teal-deep);
 }
 
+/* run-count badge on an instance row holding several Runs (one sender, several drafts) */
+.pl-run-count {
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .pl-kids {
   position: relative;
   margin-left: 15px;
