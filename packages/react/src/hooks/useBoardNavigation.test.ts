@@ -108,6 +108,74 @@ describe('useBoardNavigation', () => {
     expect(result.current.pickerInstances).toHaveLength(2) // one row per distinct key
   })
 
+  // R4-stopped / R5-stopped: use phase:'terminal', outcome:'stopped' which lifecycle() marks
+  // isVisible:true (HUMAN_TERMINAL) but displayStatus() → 'done' → isLive('done') === false.
+  // These are the LOAD-BEARING cases: the upstream visibility filter does NOT exclude them —
+  // only the isLive filter in instancesOf does. (The old R4/R5 use phase:'done' which is not a
+  // valid Phase, so lifecycle isVisible=false excludes them before instancesOf even runs.)
+
+  it('R4-stopped: a visible-but-terminal (stopped) lone instance recedes — openAgent routes to the type view', () => {
+    items = [
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'terminal',
+        status: 'done',
+        outcome: 'stopped',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.openAgent('reply'))
+    // stopped instance is board-visible (lifecycle isVisible:true via HUMAN_TERMINAL),
+    // but isLive('done')===false → instancesOf returns 0 items → type view.
+    expect(result.current.openTypeId).toBe('reply')
+    expect(result.current.openId).toBeNull()
+    expect(result.current.openPickerId).toBeNull()
+  })
+
+  it('R5-stopped: [1 running, 1 stopped] opens only the LIVE thread; stopped excluded from picker', () => {
+    items = [
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'active',
+        status: 'running',
+        outcome: 'running',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'a__reply#2',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'bob',
+        phase: 'terminal',
+        status: 'done',
+        outcome: 'stopped',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.openAgent('reply'))
+    // stopped is board-visible; without the isLive filter instancesOf would return 2 items
+    // and trigger the picker — the filter is load-bearing here.
+    expect(result.current.openId).toBe('a__reply#1')      // single LIVE thread
+    expect(result.current.openPickerId).toBeNull()         // no picker
+    // pickerInstances (if it were opened) would also exclude the stopped instance
+    expect(result.current.instancesOf('reply')).toHaveLength(1)
+    expect(result.current.instancesOf('reply')[0].localId).toBe('a__reply#1')
+  })
+
   it('R4: a lone TERMINAL instance does not route to a dead thread — opens the type view', () => {
     items = [
       {
