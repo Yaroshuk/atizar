@@ -1073,6 +1073,40 @@ describe.skipIf(!reachable)('PipelineService START = supersede-prior + one-live-
     expect(second.id).toBe(first.id)
     expect(second.deduped).toBe(true)
   })
+
+  it('a fresh input START supersedes a prior STOPPED scan root (not only done)', async () => {
+    // The Stop→START bug. The instance model decided "show only the LATEST scan per input instance —
+    // prior TERMINAL scan Runs auto-retire via supersede" (spec 2026-06-16). Terminal means done OR
+    // stopped OR error — not just done. A scan the human STOPPED is terminal/stopped; if supersede
+    // only covers `done`, the stopped root survives next to the new scan → two VISIBLE Runs of the
+    // one input instance (same key) → the card flips between the stale and the fresh result.
+    const { svc, workflowId, sorterId } = makeInputService(blockingProvider())
+    const first = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'active')
+
+    // Human STOP of the live scan → terminal/stopped (cancel settles the DB row regardless of the
+    // blocked generator).
+    await svc.cancel(first.id)
+    await waitFor(async () => (await svc.getStatus(first.id))?.status === 'terminal')
+    expect((await svc.getStatus(first.id))?.outcome).toBe('stopped')
+
+    // Re-START mints a new scan AND retires the prior stopped root → one visible scan per instance.
+    const second = await svc.dispatch({
+      workflowId,
+      agentId: sorterId,
+      origin: 'human',
+      payload: {},
+    })
+    expect(second.id).not.toBe(first.id)
+    expect((await makeStateStore(db).getWorkItem(first.id))?.outcome).toBe('superseded')
+    const board = await svc.getBoard()
+    expect(board.items.some((i) => i.id === first.id)).toBe(false)
+  })
 })
 
 describe.skipIf(!reachable)('PipelineService.cancelInstance (B2)', () => {

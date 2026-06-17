@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, eq, gte, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNull } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db, Tx } from './db/client.js'
 import {
@@ -206,9 +206,14 @@ export function makeStateStore(db: Db) {
       )
     },
 
-    // The prior FINISHED, parentless scan roots of a given workflow × input-agent — the
-    // candidates a fresh human START supersedes (WS1). Finished-but-open only: phase='terminal'
-    // with outcome='done'. Children (parentId != null) are never roots and are never superseded.
+    // The prior TERMINAL, parentless scan roots of a given workflow × input-agent — the candidates
+    // a fresh human START supersedes (WS1). The instance model decided "show only the LATEST scan;
+    // prior TERMINAL scan Runs auto-retire" (spec 2026-06-16), so this is EVERY terminal flavour
+    // that is still on the live board — done OR stopped OR error — NOT just done. (A scan the human
+    // STOPPED is terminal/stopped: if it were excluded it would survive next to the new scan as a
+    // second visible Run of the one input instance.) 'superseded'/'reset' are already-retired and
+    // never re-superseded. Children (parentId != null) are never roots and are never superseded;
+    // the caller still keeps any root with a live descendant (orphan guard).
     async getFinishedInputRoots(workflowId: string, agentId: string): Promise<WorkItem[]> {
       return db
         .select()
@@ -219,7 +224,7 @@ export function makeStateStore(db: Db) {
             eq(workItems.agentId, agentId),
             isNull(workItems.parentId),
             eq(workItems.phase, 'terminal'),
-            eq(workItems.outcome, 'done')
+            inArray(workItems.outcome, ['done', 'stopped', 'error'])
           )
         )
     },
