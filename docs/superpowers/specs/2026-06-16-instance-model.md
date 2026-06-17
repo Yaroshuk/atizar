@@ -46,8 +46,9 @@ dispatch({ agentId: 'reply', key: msg.from, ... })   // key = sender → one ins
 dispatch({ agentId: 'spam',  key: 'spam',   ... })   // constant key → one instance
 ```
 
-- `reply` is dispatched with a **per-entity key** (sender / email id) → one instance per entity.
-- `spam` / `read` are dispatched with a **constant key** → exactly one instance.
+- `reply` is dispatched with a **per-sender key** (`email.from`) → one instance per sender; two
+  emails from one sender = one reply instance, two Runs (two drafts) under it.
+- `spam` / `reader` are dispatched with a **constant key** → exactly one instance.
 
 There is **no separate "singleton" concept** and **no `maxInstances` / `singleton` / `instanceKey` on
 the agent**. "One spam instance" simply means the caller always passes the same key for spam —
@@ -92,7 +93,9 @@ drop-in if process pressure appears.
 Every Run is stamped with its **`source`** (the email id). Before creating work for an email:
 *"is there already a Run for this source?"* → yes: **skip**; no: **create**.
 
-- `reply`: key == source, so instance-existence == "seen this email".
+- `reply`: key = sender, source = the per-email delivery key — they DIFFER. Dedup (skip-if-covered)
+  is by **source** (per email); the **instance** groups those Runs by sender. So a second email from
+  a known sender = a new Run (new source) under the **existing** reply instance, not a skip.
 - `spam`: constant key, so dedup is at the **Run level** by source (the one spam instance, one Run per
   distinct spam email).
 
@@ -171,9 +174,9 @@ a "waiting on answers" Run state + wake-when-all-answered, on top of the provide
 
 - **Keying + dedup:** `packages/server/src/dispatch.ts` — add `key` to `DispatchInput` (caller-set;
   the agent definition is NOT touched), group/identify instances by `key`; dedup-by-source partly
-  exists via `lifecycle().covers`. `db/schema.ts` (`source` already on work items; add an instance
-  `key` column or derive the instance grouping from it). Callers set the key: the sorter's dispatch
-  to `reply`/`spam`, and the human START path.
+  exists via `lifecycle().covers`. `db/schema.ts` (`source` already on work items; add a dedicated
+  `key` column — NOT derivable from `source`, per the Keying decision). Callers set the key: the
+  sorter's dispatch to `reply`/`spam`, and the human START path.
 - **View / identity:** `packages/react/src/boardModel.ts` (`toPInstances` — group by key, not per-Run),
   `pipelineModel.ts`, `hooks/useBoardNavigation.ts` (`openAgent` — never a picker for one agent),
   `aggregate.ts`, `lifecycleDisplay.ts` (the lossy `displayStatus`/aggregate that hides `stopped`).
