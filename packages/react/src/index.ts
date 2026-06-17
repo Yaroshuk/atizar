@@ -26,7 +26,7 @@ export { useResetController, type ResetController } from './hooks/useResetContro
 export { lookups } from './lookups.js'
 export { buildPipeline } from './pipelineModel.js'
 export { diffLeaving, type LeavingState } from './pipelineLinger.js'
-export { latestScanRuns } from './latestScanRuns.js'
+export { currentEpisode } from './currentEpisode.js'
 export { toPInstances, queuedByAgent } from './boardModel.js'
 export { aggregateAgent, aggregateLabel } from './aggregate.js'
 export { OUTCOME_LABEL, OUTCOME_TINT, displayStatus } from './lifecycleDisplay.js'

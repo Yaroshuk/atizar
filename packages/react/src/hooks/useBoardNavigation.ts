@@ -6,7 +6,7 @@ import { lookups } from '../lookups'
 import { toPInstances } from '../boardModel'
 import { pickHead, type PInstance } from '../pipelineModel'
 import { isLive } from '../liveness'
-import { latestScanRuns } from '../latestScanRuns'
+import { currentEpisode } from '../currentEpisode'
 import type { WorkItem } from '../serverTypes'
 import type { WorkflowsConfig } from '../workflowsContext'
 
@@ -130,16 +130,15 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   // ≥2 → one row per distinct instance (variant B), each represented by its head Run.
   const pickerInstances = openPickerId ? instancesOf(openPickerId) : []
 
-  // All visible Runs of the OPEN item's instance (same agentId + key), in board/creation order.
-  // For an INPUT agent (constant key → every scan collapses into one instance) the open thread
-  // renders ONLY the latest scan — older kept-for-children scans host their children in the
-  // pipeline tree, not as a repeated scan card here (see latestScanRuns). A WORKER keeps all of
-  // its runs (a sender's several drafts). openHead/onStop derive from this — the latest scan is
-  // the correct head to represent and to stop.
+  // Visible Runs of the OPEN item's instance (same agentId + key), narrowed to its CURRENT EPISODE
+  // (the highest episodeSeq). Generic — no input-vs-worker branch: a reactivated keyed instance does
+  // not resurrect a prior episode's done runs, and an input agent's latest scan is simply its current
+  // episode (the constant-key scans of an old episode host their children in the pipeline tree, not as
+  // a repeated scan card here). Within ONE episode every run shows (a sender's several drafts; a done
+  // sibling next to a live one). openHead/onStop derive from this.
   const openRuns: PInstance[] = openItem
-    ? latestScanRuns(
-        pInstances.filter((p) => p.agentId === stripAgent(openItem) && p.key === openItem.key),
-        roleOf(stripAgent(openItem)) === 'input'
+    ? currentEpisode(
+        pInstances.filter((p) => p.agentId === stripAgent(openItem) && p.key === openItem.key)
       )
     : []
   const openHead: PInstance | undefined = openRuns.length ? pickHead(openRuns) : undefined

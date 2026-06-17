@@ -435,15 +435,18 @@ describe('useBoardNavigation', () => {
   // START is a plain dispatch now — no client-side wipe/Start-over confirm (the server handles
   // re-scan safety: supersede-prior + one-live gate). Even a live singleton input agent dispatches
   // straight away.
-  it('INPUT open item: openRuns returns ONLY the latest scan (last by board order), not the stack', () => {
-    // Three scan roots sharing the input agent's CONSTANT key — board/creation order is array order.
-    // scan-1 and scan-2 are done with a card (hasCard → isVisible); scan-3 is running.
+  it('INPUT open item: openRuns returns ONLY the latest EPISODE (no stacking of prior scans)', () => {
+    // Three scan roots sharing the input agent's CONSTANT key — each a fresh episode (the prior
+    // scan fully receded before the next re-START), so episodeSeq increases 1→2→3. scan-1 and
+    // scan-2 are done with a card (hasCard → isVisible); scan-3 is running. currentEpisode keeps
+    // only the highest episodeSeq → scan-3.
     items = [
       {
         id: 'scan-1',
         workflowId: 'a',
         agentId: 'a__qualifier',
         key: 'qualifier',
+        episodeSeq: 1,
         phase: 'terminal',
         outcome: 'done',
         status: 'done',
@@ -456,6 +459,7 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__qualifier',
         key: 'qualifier',
+        episodeSeq: 2,
         phase: 'terminal',
         outcome: 'done',
         status: 'done',
@@ -468,6 +472,7 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__qualifier',
         key: 'qualifier',
+        episodeSeq: 3,
         phase: 'active',
         outcome: 'running',
         status: 'running',
@@ -478,17 +483,19 @@ describe('useBoardNavigation', () => {
     ]
     const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
     act(() => result.current.setOpenId('scan-1')) // open via ANY of the instance's runs
-    // Only the latest scan root is rendered in the input thread (no stacking).
+    // Only the latest episode's scan is rendered in the input thread (no stacking).
     expect(result.current.openRuns.map((r) => r.localId)).toEqual(['scan-3'])
   })
 
-  it('WORKER open item: openRuns keeps ALL of the instance runs (a sender keeps every draft)', () => {
+  it('WORKER open item: openRuns keeps ALL runs of the CURRENT episode (a sender keeps every draft)', () => {
+    // Two drafts of one sender within one continuous live span → same episodeSeq → both show.
     items = [
       {
         id: 'd1',
         workflowId: 'a',
         agentId: 'a__reply',
         key: 'alice',
+        episodeSeq: 1,
         phase: 'awaiting_human',
         outcome: 'running',
         status: 'awaiting_approval',
@@ -501,6 +508,7 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__reply',
         key: 'alice',
+        episodeSeq: 1,
         phase: 'active',
         outcome: 'running',
         status: 'running',

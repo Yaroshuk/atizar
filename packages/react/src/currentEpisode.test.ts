@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-// RED NOW (module does not exist) → GREEN when episode-scoping lands. Cheap deterministic acceptance
-// for the episode-scoping feature (pairs with the browser test e2e/episode-scoping.spec.ts).
-// @ts-expect-error — currentEpisode is the projection the fix introduces; not built yet.
+// Cheap deterministic acceptance for the episode-scoping feature (pairs with the browser test
+// e2e/episode-scoping.spec.ts).
 import { currentEpisode } from './currentEpisode'
 
 // A reply instance accumulates one Run per "episode" (a fresh email it drafts for the same sender),
