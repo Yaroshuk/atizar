@@ -59,9 +59,12 @@ describe('AgentModal handoff render order', () => {
 
     render(<AgentModal {...base} agent={{ messages }} resolveHandoff={resolveHandoff} />)
 
-    expect(screen.getByText(/a draft/)).toBeInTheDocument()
-    // "Reply agent" appears in both the modal title and the handoff note — verify the note is there
-    expect(screen.getAllByText(/Reply agent/).length).toBeGreaterThanOrEqual(1)
+    // "Reply agent" appears in both the modal title AND the handoff note, so query the note
+    // element itself and assert it carries BOTH the resolved label and name (a trivial
+    // getAllByText(/Reply agent/) would pass on the title alone).
+    const note = screen.getByText(/Handed/)
+    expect(note.textContent).toContain('a draft')
+    expect(note.textContent).toContain('Reply agent')
   })
 
   it('does not render a handoff note for a deduped handoff', () => {
