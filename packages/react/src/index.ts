@@ -62,6 +62,7 @@ export { ActivityPanel } from './components/ActivityPanel/ActivityPanel.js'
 // Headless hooks (the data layer — build your own UI without forking).
 export { useBoard, useBoardConnection } from './hooks/useBoard.js'
 export { useDispatch } from './hooks/useDispatch.js'
+export { useAcknowledge } from './hooks/useAcknowledge.js'
 export { useGate } from './hooks/useGate.js'
 export { useWorkItemThread } from './hooks/useWorkItemThread.js'
 export { useActivity, type ActivityFeed, type ConnState } from './hooks/useActivity.js'
