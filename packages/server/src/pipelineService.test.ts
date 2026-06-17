@@ -464,9 +464,9 @@ describe.skipIf(!reachable)('PipelineService (real Postgres)', () => {
     expect((await svc.getStatus(g2.workItemId))?.outcome).toBe('done')
   })
 
-  // RED until FINDING F1 is fixed (docs/superpowers/plans/2026-06-17-e2e-test-findings.md): the
-  // effect call at pipelineService.ts:399 has no try/catch, so a THROWING effect leaves the run stuck
-  // in awaiting_approval (gate already closed) instead of failing it. Stays red until the fix lands.
+  // FINDING F1 (docs/superpowers/plans/2026-06-17-e2e-test-findings.md) — FIXED: the effect call is
+  // now wrapped in try/catch, so a THROWING effect fails the run to terminal/error instead of leaving
+  // it stuck in awaiting_approval (gate already closed). This test guards that fix (green).
   it('GE2: an effect that THROWS fails the work item (terminal/error), no resume-as-success', async () => {
     const effect = vi.fn(async () => {
       throw new Error('gmail boom')
