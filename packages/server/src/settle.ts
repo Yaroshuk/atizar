@@ -14,7 +14,14 @@ import { applyEdge } from './transition.js'
 //
 // No `approve`: a gate-approved finish IS edge 'finish' → done; the approval is recorded by the
 // gate's resolved row + the `approved <tool>` audit summary (opts.summary) + this note.
-export type TerminalEdge = 'finish' | 'fail' | 'cancel' | 'reject' | 'supersede' | 'reset'
+export type TerminalEdge =
+  | 'finish'
+  | 'fail'
+  | 'cancel'
+  | 'reject'
+  | 'supersede'
+  | 'reset'
+  | 'acknowledge'
 
 const OUTCOME_OF: Record<TerminalEdge, Outcome> = {
   finish: 'done',
@@ -23,6 +30,7 @@ const OUTCOME_OF: Record<TerminalEdge, Outcome> = {
   reject: 'rejected',
   supersede: 'superseded',
   reset: 'reset',
+  acknowledge: 'dismissed',
 }
 
 const NOTE_KIND = 'lifecycle'

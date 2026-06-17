@@ -60,6 +60,25 @@ describe.skipIf(!reachable)('settle() — the one terminal writer', () => {
     expect(order.indexOf('note')).toBeLessThan(order.indexOf('status'))
   })
 
+  it('acknowledge: terminal/dismissed + a lifecycle note + an audit row', async () => {
+    const id = await newActive()
+    const { transition } = await import('./transition.js')
+    await transition(db, id, 'fail', { error: 'boom' }) // terminal/error
+    const bus = makeEventBus()
+    await settle({ db, store, bus, reconcile: () => {} }, id, 'acknowledge', 'tester')
+
+    const wi = await store.getWorkItem(id)
+    expect(wi?.phase).toBe('terminal')
+    expect(wi?.outcome).toBe('dismissed')
+
+    const trace = await store.getTrace(id, 0)
+    const note = trace.find((t) => (t.event as any).name === 'lifecycle')
+    expect((note?.event as any).value.outcome).toBe('dismissed')
+
+    const audit = await store.getAuditByWorkItem(id)
+    expect(audit.some((a) => a.kind === 'lifecycle')).toBe(true)
+  })
+
   it('illegal edge rolls back — trace note + audit row count unchanged', async () => {
     const id = await newActive()
     const deps = { db, store, bus: makeEventBus(), reconcile: () => {} }

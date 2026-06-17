@@ -24,6 +24,7 @@ export type Edge =
   | 'supersede'
   | 'reset'
   | 'reopen'
+  | 'acknowledge'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -57,6 +58,10 @@ const EDGES: Record<Edge, EdgeSpec> = {
   // reopen: a finished parent gained a fresh active child (finish-vs-dispatch race). Legal ONLY
   // from a clean done (outcome must be 'done') — a stopped/rejected/error item never reopens.
   reopen: { from: ['terminal'], to: 'active', outcome: 'running' },
+  // acknowledge: a human dismissed an errored run ("OK / Got it"). Moves the outcome OFF error
+  // to `dismissed` so the run leaves the live UI (symmetric with approve→done / reject→rejected).
+  // Legal ONLY from terminal/error (guarded below, like reopen's done-only guard).
+  acknowledge: { from: ['terminal'], to: 'terminal', outcome: 'dismissed' },
 }
 
 export interface TransitionOpts {
@@ -82,6 +87,11 @@ export async function applyEdge(
   // tree must stay frozen (Option A).
   if (edge === 'reopen' && row.outcome !== 'done') {
     throw new IllegalTransition(`cannot "reopen" a "${row.outcome}" item (work item ${id})`)
+  }
+  // acknowledge is only valid from terminal/error — a done/stopped/rejected/superseded/reset item
+  // never acknowledges (it has no error to dismiss).
+  if (edge === 'acknowledge' && row.outcome !== 'error') {
+    throw new IllegalTransition(`cannot "acknowledge" a "${row.outcome}" item (work item ${id})`)
   }
 
   await executor

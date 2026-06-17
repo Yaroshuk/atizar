@@ -190,6 +190,29 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     expect((await store.getWorkItem(root))?.phase).toBe('active') // parent unaffected by the child
   })
 
+  it('acknowledge moves terminal/error → terminal/dismissed', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'fail', { error: 'boom' }) // terminal/error
+    await transition(db, id, 'acknowledge')
+    const w = await store.getWorkItem(id)
+    expect(w?.phase).toBe('terminal')
+    expect(w?.outcome).toBe('dismissed')
+  })
+
+  it('acknowledge is illegal from a non-error terminal (only an error acknowledges)', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'finish') // terminal/done
+    await expect(transition(db, id, 'acknowledge')).rejects.toBeInstanceOf(IllegalTransition)
+  })
+
+  it('acknowledge is illegal from a live phase', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start') // active
+    await expect(transition(db, id, 'acknowledge')).rejects.toBeInstanceOf(IllegalTransition)
+  })
+
   it('supersede does NOT cascade to the parent (children stay durable, I12)', async () => {
     const { id: parent } = await newQueued()
     await transition(db, parent, 'start')
