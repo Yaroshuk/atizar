@@ -43,6 +43,15 @@ can't enforce (arrow-const named-export components, `type {Name}Props`, strict
 one-component-per-file, naming, import grouping), distilled from the Magma house
 style and filtered to this stack. Read it before writing client code.
 
+**ALWAYS check the framework/app boundary before placing code (I5).** Before writing or
+moving any non-trivial code, ask: is this a **generic mechanism** (every workflow needs it →
+`@atizar/*` framework) or **one workflow's policy** (destinations, labels, card shapes, "what this
+agent means" → `apps/inbox/workflows/<id>` or app glue)? A framework symbol must carry **zero**
+knowledge of a specific workflow (no email/sorter/destination literals). When unsure, default to the
+app and lift to the framework only once a second consumer proves it's generic. Do this check as a
+standing step of every design/plan/implementation — not only when `check-foundation` fires. (This is
+the proactive companion to invariant I5 and the `check-foundation` skill.)
+
 ## Packages (`@atizar/*` split — BUILT)
 
 Yarn-classic (1.22) workspace. Quick map (full detail → `docs/BUILD-LOG.md` §5):
