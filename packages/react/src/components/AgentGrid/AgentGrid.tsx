@@ -58,6 +58,7 @@ export const AgentGrid = ({
               subtitle={meta[agent.id].subtitle}
               iconName={meta[agent.id].iconName}
               status={agg.status}
+              outcome={agg.outcome}
               aggregateLabel={aggregateLabel(agg)}
               canStart={canStart(agent.id)}
               health={healthOf(agent.id)}

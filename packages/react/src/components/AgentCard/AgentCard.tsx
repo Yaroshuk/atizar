@@ -1,5 +1,7 @@
 import clsx from 'clsx'
-import { STATUS_LABEL, type Status } from '../../status'
+import type { Outcome } from '@atizar/core'
+import { type Status } from '../../status'
+import { cardLabel } from '../../statusDisplay'
 import type { AgentHealth } from '../../serverTypes'
 import { Icon, type IconName } from '../Icon/Icon'
 import { Button } from '../../primitives/Button/Button'
@@ -10,6 +12,11 @@ type AgentCardProps = {
   subtitle: string
   iconName: IconName
   status: Status
+  // The representative terminal outcome when nothing is live (status === 'done'). A distinct
+  // terminal (stopped/rejected) makes the badge read "Stopped"/"Rejected" instead of "Done";
+  // `null` / clean done → the status label. The dot/pill colour stays status-keyed (the card
+  // scss has no stopped/rejected variants — the label is the meaningful signal here).
+  outcome?: Outcome | null
   // Headline for the type card, e.g. "2 active · 1 awaiting approval" ('' = none live).
   // When set it replaces the START / hint footer with the live-instance summary.
   aggregateLabel: string
@@ -37,6 +44,7 @@ export const AgentCard = ({
   subtitle,
   iconName,
   status,
+  outcome = null,
   aggregateLabel,
   canStart,
   health,
@@ -90,7 +98,7 @@ export const AgentCard = ({
         </div>
         <span className={clsx(s.status, pillClass(status))}>
           <span className={clsx(s.dot, statusClass(status))} />
-          {STATUS_LABEL[status]}
+          {cardLabel(status, outcome)}
         </span>
       </div>
 

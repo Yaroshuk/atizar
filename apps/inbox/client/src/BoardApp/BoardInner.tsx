@@ -20,7 +20,7 @@ import {
   useResetController,
   buildPipeline,
   queuedByAgent,
-  statusesOf,
+  entriesOf,
   aggregateAgent,
   isDevMode,
   renderableNamesFor,
@@ -58,7 +58,7 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
 
   const blocks = buildPipeline(nav.pInstances, queuedByAgent(board.items, nav.workflow.id))
   const aggOf = (agentId: string) =>
-    aggregateAgent(statusesOf(board.items, nav.workflow.id, agentId))
+    aggregateAgent(entriesOf(board.items, nav.workflow.id, agentId))
   // Prefer the freshly-fetched health (updates on connect/disconnect); fall back to the
   // board snapshot's boot cache only until the first /api/health resolves.
   const healthOf = (agentId: string) =>

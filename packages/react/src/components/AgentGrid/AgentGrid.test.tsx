@@ -21,6 +21,24 @@ describe('AgentGrid', () => {
     expect(screen.getByText('REPLY AGENT')).toBeTruthy()
   })
 
+  it('shows "Stopped" (not "Done") for a terminal-stopped aggregate', () => {
+    render(
+      <AgentGrid
+        agents={agents}
+        meta={cfg.meta}
+        aggOf={() =>
+          ({ activeCount: 0, awaitingCount: 0, status: 'done', outcome: 'stopped' }) as any
+        }
+        healthOf={() => undefined}
+        canStart={() => true}
+        onStart={vi.fn()}
+        onOpen={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Stopped')).toBeTruthy()
+    expect(screen.queryByText('Done')).toBeNull()
+  })
+
   describe('START disable is health-driven only (no more singletonBusy)', () => {
     const singletonAgents = [{ id: 'qualifier', name: 'QUALIFIER', maxInstances: 1 }] as any
     const singletonMeta: any = { qualifier: { subtitle: 'qualifies leads', iconName: 'inbox' } }
