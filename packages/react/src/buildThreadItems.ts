@@ -48,6 +48,32 @@ export function buildThreadItems(messages: Message[], opts: BuildThreadItemsOpts
       continue
     }
 
+    // Handoff: role:'handoff' messages carry cross-agent delivery metadata.
+    // Only non-deduped handoffs surface as a timeline note (a deduped route
+    // handed nothing off new and does not warrant a visible marker).
+    // Note: role:'handoff' is a duck-typed extension injected by fold.ts via
+    // `as unknown as Message`; the AG-UI Message union has no 'handoff' role,
+    // so we must narrow via (msg as unknown as {role:string}).role.
+    if ((msg as unknown as { role: string }).role === 'handoff') {
+      const hMsg = msg as unknown as {
+        id: string
+        role: 'handoff'
+        targetAgentId: string
+        childWorkItemId?: string
+        deduped?: boolean
+      }
+      if (!hMsg.deduped) {
+        items.push({
+          kind: 'handoff',
+          id: hMsg.id,
+          targetAgentId: hMsg.targetAgentId,
+          childWorkItemId: hMsg.childWorkItemId,
+          deduped: hMsg.deduped,
+        })
+      }
+      continue
+    }
+
     if (msg.role !== 'assistant') continue
 
     // Assistant text content → chat bubble.

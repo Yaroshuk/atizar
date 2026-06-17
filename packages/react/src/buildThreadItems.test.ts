@@ -75,4 +75,36 @@ describe('buildThreadItems', () => {
     const items = buildThreadItems(messages, opts)
     expect(items).toHaveLength(0)
   })
+
+  it('places a handoff between text and report, and never above earlier text in a prefix', () => {
+    const full = [
+      { id: 'a1', role: 'assistant', content: 'sorting' },
+      {
+        id: 'handoff-c1',
+        role: 'handoff',
+        targetAgentId: 'wf__reply',
+        childWorkItemId: 'c1',
+        deduped: false,
+      },
+      { id: 'a2', role: 'assistant', content: 'summary' },
+    ] as unknown as Message[]
+    expect(buildThreadItems(full, opts).map((i) => i.kind)).toEqual(['text', 'handoff', 'text'])
+
+    // streaming prefix: only the first two have arrived — handoff stays after the text, not floated up
+    const prefix = full.slice(0, 2)
+    expect(buildThreadItems(prefix, opts).map((i) => i.kind)).toEqual(['text', 'handoff'])
+  })
+
+  it('drops a deduped handoff from the timeline (no visible note)', () => {
+    const messages = [
+      {
+        id: 'handoff-c2',
+        role: 'handoff',
+        targetAgentId: 'wf__reader',
+        childWorkItemId: 'c2',
+        deduped: true,
+      },
+    ] as unknown as Message[]
+    expect(buildThreadItems(messages, opts)).toHaveLength(0)
+  })
 })

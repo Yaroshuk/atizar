@@ -65,6 +65,14 @@ export type AgentModalProps = {
   gateSlot?: ReactNode
   // Handoff lines (sent and/or received) to show above the thread.
   notes: HandoffNote[]
+  // Resolve display name/label + open affordance for an inline handoff item.
+  // Supplied by the app (ThreadModal/board) so the framework carries no workflow literals.
+  // When absent, a generic fallback is shown.
+  resolveHandoff?: (h: { targetAgentId: string; childWorkItemId: string }) => {
+    name: string
+    label: string
+    onOpen?: () => void
+  }
   // Switch to the target workflow when a cross-workflow 'sent' note is clicked.
   onOpenWorkflow?: (id: string) => void
   // Jump to a live target instance (intra-workflow 'sent' note) by its localId.
@@ -89,6 +97,7 @@ export const AgentModal = ({
   intro,
   gateSlot,
   notes,
+  resolveHandoff,
   onOpenWorkflow,
   onOpenInstance,
   onStart,
@@ -168,7 +177,25 @@ export const AgentModal = ({
         </div>
       )
     }
-    // kind === 'handoff' — rendered by Task 4; skip for now.
+    // kind === 'handoff' — inline timeline note for a delivery to another agent.
+    if (item.kind === 'handoff') {
+      const resolved = resolveHandoff
+        ? resolveHandoff({
+            targetAgentId: item.targetAgentId,
+            childWorkItemId: item.childWorkItemId ?? '',
+          })
+        : { name: item.targetAgentId, label: 'a work item', onOpen: undefined }
+      return (
+        <div className={clsx(s.threadNote, s.sent)} key={item.id}>
+          → Handed <strong>{resolved.label}</strong> to {resolved.name}
+          {resolved.onOpen && (
+            <button className={s.noteLink} onClick={resolved.onOpen}>
+              Open {resolved.name}
+            </button>
+          )}
+        </div>
+      )
+    }
     return null
   })
 
