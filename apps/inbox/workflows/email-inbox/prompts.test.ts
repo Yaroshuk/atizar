@@ -69,17 +69,21 @@ describe('reply prompt strategy', () => {
     expect(p).toMatch(/sorter/i)
   })
 
-  it('onResume narrates the server-created draft and forbids tool calls', () => {
-    const p = replyPrompt.buildResume?.({ threadId: 't', body: 'hi' }, { draftId: 'd-42' })
-    expect(p).not.toBeNull()
-    expect(p).toMatch(/already (created|saved)/i)
-    expect(p).toContain('d-42')
-    expectTurnOnly(p as string)
+  it('onResume returns prompt-mode ResumeOutcome with draft confirmation text', () => {
+    const outcome = replyPrompt.buildResume?.({ threadId: 't', body: 'hi' }, { draftId: 'd-42' })
+    expect(outcome).not.toBeNull()
+    expect(outcome).toMatchObject({ kind: 'prompt' })
+    const text = (outcome as { kind: 'prompt'; text: string }).text
+    expect(text).toMatch(/already (created|saved)/i)
+    expect(text).toContain('d-42')
+    expectTurnOnly(text)
   })
 
   it('onResume falls back to "saved" when no draftId', () => {
-    const p = replyPrompt.buildResume?.({})
-    expect(p).toMatch(/already (created|saved)/i)
+    const outcome = replyPrompt.buildResume?.({})
+    expect(outcome).toMatchObject({ kind: 'prompt' })
+    const text = (outcome as { kind: 'prompt'; text: string }).text
+    expect(text).toMatch(/already (created|saved)/i)
   })
 })
 
@@ -98,10 +102,12 @@ describe('batch prompt strategy (reader)', () => {
     expect(p).toMatch(/sorter/i)
   })
 
-  it('onResume narrates the server-applied actions', () => {
-    const p = readerPrompt.buildResume?.({}, { applied: 2, failed: [] })
-    expect(p).not.toBeNull()
-    expect(p).toMatch(/already applied/i)
-    expect(p).toContain('2')
+  it('onResume returns prompt-mode ResumeOutcome with applied-actions confirmation text', () => {
+    const outcome = readerPrompt.buildResume?.({}, { applied: 2, failed: [] })
+    expect(outcome).not.toBeNull()
+    expect(outcome).toMatchObject({ kind: 'prompt' })
+    const text = (outcome as { kind: 'prompt'; text: string }).text
+    expect(text).toMatch(/already applied/i)
+    expect(text).toContain('2')
   })
 })

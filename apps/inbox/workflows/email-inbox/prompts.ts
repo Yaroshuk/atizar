@@ -1,4 +1,5 @@
 import { definePrompt } from '@atizar/core'
+import type { ResumeOutcome } from '@atizar/core'
 import { EMAIL_INBOX_TOOLS as t } from './tools.js'
 import { ReplyPayloadSchema, EmailBatchSchema, type EmailRef } from './contracts.js'
 
@@ -58,14 +59,15 @@ const replyOnStart = (): string =>
     'not call any tool and do not narrate tool usage.',
   ].join('\n')
 
-const replyOnResume = (result: Record<string, unknown>): string => {
+const replyOnResume = (result: Record<string, unknown>): ResumeOutcome => {
   const draftId = typeof result.draftId === 'string' ? result.draftId : 'saved'
-  return [
+  const text = [
     'The human APPROVED the reply and the SERVER has ALREADY created the Gmail draft',
     `(draft id "${draftId}"). You do NOT create or send anything — it is done.`,
     'Reply with ONE short sentence confirming the draft was saved. Do not call any tool',
     'and do not narrate tool usage.',
   ].join('\n')
+  return { kind: 'prompt', text }
 }
 
 export const replyPrompt = definePrompt({
@@ -109,15 +111,16 @@ const batchOnStart = (): string =>
     'Sorter. Do not call any tool and do not narrate tool usage.',
   ].join('\n')
 
-const batchOnResume = (result: Record<string, unknown>): string => {
+const batchOnResume = (result: Record<string, unknown>): ResumeOutcome => {
   const applied = typeof result.applied === 'number' ? result.applied : 0
   const failedArr = Array.isArray(result.failed) ? result.failed : []
-  return [
+  const text = [
     'The human APPROVED and the SERVER has ALREADY applied the actions',
     `(${applied} applied, ${failedArr.length} failed). You do NOT perform anything — it is done.`,
     'Reply with ONE short sentence confirming the result. Do not call any tool and do not',
     'narrate tool usage.',
   ].join('\n')
+  return { kind: 'prompt', text }
 }
 
 const batchPrompt = (def: DefaultAction) =>
