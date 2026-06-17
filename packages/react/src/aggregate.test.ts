@@ -96,4 +96,9 @@ describe('START gating via aggregateLabel (Unit 4.2)', () => {
     expect(aggregateLabel(aggregateAgent([]))).toBe('')
     expect(aggregateLabel(aggregateAgent([term('done')]))).toBe('')
   })
+  it('an error-only agent reads 0 active (error ∉ isBusy → START stays exposed)', () => {
+    const a = aggregateAgent([{ status: 'error', outcome: 'error' }])
+    expect(a.activeCount).toBe(0)
+    expect(aggregateLabel(a)).toBe('') // empty headline → never hides START
+  })
 })

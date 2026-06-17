@@ -1,11 +1,8 @@
 import type { Outcome } from '@atizar/core'
 import type { Status } from './status'
 import { DISTINCT_TERMINAL } from './statusDisplay'
+import { isBusy } from './liveness'
 
-// "Busy" = an instance is actively holding the agent's slot: running or awaiting a human.
-// `error` is deliberately NOT busy (Unit 4.2): an agent whose only instance errored has a
-// FREE slot, so START must stay available — the error shows as a badge alongside the button.
-const BUSY: ReadonlySet<Status> = new Set(['running', 'awaiting_approval'])
 // Worst-meaningful-first; the human must not miss an approval. The ONE status-priority order —
 // reused by the pipeline model's pickHead (do NOT redeclare elsewhere).
 export const PRIORITY: Status[] = ['awaiting_approval', 'error', 'running', 'done', 'idle']
@@ -30,7 +27,7 @@ export type AgentEntry = { status: Status; outcome: Outcome }
 // 0 active so its headline label is empty and START remains exposed.
 export const aggregateAgent = (entries: AgentEntry[]): AgentAggregate => {
   const statuses = entries.map((e) => e.status)
-  const activeCount = statuses.filter((s) => BUSY.has(s)).length
+  const activeCount = statuses.filter((s) => isBusy(s)).length
   const awaitingCount = statuses.filter((s) => s === 'awaiting_approval').length
   const status = PRIORITY.find((p) => statuses.includes(p)) ?? 'idle'
   // Only a settled-done headline carries a terminal outcome; a live/idle/error one shows its
