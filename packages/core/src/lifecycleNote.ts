@@ -26,4 +26,5 @@ export const LIFECYCLE_NOTE_TEXT: Record<Outcome, string> = {
   error: 'Error',
   superseded: 'Superseded by a re-run',
   reset: 'Cleared from board',
+  dismissed: 'Error acknowledged — dismissed',
 }

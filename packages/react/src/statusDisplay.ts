@@ -23,10 +23,16 @@ export const STATE_WORD: Record<Status, string> = {
 }
 
 // A terminal item whose display Status collapses to the 'done' lane (stopped/rejected/superseded/
-// reset all do) must still SHOW its distinct outcome on the list surfaces — otherwise a Stopped run
-// is indistinguishable from a clean Done without opening the modal. For those, prefer the outcome
-// word/tint; for everything live (running/awaiting/error) keep the status-keyed maps.
-export const DISTINCT_TERMINAL = new Set<Outcome>(['stopped', 'rejected', 'superseded', 'reset'])
+// reset/dismissed all do) must still SHOW its distinct outcome on the list surfaces — otherwise a
+// Stopped run is indistinguishable from a clean Done without opening the modal. For those, prefer
+// the outcome word/tint; for everything live (running/awaiting/error) keep the status-keyed maps.
+export const DISTINCT_TERMINAL = new Set<Outcome>([
+  'stopped',
+  'rejected',
+  'superseded',
+  'reset',
+  'dismissed',
+])
 
 export const pillLabel = (status: Status, outcome: Outcome): string =>
   status === 'done' && DISTINCT_TERMINAL.has(outcome) ? OUTCOME_LABEL[outcome] : STATE_WORD[status]

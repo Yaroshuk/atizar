@@ -15,6 +15,13 @@
       "when": 1781633292883,
       "tag": "0001_familiar_mystique",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781720265674,
+      "tag": "0002_cool_ricochet",
+      "breakpoints": true
     }
   ]
 }

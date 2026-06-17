@@ -1,0 +1,1 @@
+ALTER TYPE "public"."work_item_outcome" ADD VALUE 'dismissed';

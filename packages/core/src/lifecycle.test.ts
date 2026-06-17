@@ -26,6 +26,7 @@ const TABLE: Row[] = [
   { phase: 'terminal', outcome: 'error', isLive: false, baseVisible: true, covers: false },
   { phase: 'terminal', outcome: 'superseded', isLive: false, baseVisible: false, covers: false },
   { phase: 'terminal', outcome: 'reset', isLive: false, baseVisible: false, covers: false },
+  { phase: 'terminal', outcome: 'dismissed', isLive: false, baseVisible: false, covers: false },
 ]
 
 describe('lifecycle() golden table (I12 ladder)', () => {
@@ -58,6 +59,22 @@ describe('lifecycle() golden table (I12 ladder)', () => {
 
   it('a reset item stays hidden even with a card', () => {
     expect(lifecycle('terminal', 'reset', true, true).isVisible).toBe(false)
+  })
+
+  it('dismissed is a retired terminal: not live, not visible, does not cover', () => {
+    const lc = lifecycle('terminal', 'dismissed', true, false)
+    expect(lc.isLive).toBe(false)
+    expect(lc.isVisible).toBe(false) // retired — leaves the live board (RETIRED), even with a card
+    expect(lc.covers).toBe(false) // like error: a re-scan re-surfaces the source
+  })
+
+  it('dismissed stays hidden even with a card and a live descendant', () => {
+    expect(lifecycle('terminal', 'dismissed', true, true).isVisible).toBe(false)
+  })
+
+  it('dismissed is not in HUMAN_TERMINAL (no must-see without a card)', () => {
+    // The acknowledged error recedes; it is NOT a human-must-see marker
+    expect(lifecycle('terminal', 'dismissed', false, false).isVisible).toBe(false)
   })
 
   it('a human-terminal marker (stopped/rejected/error) is visible without a card', () => {

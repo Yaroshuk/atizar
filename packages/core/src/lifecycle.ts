@@ -7,10 +7,20 @@
 // awaiting_approval + awaiting_input (both pause on a human).
 export type Phase = 'queued' | 'active' | 'awaiting_human' | 'terminal'
 
-// outcome: was `resolution`, now first-class. running = not-yet-terminal; the other six are the
+// outcome: was `resolution`, now first-class. running = not-yet-terminal; the other seven are the
 // terminal flavours. done = a clean finish (incl. an approved gate, which is `done` + an audit
 // marker, so approved is distinguishable in the thread/audit, not in the outcome value).
-export type Outcome = 'running' | 'done' | 'stopped' | 'rejected' | 'error' | 'superseded' | 'reset'
+// dismissed = an acknowledged error ("OK / Got it"): the human saw the crash and dismissed it;
+// it recedes off the board like reset/superseded but remains a distinct outcome in audit/history.
+export type Outcome =
+  | 'running'
+  | 'done'
+  | 'stopped'
+  | 'rejected'
+  | 'error'
+  | 'superseded'
+  | 'reset'
+  | 'dismissed'
 
 export interface Lifecycle {
   phase: Phase
@@ -35,7 +45,9 @@ export interface Lifecycle {
 const LIVE_PHASES: ReadonlySet<Phase> = new Set(['queued', 'active', 'awaiting_human'])
 
 // Terminal outcomes that have LEFT the board (retired into Activity/history) — never visible.
-const RETIRED: ReadonlySet<Outcome> = new Set(['superseded', 'reset'])
+// `dismissed` joins here: an acknowledged error recedes like reset/superseded but stays a DISTINCT
+// outcome in audit/history and does NOT cover its source (a re-scan can re-surface it).
+const RETIRED: ReadonlySet<Outcome> = new Set(['superseded', 'reset', 'dismissed'])
 
 // Terminal outcomes the human must always see, even with no card.
 const HUMAN_TERMINAL: ReadonlySet<Outcome> = new Set(['stopped', 'rejected', 'error'])

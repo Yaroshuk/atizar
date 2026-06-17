@@ -24,6 +24,21 @@ describe('lifecycleDisplay', () => {
   })
 })
 
+describe('dismissed outcome display', () => {
+  it('dismissed has the "Dismissed" label', () => {
+    expect(OUTCOME_LABEL.dismissed).toBe('Dismissed')
+  })
+
+  it('dismissed maps to the neutral terminal (stopped) tint, not the danger tint', () => {
+    expect(OUTCOME_TINT.dismissed).toBe('stopped')
+    expect(OUTCOME_TINT.dismissed).not.toBe(OUTCOME_TINT.error)
+  })
+
+  it('dismissed maps to the done display lane (recedes, not red)', () => {
+    expect(displayStatus('terminal', 'dismissed')).toBe('done')
+  })
+})
+
 describe('OUTCOME_TINT color semantics (only error is danger)', () => {
   it('rejected uses the neutral terminal tint, not the danger tint', () => {
     // user-terminal: a declined draft is an intentional ending, not a crash

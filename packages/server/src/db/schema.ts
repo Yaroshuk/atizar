@@ -25,7 +25,8 @@ export const workItemPhase = pgEnum('work_item_phase', [
 ])
 
 // WorkItem outcome — first-class now (was the orthogonal `resolution`). `running` = not yet
-// terminal; the six terminal flavours match @atizar/core Outcome exactly.
+// terminal; the seven terminal flavours match @atizar/core Outcome exactly.
+// `dismissed` = an acknowledged error; retired (leaves the board), non-covering (re-scan ok).
 export const workItemOutcome = pgEnum('work_item_outcome', [
   'running',
   'done',
@@ -34,6 +35,7 @@ export const workItemOutcome = pgEnum('work_item_outcome', [
   'error',
   'superseded',
   'reset',
+  'dismissed',
 ])
 
 // How a WorkItem was minted. `inbound` is reserved (machine dispatch) — no producer ships

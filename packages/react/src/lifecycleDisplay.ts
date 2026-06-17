@@ -14,6 +14,7 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
   error: 'Error',
   superseded: 'Superseded',
   reset: 'Cleared',
+  dismissed: 'Dismissed',
 }
 
 // Tint class suffix per outcome (consumed where a terminal card needs a distinct colour).
@@ -29,6 +30,7 @@ export const OUTCOME_TINT: Record<Outcome, string> = {
   error: 'err',
   superseded: 'stopped',
   reset: 'stopped',
+  dismissed: 'stopped',
 }
 
 // Reduce (phase, outcome) to the card pill Status. awaiting_human → awaiting_approval (the pill

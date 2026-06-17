@@ -14,6 +14,7 @@ const OUTCOMES: Outcome[] = [
   'error',
   'superseded',
   'reset',
+  'dismissed',
 ]
 
 describe('lifecycle drift guard', () => {
@@ -40,9 +41,10 @@ describe('lifecycle drift guard', () => {
     }
   })
 
-  it('a retired (superseded/reset) item is never visible; a queued item is never visible', () => {
+  it('a retired (superseded/reset/dismissed) item is never visible; a queued item is never visible', () => {
     expect(lifecycle('terminal', 'superseded', true, true).isVisible).toBe(false)
     expect(lifecycle('terminal', 'reset', true, true).isVisible).toBe(false)
+    expect(lifecycle('terminal', 'dismissed', true, true).isVisible).toBe(false)
     expect(lifecycle('queued', 'running', true, true).isVisible).toBe(false)
   })
 
