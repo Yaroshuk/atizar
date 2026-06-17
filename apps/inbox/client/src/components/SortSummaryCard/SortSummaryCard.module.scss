@@ -16,3 +16,14 @@
   gap: 6px;
   margin-top: 8px;
 }
+
+.headline {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--atz-color-text);
+}
+
+.handled {
+  opacity: 0.5;
+}

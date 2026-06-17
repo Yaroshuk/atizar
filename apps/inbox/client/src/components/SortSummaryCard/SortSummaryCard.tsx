@@ -1,30 +1,36 @@
-import { CardShell, Markdown } from '@atizar/react'
+import { CardShell, Markdown, useBoard, useThreadHandoffs } from '@atizar/react'
+import { projectScanResult, type Dest } from '../../../../workflows/email-inbox/scanResult'
 import s from './SortSummaryCard.module.scss'
 
-type SortCounts = { reply?: number; reader?: number; spam?: number; important?: number }
-type SortSummaryCardProps = { summary: string; counts?: SortCounts }
+type SortSummaryCardProps = { summary: string }
 
-const LABELS: { key: keyof SortCounts; label: string }[] = [
-  { key: 'reply', label: 'reply' },
-  { key: 'reader', label: 'reader' },
-  { key: 'spam', label: 'spam' },
-  { key: 'important', label: 'important' },
-]
+const DESTS: Dest[] = ['reply', 'reader', 'spam', 'important']
 
-export const SortSummaryCard = ({ summary, counts }: SortSummaryCardProps) => (
-  <CardShell icon='inbox' kicker='Inbox sorted'>
-    <div className={s.reason}>
-      <Markdown>{summary}</Markdown>
-    </div>
-    {counts && (
-      <div className={s.tags}>
-        {LABELS.filter(({ key }) => typeof counts[key] === 'number').map(({ key, label }) => (
-          <span className='pill' key={key}>
-            <span className='pill-dot' />
-            {label}: {counts[key]}
-          </span>
-        ))}
+export const SortSummaryCard = ({ summary }: SortSummaryCardProps) => {
+  const handoffs = useThreadHandoffs()
+  const { items } = useBoard()
+  const r = projectScanResult(handoffs, items)
+  const sum = (rec: Record<Dest, number>) => DESTS.reduce((n, d) => n + rec[d], 0)
+  const handled = sum(r.alreadyHandled)
+
+  const chips = (rec: Record<Dest, number>) =>
+    DESTS.filter((d) => rec[d] > 0).map((d) => (
+      <span className='pill' key={d}>
+        <span className='pill-dot' />
+        {d}: {rec[d]}
+      </span>
+    ))
+
+  return (
+    <CardShell icon='inbox' kicker='Inbox sorted'>
+      <div className={s.reason}>
+        <Markdown>{summary}</Markdown>
       </div>
-    )}
-  </CardShell>
-)
+      <div className={s.headline}>
+        {r.read} read · {sum(r.new)} new{handled > 0 ? ` · ${handled} already handled` : ''}
+      </div>
+      <div className={s.tags}>{chips(r.new)}</div>
+      {handled > 0 && <div className={`${s.tags} ${s.handled}`}>{chips(r.alreadyHandled)}</div>}
+    </CardShell>
+  )
+}

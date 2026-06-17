@@ -44,6 +44,9 @@ export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
     toolName: t.renderSort,
     parameters: z.object({
       summary: z.string(),
+      // counts is still accepted from the model for backward compat, but the card
+      // now reads numbers from the workflow projection (useThreadHandoffs + useBoard).
+      // Task 4 will remove this from the model prompt / tool schema entirely.
       counts: z
         .object({
           reply: z.number(),
@@ -55,9 +58,9 @@ export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
         .optional(),
     }),
     render: ({ parameters }) => {
-      const { summary, counts } = parameters
+      const { summary } = parameters
       if (summary === undefined) return <></>
-      return <SortSummaryCard summary={summary} counts={counts} />
+      return <SortSummaryCard summary={summary} />
     },
   },
   {
