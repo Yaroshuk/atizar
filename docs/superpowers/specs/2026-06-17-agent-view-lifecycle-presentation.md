@@ -78,10 +78,12 @@ The instance is the unit. A run is never individually hidden inside a thread.
 - **done** — finished normally → the instance **recedes from the live lists** (pipeline node, card
   overlay, picker) once it has 0 live runs.
 - **stopped** — user-initiated stop → same: **recedes**. Nothing is wrong, nothing to do.
-- **rejected** — the human declined the proposed action → **recedes** like stopped (user decision,
-  done with it). **Kept as a distinct outcome on purpose** — see §7: `rejected` does NOT `cover` its
-  source, so a re-scan re-offers the email for a fresh draft (the only "retry" path given no restart).
-  Folding it into `stopped` would make a rejected email permanently dead.
+- **rejected** — the human declined (cancelled) the proposed action → **recedes** like stopped, and
+  **`covers` its source exactly like done/stopped** (the human triaged it → a re-scan does NOT
+  re-offer it). reject is an ordinary cancel of the action, not a request for another attempt — and
+  this applies to BOTH reply drafts AND batch reject (spam/important/reader); re-offering declined
+  items every scan was noise. Kept a distinct outcome only for the LABEL/audit ("declined" vs
+  "stopped"); its dedup behaviour matches done/stopped.
 - **error** — failed unexpectedly → **STAYS visible** (needs attention) **until acknowledged**
   (§4). The one terminal exception. An oversight tool must not silently hide a crash.
 
@@ -232,9 +234,12 @@ auto-reading a mailbox. **Same mechanics as the sorter**, only the input is prov
 - **No restart, no history surface.** done/stopped recede and are gone from the live UI; the only
   "history" kept is the input agent's **last result** on its persistent card.
 - **No auto-close** of an open instance modal; Stop just disappears.
-- **Keep `rejected` as a distinct outcome** (do not fold into `stopped`). It does NOT `cover` its
-  source, so a re-scan re-offers the email for a fresh draft — the only retry path without restart.
-  Fix is presentation only: recede like stopped + neutral color (not red).
+- **`rejected` `covers` its source** (added to `COVERING_TERMINAL` with done/stopped, 2026-06-17):
+  reject = the human declined/cancelled the action = handled → a re-scan does NOT re-offer it
+  (applies to reply drafts AND batch reject — spam/important/reader). Kept a distinct outcome only for
+  the LABEL/audit. Presentation: recede like stopped + neutral color (not red). (Reverses the earlier
+  "rejected non-covering / re-offer as retry" rationale — re-offering declined items every scan was
+  noise; check-foundation Clear-with-confirmation, I12 covers table.)
 - **Color**: red = `error` only; `done`/`stopped`/`rejected` are neutral.
 
 ### Open decisions to make explicitly when building 6b / the animation

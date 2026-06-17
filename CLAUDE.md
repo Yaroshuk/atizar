@@ -17,6 +17,10 @@ are right now and what to build next, see **`HANDOFF.md`** (living session state
 - `docs/copilotkit-notes.md` — confirmed CopilotKit v2 + AG-UI API reference.
 - `.claude/skills/rules/copilotkit-v2.md` — quick-recall CopilotKit gotchas.
 - `docs/CONVENTIONS.md` — code-style rules Prettier/ESLint can't enforce.
+- `docs/TESTING.md` — **how we test**: TDD (red first), the red→green acceptance ledger (🎯 target
+  tests are red-now/green-when-built — never skip or weaken them to go green), test layers
+  (unit/server-PGlite/component/browser-E2E), the "only the browser catches it" set, and the
+  cassette/`DEV_RECORD_REPLAY` infra. Read before writing or reviewing tests.
 - `docs/AGENTIC.md` — the agentic-first infrastructure track (docs/skills/delivery for agents
   building and consuming the framework): decisions + roadmap with statuses. Living handoff,
   maintained like `HANDOFF.md`.

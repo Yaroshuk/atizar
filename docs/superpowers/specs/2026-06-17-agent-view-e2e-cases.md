@@ -156,8 +156,8 @@ OFF for consumer-surface assertions.
 
 - **D1** ✅ `done` source COVERS: a re-scan does NOT re-dispatch a done email.
 - **D2** ✅ `stopped` source COVERS: a re-scan does NOT re-dispatch a stopped email.
-- **D3** 🎯/✅ `rejected` source does NOT cover: a re-scan **re-offers** the email to reply for a fresh
-  draft. *(This is the reason rejected stays a distinct outcome — assert the re-draft appears.)*
+- **D3** ✅ `rejected` source COVERS: a re-scan does NOT re-offer it (reject = the human declined the
+  action = handled; applies to reply drafts AND batch reject). *(Assert no re-dispatch for that source.)*
 - **D4** ✅ `error` source does NOT cover: a re-scan re-dispatches the failed email.
 - **D5** ✅ Re-pasting / re-scanning an already-handled source returns `{deduped:true}`, no second
   child.
