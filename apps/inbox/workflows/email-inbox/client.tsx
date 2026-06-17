@@ -42,21 +42,7 @@ export const emailInboxMeta: Record<string, AgentMeta> = {
 export const emailInboxRenders: Omit<RenderSpec, 'workflowId'>[] = [
   {
     toolName: t.renderSort,
-    parameters: z.object({
-      summary: z.string(),
-      // counts is still accepted from the model for backward compat, but the card
-      // now reads numbers from the workflow projection (useThreadHandoffs + useBoard).
-      // Task 4 will remove this from the model prompt / tool schema entirely.
-      counts: z
-        .object({
-          reply: z.number(),
-          reader: z.number(),
-          spam: z.number(),
-          important: z.number(),
-        })
-        .partial()
-        .optional(),
-    }),
+    parameters: z.object({ summary: z.string() }),
     render: ({ parameters }) => {
       const { summary } = parameters
       if (summary === undefined) return <></>
