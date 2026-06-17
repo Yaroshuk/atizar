@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { Destination } from '@atizar/core'
 import { useWorkItemThread } from '../../hooks/useWorkItemThread'
 import { useGateNode } from '../../hooks/useGateNode'
+import { useAcknowledge } from '../../hooks/useAcknowledge'
 import { buildRenderToolCall } from '../../buildRenderToolCall'
 import { useWorkflowsConfig } from '../../workflowsContext'
 import { byWorkflow } from '../../registryScope'
@@ -9,6 +10,7 @@ import { displayStatus } from '../../lifecycleDisplay'
 import { lookups } from '../../lookups'
 import { useBoard } from '../../hooks/useBoard'
 import { ThreadItems } from '../AgentModal/ThreadItems'
+import { AcknowledgeButton } from './AcknowledgeButton'
 import type { HandoffNote } from '../../hooks/useBoardNavigation'
 
 // RunView = the MESSAGES of one run (one email → one draft), rendered INLINE into the instance's
@@ -35,6 +37,11 @@ export const RunView = (p: RunViewProps) => {
   const display = wi ? displayStatus(wi.phase, wi.outcome) : 'running'
 
   const gateNode = useGateNode(p.id, p.workflowId)
+  const { acknowledge } = useAcknowledge()
+  const ackSlot =
+    display === 'error' ? (
+      <AcknowledgeButton onAcknowledge={() => void acknowledge(p.id)} />
+    ) : undefined
 
   const { deliver, id, workflowId } = p
   const renderToolCall = useMemo(
@@ -74,6 +81,7 @@ export const RunView = (p: RunViewProps) => {
       renderableToolNames={p.renderableToolNames}
       loading={display === 'running'}
       gateSlot={gateNode ?? undefined}
+      ackSlot={ackSlot}
       notes={p.notes}
       resolveHandoff={resolveHandoff}
     />

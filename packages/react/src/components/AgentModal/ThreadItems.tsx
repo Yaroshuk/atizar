@@ -4,6 +4,7 @@ import { pairToolResults, type Message, type ToolCall, type ToolMessage } from '
 import { isDevMode } from '../../devMode'
 import { ThreadResultsContext } from '../../threadResults'
 import { ThreadHandoffsContext, type ThreadHandoff } from '../../threadHandoffs'
+import { testIds } from '../../testIds'
 import { Icon } from '../Icon/Icon'
 import { Markdown } from '../../primitives/Markdown/Markdown'
 import { IntroBubble } from './IntroBubble'
@@ -24,6 +25,7 @@ export type ThreadItemsProps = {
   loading: boolean
   intro?: string
   gateSlot?: ReactNode
+  ackSlot?: ReactNode
   notes: HandoffNote[]
   resolveHandoff?: (h: { targetAgentId: string; childWorkItemId: string }) => {
     name: string
@@ -39,6 +41,7 @@ export const ThreadItems = ({
   loading,
   intro,
   gateSlot,
+  ackSlot,
   notes,
   resolveHandoff,
 }: ThreadItemsProps) => {
@@ -63,7 +66,11 @@ export const ThreadItems = ({
     .filter((m) => (m as { role?: string }).role === 'handoff')
     .map((m) => {
       const h = m as unknown as ThreadHandoff
-      return { targetAgentId: h.targetAgentId, childWorkItemId: h.childWorkItemId, deduped: h.deduped }
+      return {
+        targetAgentId: h.targetAgentId,
+        childWorkItemId: h.childWorkItemId,
+        deduped: h.deduped,
+      }
     })
 
   const received = notes.filter((n) => n.dir === 'received')
@@ -120,7 +127,11 @@ export const ThreadItems = ({
         <div className={clsx(s.threadNote, s.sent)} key={item.id}>
           → Handed <strong>{resolved.label}</strong> to {resolved.name}
           {resolved.onOpen && (
-            <button className={s.noteLink} onClick={resolved.onOpen}>
+            <button
+              className={s.noteLink}
+              data-testid={testIds.handoffOpen(item.targetAgentId)}
+              onClick={resolved.onOpen}
+            >
               Open {resolved.name}
             </button>
           )}
@@ -134,7 +145,11 @@ export const ThreadItems = ({
     <ThreadResultsContext.Provider value={resultsByToolName}>
       <ThreadHandoffsContext.Provider value={handoffs}>
         {received.map((note, i) => (
-          <div className={clsx(s.threadNote, s.received)} key={`rcv-${i}`}>
+          <div
+            className={clsx(s.threadNote, s.received)}
+            data-testid={testIds.receivedNote}
+            key={`rcv-${i}`}
+          >
             ← Received <strong>{note.label}</strong> from {note.otherName}
           </div>
         ))}
@@ -146,6 +161,7 @@ export const ThreadItems = ({
         {intro && <IntroBubble text={intro} />}
         {thread}
         {gateSlot && <div className={s.threadItem}>{gateSlot}</div>}
+        {ackSlot && <div className={s.threadItem}>{ackSlot}</div>}
         {loading && (
           <div className={clsx(s.threadItem, s.bubbleRow)}>
             <span className={s.agentGlyph}>
