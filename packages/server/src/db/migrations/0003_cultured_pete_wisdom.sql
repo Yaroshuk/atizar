@@ -1,0 +1,1 @@
+ALTER TABLE "work_items" ADD COLUMN "episode_seq" integer DEFAULT 1 NOT NULL;

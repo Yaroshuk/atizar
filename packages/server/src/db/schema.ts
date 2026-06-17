@@ -62,6 +62,11 @@ export const workItems = pgTable('work_items', {
   // Instance identity (spec 2026-06-16). Caller-supplied at dispatch; same key → same instance.
   // NOT derivable from `source` (reply: key=sender, source=email; spam: key='spam', source=email).
   key: text('key').notNull(),
+  // Episode = a contiguous live span of a keyed instance. Stamped at dispatch: a new run inherits
+  // the max episodeSeq of its (workflowId, agentId, key) siblings if any is still live, else max+1
+  // (a fresh episode after the instance fully receded). The open thread shows only the latest episode
+  // so a reactivated keyed instance does NOT resurrect a prior episode's done runs.
+  episodeSeq: integer('episode_seq').notNull().default(1),
   payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
   phase: workItemPhase('phase').notNull(),
   outcome: workItemOutcome('outcome').notNull().default('running'),

@@ -139,21 +139,45 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
     expect(second.id).toBe(first.id)
   })
 
-  it('a rejected same-source item does NOT cover (re-scan re-surfaces)', async () => {
+  it('a rejected same-source item COVERS (declining the action is handled — no re-offer)', async () => {
     const { pool } = fakePool()
-    const src = `nocover-${randomUUID()}`
+    const src = `cover-rej-${randomUUID()}`
     const first = await dispatch(db, pool, { ...base, source: src })
     await transition(db, first.id, 'start')
     await transition(db, first.id, 'gate')
-    await transition(db, first.id, 'reject') // outcome=rejected → does NOT cover
+    await transition(db, first.id, 'reject') // outcome=rejected → COVERS (handled, do not re-surface)
     const second = await dispatch(db, pool, { ...base, source: src })
-    expect(second.deduped).toBe(false)
-    expect(second.id).not.toBe(first.id)
+    expect(second.deduped).toBe(true)
+    expect(second.id).toBe(first.id)
   })
 
   it('stores the caller-supplied key on the work item', async () => {
     const { pool } = fakePool()
     const { id } = await dispatch(db, pool, { ...base, key: 'alice@example.com' })
     expect((await store.getWorkItem(id))?.key).toBe('alice@example.com')
+  })
+
+  it('stamps episodeSeq: first run = 1, live sibling inherits, fully-receded restart bumps', async () => {
+    const { pool } = fakePool()
+    const key = `sender-${randomUUID()}@x.com`
+    const episodeOf = async (id: string) => (await store.getWorkItem(id))?.episodeSeq
+
+    // first run for the key → episode 1
+    const a = await dispatch(db, pool, { ...base, key })
+    expect(await episodeOf(a.id)).toBe(1)
+
+    // a SECOND run while the first is still live (queued) → same episode
+    const b = await dispatch(db, pool, { ...base, key })
+    expect(await episodeOf(b.id)).toBe(1)
+
+    // drive BOTH to terminal (instance fully receded)
+    await transition(db, a.id, 'start')
+    await transition(db, a.id, 'finish')
+    await transition(db, b.id, 'start')
+    await transition(db, b.id, 'finish')
+
+    // a NEW run after full recede → fresh episode 2
+    const c = await dispatch(db, pool, { ...base, key })
+    expect(await episodeOf(c.id)).toBe(2)
   })
 })

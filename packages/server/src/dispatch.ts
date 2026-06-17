@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { lifecycle } from '@atizar/core'
 import type { Db } from './db/client.js'
 import { workItems, type OriginKind } from './db/schema.js'
@@ -76,6 +76,28 @@ export async function dispatch(
   const ancestors = await countAncestors(db, input.parentId ?? null)
   if (ancestors >= DEPTH_CAP) throw new DepthExceeded(ancestors)
 
+  // Episode boundary (server-authoritative): inherit the current episode if a sibling of this
+  // (workflowId, agentId, key) is still live, else start a fresh episode (max+1). A keyed instance
+  // that fully receded and reactivates thus starts a new episode — its prior done runs do not
+  // resurrect in the open thread.
+  const siblings = await db
+    .select({
+      episodeSeq: workItems.episodeSeq,
+      phase: workItems.phase,
+      outcome: workItems.outcome,
+    })
+    .from(workItems)
+    .where(
+      and(
+        eq(workItems.workflowId, input.workflowId),
+        eq(workItems.agentId, input.agentId),
+        eq(workItems.key, input.key)
+      )
+    )
+  const maxSeq = siblings.reduce((m, s) => Math.max(m, s.episodeSeq), 0)
+  const anyLive = siblings.some((s) => lifecycle(s.phase, s.outcome, false, false).isLive)
+  const episodeSeq = siblings.length === 0 || !anyLive ? maxSeq + 1 : maxSeq
+
   // 3. Insert `queued`, then reopen the parent if it auto-finished concurrently (see below).
   const id = randomUUID()
   await db.transaction(async (tx) => {
@@ -87,6 +109,7 @@ export async function dispatch(
       payload: input.payload,
       source: input.source ?? null,
       key: input.key,
+      episodeSeq,
       parentId: input.parentId ?? null,
       phase: 'queued',
       outcome: 'running',
