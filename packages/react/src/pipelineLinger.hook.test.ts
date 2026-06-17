@@ -15,9 +15,10 @@ afterEach(() => {
 })
 
 describe('useLingerSet — set membership across renders and fake-timer advances', () => {
-  it('initially present ids are in lingering and not leaving', () => {
+  it('initially present ids are NOT in lingering (lingering is the leaving set only)', () => {
     const { result } = renderHook(() => useLingerSet(S('a', 'b'), 300))
-    expect(arr(result.current.lingering)).toEqual(['a', 'b'])
+    // Nothing is leaving yet — lingering is empty.
+    expect(arr(result.current.lingering)).toEqual([])
     expect(result.current.isLeaving('a')).toBe(false)
     expect(result.current.isLeaving('b')).toBe(false)
   })
@@ -28,7 +29,8 @@ describe('useLingerSet — set membership across renders and fake-timer advances
     })
     // Drop 'b' from the present set.
     rerender({ present: S('a') })
-    expect(arr(result.current.lingering)).toEqual(['a', 'b'])
+    // lingering = leaving set only — 'a' (still present) is NOT in lingering.
+    expect(arr(result.current.lingering)).toEqual(['b'])
     expect(result.current.isLeaving('b')).toBe(true)
     expect(result.current.isLeaving('a')).toBe(false)
   })
@@ -38,13 +40,13 @@ describe('useLingerSet — set membership across renders and fake-timer advances
       initialProps: { present: S('a', 'b') },
     })
     rerender({ present: S('a') })
-    // Before timer: 'b' is still lingering.
-    expect(arr(result.current.lingering)).toEqual(['a', 'b'])
+    // Before timer: 'b' is in lingering (leaving).
+    expect(arr(result.current.lingering)).toEqual(['b'])
     // Advance past the linger window — the timer callback removes 'b' and re-renders.
     act(() => {
       vi.advanceTimersByTime(300)
     })
-    expect(arr(result.current.lingering)).toEqual(['a'])
+    expect(arr(result.current.lingering)).toEqual([])
     expect(result.current.isLeaving('b')).toBe(false)
   })
 
@@ -58,30 +60,31 @@ describe('useLingerSet — set membership across renders and fake-timer advances
     // 'b' comes back before the timer fires.
     rerender({ present: S('a', 'b') })
     expect(result.current.isLeaving('b')).toBe(false)
-    expect(arr(result.current.lingering)).toEqual(['a', 'b'])
+    // lingering is leaving-only — nothing is leaving now.
+    expect(arr(result.current.lingering)).toEqual([])
     // Advancing the timer should not affect anything (the removal was cancelled).
     act(() => {
       vi.advanceTimersByTime(300)
     })
-    expect(arr(result.current.lingering)).toEqual(['a', 'b'])
+    expect(arr(result.current.lingering)).toEqual([])
   })
 
-  it('lingering always includes both present and leaving ids (superset)', () => {
+  it('lingering contains only leaving ids — present-only ids are excluded', () => {
     const { result, rerender } = renderHook(({ present }) => useLingerSet(present, 500), {
       initialProps: { present: S('a', 'b', 'c') },
     })
     rerender({ present: S('a') })
-    // 'b' and 'c' are leaving — all three must remain in lingering.
-    expect(arr(result.current.lingering)).toEqual(['a', 'b', 'c'])
+    // 'b' and 'c' are leaving — only they appear in lingering ('a' is present, not leaving).
+    expect(arr(result.current.lingering)).toEqual(['b', 'c'])
     // After partial advance (250 ms), still there.
     act(() => {
       vi.advanceTimersByTime(250)
     })
-    expect(arr(result.current.lingering)).toEqual(['a', 'b', 'c'])
-    // Full advance — both drop.
+    expect(arr(result.current.lingering)).toEqual(['b', 'c'])
+    // Full advance — both drop out of lingering.
     act(() => {
       vi.advanceTimersByTime(250)
     })
-    expect(arr(result.current.lingering)).toEqual(['a'])
+    expect(arr(result.current.lingering)).toEqual([])
   })
 })

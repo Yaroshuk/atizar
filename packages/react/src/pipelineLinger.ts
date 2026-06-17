@@ -39,7 +39,6 @@ export function useLingerSet(
   const leavingRef = useRef<ReadonlySet<string>>(new Set())
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const [, force] = useState(0)
-  const rerender = () => force((n) => n + 1)
 
   const next = diffLeaving(presentRef.current, leavingRef.current, currentPresent)
 
@@ -52,16 +51,16 @@ export function useLingerSet(
         timers.current.delete(id)
         // Drop this id from the tracked leaving set, then re-render to unmount the row.
         leavingRef.current = new Set([...leavingRef.current].filter((x) => x !== id))
-        rerender()
+        force((n) => n + 1)
       }, lingerMs)
     )
   }
-  // If an id reappeared (present again), cancel its pending removal timer.
-  for (const [id, t] of timers.current) {
-    if (currentPresent.has(id)) {
-      clearTimeout(t)
-      timers.current.delete(id)
-    }
+  // If an id reappeared (present again), cancel its pending removal timer. Collect first, then
+  // delete — never mutate the Map while iterating it.
+  const reappeared = [...timers.current.keys()].filter((id) => currentPresent.has(id))
+  for (const id of reappeared) {
+    clearTimeout(timers.current.get(id))
+    timers.current.delete(id)
   }
 
   presentRef.current = next.present
@@ -75,8 +74,5 @@ export function useLingerSet(
     }
   }, [])
 
-  // lingering = present ∪ leaving — the full set of row ids that must stay mounted this frame.
-  const lingering: ReadonlySet<string> = new Set([...presentRef.current, ...leavingRef.current])
-
-  return { isLeaving: (id) => leavingRef.current.has(id), lingering }
+  return { isLeaving: (id) => leavingRef.current.has(id), lingering: leavingRef.current }
 }
