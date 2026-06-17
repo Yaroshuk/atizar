@@ -272,6 +272,14 @@ describe('buildPipeline', () => {
     expect(blocks).toHaveLength(1) // one card, not two
   })
 
+  it('an errored instance stays in the pipeline; a done lone instance recedes', () => {
+    const errored = buildPipeline([i({ localId: 'e1', status: 'error', isInput: true })], {})
+    expect(errored).toHaveLength(1) // error is live → shown
+
+    const doneOnly = buildPipeline([i({ localId: 'd1', status: 'done', isInput: true })], {})
+    expect(doneOnly).toHaveLength(0) // done with no live descendant → recedes
+  })
+
   it('collapsed same-(agentId,key) roots keep children from ALL members (no drop)', () => {
     const s1 = i({
       localId: 's1',

@@ -2,6 +2,7 @@ import type { Outcome } from '@atizar/core'
 import type { Status } from './status'
 import type { IconName } from './components/Icon/Icon'
 import { PRIORITY } from './aggregate'
+import { isLive } from './liveness'
 
 export type PInstance = {
   localId: string
@@ -43,8 +44,6 @@ export type PipelineBlock = {
   groups: AgentGroup[] // children grouped by agentId; [] => lone header
 }
 
-const ACTIVE: ReadonlySet<Status> = new Set(['running', 'awaiting_approval', 'error'])
-
 // Build the repeated depth-2 block model from the live instances of one workflow.
 // queued: agentId -> count of items waiting for a free slot.
 export function buildPipeline(
@@ -64,7 +63,7 @@ export function buildPipeline(
   // the LIVE column (Unit 4.1). A non-terminal input root is active and seeded here anyway; a
   // terminal one re-enters `shown` only via the ancestor-promotion walk below (a live child).
   const shown = new Set<string>()
-  for (const x of instances) if (ACTIVE.has(x.status)) shown.add(x.localId)
+  for (const x of instances) if (isLive(x.status)) shown.add(x.localId)
   // Promote ancestors of shown nodes (a parent is kept because a child is shown).
   let changed = true
   while (changed) {
@@ -85,7 +84,7 @@ export function buildPipeline(
     if (hasLiveDescendant.has(x.localId)) return hasLiveDescendant.get(x.localId)!
     let live = false
     for (const kid of childrenOf.get(x.localId) ?? []) {
-      if (ACTIVE.has(kid.status) || computeLive(kid)) live = true
+      if (isLive(kid.status) || computeLive(kid)) live = true
     }
     hasLiveDescendant.set(x.localId, live)
     return live
@@ -96,8 +95,8 @@ export function buildPipeline(
   // keeps its true status (a finished/closed root with no live child reads Done — WS1 label fix).
   // An already-active node keeps its own status as-is.
   const view = (x: PInstance): PInstance =>
-    ACTIVE.has(x.status) || hasLiveDescendant.get(x.localId)
-      ? ACTIVE.has(x.status)
+    isLive(x.status) || hasLiveDescendant.get(x.localId)
+      ? isLive(x.status)
         ? x
         : { ...x, status: 'running' as Status }
       : x
