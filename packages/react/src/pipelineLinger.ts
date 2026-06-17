@@ -1,3 +1,9 @@
+// Linger window for the pipeline completion fade. Kept in sync with the CSS token --atz-linger
+// (tokens.css): the JS timer must be ≥ the CSS transition so the row stays mounted for the whole
+// fade. (jsdom can't reliably read a computed custom property, so the JS side is a constant, not
+// a getComputedStyle read — a single source documented here, asserted by browser-verify.)
+export const LINGER_MS = 600
+
 // Pure presentation helper for the pipeline completion animation. Diffs the set of pipeline
 // row ids rendered "present" last frame against the set buildPipeline emits this frame, and
 // returns which ids are now "leaving" (a row that just dropped out of the live set). The hook

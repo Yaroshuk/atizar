@@ -177,6 +177,27 @@
   margin: 8px 0 0 35px;
 }
 
+// Completion animation: a row that just went terminal lingers mounted with this class, fading
+// out over --atz-linger before useLingerSet unmounts it. Presentation only — the row's data
+// (and its DB Run) is untouched; it is simply no longer in the live set. Applied to the leaf
+// row elements (.pl-single / .pl-inst / .mini) as a co-class.
+.leaving {
+  animation: pl-fade-out var(--atz-linger) ease forwards;
+  pointer-events: none;
+}
+
+@keyframes pl-fade-out {
+  0% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  } // hold briefly so the human reads the final state…
+  100% {
+    opacity: 0; // …then fade.
+  }
+}
+
 // mini tint legend at panel bottom
 .tint-legend {
   border-top: 1px solid var(--border);

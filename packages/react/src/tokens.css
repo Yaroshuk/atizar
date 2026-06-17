@@ -42,6 +42,9 @@
   --atz-color-accent-deep: var(--atz-teal-600);
   --atz-color-danger: var(--atz-red-ink);
 
+  /* completion-animation linger: how long a finished pipeline row fades before it unmounts */
+  --atz-linger: 600ms;
+
   /* Tier 2 — board statuses (one source for dots + badges) */
   --atz-status-running: var(--atz-color-accent);
   --atz-status-awaiting: var(--atz-amber-border);
