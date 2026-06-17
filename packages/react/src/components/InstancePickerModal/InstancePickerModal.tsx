@@ -3,6 +3,7 @@ import type { Outcome } from '@atizar/core'
 import type { Status } from '../../status'
 import { isBusy } from '../../liveness'
 import { pillLabel, pillTint } from '../../statusDisplay'
+import { testIds } from '../../testIds'
 import { useDismiss } from '../../hooks/useDismiss'
 import { Icon, type IconName } from '../Icon/Icon'
 import s from './InstancePickerModal.module.scss'
@@ -39,7 +40,7 @@ export const InstancePickerModal = ({
   const liveCount = instances.filter((i) => isBusy(i.status)).length
   return (
     <div className={clsx('backdrop', closing && 'closing')} onClick={dismiss}>
-      <div className='modal' onClick={(e) => e.stopPropagation()}>
+      <div className='modal' data-testid={testIds.pickerModal} onClick={(e) => e.stopPropagation()}>
         <div className='modal-head'>
           <span className='modal-mark'>
             <Icon name={iconName} size={17} />
@@ -62,6 +63,7 @@ export const InstancePickerModal = ({
             <div
               key={inst.localId}
               className={`pl-single ${pillTint(inst.status, inst.outcome)}`}
+              data-testid={testIds.pickerRow}
               onClick={() => onOpenInstance(inst.localId)}
             >
               <div className='m-icon'>

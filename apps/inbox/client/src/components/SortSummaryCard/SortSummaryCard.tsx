@@ -1,5 +1,6 @@
 import { CardShell, Markdown, useBoard, useThreadHandoffs } from '@atizar/react'
 import { projectScanResult, type Dest } from '../../../../workflows/email-inbox/scanResult'
+import { appTestIds } from '../../testIds'
 import s from './SortSummaryCard.module.scss'
 
 type SortSummaryCardProps = { summary: string }
@@ -26,7 +27,7 @@ export const SortSummaryCard = ({ summary }: SortSummaryCardProps) => {
       <div className={s.reason}>
         <Markdown>{summary}</Markdown>
       </div>
-      <div className={s.headline}>
+      <div className={s.headline} data-testid={appTestIds.sortHeadline}>
         {r.read} read · {sum(r.new)} new{handled > 0 ? ` · ${handled} already handled` : ''}
       </div>
       <div className={s.tags}>{chips(r.new)}</div>

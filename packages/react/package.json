@@ -18,6 +18,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./testIds": {
+      "development": "./src/testIds.ts",
+      "types": "./dist/testIds.d.ts",
+      "import": "./dist/testIds.js"
+    },
     "./styles.css": {
       "development": "./src/styles.css",
       "default": "./dist/react.css"

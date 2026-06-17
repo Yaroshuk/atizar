@@ -24,6 +24,8 @@ type AgentCardProps = {
   canStart: boolean
   // Credential health (from the board snapshot). !ok → a warning line + START blocked.
   health?: AgentHealth
+  // Optional stable hook for E2E (e.g. `agent-<id>`): tags the card + its START button.
+  testId?: string
   onStart: () => void
   onOpen: () => void
 }
@@ -51,6 +53,7 @@ export const AgentCard = ({
   aggregateLabel,
   canStart,
   health,
+  testId,
   onStart,
   onOpen,
 }: AgentCardProps) => {
@@ -85,6 +88,7 @@ export const AgentCard = ({
           iconSize={12}
           disabled={blocked}
           title={blocked ? blockedReason : undefined}
+          data-testid={testId ? `${testId}-start` : undefined}
           onClick={start}
         >
           START
@@ -94,7 +98,11 @@ export const AgentCard = ({
   }
 
   return (
-    <div className={clsx(s.agentCard, unhealthy && s.isError)} onClick={onOpen}>
+    <div
+      className={clsx(s.agentCard, unhealthy && s.isError)}
+      data-testid={testId}
+      onClick={onOpen}
+    >
       <div className={s.cardTop}>
         <div className={s.cardIcon}>
           <Icon name={iconName} size={20} />

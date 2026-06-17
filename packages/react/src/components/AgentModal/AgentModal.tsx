@@ -4,6 +4,7 @@ import { type Message, type Outcome, type ToolCall, type ToolMessage } from '@at
 import { STATUS_LABEL, type Status } from '../../status'
 import { OUTCOME_LABEL } from '../../lifecycleDisplay'
 import { useDismiss } from '../../hooks/useDismiss'
+import { testIds } from '../../testIds'
 import { Icon, type IconName } from '../Icon/Icon'
 import { ThreadBody } from './ThreadBody'
 import s from './AgentModal.module.scss'
@@ -73,7 +74,7 @@ export const AgentModal = ({
 
   return (
     <div className={clsx('backdrop', closing && 'closing')} onClick={dismiss}>
-      <div className='modal' onClick={(e) => e.stopPropagation()}>
+      <div className='modal' data-testid={testIds.typeView} onClick={(e) => e.stopPropagation()}>
         <div className='modal-head'>
           <span className='modal-mark'>
             <Icon name={iconName} size={17} />

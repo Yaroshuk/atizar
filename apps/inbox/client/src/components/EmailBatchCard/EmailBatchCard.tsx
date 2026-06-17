@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CardShell, Button, IconButton, type IconName } from '@atizar/react'
+import { appTestIds } from '../../testIds'
 import s from './EmailBatchCard.module.scss'
 
 type BatchAction = 'read' | 'trash' | 'star' | 'keep'
@@ -38,10 +39,14 @@ export const EmailBatchCard = ({ data, onApprove, onReject }: EmailBatchCardProp
       kicker={`Review ${rows.length} email(s)`}
       actions={
         <>
-          <Button variant='teal' onClick={() => onApprove({ items: rows })}>
+          <Button
+            variant='teal'
+            data-testid={appTestIds.batchApply}
+            onClick={() => onApprove({ items: rows })}
+          >
             Apply {applied} action(s)
           </Button>
-          <Button variant='ghost' onClick={onReject}>
+          <Button variant='ghost' data-testid={appTestIds.batchReject} onClick={onReject}>
             Reject
           </Button>
         </>
@@ -63,6 +68,7 @@ export const EmailBatchCard = ({ data, onApprove, onReject }: EmailBatchCardProp
                     icon={icon}
                     iconSize={16}
                     active={row.action === action}
+                    data-testid={appTestIds.batchAction(action)}
                     aria-label={`${label} — ${who}`}
                     aria-pressed={row.action === action}
                     onClick={() => setAction(i, action)}

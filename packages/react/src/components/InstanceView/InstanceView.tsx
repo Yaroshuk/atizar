@@ -8,6 +8,7 @@ import { Icon, type IconName } from '../Icon/Icon'
 import { IntroBubble } from '../AgentModal/IntroBubble'
 import { RunView } from '../RunView/RunView'
 import type { HandoffNote } from '../../hooks/useBoardNavigation'
+import { testIds } from '../../testIds'
 import s from './InstanceView.module.scss'
 
 // One run of the instance: its work item id and that run's origin notes. A run has NO name/status/
@@ -46,7 +47,11 @@ export const InstanceView = (p: InstanceViewProps) => {
   const active = p.status === 'running' || p.status === 'awaiting_approval'
   return (
     <div className={clsx('backdrop', closing && 'closing')} onClick={dismiss}>
-      <div className='modal' onClick={(e) => e.stopPropagation()}>
+      <div
+        className='modal'
+        data-testid={testIds.instanceModal}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className='modal-head'>
           <span className='modal-mark'>
             <Icon name={p.iconName} size={17} />
@@ -59,7 +64,12 @@ export const InstanceView = (p: InstanceViewProps) => {
             </span>
             {p.runs.length > 1 && <span className={s.runCount}>{p.runs.length} runs</span>}
           </div>
-          <button className='modal-x' onClick={dismiss} aria-label='Close'>
+          <button
+            className='modal-x'
+            data-testid={testIds.instanceClose}
+            onClick={dismiss}
+            aria-label='Close'
+          >
             <Icon name='close' size={17} />
           </button>
         </div>
@@ -84,7 +94,7 @@ export const InstanceView = (p: InstanceViewProps) => {
 
         {active && (
           <div className='modal-foot'>
-            <button className='btn btn-ghost' onClick={p.onStop}>
+            <button className='btn btn-ghost' data-testid={testIds.instanceStop} onClick={p.onStop}>
               Stop
             </button>
           </div>

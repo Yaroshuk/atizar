@@ -3,6 +3,7 @@ import { Connections } from '../Connections/Connections'
 import { StopButton } from '../../primitives/StopButton/StopButton'
 import { ResetButton } from '../../primitives/ResetButton/ResetButton'
 import { IconButton } from '../../primitives/IconButton/IconButton'
+import { testIds } from '../../testIds'
 import s from './AppHeader.module.scss'
 import type { WorkflowDescriptor } from '@atizar/core'
 
@@ -64,7 +65,7 @@ export const AppHeader = ({
       {!demo && <Connections />}
       {!demo && <span className={s.ahVline} />}
       {boardConnection === 'reconnecting' && (
-        <span className={s.ahReconnect}>
+        <span className={s.ahReconnect} data-testid={testIds.reconnectChip}>
           <span className={s.ahReconnectDot} />
           Reconnecting…
         </span>
@@ -81,6 +82,7 @@ export const AppHeader = ({
       <StopButton
         scope='all'
         label='Stop all'
+        data-testid={testIds.stopAll}
         disabled={globalActive === 0}
         stopping={stoppingAll}
         onClick={onStopAll}

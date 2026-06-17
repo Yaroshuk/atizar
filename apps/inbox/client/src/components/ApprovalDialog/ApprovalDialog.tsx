@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CardShell, Button, SourcePanel } from '@atizar/react'
+import { appTestIds } from '../../testIds'
 import s from './ApprovalDialog.module.scss'
 
 type ApprovalData = { threadId: string; body: string }
@@ -24,10 +25,14 @@ export const ApprovalDialog = ({ data, source, onApprove, onReject }: ApprovalDi
       kicker='Approval needed'
       actions={
         <>
-          <Button variant='teal' onClick={() => onApprove(body)}>
+          <Button
+            variant='teal'
+            data-testid={appTestIds.approvalSave}
+            onClick={() => onApprove(body)}
+          >
             Save draft
           </Button>
-          <Button variant='ghost' onClick={onReject}>
+          <Button variant='ghost' data-testid={appTestIds.approvalReject} onClick={onReject}>
             Reject
           </Button>
         </>
@@ -36,6 +41,7 @@ export const ApprovalDialog = ({ data, source, onApprove, onReject }: ApprovalDi
       <SourcePanel source={source} />
       <textarea
         className={s.edit}
+        data-testid={appTestIds.approvalBody}
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={8}

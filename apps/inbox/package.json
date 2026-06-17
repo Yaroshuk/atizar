@@ -18,6 +18,9 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run -c ../../vitest.config.ts",
+    "ui": "playwright test --headed",
+    "ui:smoke": "playwright test",
+    "ui:report": "playwright show-report",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -25,15 +28,15 @@
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
     "@ai-sdk/anthropic": "^3.0.82",
-    "@hono/node-server": "^2.0.4",
-    "@mastra/core": "^1.41.0",
-    "@mastra/pg": "^1.12.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@atizar/core": "*",
     "@atizar/integrations": "*",
     "@atizar/providers": "*",
     "@atizar/react": "*",
     "@atizar/server": "*",
+    "@hono/node-server": "^2.0.4",
+    "@mastra/core": "^1.41.0",
+    "@mastra/pg": "^1.12.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "googleapis": "^173.0.0",
     "hono": "^4.12.23",
     "react": "^19.2.7",
@@ -41,6 +44,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@rolldown/binding-darwin-arm64": "^1.0.3"
   }
 }

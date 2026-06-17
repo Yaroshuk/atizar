@@ -19,6 +19,8 @@ type CardShellProps = {
   actions?: ReactNode
   children?: ReactNode
   className?: string
+  // Optional E2E hook — set by a userland card to make its frame addressable in a test.
+  testId?: string
 }
 
 export const CardShell = ({
@@ -30,8 +32,9 @@ export const CardShell = ({
   actions,
   children,
   className,
+  testId,
 }: CardShellProps) => (
-  <div className={clsx(s.shell, tone === 'attention' && s.attention, className)}>
+  <div className={clsx(s.shell, tone === 'attention' && s.attention, className)} data-testid={testId}>
     {(icon || kicker || title || badge) && (
       <div className={s.head}>
         {icon && (

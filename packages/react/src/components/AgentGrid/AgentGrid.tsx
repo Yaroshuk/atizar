@@ -1,6 +1,7 @@
 import type { AgentDefinition } from '@atizar/core'
 import { AgentCard } from '../AgentCard/AgentCard'
 import { CompHeader } from '../../primitives/CompHeader/CompHeader'
+import { testIds } from '../../testIds'
 import { aggregateLabel } from '../../aggregate'
 import type { AgentAggregate } from '../../aggregate'
 import type { AgentMeta } from '../../renderSpecs'
@@ -62,6 +63,7 @@ export const AgentGrid = ({
               aggregateLabel={aggregateLabel(agg)}
               canStart={canStart(agent.id)}
               health={healthOf(agent.id)}
+              testId={testIds.agentCard(agent.id)}
               onStart={() => onStart(agent)}
               onOpen={() => onOpen(agent.id)}
             />

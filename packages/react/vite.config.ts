@@ -13,7 +13,12 @@ export default defineConfig({
   css: { modules: { localsConvention: 'camelCaseOnly' } },
   build: {
     lib: {
-      entry: { index: resolve(__dirname, 'src/index.ts') },
+      // `testIds` is a SEPARATE entry so consumers (incl. E2E runners in plain Node) can import the
+      // id catalog WITHOUT pulling the whole UI bundle (which references `document` at load).
+      entry: {
+        index: resolve(__dirname, 'src/index.ts'),
+        testIds: resolve(__dirname, 'src/testIds.ts'),
+      },
       formats: ['es'],
     },
     rollupOptions: {

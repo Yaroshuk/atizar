@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import type { AgentGroup, Instance, PInstance, PipelineBlock } from '../../pipelineModel'
 import type { Status } from '../../status'
 import { pillLabel, pillTint } from '../../statusDisplay'
+import { testIds } from '../../testIds'
 import { LINGER_MS, useLingerSet } from '../../pipelineLinger'
 import { Icon } from '../Icon/Icon'
 import { CompHeader } from '../../primitives/CompHeader/CompHeader'
@@ -173,6 +174,7 @@ export const PipelineColumn = ({
   const renderMiniRow = (parent: PInstance, leaving: boolean) => (
     <div
       className={`mini ${pillTint(parent.status, parent.outcome)}${stopClasses(parent)}${leaving ? ' ' + s.leaving : ''}`}
+      data-testid={testIds.pipelineRow(parent.agentId)}
       onClick={() => onOpen(parent.localId)}
     >
       <div className='m-icon'>
@@ -194,6 +196,7 @@ export const PipelineColumn = ({
       <div
         key={g.agentId}
         className={`pl-single ${pillTint(head.status, head.outcome)}${stopClasses(head)}${leaving ? ' ' + s.leaving : ''}`}
+        data-testid={testIds.pipelineRow(head.agentId)}
         onClick={() => onOpen(head.localId)}
       >
         <div className='m-icon'>
@@ -218,6 +221,7 @@ export const PipelineColumn = ({
         <span className={s.plHstub} />
         <div
           className={`pl-inst ${pillTint(head.status, head.outcome)}${stopClasses(head)}${leaving ? ' ' + s.leaving : ''}`}
+          data-testid={testIds.pipelineRow(head.agentId)}
           onClick={() => onOpen(head.localId)}
         >
           <span className='pl-iname'>
@@ -325,6 +329,7 @@ export const PipelineColumn = ({
               {onResetWorkflow && (
                 <ResetButton
                   scope='workflow'
+                  data-testid={testIds.resetWorkflow}
                   resetting={resettingWorkflow}
                   onClick={onResetWorkflow}
                   title='Reset this workflow — stop and clear everything (running items included)'
@@ -333,6 +338,7 @@ export const PipelineColumn = ({
               {onStopWorkflow && (
                 <StopButton
                   scope='workflow'
+                  data-testid={testIds.stopWorkflow}
                   disabled={workflowActiveCount === 0}
                   stopping={stoppingWorkflow}
                   onClick={onStopWorkflow}
