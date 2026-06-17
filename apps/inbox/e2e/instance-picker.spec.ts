@@ -17,6 +17,9 @@ test.describe('Instance picker (demo, staged)', () => {
     })
 
     await test.step('opening the reply card routes to the picker (≥2 live)', async () => {
+      // Wait for BOTH staged instances to be live first — otherwise a click while only one has
+      // reached awaiting routes to the single thread (length 1), not the picker (a race).
+      await expect(board.pipelineRow('reply')).toHaveCount(2, { timeout: 30_000 })
       await board.agentCard('reply').click()
       await expect(board.pickerModal()).toBeVisible({ timeout: 30_000 })
       await expect(board.pickerModal()).toContainText('2 active')

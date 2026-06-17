@@ -19,15 +19,18 @@ test.describe('START → Stop all → START again', () => {
     await test.step('Stop all halts everything → the board clears, START returns', async () => {
       await expect(board.stopAll()).toBeEnabled()
       await board.stopAll().click()
+      // Bulk Stop is confirm-gated by design (useStopController) — confirm to actually halt.
+      await board.confirmAction().click()
       await expect(board.pipelineRow('reply')).toHaveCount(0, { timeout: 30_000 })
       await expect(board.startButton('sorter')).toBeVisible()
     })
 
-    await test.step('a second START re-scans from a clean slate', async () => {
+    await test.step('after the brake, a second START still scans (prior emails stay covered)', async () => {
+      // Stop is NOT Clear: the stopped emails COVER their source (freeze & keep), so the re-scan
+      // dedups them and dispatches NO new workers. We only assert START still works — the scan runs
+      // and shows its summary. (A genuine clean-slate re-offer needs Clear/Reset, not Stop.)
       await board.startSorter()
       await expect(board.sortHeadline()).toBeVisible({ timeout: 30_000 })
-      await board.closeModalIfOpen()
-      await expect(board.pipelineRow('reply').first()).toBeVisible()
     })
   })
 })

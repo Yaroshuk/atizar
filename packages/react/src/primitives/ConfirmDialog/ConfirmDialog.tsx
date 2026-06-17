@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Button } from '../Button/Button'
+import { testIds } from '../../testIds'
 import s from './ConfirmDialog.module.scss'
 
 // A small destructive-action confirmation (the bulk Stop scopes use it). Esc and
@@ -43,7 +44,7 @@ export const ConfirmDialog = ({
           <Button variant='soft' onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant='danger' onClick={onConfirm}>
+          <Button variant='danger' data-testid={testIds.confirmAction} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>
