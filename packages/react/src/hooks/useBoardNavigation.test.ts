@@ -435,6 +435,85 @@ describe('useBoardNavigation', () => {
   // START is a plain dispatch now — no client-side wipe/Start-over confirm (the server handles
   // re-scan safety: supersede-prior + one-live gate). Even a live singleton input agent dispatches
   // straight away.
+  it('INPUT open item: openRuns returns ONLY the latest scan (last by board order), not the stack', () => {
+    // Three scan roots sharing the input agent's CONSTANT key — board/creation order is array order.
+    // scan-1 and scan-2 are done with a card (hasCard → isVisible); scan-3 is running.
+    items = [
+      {
+        id: 'scan-1',
+        workflowId: 'a',
+        agentId: 'a__qualifier',
+        key: 'qualifier',
+        phase: 'terminal',
+        outcome: 'done',
+        status: 'done',
+        card: {},
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'scan-2',
+        workflowId: 'a',
+        agentId: 'a__qualifier',
+        key: 'qualifier',
+        phase: 'terminal',
+        outcome: 'done',
+        status: 'done',
+        card: {},
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'scan-3',
+        workflowId: 'a',
+        agentId: 'a__qualifier',
+        key: 'qualifier',
+        phase: 'active',
+        outcome: 'running',
+        status: 'running',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.setOpenId('scan-1')) // open via ANY of the instance's runs
+    // Only the latest scan root is rendered in the input thread (no stacking).
+    expect(result.current.openRuns.map((r) => r.localId)).toEqual(['scan-3'])
+  })
+
+  it('WORKER open item: openRuns keeps ALL of the instance runs (a sender keeps every draft)', () => {
+    items = [
+      {
+        id: 'd1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'awaiting_human',
+        outcome: 'running',
+        status: 'awaiting_approval',
+        card: {},
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'd2',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'active',
+        outcome: 'running',
+        status: 'running',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.setOpenId('d1'))
+    expect(result.current.openRuns.map((r) => r.localId).sort()).toEqual(['d1', 'd2'])
+  })
+
   describe('startInput', () => {
     it('calls start with the correct instanceId and sets openId to the returned id', async () => {
       const returnedId = 'a__qualifier#42'

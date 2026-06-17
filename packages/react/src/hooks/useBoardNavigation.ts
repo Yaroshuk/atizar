@@ -6,6 +6,7 @@ import { lookups } from '../lookups'
 import { toPInstances } from '../boardModel'
 import { pickHead, type PInstance } from '../pipelineModel'
 import { isLive } from '../liveness'
+import { latestScanRuns } from '../latestScanRuns'
 import type { WorkItem } from '../serverTypes'
 import type { WorkflowsConfig } from '../workflowsContext'
 
@@ -129,11 +130,17 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   // ≥2 → one row per distinct instance (variant B), each represented by its head Run.
   const pickerInstances = openPickerId ? instancesOf(openPickerId) : []
 
-  // All visible Runs of the OPEN item's instance (same agentId + key). One sender with several
-  // drafts → several Runs here; InstanceView stacks them. The head is the worst-meaningful Run
-  // (pickHead — the same one-source priority the pipeline/aggregate use) → the instance status.
+  // All visible Runs of the OPEN item's instance (same agentId + key), in board/creation order.
+  // For an INPUT agent (constant key → every scan collapses into one instance) the open thread
+  // renders ONLY the latest scan — older kept-for-children scans host their children in the
+  // pipeline tree, not as a repeated scan card here (see latestScanRuns). A WORKER keeps all of
+  // its runs (a sender's several drafts). openHead/onStop derive from this — the latest scan is
+  // the correct head to represent and to stop.
   const openRuns: PInstance[] = openItem
-    ? pInstances.filter((p) => p.agentId === stripAgent(openItem) && p.key === openItem.key)
+    ? latestScanRuns(
+        pInstances.filter((p) => p.agentId === stripAgent(openItem) && p.key === openItem.key),
+        roleOf(stripAgent(openItem)) === 'input'
+      )
     : []
   const openHead: PInstance | undefined = openRuns.length ? pickHead(openRuns) : undefined
 
