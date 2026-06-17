@@ -9,6 +9,7 @@ const inst = (over: Partial<PInstance>): PInstance => ({
   runtimeKey: 'rk',
   agentId: 'wf__reply',
   key: 'k',
+  episodeSeq: 1,
   name: 'Reply',
   iconName: 'mail',
   label: 'Ann',
