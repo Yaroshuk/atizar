@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import {
   encodeHandoff,
+  handoffNote,
   readGateOpened,
   type EffectFn,
   type GateResolution,
@@ -47,7 +48,9 @@ export interface RunObserverDeps {
     dest: { kind: 'agent'; agentId: string }
     payload: Record<string, unknown>
     parentId: string
-  }) => Promise<unknown>
+  }) => Promise<
+    { ok: true; id: string; deduped: boolean } | { ok: false; error: string } | undefined
+  >
   // F4 activity feed — optional so tests that omit it stay zero-overhead.
   activity?: ActivityLog
   // The one terminal writer (U7). RunObserver calls it for its own finish/fail so the trace note
@@ -157,14 +160,29 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
               if (runtime.handoffs.includes(to)) {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured to strip `to` from the payload
                 const { to: _to, ...payload } = parsed
-                await deps
+                const res = await deps
                   .deliver({
                     origin: wi.workflowId,
                     dest: { kind: 'agent', agentId: to },
                     payload,
                     parentId: id,
                   })
-                  .catch((e) => console.error('[runObserver] dispatch deliver failed', id, e))
+                  .catch((e) => {
+                    console.error('[runObserver] dispatch deliver failed', id, e)
+                    return undefined
+                  })
+                if (res?.ok === true) {
+                  const ho = handoffNote({
+                    kind: 'handoff',
+                    targetAgentId: to,
+                    childWorkItemId: res.id,
+                    deduped: res.deduped,
+                    at: Date.now(),
+                  })
+                  await store.appendTrace(id, seq, ho)
+                  bus.publish(`workitem:${id}`, { seq, event: ho })
+                  seq++
+                }
               } else {
                 // Invalid target: append a synthetic warning to the trace and publish it.
                 // The stream continues — this is a model-side routing mistake, not a system fault.
