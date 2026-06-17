@@ -12,6 +12,7 @@ import { OUTCOME_LABEL } from '../../lifecycleDisplay'
 import { isDevMode } from '../../devMode'
 import { useDismiss } from '../../hooks/useDismiss'
 import { ThreadResultsContext } from '../../threadResults'
+import { ThreadHandoffsContext, type ThreadHandoff } from '../../threadHandoffs'
 import { Icon, type IconName } from '../Icon/Icon'
 import { Markdown } from '../../primitives/Markdown/Markdown'
 import { buildThreadItems } from '../../buildThreadItems.js'
@@ -123,6 +124,19 @@ export const AgentModal = ({
     }
   }
 
+  // Handoff events from this thread — ALL handoffs (both deduped and non-deduped) collected from
+  // agent.messages so cards can count/display them via ThreadHandoffsContext / useThreadHandoffs.
+  const handoffs: ThreadHandoff[] = agent.messages
+    .filter((m) => (m as { role?: string }).role === 'handoff')
+    .map((m) => {
+      const h = m as unknown as ThreadHandoff
+      return {
+        targetAgentId: h.targetAgentId,
+        childWorkItemId: h.childWorkItemId,
+        deduped: h.deduped,
+      }
+    })
+
   // Received notes show "← Received …" at the TOP (its first event). Sent notes ("→ Handed …")
   // are now rendered inline via the trace handoff event (Task 5) — no layout-pinned block needed.
   const received = notes.filter((n) => n.dir === 'received')
@@ -218,41 +232,43 @@ export const AgentModal = ({
         </div>
 
         <ThreadResultsContext.Provider value={resultsByToolName}>
-          <div className={s.thread}>
-            {received.map((note, i) => (
-              <div className={clsx(s.threadNote, s.received)} key={`rcv-${i}`}>
-                ← Received <strong>{note.label}</strong> from {note.otherName}
-              </div>
-            ))}
-            {incomingText && (
-              <div className={clsx(s.threadItem, s.userTurn)} key='incoming'>
-                {incomingText}
-              </div>
-            )}
-            {/* Always show the intro — for a running instance it heads the thread; for a
+          <ThreadHandoffsContext.Provider value={handoffs}>
+            <div className={s.thread}>
+              {received.map((note, i) => (
+                <div className={clsx(s.threadNote, s.received)} key={`rcv-${i}`}>
+                  ← Received <strong>{note.label}</strong> from {note.otherName}
+                </div>
+              ))}
+              {incomingText && (
+                <div className={clsx(s.threadItem, s.userTurn)} key='incoming'>
+                  {incomingText}
+                </div>
+              )}
+              {/* Always show the intro — for a running instance it heads the thread; for a
                 type view (idle, no instance) it's the agent's description so the card opens
                 to something meaningful rather than a blank panel. */}
-            <div className={clsx(s.threadItem, s.bubbleRow)}>
-              <span className={s.agentGlyph}>
-                <Icon name='sparkle' size={15} />
-              </span>
-              <div className={clsx(s.bubble, s.intro)}>{intro}</div>
-            </div>
-            {thread}
-            {gateSlot && <div className={s.threadItem}>{gateSlot}</div>}
-            {loading && (
               <div className={clsx(s.threadItem, s.bubbleRow)}>
                 <span className={s.agentGlyph}>
                   <Icon name='sparkle' size={15} />
                 </span>
-                <div className={s.typing}>
-                  <span />
-                  <span />
-                  <span />
-                </div>
+                <div className={clsx(s.bubble, s.intro)}>{intro}</div>
               </div>
-            )}
-          </div>
+              {thread}
+              {gateSlot && <div className={s.threadItem}>{gateSlot}</div>}
+              {loading && (
+                <div className={clsx(s.threadItem, s.bubbleRow)}>
+                  <span className={s.agentGlyph}>
+                    <Icon name='sparkle' size={15} />
+                  </span>
+                  <div className={s.typing}>
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              )}
+            </div>
+          </ThreadHandoffsContext.Provider>
         </ThreadResultsContext.Provider>
 
         {(() => {
