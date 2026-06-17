@@ -49,6 +49,10 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__reply',
         key: 'alice',
+        phase: 'active',
+        outcome: 'running',
+        card: null,
+        parentId: null,
         status: 'running',
         payload: {},
       },
@@ -57,6 +61,10 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__reply',
         key: 'alice',
+        phase: 'active',
+        outcome: 'running',
+        card: null,
+        parentId: null,
         status: 'running',
         payload: {},
       },
@@ -74,6 +82,10 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__reply',
         key: 'alice',
+        phase: 'active',
+        outcome: 'running',
+        card: null,
+        parentId: null,
         status: 'running',
         payload: {},
       },
@@ -82,6 +94,10 @@ describe('useBoardNavigation', () => {
         workflowId: 'a',
         agentId: 'a__reply',
         key: 'bob',
+        phase: 'active',
+        outcome: 'running',
+        card: null,
+        parentId: null,
         status: 'running',
         payload: {},
       },
@@ -90,6 +106,107 @@ describe('useBoardNavigation', () => {
     act(() => result.current.openAgent('reply'))
     expect(result.current.openPickerId).toBe('reply')
     expect(result.current.pickerInstances).toHaveLength(2) // one row per distinct key
+  })
+
+  it('R4: a lone TERMINAL instance does not route to a dead thread — opens the type view', () => {
+    items = [
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'done',
+        status: 'done',
+        outcome: 'done',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.openAgent('reply'))
+    expect(result.current.openTypeId).toBe('reply') // 0 LIVE instances → type view
+    expect(result.current.openId).toBeNull()
+    expect(result.current.openPickerId).toBeNull()
+  })
+
+  it('R5: [1 running, 1 done] opens the single LIVE thread, not the picker', () => {
+    items = [
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'active',
+        status: 'running',
+        outcome: 'running',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'a__reply#2',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'bob',
+        phase: 'done',
+        status: 'done',
+        outcome: 'done',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.openAgent('reply'))
+    expect(result.current.openId).toBe('a__reply#1') // count = 1 live → its thread
+    expect(result.current.openPickerId).toBeNull()
+  })
+
+  it('PK1: the picker lists only LIVE instances (a done instance does not appear)', () => {
+    items = [
+      {
+        id: 'a__reply#1',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'alice',
+        phase: 'active',
+        status: 'running',
+        outcome: 'running',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'a__reply#2',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'bob',
+        phase: 'awaiting_human',
+        status: 'awaiting_approval',
+        outcome: 'running',
+        card: {},
+        parentId: null,
+        payload: {},
+      },
+      {
+        id: 'a__reply#3',
+        workflowId: 'a',
+        agentId: 'a__reply',
+        key: 'carol',
+        phase: 'done',
+        status: 'done',
+        outcome: 'done',
+        card: null,
+        parentId: null,
+        payload: {},
+      },
+    ]
+    const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+    act(() => result.current.openAgent('reply'))
+    expect(result.current.openPickerId).toBe('reply') // 2 live instances → picker
+    expect(result.current.pickerInstances).toHaveLength(2) // carol (done) excluded
+    expect(result.current.pickerInstances.map((p) => p.key).sort()).toEqual(['alice', 'bob'])
   })
 
   it('writes the open id into the ?open= URL', () => {

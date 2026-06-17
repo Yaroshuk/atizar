@@ -5,6 +5,7 @@ import { useDispatch } from './useDispatch'
 import { lookups } from '../lookups'
 import { toPInstances } from '../boardModel'
 import { pickHead, type PInstance } from '../pipelineModel'
+import { isLive } from '../liveness'
 import type { WorkItem } from '../serverTypes'
 import type { WorkflowsConfig } from '../workflowsContext'
 
@@ -75,7 +76,11 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
       arr.push(p)
       byKey.set(p.key, arr)
     }
-    return [...byKey.values()].map(pickHead)
+    // One head Run per key; KEEP only instances whose head is live (running/awaiting/error).
+    // A done/stopped/rejected instance recedes from the card overlay, the picker, and the
+    // open-routing count — but stays in `openRuns` (the open thread is unfiltered) and in the
+    // board data (tree/dedup). One source: pickHead for the head, isLive for the live filter.
+    return [...byKey.values()].map(pickHead).filter((h) => isLive(h.status))
   }
 
   // Open an agent by count of its distinct INSTANCES (grouped by key).
