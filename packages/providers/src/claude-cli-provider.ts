@@ -86,16 +86,16 @@ export function createClaudeCliProvider(opts: {
     }
   }
 
-  // Build the resume prompt from the approved/edited artifact (resolution.form), falling back
-  // to the last approval args in the transcript. Returns null when no usable draft exists.
+  // Returns the resume PROMPT (string) to spawn, or null when there is no prompt-mode resume to run.
+  // message/null modes are resolved by the SERVER before resume() is called, so they never reach here.
   // Precedence is `??` (not `||`) on purpose: an explicitly-passed `form` is honored even when
-  // empty `{}` — the caller's decision wins over the transcript — and an empty form then yields
-  // a null prompt (buildResume rejects it), surfacing "Resume failed" rather than silently
-  // re-priming from a stale transcript. Do not change `??` to `||`.
+  // empty `{}` — the caller's decision wins over the transcript. Do not change `??` to `||`.
   function resumePromptFrom(handle: ResumeHandle, resolution: GateResolution): string | null {
     const messages = (handle.input?.messages ?? []) as Message[]
     const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
-    return withIdentity(prompts.buildResume?.(args, resolution.executedResult) ?? null)
+    const outcome = prompts.buildResume?.(args, resolution.executedResult) ?? null
+    if (outcome && outcome.kind === 'prompt') return withIdentity(outcome.text)
+    return null // message/null mode: nothing for the provider to spawn
   }
 
   return {
@@ -107,11 +107,10 @@ export function createClaudeCliProvider(opts: {
         // resolved transcript and NO resolution.form, so this reads args from the transcript
         // only. The explicit resume() path (below) prefers resolution.form via resumePromptFrom.
         const args = lastApprovalArgs(messages, approvalNames) ?? {}
-        const resumePrompt = withIdentity(prompts.buildResume?.(args) ?? null)
-        if (!resumePrompt) {
-          yield errorChunk('Resume failed: no saved draft found in the thread')
-          return
-        }
+        const outcome = prompts.buildResume?.(args) ?? null
+        const resumePrompt =
+          outcome && outcome.kind === 'prompt' ? withIdentity(outcome.text) : null
+        if (!resumePrompt) return // message/null/none: clean end, no "Resume failed"
         yield* primeAndStream(resumePrompt, [])
         return
       }
@@ -124,10 +123,7 @@ export function createClaudeCliProvider(opts: {
         return
       }
       const resumePrompt = resumePromptFrom(handle, resolution)
-      if (!resumePrompt) {
-        yield errorChunk('Resume failed: no saved draft found in the thread')
-        return
-      }
+      if (!resumePrompt) return // message/null handled server-side; nothing to spawn here
       yield* primeAndStream(resumePrompt, [])
     },
   }

@@ -35,16 +35,19 @@ const createReplyPrompts = (instructions: string): PromptStrategy => ({
       'Qualifier and click "Draft reply" on a verdict.',
     ].join('\n')
   },
-  buildResume(args: Record<string, unknown>): string | null {
+  buildResume(args: Record<string, unknown>) {
     const threadId = typeof args.threadId === 'string' ? args.threadId : ''
     const body = typeof args.body === 'string' ? args.body : ''
     if (!threadId || !body) return null
-    return [
-      instructions,
-      'The human APPROVED saving this reply. Create it as a Gmail DRAFT now by',
-      `calling create_draft, replying within thread "${threadId}", with body:`,
-      body,
-    ].join('\n')
+    return {
+      kind: 'prompt' as const,
+      text: [
+        instructions,
+        'The human APPROVED saving this reply. Create it as a Gmail DRAFT now by',
+        `calling create_draft, replying within thread "${threadId}", with body:`,
+        body,
+      ].join('\n'),
+    }
   },
 })
 
@@ -210,7 +213,7 @@ describe('createClaudeCliProvider', () => {
     expect(seenPrompt).toContain('create_draft')
   })
 
-  it('resume: surfaces an error when the thread has no usable draft args', async () => {
+  it('resume: clean exit (no spawn, no error) when the thread has no usable draft args', async () => {
     let spawned = false
     const spawn: ClaudeSpawn = () => {
       spawned = true
@@ -238,11 +241,9 @@ describe('createClaudeCliProvider', () => {
       { role: 'tool', id: 't1', content: 'approved', toolCallId: 'tc_d' },
     ]
     const out = await drain(provider.run(runInput(messages)))
-    const errorEvent = out.find(
-      (e) => e.type === EventType.TEXT_MESSAGE_CHUNK && e.delta?.includes('Resume failed')
-    )
-    expect(errorEvent).toBeDefined()
+    // null outcome → clean exit: no spawn, no "Resume failed" chunk (RM4)
     expect(spawned).toBe(false)
+    expect(out.some((e) => String(e.delta ?? '').includes('Resume failed'))).toBe(false)
   })
 
   it('emits a readable error chunk when spawn throws', async () => {
@@ -325,7 +326,7 @@ describe('createClaudeCliProvider — identity prepend', () => {
       instructions: 'HOUSE RULES',
       prompts: {
         buildFirst: () => 'TURN STEPS',
-        buildResume: () => 'RESUME STEPS',
+        buildResume: () => ({ kind: 'prompt' as const, text: 'RESUME STEPS' }),
       },
       spawn,
     })
@@ -402,7 +403,7 @@ describe('createClaudeCliProvider — resume()', () => {
     })
   })
 
-  it('resume(approved) errors (no spawn) when no usable draft args exist', async () => {
+  it('resume(approved) clean exit (no spawn, no error) when no usable draft args exist', async () => {
     let spawned = false
     const spawn = () => {
       spawned = true
@@ -418,8 +419,46 @@ describe('createClaudeCliProvider — resume()', () => {
     const out = await drain(
       provider.resume!(handle, { gateId: 'g1', decision: 'approved', form: {} })
     )
+    // null outcome → clean exit: no spawn, no "Resume failed" chunk (RM4)
     expect(spawned).toBe(false)
-    expect(out.some((e) => /Resume failed/.test(e.delta ?? ''))).toBe(true)
+    expect(out.some((e) => /Resume failed/.test(e.delta ?? ''))).toBe(false)
+  })
+})
+
+describe('createClaudeCliProvider — ResumeOutcome union (RM4)', () => {
+  it('streams the prompt text when buildResume returns prompt mode', async () => {
+    const spawned: string[] = []
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: [],
+      allowedTools: [],
+      prompts: {
+        buildFirst: () => 'first',
+        buildResume: () => ({ kind: 'prompt', text: 'human approved, confirm' }),
+      },
+      spawn: (prompt) => {
+        spawned.push(prompt)
+        return { lines: (async function* () {})(), kill: () => {} }
+      },
+    })
+    const handle = { runId: 'r1', input: { messages: [] } as any }
+    for await (const _ of provider.resume!(handle, { gateId: 'g', decision: 'approved' })) void _
+    expect(spawned.some((p) => p.includes('human approved, confirm'))).toBe(true)
+  })
+
+  it('never emits a "Resume failed" chunk when buildResume returns null', async () => {
+    const provider = createClaudeCliProvider({
+      approvalNames: ['saveDraft'],
+      surfaceTools: [],
+      allowedTools: [],
+      prompts: { buildFirst: () => 'first', buildResume: () => null },
+      spawn: () => ({ lines: (async function* () {})(), kill: () => {} }),
+    })
+    const handle = { runId: 'r1', input: { messages: [] } as any }
+    const out: any[] = []
+    for await (const e of provider.resume!(handle, { gateId: 'g', decision: 'approved' }))
+      out.push(e)
+    expect(out.some((e) => String(e.delta ?? '').includes('Resume failed'))).toBe(false)
   })
 })
 
