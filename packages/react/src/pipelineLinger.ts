@@ -48,7 +48,10 @@ export function useLingerSet(
 
   const next = diffLeaving(presentRef.current, leavingRef.current, currentPresent)
 
-  // Schedule a removal timer for any id that is newly leaving (no timer yet).
+  // Schedule a removal timer for any id that is newly leaving (no timer yet). This runs in the
+  // render phase, not an effect — StrictMode-safe because `timers` is a stable useRef and the
+  // `has(id)` guard makes scheduling idempotent across a double-invoked/discarded render; the
+  // cleanup effect below clears every timer on unmount. Keep the `has(id)` guard if refactoring.
   for (const id of next.leaving) {
     if (timers.current.has(id)) continue
     timers.current.set(

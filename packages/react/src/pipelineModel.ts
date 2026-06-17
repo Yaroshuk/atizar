@@ -77,8 +77,8 @@ export function buildPipeline(
     }
   }
 
-  // A "live descendant" exists if any node in the subtree rooted at x is ACTIVE (running /
-  // awaiting_approval / error). Precompute per-localId so view() is O(1).
+  // A "live descendant" exists if any node in the subtree rooted at x is live per isLive
+  // (running / awaiting_approval / error). Precompute per-localId so view() is O(1).
   const hasLiveDescendant = new Map<string, boolean>()
   const computeLive = (x: PInstance): boolean => {
     if (hasLiveDescendant.has(x.localId)) return hasLiveDescendant.get(x.localId)!
