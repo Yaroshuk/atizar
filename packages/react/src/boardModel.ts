@@ -1,7 +1,6 @@
 import { lifecycle, hasLiveDescendant, type Phase } from '@atizar/core'
 import type { WorkItem } from './serverTypes'
 import { displayStatus } from './lifecycleDisplay'
-import type { AgentEntry } from './aggregate'
 import type { PInstance } from './pipelineModel'
 import type { IconName } from './components/Icon/Icon'
 
@@ -55,19 +54,3 @@ export const queuedByAgent = (items: WorkItem[], workflowId: string): Record<str
   return out
 }
 
-// Retired items (superseded/reset) have LEFT the board — the server drops them, so they never
-// reach this filter and cannot colour the agent's type card. A queued item carries no settled
-// status yet, so it is excluded too; everything past queued maps via displayStatus. Each entry
-// carries BOTH the display status and the raw outcome so the card can show the distinct terminal
-// word (Stopped/Rejected) the 'done' lane collapses away — same data the pipeline pills use.
-export const entriesOf = (items: WorkItem[], workflowId: string, agentId: string): AgentEntry[] =>
-  items
-    .filter(
-      (w) =>
-        w.workflowId === workflowId &&
-        stripWf(w.agentId, workflowId) === agentId &&
-        w.phase !== 'queued' &&
-        w.outcome !== 'superseded' &&
-        w.outcome !== 'reset'
-    )
-    .map((w) => ({ status: displayStatus(w.phase, w.outcome), outcome: w.outcome }))

@@ -136,6 +136,7 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
     pickerInstances,
     pInstances,
     liveOf,
+    instancesOf,
     canStart,
     openAgent,
     startInput,

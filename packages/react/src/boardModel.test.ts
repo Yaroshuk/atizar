@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { WorkItem } from './serverTypes'
-import { toPInstances, queuedByAgent, entriesOf } from './boardModel'
+import { toPInstances, queuedByAgent } from './boardModel'
 
 const wi = (over: Partial<WorkItem> & Pick<WorkItem, 'id' | 'agentId' | 'phase'>): WorkItem => ({
   workflowId: 'lead-inbox',
@@ -60,48 +60,6 @@ describe('toPInstances', () => {
 describe('queuedByAgent', () => {
   it('counts queued items per agent within the workflow', () => {
     expect(queuedByAgent(items, 'lead-inbox')).toEqual({ reply: 1 })
-  })
-})
-
-describe('entriesOf', () => {
-  it('returns {status, outcome} entries of a given agent (queued excluded)', () => {
-    expect(entriesOf(items, 'lead-inbox', 'reply')).toEqual([
-      { status: 'awaiting_approval', outcome: 'running' },
-    ])
-    expect(entriesOf(items, 'lead-inbox', 'qualifier')).toEqual([
-      { status: 'running', outcome: 'running' },
-    ])
-  })
-
-  it('excludes retired items so a Reset/superseded agent reads idle, not done', () => {
-    const afterReset: WorkItem[] = [
-      wi({ id: 'S1', agentId: 'lead-inbox__qualifier', phase: 'terminal', outcome: 'reset' }),
-      wi({
-        id: 'S2',
-        agentId: 'lead-inbox__qualifier',
-        phase: 'terminal',
-        outcome: 'superseded',
-      }),
-    ]
-    // all runs retired → no entries contribute → the type card returns to idle (empty list)
-    expect(entriesOf(afterReset, 'lead-inbox', 'qualifier')).toEqual([])
-    // a still-relevant run is unaffected: a done (not retired) run keeps reading 'done'
-    const mixed: WorkItem[] = [
-      ...afterReset,
-      wi({ id: 'F', agentId: 'lead-inbox__qualifier', phase: 'terminal', outcome: 'done' }),
-    ]
-    expect(entriesOf(mixed, 'lead-inbox', 'qualifier')).toEqual([
-      { status: 'done', outcome: 'done' },
-    ])
-  })
-
-  it('carries the distinct terminal outcome (stopped) through for the type card', () => {
-    const stopped: WorkItem[] = [
-      wi({ id: 'T', agentId: 'lead-inbox__qualifier', phase: 'terminal', outcome: 'stopped' }),
-    ]
-    expect(entriesOf(stopped, 'lead-inbox', 'qualifier')).toEqual([
-      { status: 'done', outcome: 'stopped' },
-    ])
   })
 })
 

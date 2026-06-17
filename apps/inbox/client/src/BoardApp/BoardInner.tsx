@@ -20,7 +20,6 @@ import {
   useResetController,
   buildPipeline,
   queuedByAgent,
-  entriesOf,
   aggregateAgent,
   isDevMode,
   renderableNamesFor,
@@ -57,8 +56,12 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
   const renderableToolNames: ReadonlySet<string> = renderableNamesFor(config, nav.workflow.id)
 
   const blocks = buildPipeline(nav.pInstances, queuedByAgent(board.items, nav.workflow.id))
+  // ONE source of truth for "how many active": both the pipeline group count and this type-card
+  // aggregate collapse Runs into instances by (agentId, key). Aggregating raw work-items here
+  // (the old entriesOf) counted Runs, so the card read "2 active" while the pipeline read "1" for
+  // the same sender's two drafts. Now both count instances — represented by the head Run.
   const aggOf = (agentId: string) =>
-    aggregateAgent(entriesOf(board.items, nav.workflow.id, agentId))
+    aggregateAgent(nav.instancesOf(agentId).map((h) => ({ status: h.status, outcome: h.outcome })))
   // Prefer the freshly-fetched health (updates on connect/disconnect); fall back to the
   // board snapshot's boot cache only until the first /api/health resolves.
   const healthOf = (agentId: string) =>
