@@ -104,7 +104,9 @@ describe('useBoardNavigation', () => {
   describe('notesFor', () => {
     // parent = qualifier instance in workflow 'a'
     // child  = reply instance in the SAME workflow 'a'
-    it('same-workflow child: parent gets sent note with targetLocalId; child gets received note', () => {
+    // Task 5: the parent no longer gets a 'sent' note from board topology — "Handed to X" is
+    // now rendered inline via the trace handoff event. The child still gets a 'received' note.
+    it('same-workflow child: parent gets NO sent note; child gets received note', () => {
       const parentId = 'a__qualifier#1'
       const childId = 'a__reply#1'
       items = [
@@ -137,14 +139,9 @@ describe('useBoardNavigation', () => {
       ]
       const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
 
-      // Notes for the parent: one 'sent' note pointing at the child
+      // Notes for the parent: no notes (sent is gone — handoff is now a trace event)
       const parentNotes = result.current.notesFor(parentId)
-      expect(parentNotes).toHaveLength(1)
-      expect(parentNotes[0].dir).toBe('sent')
-      expect(parentNotes[0].otherName).toBe('R') // nameOf('reply') in workflow 'a'
-      expect(parentNotes[0].label).toBe('Lead A') // labelOf(child) via payload.subject
-      expect(parentNotes[0].targetLocalId).toBe(childId) // same-workflow → set
-      expect(parentNotes[0].targetWorkflow).toBeUndefined() // same-workflow → absent
+      expect(parentNotes).toHaveLength(0)
 
       // Notes for the child: one 'received' note from the parent
       const childNotes = result.current.notesFor(childId)
@@ -152,13 +149,10 @@ describe('useBoardNavigation', () => {
       expect(childNotes[0].dir).toBe('received')
       expect(childNotes[0].otherName).toBe('Qualifier') // nameOf('qualifier') in workflow 'a'
       expect(childNotes[0].label).toBe('Lead A') // labelOf(child) — label is on the child item
-      expect(childNotes[0].targetLocalId).toBeUndefined()
-      expect(childNotes[0].targetWorkflow).toBeUndefined()
     })
 
-    // parent = qualifier instance in workflow 'a'
-    // child  = reply instance in a DIFFERENT workflow 'b'
-    it('cross-workflow child: sent note has targetWorkflow set and targetLocalId absent', () => {
+    // Task 5: cross-workflow child no longer produces a sent note on the parent.
+    it('cross-workflow child: parent gets NO sent note (sent is a trace event now)', () => {
       const parentId = 'a__qualifier#1'
       const crossChildId = 'b__reply#1'
       items = [
@@ -192,14 +186,44 @@ describe('useBoardNavigation', () => {
       const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
 
       const parentNotes = result.current.notesFor(parentId)
-      expect(parentNotes).toHaveLength(1)
-      expect(parentNotes[0].dir).toBe('sent')
-      // stripAgent(child) = 'b__reply'.slice('b'.length + 2) = 'reply'
-      // nameOf('reply') looks up workflow 'a' → finds agent id 'reply', name 'R'
-      expect(parentNotes[0].otherName).toBe('R')
-      expect(parentNotes[0].label).toBe('Cross lead')
-      expect(parentNotes[0].targetWorkflow).toBe('b') // cross-workflow → set
-      expect(parentNotes[0].targetLocalId).toBeUndefined() // cross-workflow → absent
+      expect(parentNotes).toHaveLength(0)
+    })
+
+    it('notesFor never returns sent notes — handoff is a trace event (Task 5)', () => {
+      // Even when a child work item exists in the board, notesFor must not emit 'sent' notes.
+      // The "Handed to X" line is now rendered inline via the trace handoff event (Task 4).
+      const parentId = 'a__qualifier#1'
+      const childId = 'a__reply#1'
+      items = [
+        {
+          id: parentId,
+          workflowId: 'a',
+          agentId: 'a__qualifier',
+          parentId: null,
+          status: 'running',
+          payload: { subject: 'Lead A' },
+          resolution: null,
+          card: null,
+          error: null,
+          origin: 'human',
+          source: null,
+        },
+        {
+          id: childId,
+          workflowId: 'a',
+          agentId: 'a__reply',
+          parentId: parentId,
+          status: 'running',
+          payload: { subject: 'Lead A' },
+          resolution: null,
+          card: null,
+          error: null,
+          origin: 'agent',
+          source: null,
+        },
+      ]
+      const { result } = renderHook(() => useBoardNavigation(cfg, 'a'))
+      expect(result.current.notesFor(parentId).every((n) => n.dir === 'received')).toBe(true)
     })
 
     it('item with no parent and no children returns []', () => {

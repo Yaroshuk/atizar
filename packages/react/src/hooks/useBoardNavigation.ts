@@ -14,12 +14,12 @@ import type { WorkflowsConfig } from '../workflowsContext'
 //
 // HandoffNote mirrors the type in AgentModal; duplicated here so this hook (and any hook
 // consumer) can type notes without importing a React component.
+// Only 'received' notes are emitted by notesFor — 'sent' notes were removed in Task 5
+// (the "Handed to X" line is now rendered inline via the trace handoff event).
 export type HandoffNote = {
-  dir: 'received' | 'sent'
+  dir: 'received'
   otherName: string
   label: string
-  targetWorkflow?: string // present on a cross-workflow 'sent' note
-  targetLocalId?: string // the spawned target instance (intra-workflow jump), if it started
 }
 
 export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: string) {
@@ -100,7 +100,8 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
   }
 
   // WorkflowBoard.tsx:185-209: handoff notes for an open item, derived from board topology.
-  // A 'received' note from the item's parent; a 'sent' note per child.
+  // Only 'received' notes are emitted (from the item's parent). 'Sent' notes (→ Handed to X)
+  // are now rendered inline from the trace handoff event (Task 5).
   const notesFor = (id: string): HandoffNote[] => {
     const item = itemById(id)
     if (!item) return []
@@ -113,15 +114,6 @@ export function useBoardNavigation(config: WorkflowsConfig, activeWorkflowId: st
           otherName: nameOf(stripAgent(parent)),
           label: labelOf(item),
         })
-    }
-    for (const child of board.items.filter((w) => w.parentId === id)) {
-      notes.push({
-        dir: 'sent',
-        otherName: nameOf(stripAgent(child)),
-        label: labelOf(child),
-        targetWorkflow: child.workflowId !== workflow.id ? child.workflowId : undefined,
-        targetLocalId: child.workflowId === workflow.id ? child.id : undefined,
-      })
     }
     return notes
   }

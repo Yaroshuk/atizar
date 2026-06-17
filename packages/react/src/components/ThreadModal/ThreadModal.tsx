@@ -6,6 +6,7 @@ import { buildRenderToolCall } from '../../buildRenderToolCall'
 import { useWorkflowsConfig } from '../../workflowsContext'
 import { byWorkflow } from '../../registryScope'
 import { displayStatus } from '../../lifecycleDisplay'
+import { lookups } from '../../lookups'
 import { AgentModal, type HandoffNote } from '../AgentModal/AgentModal'
 import type { IconName } from '../Icon/Icon'
 import { useBoard } from '../../hooks/useBoard'
@@ -88,6 +89,31 @@ export const ThreadModal = (p: ThreadModalProps) => {
       })
     })()
 
+  // Resolve display name/label + open affordance for an inline handoff item (Task 5).
+  // targetAgentId is in wf__agent format; childWorkItemId is the spawned work item's id.
+  // We look up the child in the board to get its workflowId and payload (for the label),
+  // then use defOf to get the agent display name (cross-workflow aware).
+  const { defOf, labelOf } = lookups(config, p.workflowId)
+  const resolveHandoff = useMemo(
+    () => (h: { targetAgentId: string; childWorkItemId: string }) => {
+      const child = board.items.find((w) => w.id === h.childWorkItemId)
+      const childWorkflowId = child?.workflowId ?? p.workflowId
+      // Strip the "wf__" prefix from the full agent id to get the bare agent id.
+      const bareAgentId = h.targetAgentId.slice(childWorkflowId.length + 2)
+      const name = defOf(childWorkflowId, bareAgentId)?.name ?? h.targetAgentId
+      const label = child ? labelOf(child) : h.childWorkItemId
+      const onOpen =
+        child && childWorkflowId !== p.workflowId
+          ? () => p.onOpenWorkflow?.(childWorkflowId)
+          : child
+            ? () => p.onOpenInstance?.(child.id)
+            : undefined
+      return { name, label, onOpen }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [board.items, defOf, labelOf, p.workflowId, p.onOpenWorkflow, p.onOpenInstance]
+  )
+
   return (
     <AgentModal
       agent={{ messages }}
@@ -103,8 +129,7 @@ export const ThreadModal = (p: ThreadModalProps) => {
       intro={p.intro}
       gateSlot={gateSlot || undefined}
       notes={p.notes}
-      onOpenWorkflow={p.onOpenWorkflow}
-      onOpenInstance={p.onOpenInstance}
+      resolveHandoff={resolveHandoff}
       onStart={p.onStart}
       onStop={() => p.onStop(p.id)}
       onClose={p.onClose}

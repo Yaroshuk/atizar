@@ -73,10 +73,6 @@ export type AgentModalProps = {
     label: string
     onOpen?: () => void
   }
-  // Switch to the target workflow when a cross-workflow 'sent' note is clicked.
-  onOpenWorkflow?: (id: string) => void
-  // Jump to a live target instance (intra-workflow 'sent' note) by its localId.
-  onOpenInstance?: (localId: string) => void
   onStart: () => void
   // Stop the run (cancel the work item). Shown while running/awaiting_approval.
   onStop?: () => void
@@ -98,8 +94,6 @@ export const AgentModal = ({
   gateSlot,
   notes,
   resolveHandoff,
-  onOpenWorkflow,
-  onOpenInstance,
   onStart,
   onStop,
   onClose,
@@ -129,10 +123,9 @@ export const AgentModal = ({
     }
   }
 
-  // Chronology: a receiver shows "← Received …" at the TOP (its first event); a sender
-  // shows "→ Handed …" at the BOTTOM (the last thing it did), so the thread reads as history.
+  // Received notes show "← Received …" at the TOP (its first event). Sent notes ("→ Handed …")
+  // are now rendered inline via the trace handoff event (Task 5) — no layout-pinned block needed.
   const received = notes.filter((n) => n.dir === 'received')
-  const sent = notes.filter((n) => n.dir === 'sent')
 
   // The incoming user-turn: the seed/source message the agent reacted to. AgentModal otherwise
   // renders only assistant turns; surfacing the first user message gives the human the input
@@ -246,28 +239,6 @@ export const AgentModal = ({
               <div className={clsx(s.bubble, s.intro)}>{intro}</div>
             </div>
             {thread}
-            {sent.map((note, i) => (
-              <div className={clsx(s.threadNote, s.sent)} key={`snt-${i}`}>
-                → Handed <strong>{note.label}</strong> to {note.otherName}
-                {note.targetWorkflow ? (
-                  <button
-                    className={s.noteLink}
-                    onClick={() => onOpenWorkflow?.(note.targetWorkflow!)}
-                  >
-                    Open in {note.targetWorkflow}
-                  </button>
-                ) : (
-                  note.targetLocalId && (
-                    <button
-                      className={s.noteLink}
-                      onClick={() => onOpenInstance?.(note.targetLocalId!)}
-                    >
-                      Open {note.otherName}
-                    </button>
-                  )
-                )}
-              </div>
-            ))}
             {gateSlot && <div className={s.threadItem}>{gateSlot}</div>}
             {loading && (
               <div className={clsx(s.threadItem, s.bubbleRow)}>
