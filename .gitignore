@@ -25,3 +25,7 @@ apps/inbox/.cassettes/
 
 # Subagent git worktrees (harness-managed, transient) — never tracked or linted
 .claude/worktrees/
+
+# Playwright run artifacts (screenshots, traces, error-context) — regenerated each run
+apps/inbox/test-results/
+playwright-report/
