@@ -32,13 +32,18 @@ if ! echo "$TARGET" | grep -qE 'docs/(PHILOSOPHY|ARCHITECTURE)\.md'; then
 fi
 
 # For Bash, READING a foundation doc is ALWAYS allowed (cat/sed -n/grep/head/less/…) — only a
-# WRITE prompts. We match the few unambiguous write vectors that don't collide with read
-# commands: a redirect into the file (`>`/`>>`) and the in-place editors (sed -i / perl -i / tee).
-# This is deliberately a SMALL, precise set: broadening it to cp/mv/dd reintroduced false
-# prompts on reads (e.g. `grep -n cp <doc>`), and a read must never be blocked. The Edit/Write
-# tools are the real edit path and are caught above regardless. Anything else here → read → defer.
+# WRITE prompts. The write vector must TARGET the doc itself; a bare `>` anywhere in the command
+# must NOT count (the old `>>?` match fired on `2>/dev/null` / `2>&1` in pure reads like
+# `cat <doc> 2>/dev/null`, prompting on every read). We match only:
+#   - a redirect whose target IS the doc:   > docs/…  >> docs/…   (the path follows the `>`)
+#   - an in-place editor / tee operating ON the doc:   sed -i … <doc>   perl -i … <doc>   tee … <doc>
+# A `>` that targets something else (/dev/null, another file) or the doc appearing only as a READ
+# arg → defer. The Edit/Write tools are the real edit path and are caught above regardless.
+DOC='docs/(PHILOSOPHY|ARCHITECTURE)\.md'
 if [ "$TOOL" = "Bash" ]; then
-  if ! echo "$TARGET" | grep -qE '(>>?|sed[[:space:]]+-i|perl[[:space:]]+-i|tee)'; then
+  REDIR_TO_DOC=">>?[[:space:]]*[\"']?[^[:space:]|;&]*${DOC}"
+  INPLACE_ON_DOC="(sed[[:space:]]+-i|perl[[:space:]]+-i|tee)[^|;]*${DOC}"
+  if ! echo "$TARGET" | grep -qE "${REDIR_TO_DOC}|${INPLACE_ON_DOC}"; then
     exit 0
   fi
 fi
