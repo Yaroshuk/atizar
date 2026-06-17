@@ -98,8 +98,11 @@ export const ThreadModal = (p: ThreadModalProps) => {
     () => (h: { targetAgentId: string; childWorkItemId: string }) => {
       const child = board.items.find((w) => w.id === h.childWorkItemId)
       const childWorkflowId = child?.workflowId ?? p.workflowId
-      // Strip the "wf__" prefix from the full agent id to get the bare agent id.
-      const bareAgentId = h.targetAgentId.slice(childWorkflowId.length + 2)
+      // targetAgentId from runObserver is the BARE id (e.g. 'reply') — not the namespaced
+      // 'wf__agent' form. Use the '__' separator to handle both bare and namespaced ids.
+      const bareAgentId = h.targetAgentId.includes('__')
+        ? h.targetAgentId.slice(h.targetAgentId.indexOf('__') + 2)
+        : h.targetAgentId
       const name = defOf(childWorkflowId, bareAgentId)?.name ?? h.targetAgentId
       const label = child ? labelOf(child) : h.childWorkItemId
       const onOpen =

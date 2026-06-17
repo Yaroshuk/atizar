@@ -28,6 +28,46 @@ const wi = (over: Partial<WorkItem>): WorkItem =>
     ...over,
   }) as WorkItem
 
+// Mirrors the resolveHandoff extraction in ThreadModal.tsx: given a handoff event whose
+// targetAgentId is a BARE id (as set by runObserver.ts `targetAgentId: to`), the bare-agent
+// extraction must yield the correct agent id so defOf returns the display name.
+describe('resolveHandoff bare-agent extraction', () => {
+  it('resolves a BARE targetAgentId to the display name via defOf', () => {
+    const { defOf } = lookups(cfg, 'lead-inbox')
+    const childWorkflowId = 'lead-inbox'
+
+    // Simulate the BUGGY extraction (the old slice logic):
+    const buggyBareId = 'reply'.slice(childWorkflowId.length + 2) // '' (empty string)
+    const buggyName = defOf(childWorkflowId, buggyBareId)?.name ?? 'reply'
+    // This is the bug: defOf returns undefined for '' → falls back to the raw 'reply'
+    expect(buggyBareId).toBe('')
+    expect(buggyName).toBe('reply') // lowercase bare id, not the display name
+
+    // Simulate the FIXED extraction (__ split):
+    const bareTargetId = 'reply'
+    const fixedBareId = bareTargetId.includes('__')
+      ? bareTargetId.slice(bareTargetId.indexOf('__') + 2)
+      : bareTargetId
+    const fixedName = defOf(childWorkflowId, fixedBareId)?.name ?? bareTargetId
+    expect(fixedBareId).toBe('reply')
+    expect(fixedName).toBe('REPLY AGENT') // correct display name
+  })
+
+  it('also handles a namespaced wf__agent targetAgentId (backward compat)', () => {
+    const { defOf } = lookups(cfg, 'lead-inbox')
+    const childWorkflowId = 'lead-inbox'
+
+    // A namespaced id like 'lead-inbox__reply' must also resolve correctly with the fix:
+    const namespacedId = 'lead-inbox__reply'
+    const fixedBareId = namespacedId.includes('__')
+      ? namespacedId.slice(namespacedId.indexOf('__') + 2)
+      : namespacedId
+    const fixedName = defOf(childWorkflowId, fixedBareId)?.name ?? namespacedId
+    expect(fixedBareId).toBe('reply')
+    expect(fixedName).toBe('REPLY AGENT')
+  })
+})
+
 describe('lookups', () => {
   it('resolves role, name, icon, stripped agent id, and label', () => {
     const lk = lookups(cfg, 'lead-inbox')
