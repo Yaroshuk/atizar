@@ -2,7 +2,6 @@ import './load-dev-env.js' // MUST be first: loads .env.local (dev) before any e
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createServer, isDemo } from '@atizar/server'
-import { providerRegistry } from './providers.js'
 import { buildProvider } from './build-agent.js'
 import { workflowServers } from './workflows.js'
 import { scopesFor, connectionList } from './connections.js'
@@ -11,6 +10,13 @@ import { ReplyPayloadSchema, EmailBatchSchema } from '../workflows/email-inbox/d
 // In demo mode only the flagship email-inbox workflow is enabled (zero-cred showcase); otherwise
 // all workflows are active (null = all).
 const ENABLED_WORKFLOWS: string[] | null = isDemo() ? ['email-inbox'] : null
+
+// The demo replays cassettes and never invokes a real provider, so it loads an INERT registry that
+// pulls in NO Mastra / AI-SDK (keeps boot memory under the free-tier 512MB). Production loads the
+// real registry. Dynamic import so the heavy module is never even parsed in demo.
+const { providerRegistry } = await (isDemo()
+  ? import('./providers.demo.js')
+  : import('./providers.js'))
 
 // Single-process deploy: when the client has been built (`yarn build` → apps/inbox/dist), serve it
 // from the same Hono server (the staticDir seam). Absent in dev — Vite serves the client there, so
