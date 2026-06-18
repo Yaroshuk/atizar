@@ -5,13 +5,10 @@ import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import { agentQuestion, type Provider } from '@atizar/core'
 import { db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
-import { makeRunObserver, type AgentRuntime } from './runObserver.js'
-import { makeEventBus } from './eventBus.js'
+import { type AgentRuntime } from './runObserver.js'
 import { makePipelineService } from './pipelineService.js'
-import { settle } from './settle.js'
 import { transition } from './transition.js'
 import { questions, gates } from './db/schema.js'
-import type { WorkerPool } from './workerPool.js'
 
 // ── DB reachability ───────────────────────────────────────────────────────────
 
@@ -24,8 +21,10 @@ const reachable = await db
 
 const ev = (e: Record<string, unknown>): BaseEvent => e as unknown as BaseEvent
 
-/** Asker provider: emits AGENT_QUESTION then terminates (mirrors claude-cli kill at ask). */
-function askerProvider(answererAgentId: string): Provider {
+/** Asker provider: emits AGENT_QUESTION then terminates (mirrors claude-cli kill at ask).
+ *  `answererBareId` is the bare (non-prefixed) agent id — the target the observer resolves
+ *  via `resolveQuestionTarget` → deliverImpl builds the full `${wfId}__${answererBareId}` key. */
+function askerProvider(answererBareId: string): Provider {
   return {
     async *run(_input: RunAgentInput) {
       yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'asking…' })
@@ -33,7 +32,7 @@ function askerProvider(answererAgentId: string): Provider {
         questions: [
           {
             toolCallId: 'tc-ask',
-            target: { agentId: answererAgentId },
+            target: { agentId: answererBareId },
             payload: { q: 'what is the answer?' },
           },
         ],
@@ -76,203 +75,159 @@ function makeRuntime(provider: Provider, overrides: Partial<AgentRuntime> = {}):
   }
 }
 
-function fakePool(): WorkerPool {
-  return {
-    enqueue: vi.fn(),
-    dequeue: vi.fn(),
-    reconcile: vi.fn(),
-    activeCount: async () => 0,
-    queuedCount: () => 0,
+/** Poll `pred` every 20 ms until it returns true or `timeout` ms elapses. */
+async function waitFor(pred: () => Promise<boolean>, timeout = 5000): Promise<void> {
+  const start = Date.now()
+  while (Date.now() - start < timeout) {
+    if (await pred()) return
+    await new Promise((r) => setTimeout(r, 20))
   }
+  throw new Error('waitFor timed out')
 }
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
 describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails (PGlite)', () => {
   /**
-   * HAPPY PATH
-   * asker emits AGENT_QUESTION → awaiting_agent + question row open + answerer dispatched
-   * answerer emits card + finishes → question answered → asker wakes → finishes with answer in trace
+   * HAPPY PATH — drives the REAL makePipelineService with BOTH agents registered.
+   *
+   * The production automatic chain under test:
+   *   settle(answerer, 'finish') → finishWake(answererWiId) → observer.resume(askerWiId, {kind:'answer'})
+   *
+   * NO manual observer.resume call — the wake fires automatically from the production finishWake hook.
+   *
+   * Flow:
+   *   1. service.dispatch(asker) → pool enqueues + activates → observer.run(asker)
+   *   2. askerProvider emits AGENT_QUESTION → runObserver transitions asker→awaiting_agent,
+   *      inserts question row, calls deliverImpl({dest:{kind:'agent',agentId:'answerer'}})
+   *   3. deliverImpl builds instanceId(wfId, 'answerer') = `${wfId}__answerer`,
+   *      dispatches via pool → observer.run(answerer)
+   *   4. answererProvider emits renderCard → card set → finishes
+   *   5. settle(answerer,'finish') calls finishWake → answerQuestion → observer.resume(asker,{kind:'answer'})
+   *   6. asker resumes with buildResumeFromAnswer → emits "done: ..." text → terminal/done
    */
   it('happy path: asker suspends, answerer answers, asker wakes and finishes with answer', async () => {
     const wfId = `e2e-happy__${randomUUID().slice(0, 8)}`
-    const askerAgentId = `${wfId}__asker`
-    const answererAgentId = `${wfId}__answerer`
+    // Bare agent ids — the service builds full runtime keys as `${wfId}__asker` / `${wfId}__answerer`
+    // via instanceId(wfId, bareId) inside deliverImpl / resolveDelivery.
+    const askerBareId = 'asker'
+    const answererBareId = 'answerer'
+    const askerRuntimeId = `${wfId}__${askerBareId}`
+    const answererRuntimeId = `${wfId}__${answererBareId}`
     const card = { text: 'the answer' }
 
     const store = makeStateStore(db)
-    const bus = makeEventBus()
-    const pool = fakePool()
 
-    const settleImpl = async (
-      id: string,
-      edge: 'finish' | 'fail',
-      actor: string | null,
-      opts?: { error?: string }
-    ) => settle({ db, store, bus, reconcile: pool.reconcile }, id, edge, actor, opts)
-
-    // Track resume calls to verify the asker wakes correctly.
-    const resumeCalls: { id: string; payload: unknown }[] = []
-
-    // Answerer observer: runs the answer provider, sets the card, then wakes the asker.
-    const answererObs = makeRunObserver({
+    const service = makePipelineService({
       db,
-      store,
-      pool,
-      bus,
       resolveAgent: (agentId) => {
-        if (agentId === answererAgentId) {
-          return makeRuntime(answererProvider(card), { renderToolNames: ['renderCard'] })
-        }
-        return undefined
-      },
-      deliver: async () => ({ ok: true, id: randomUUID(), deduped: false }),
-      settle: async (id, edge, actor, opts) => {
-        await settleImpl(id, edge, actor, opts)
-        if (edge === 'finish') {
-          const q = await store.getQuestionByAnswerer(id)
-          if (!q) return
-          const wi = await store.getWorkItem(id)
-          const answer: Record<string, unknown> = wi?.card ?? {}
-          await store.answerQuestion(q.id, answer)
-          const pending = await store.getPendingQuestionsForAsker(q.askerWorkItemId)
-          if (pending.length === 0) {
-            const answers = [{ target: q.target, answer, ok: true as const }]
-            resumeCalls.push({
-              id: q.askerWorkItemId,
-              payload: { kind: 'answer', answers, allOk: true },
-            })
-          }
-        }
-      },
-      reconcile: pool.reconcile,
-      resolveQuestionTarget: () => null,
-    })
-
-    // Asker observer: runs the question provider, suspends, and tracks deliver for the answerer.
-    let answererWorkItemId: string | undefined
-    const askerObs = makeRunObserver({
-      db,
-      store,
-      pool,
-      bus,
-      resolveAgent: (agentId) => {
-        if (agentId === askerAgentId) {
-          return makeRuntime(askerProvider(answererAgentId), {
+        if (agentId === askerRuntimeId) {
+          return makeRuntime(askerProvider(answererBareId), {
             buildResumeFromAnswer: (answers) => ({
               kind: 'message',
               text: `done: ${JSON.stringify(answers[0]?.answer)}`,
             }),
           })
         }
+        if (agentId === answererRuntimeId) {
+          return makeRuntime(answererProvider(card), { renderToolNames: ['renderCard'] })
+        }
         return undefined
       },
-      deliver: async (_req) => {
-        // Create the answerer work item so we can link it via setQuestionAnswerer.
-        const awi = await store.insertWorkItem({
-          workflowId: wfId,
-          agentId: answererAgentId,
-          origin: 'agent',
-          payload: { q: 'what is the answer?' },
-          key: answererAgentId,
-          parentId: askerWi.id,
-        })
-        answererWorkItemId = awi.id
-        return { ok: true, id: awi.id, deduped: false }
-      },
-      settle: settleImpl,
-      reconcile: pool.reconcile,
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      // resolveQuestionTarget: target carries { agentId: 'answerer' } (the bare id emitted by
+      // askerProvider). Return it as-is; deliverImpl will build the full `${wfId}__answerer` key
+      // via instanceId(wfId, 'answerer') inside resolveDelivery.
       resolveQuestionTarget: (target) => {
         const t = target as { agentId?: string }
         return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
       },
     })
 
-    // Insert + start the asker work item.
-    const askerWi = await store.insertWorkItem({
+    // ── Phase 1: dispatch the asker and wait for it to suspend ────────────────
+    const { id: askerWiId } = await service.dispatch({
       workflowId: wfId,
-      agentId: askerAgentId,
+      agentId: askerRuntimeId,
       origin: 'human',
       payload: { task: 'test' },
-      key: askerAgentId,
     })
-    await transition(db, askerWi.id, 'start')
 
-    // ── Phase 1: run the asker ────────────────────────────────────────────────
-    await askerObs.run(askerWi.id)
+    // Wait until the asker has suspended AND the question row has the answerer linked.
+    // The observer transitions active→awaiting_agent BEFORE calling deliver+setQuestionAnswerer,
+    // so we must wait for the answererWorkItemId to be populated (not just for awaiting_agent phase)
+    // to avoid a race between our read and setQuestionAnswerer.
+    await waitFor(async () => {
+      const [q] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
+      return q?.answererWorkItemId != null
+    })
 
     // (a) Asker is now awaiting_agent.
-    const askerAfterAsk = await store.getWorkItem(askerWi.id)
+    const askerAfterAsk = await store.getWorkItem(askerWiId)
     expect(askerAfterAsk?.phase).toBe('awaiting_agent')
 
     // (b) One open question row.
-    const pendingBefore = await store.getPendingQuestionsForAsker(askerWi.id)
+    const pendingBefore = await store.getPendingQuestionsForAsker(askerWiId)
     expect(pendingBefore).toHaveLength(1)
     expect(pendingBefore[0].status).toBe('open')
     expect(pendingBefore[0].toolCallId).toBe('tc-ask')
     expect(pendingBefore[0].payload).toEqual({ q: 'what is the answer?' })
 
-    // (c) Answerer was dispatched (deliver was called once).
-    expect(answererWorkItemId).toBeDefined()
+    // (c) Answerer was dispatched automatically (deliverImpl called via runObserver → question path).
+    const answererWorkItemId = pendingBefore[0].answererWorkItemId
+    if (!answererWorkItemId) throw new Error('deliver was not called — answererWorkItemId is null')
 
-    // (d) Answerer's parentId links to the asker — lineage depth is 1 (question row is the link).
-    const answererWi = await store.getWorkItem(answererWorkItemId!)
-    expect(answererWi?.parentId).toBe(askerWi.id)
+    // (d) Answerer's parentId links to the asker — lineage depth 1.
+    const answererWiSnap = await store.getWorkItem(answererWorkItemId)
+    expect(answererWiSnap?.parentId).toBe(askerWiId)
 
-    // Link the answerer work item id to the question row (normally done by the observer via
-    // setQuestionAnswerer inside deliver success — here it's already done in the deliver mock above
-    // via RunObserver.consume which calls setQuestionAnswerer after deliver returns ok).
-    // The link is already set by the askerObs.run path (RunObserver calls setQuestionAnswerer).
-    const pendingAfterLink = await db
+    // (e) Question row already links the answerer.
+    const [qRowAfterDispatch] = await db
       .select()
       .from(questions)
-      .where(eq(questions.askerWorkItemId, askerWi.id))
-    expect(pendingAfterLink[0].answererWorkItemId).toBe(answererWorkItemId)
+      .where(eq(questions.askerWorkItemId, askerWiId))
+    expect(qRowAfterDispatch.answererWorkItemId).toBe(answererWorkItemId)
 
-    // ── Phase 2: run the answerer ─────────────────────────────────────────────
-    await transition(db, answererWorkItemId!, 'start')
-    await answererObs.run(answererWorkItemId!)
+    // ── Phase 2: wait for the full automatic chain to complete ────────────────
+    // The answerer was already enqueued by deliverImpl. The pool activates it and runs it
+    // automatically. When it finishes, finishWake fires → answerQuestion → observer.resume(asker).
+    // The asker then resumes via buildResumeFromAnswer and reaches terminal/done.
+    // NO manual observer.resume call here — this is the production automatic chain under test.
+    await waitFor(async () => {
+      const wi = await store.getWorkItem(askerWiId)
+      return wi?.phase === 'terminal'
+    })
 
-    // (e) Answerer is terminal/done.
-    const answererFinal = await store.getWorkItem(answererWorkItemId!)
+    // (f) Answerer is terminal/done.
+    const answererFinal = await store.getWorkItem(answererWorkItemId)
     expect(answererFinal?.phase).toBe('terminal')
     expect(answererFinal?.outcome).toBe('done')
 
-    // (f) Answerer's card was set from the render tool.
+    // (g) Answerer's card was set from the render tool.
     expect(answererFinal?.card).toMatchObject({ tool: 'renderCard', props: card })
 
-    // (g) Question is now answered.
-    const [qRow] = await db
-      .select()
-      .from(questions)
-      .where(eq(questions.askerWorkItemId, askerWi.id))
+    // (h) Question is now answered (finishWake called answerQuestion).
+    const [qRow] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
     expect(qRow.status).toBe('answered')
     expect(qRow.answer).toMatchObject({ tool: 'renderCard', props: card })
 
-    // (h) Resume was called for the asker with {kind:'answer'}.
-    expect(resumeCalls).toHaveLength(1)
-    expect(resumeCalls[0].id).toBe(askerWi.id)
-    expect(resumeCalls[0].payload).toMatchObject({ kind: 'answer' })
-
-    // ── Phase 3: wake the asker (observer.resume) ─────────────────────────────
-    await askerObs.resume(
-      askerWi.id,
-      resumeCalls[0].payload as Parameters<typeof askerObs.resume>[1]
-    )
-
-    // (i) Asker is terminal/done.
-    const askerFinal = await store.getWorkItem(askerWi.id)
+    // (i) Asker is terminal/done — woke automatically via finishWake→observer.resume.
+    const askerFinal = await store.getWorkItem(askerWiId)
     expect(askerFinal?.phase).toBe('terminal')
     expect(askerFinal?.outcome).toBe('done')
 
-    // (j) Asker's trace carries the "done: ..." completion text.
-    const trace = await store.getTrace(askerWi.id, 0)
-    const textEvents = trace.filter(
+    // (j) Asker's trace carries the "done: ..." completion text (from buildResumeFromAnswer).
+    const traceRows = await store.getTrace(askerWiId, 0)
+    const textEvents = traceRows.filter(
       (r) => (r.event as { type?: string; delta?: string }).type === EventType.TEXT_MESSAGE_CHUNK
     )
     const allText = textEvents.map((r) => (r.event as { delta?: string }).delta ?? '').join('')
     expect(allText).toContain('done:')
     expect(allText).toContain('the answer')
+
+    // (k) Lineage: answerer's parentId is the asker's work item id (depth not grown beyond 1).
+    expect(answererFinal?.parentId).toBe(askerWiId)
   })
 
   /**
