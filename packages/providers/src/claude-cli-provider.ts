@@ -91,7 +91,10 @@ export function createClaudeCliProvider(opts: {
   // message/null modes are resolved by the SERVER before resume() is called, so they never reach here.
   // Precedence is `??` (not `||`) on purpose: an explicitly-passed `form` is honored even when
   // empty `{}` — the caller's decision wins over the transcript. Do not change `??` to `||`.
-  function resumePromptFrom(handle: ResumeHandle, resolution: { form?: Record<string, unknown>; executedResult?: Record<string, unknown> }): string | null {
+  function resumePromptFrom(
+    handle: ResumeHandle,
+    resolution: { form?: Record<string, unknown>; executedResult?: Record<string, unknown> }
+  ): string | null {
     const messages = (handle.input?.messages ?? []) as Message[]
     const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
     const outcome = prompts.buildResume?.(args, resolution.executedResult) ?? null

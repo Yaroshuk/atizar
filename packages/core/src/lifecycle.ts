@@ -45,7 +45,12 @@ export interface Lifecycle {
   covers: boolean
 }
 
-const LIVE_PHASES: ReadonlySet<Phase> = new Set(['queued', 'active', 'awaiting_human', 'awaiting_agent'])
+const LIVE_PHASES: ReadonlySet<Phase> = new Set([
+  'queued',
+  'active',
+  'awaiting_human',
+  'awaiting_agent',
+])
 
 // Terminal outcomes that have LEFT the board (retired into Activity/history) — never visible.
 // `dismissed` joins here: an acknowledged error recedes like reset/superseded but stays a DISTINCT

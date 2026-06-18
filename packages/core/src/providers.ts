@@ -72,9 +72,7 @@ export interface PromptStrategy {
   ): ResumeOutcome
   // Resume after an AGENT ANSWER (the return channel), parallel to buildResume (human gate). Builds
   // the resume prompt from the delivered answers. Omit for an agent that never asks.
-  buildResumeFromAnswer?(
-    answers: AnswerResolution['answers']
-  ): ResumeOutcome
+  buildResumeFromAnswer?(answers: AnswerResolution['answers']): ResumeOutcome
 }
 
 // Everything a provider needs to run ONE agent, derived from its passport.
