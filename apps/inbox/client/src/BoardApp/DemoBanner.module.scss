@@ -1,0 +1,39 @@
+// Demo-only notice strip under the board header. Light board theme, ember accent.
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 9px 20px;
+  background: linear-gradient(180deg, #fff7f2, #fff3ec);
+  border-bottom: 1px solid #f3d6c5;
+  font-size: 13px;
+  color: #7a4a35;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e6562e;
+  box-shadow: 0 0 0 3px rgba(230, 86, 46, 0.15);
+  flex: 0 0 auto;
+}
+
+.text {
+  strong {
+    font-weight: 650;
+    color: #c0451f;
+  }
+}
+
+.link {
+  color: #c0451f;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(192, 69, 31, 0.4);
+
+  &:hover {
+    border-bottom-color: #c0451f;
+  }
+}

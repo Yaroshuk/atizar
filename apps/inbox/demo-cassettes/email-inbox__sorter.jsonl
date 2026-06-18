@@ -26,14 +26,21 @@
 {"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply","delta":"\"date\":\"Thu, 11 Jun 2026 12:45:00 +0000\",\"snippet\":\"Could you clarify what the Growth tier includes versus Starter? Comparing options.\"}}"}}
 {"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_route_reply"}}
 {"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-4","toolCallId":"demo_sorter_route_reply","content":"Routed.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_route_reply_2","toolCallName":"route_emails","parentMessageId":"demo-sorter-msg-4b"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply_2","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply_2","delta":"{\"to\": \"reply\", \"email\": {\"messageId\":\"demo-thread-5\",\"threadId\":\"demo-thread-5\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply_2","delta":"\"from\":\"Priya Nair <priya@lumen-retail.example>\",\"subject\":\"Starter vs Growth for a small team?\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_route_reply_2","delta":"\"date\":\"Thu, 11 Jun 2026 13:20:00 +0000\",\"snippet\":\"We are a 6-person team comparing Starter and Growth — what does Growth add over Starter?\"}}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_route_reply_2"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-4b","toolCallId":"demo_sorter_route_reply_2","content":"Routed.","role":"tool"}}
 {"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_sorter_render","toolCallName":"renderSort","parentMessageId":"demo-sorter-msg-5"}}
 {"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":""}}
-{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":"{\"summary\": \"4 unread emails sorted: a BrightLoop product digest (informational), a"}}
-{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" gift-card promo (spam), a contract-review request from Dana Reed (important), and a"}}
-{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" pricing question from Sam Carter (needs a reply).\", \"counts\": {\"reply\": 1, \"reader\": 1,"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":"{\"summary\": \"5 unread emails sorted: a BrightLoop product digest (informational), a"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" gift-card promo (spam), a contract-review request from Dana Reed (important), and two"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" pricing questions — from Sam Carter and Priya Nair — that each need a reply.\", \"counts\": {\"reply\": 2, \"reader\": 1,"}}
 {"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_sorter_render","delta":" \"spam\": 1, \"important\": 1}}"}}
 {"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_sorter_render"}}
 {"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-sorter-res-5","toolCallId":"demo_sorter_render","content":"Sort summary surfaced to the user.","role":"tool"}}
-{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":"4"}}
-{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":" unread emails sorted — one each to the reader, spam, important, and reply"}}
-{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":" workers. Each will propose its action for your approval."}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":"5"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":" unread emails sorted — to the reader, spam, and important workers, plus two replies"}}
+{"step":0,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-sorter-text-1","delta":" (Sam Carter and Priya Nair). Each will propose its action for your approval."}}

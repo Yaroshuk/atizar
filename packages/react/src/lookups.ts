@@ -19,10 +19,22 @@ export const lookups = (config: WorkflowsConfig, activeWorkflowId: string) => {
 
   const stripAgent = (w: WorkItem) => w.agentId.slice(w.workflowId.length + 2)
 
+  // Best-effort instance label over the common payload shapes (GitHub issue, top-level email, and
+  // a reply's nested `email`). For a sender, prefer the display name ("Sam Carter <s@x>" → "Sam
+  // Carter") so two instances of the same agent read apart in the pipeline.
+  const friendlyFrom = (from: string): string => from.replace(/\s*<[^>]*>\s*/, '').trim() || from
   const labelOf = (w: WorkItem): string => {
-    const p = w.payload as { number?: number; title?: string; subject?: string; from?: string }
+    const p = w.payload as {
+      number?: number
+      title?: string
+      subject?: string
+      from?: string
+      email?: { from?: string; subject?: string }
+    }
     if (typeof p.number === 'number') return `#${p.number}${p.title ? ` · ${p.title}` : ''}`
-    return p.from ?? p.subject ?? ''
+    const from = p.from ?? p.email?.from
+    if (from) return friendlyFrom(from)
+    return p.subject ?? p.email?.subject ?? ''
   }
 
   return { workflow, defOf, roleOf, nameOf, metaIcon, stripAgent, labelOf }

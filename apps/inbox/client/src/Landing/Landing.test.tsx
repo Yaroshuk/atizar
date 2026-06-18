@@ -27,10 +27,27 @@ describe('Landing', () => {
     ).toBe(true)
   })
 
+  it('leads with the differentiation, not a job title', () => {
+    renderLanding()
+    expect(screen.getByRole('heading', { level: 1, name: /24\/7 agent/i })).toBeInTheDocument()
+  })
+
   it('states the developer value props (code-level approval, two faces)', () => {
     renderLanding()
     expect(screen.getByText(/Approval is a guarantee, not a prompt/i)).toBeInTheDocument()
     expect(screen.getByText(/Node editors fail everyone/i)).toBeInTheDocument()
+  })
+
+  it('makes the provocative no-marketplace claim', () => {
+    renderLanding()
+    expect(screen.getByText(/400\+ integrations/i)).toBeInTheDocument()
+  })
+
+  it('spells out what safe means (stop, transparency, approval)', () => {
+    renderLanding()
+    expect(screen.getByText(/Stop, instantly/i)).toBeInTheDocument()
+    expect(screen.getByText(/Total transparency/i)).toBeInTheDocument()
+    expect(screen.getByText(/Nothing irreversible without a yes/i)).toBeInTheDocument()
   })
 
   it('flags that the demo runs on pre-recorded steps', () => {

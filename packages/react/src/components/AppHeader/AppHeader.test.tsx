@@ -29,6 +29,13 @@ describe('AppHeader brand', () => {
     expect(screen.queryByText('a')).not.toBeInTheDocument() // letter fallback suppressed
     expect(screen.getByText('atizar')).toBeInTheDocument()
   })
+
+  it('wraps the brand in a link to brandHref when given', () => {
+    render(
+      <AppHeader {...base} workspaceName='atizar' logoSrc='/atizar-orange.svg' brandHref='/' />
+    )
+    expect(screen.getByRole('link', { name: /atizar/i })).toHaveAttribute('href', '/')
+  })
 })
 
 describe('AppHeader board-connection chip (CX1)', () => {

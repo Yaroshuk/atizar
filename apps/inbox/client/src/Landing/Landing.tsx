@@ -6,7 +6,7 @@ const GITHUB_URL = 'https://github.com/Yaroshuk/atizar'
 
 type Feature = { label: string; title: string; body: string }
 
-// Developer-facing value props — the four claims the code actually wins on.
+// Developer-facing value props — the claims the code actually wins on.
 const FEATURES: Feature[] = [
   {
     label: 'AGENTIC-FIRST',
@@ -16,7 +16,7 @@ const FEATURES: Feature[] = [
   {
     label: 'SAFE BY CODE',
     title: 'Approval is a guarantee, not a prompt.',
-    body: 'Effect tools bind to server-side functions the model never sees, and run through an action ledger exactly once — only after a human approves. A jailbroken prompt still cannot fire an action.',
+    body: 'Effect tools bind to server-side functions the model never sees, and run through an action ledger exactly once — only after you approve. A jailbroken prompt still cannot fire an action.',
   },
   {
     label: 'TWO FACES',
@@ -26,7 +26,25 @@ const FEATURES: Feature[] = [
   {
     label: 'ENGINE-AGNOSTIC',
     title: 'Swap the runtime, keep the code.',
-    body: 'One thin contract under everything. The same workflow runs on Mastra and claude-cli, proven by a provider conformance suite — not just claimed.',
+    body: 'Mastra, claude-cli, or your own runtime behind one thin contract — proven by a provider conformance suite, not just claimed.',
+  },
+]
+
+type Safe = { title: string; body: string }
+
+// What "safe" concretely means — the control surface, in plain terms.
+const SAFE: Safe[] = [
+  {
+    title: 'Stop, instantly',
+    body: 'Halt one agent, one workflow, or everything at once — at any moment, no matter what is running.',
+  },
+  {
+    title: 'Total transparency',
+    body: 'Every step the agent took is in the activity & trace log. Nothing happens off-screen.',
+  },
+  {
+    title: 'Nothing irreversible without a yes',
+    body: 'Every consequential action waits behind an approval gate. You can edit it, approve it, or reject it.',
   },
 ]
 
@@ -67,15 +85,15 @@ export const Landing = () => (
         <div className={s.ember}>
           <img className={s.emberMark} src='/atizar-mark.svg' alt='atizar' />
         </div>
-        <p className={s.eyebrow}>OPEN-SOURCE · TYPESCRIPT · HUMAN-IN-THE-LOOP</p>
+        <p className={s.eyebrow}>OPEN-SOURCE · HUMAN-IN-THE-LOOP · TYPESCRIPT</p>
         <h1 className={s.headline}>
-          Agentic automations you can
-          <br />
-          actually <em>ship to a client</em>.
+          Not a 24/7 agent.
+          <br />A workflow you can <em>actually trust</em>.
         </h1>
         <p className={s.sub}>
-          The agent reads, drafts, and proposes. A human approves what matters. The server — never
-          the model — runs the approved action. And you write almost no code.
+          Autonomous agents are easy to start and impossible to trust the moment they touch your
+          inbox, your data, or your money. atizar keeps a human's hand on every step that matters —
+          the agent proposes, you approve, the server acts. Safe, predictable, auditable.
         </p>
         <div className={s.actions}>
           <Link to='/demo' className={s.cta}>
@@ -88,22 +106,10 @@ export const Landing = () => (
         <p className={s.tagline}>Developer builds · Human directs · Agent runs</p>
       </main>
 
-      <section className={s.codeWrap} aria-label='The smallest thing you write'>
-        <div className={s.code}>
-          <div className={s.codeBar}>
-            <span className={s.dot} />
-            <span className={s.dot} />
-            <span className={s.dot} />
-            <span className={s.codeFile}>reply.agent.ts</span>
-          </div>
-          <pre className={s.codeBody}>
-            <code>{CODE}</code>
-          </pre>
-        </div>
-        <p className={s.codeNote}>
-          The agent drafts and proposes; the human approves; the server saves the draft.
-          <br />
-          The model never sends — it can't.
+      <section className={s.band} aria-label='No integrations marketplace'>
+        <p className={s.bandText}>
+          You don't need <em>400+ integrations</em>. When the agent can write you any one in ~10
+          minutes — skills included — a marketplace is just lock-in.
         </p>
       </section>
 
@@ -119,6 +125,42 @@ export const Landing = () => (
             <p className={s.cardBody}>{f.body}</p>
           </article>
         ))}
+      </section>
+
+      <section className={s.safe} aria-label='What safe means'>
+        <h2 className={s.safeHead}>
+          What <em>“safe”</em> actually means
+        </h2>
+        <div className={s.safeList}>
+          {SAFE.map((item) => (
+            <div key={item.title} className={s.safeRow}>
+              <span className={s.safeDot} aria-hidden='true' />
+              <div>
+                <h3 className={s.safeRowTitle}>{item.title}</h3>
+                <p className={s.safeRowText}>{item.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className={s.codeWrap} aria-label='The smallest thing you write'>
+        <div className={s.code}>
+          <div className={s.codeBar}>
+            <span className={s.dot} />
+            <span className={s.dot} />
+            <span className={s.dot} />
+            <span className={s.codeFile}>reply.agent.ts</span>
+          </div>
+          <pre className={s.codeBody}>
+            <code>{CODE}</code>
+          </pre>
+        </div>
+        <p className={s.codeNote}>
+          The agent drafts and proposes; you approve; the server saves the draft.
+          <br />
+          The model never sends — it can't.
+        </p>
       </section>
 
       <section className={s.demoBox}>

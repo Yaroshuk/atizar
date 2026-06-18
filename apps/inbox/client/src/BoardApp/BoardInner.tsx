@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { instanceId } from '@atizar/core'
+import { DemoBanner } from './DemoBanner'
 import {
   AppHeader,
   PipelineColumn,
@@ -89,9 +90,12 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
         onToggleActivity={() => setActivityOpen((v) => !v)}
         workspaceName='atizar'
         logoSrc='/atizar-orange.svg'
+        brandHref='/'
         demo={demo}
         boardConnection={boardConnection}
       />
+
+      {demo && <DemoBanner />}
 
       <div className='workspace-body'>
         <PipelineColumn

@@ -32,6 +32,9 @@ type AppHeaderProps = {
   // Optional brand logo. When set, an <img> replaces the letter mark (the initial of
   // workspaceName). The image lives in the consumer app; the framework only renders it.
   logoSrc?: string
+  // Optional href the brand links to (e.g. the marketing landing). When set, the brand becomes
+  // an anchor; the route is the app's concern, the framework only renders the link.
+  brandHref?: string
   demo?: boolean
   // 'reconnecting' shows a header chip so a dropped board stream never reads as live-but-frozen.
   boardConnection?: 'live' | 'reconnecting'
@@ -51,11 +54,12 @@ export const AppHeader = ({
   onToggleActivity,
   workspaceName = 'Acme Inbox',
   logoSrc,
+  brandHref,
   demo,
   boardConnection,
-}: AppHeaderProps) => (
-  <header className={s.appHeader}>
-    <div className={s.ahBrand}>
+}: AppHeaderProps) => {
+  const brandInner = (
+    <>
       {/* `.ws-mark` stays a GLOBAL class (shared mark across surfaces) */}
       {logoSrc ? (
         <img className='ws-mark ws-mark-img' src={logoSrc} alt={workspaceName} />
@@ -63,46 +67,57 @@ export const AppHeader = ({
         <span className='ws-mark'>{workspaceName.charAt(0)}</span>
       )}
       <span className={s.ahBrandName}>{workspaceName}</span>
-    </div>
-
-    <WorkflowTabs workflows={workflows} activeId={activeId} unread={unread} onSelect={onSelect} />
-
-    <span className={s.ahSpacer} />
-
-    <div className={s.ahRight}>
-      {!demo && <Connections />}
-      {!demo && <span className={s.ahVline} />}
-      {boardConnection === 'reconnecting' && (
-        <span className={s.ahReconnect} data-testid={testIds.reconnectChip}>
-          <span className={s.ahReconnectDot} />
-          Reconnecting…
-        </span>
+    </>
+  )
+  return (
+    <header className={s.appHeader}>
+      {brandHref ? (
+        <a className={s.ahBrand} href={brandHref}>
+          {brandInner}
+        </a>
+      ) : (
+        <div className={s.ahBrand}>{brandInner}</div>
       )}
-      {onResetAll && (
-        <ResetButton
+
+      <WorkflowTabs workflows={workflows} activeId={activeId} unread={unread} onSelect={onSelect} />
+
+      <span className={s.ahSpacer} />
+
+      <div className={s.ahRight}>
+        {!demo && <Connections />}
+        {!demo && <span className={s.ahVline} />}
+        {boardConnection === 'reconnecting' && (
+          <span className={s.ahReconnect} data-testid={testIds.reconnectChip}>
+            <span className={s.ahReconnectDot} />
+            Reconnecting…
+          </span>
+        )}
+        {onResetAll && (
+          <ResetButton
+            scope='all'
+            label='Reset all'
+            resetting={resettingAll}
+            onClick={onResetAll}
+            title='Clear every finished item across all workflows (in-progress work is kept)'
+          />
+        )}
+        <StopButton
           scope='all'
-          label='Reset all'
-          resetting={resettingAll}
-          onClick={onResetAll}
-          title='Clear every finished item across all workflows (in-progress work is kept)'
+          label='Stop all'
+          data-testid={testIds.stopAll}
+          disabled={globalActive === 0}
+          stopping={stoppingAll}
+          onClick={onStopAll}
+          title='Emergency stop — halt every active item across all workflows'
         />
-      )}
-      <StopButton
-        scope='all'
-        label='Stop all'
-        data-testid={testIds.stopAll}
-        disabled={globalActive === 0}
-        stopping={stoppingAll}
-        onClick={onStopAll}
-        title='Emergency stop — halt every active item across all workflows'
-      />
-      <IconButton
-        icon='activity'
-        active={activityOpen}
-        onClick={onToggleActivity}
-        aria-label='Activity log'
-        title='Activity'
-      />
-    </div>
-  </header>
-)
+        <IconButton
+          icon='activity'
+          active={activityOpen}
+          onClick={onToggleActivity}
+          aria-label='Activity log'
+          title='Activity'
+        />
+      </div>
+    </header>
+  )
+}
