@@ -267,7 +267,7 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
               )
             }
 
-            await store.insertQuestion({
+            const qRow = await store.insertQuestion({
               askerWorkItemId: id,
               target: question.target,
               toolCallId: question.toolCallId,
@@ -279,16 +279,23 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
             // Dispatch the answerer, seeded with the question payload.
             // The payload is stored as-is on the work item; buildInput will call encodeHandoff on
             // wi.payload to produce the seed message when the answerer's run starts.
-            // answererWorkItemId is left null on the question row for Pass 1 (deliver return value
-            // carries the id but there is no setQuestionAnswerer yet — add when the answer-back path
-            // needs to wake the asker by question id rather than by pool-scan).
+            // On success, link the answerer work item id to the question row so the finish→wake
+            // hook can look it up via getQuestionByAnswerer when the answerer finishes.
             try {
-              await deps.deliver({
+              const res = await deps.deliver({
                 origin: wi.workflowId,
                 dest: { kind: 'agent', agentId: resolved.agentId },
                 payload: question.payload,
                 parentId: id,
               })
+              if (res?.ok === true) {
+                // Link the answerer work item id to the question row (best-effort: a failure here
+                // is not fatal — the question still exists; the wake path can fall back to a pool scan
+                // if needed. I12: do NOT throw and kill the asker's ask flow over a linking error).
+                await store.setQuestionAnswerer(qRow.id, res.id).catch((e) => {
+                  console.error('[runObserver] setQuestionAnswerer failed', qRow.id, res.id, e)
+                })
+              }
             } catch (e) {
               // deliver failure is fatal: the question row exists but no answerer was dispatched.
               // Re-throw so the outer catch settles the asker terminal/error (I12: no silent drop).

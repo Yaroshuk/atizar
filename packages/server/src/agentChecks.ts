@@ -31,6 +31,7 @@ export function assertAgentClassification(
     ...def.approvals,
     ...Object.keys(def.renders),
     ...def.dispatches,
+    ...def.asks,
   ])
   for (const tool of binding.allowedTools) {
     const bare = bareName(tool)

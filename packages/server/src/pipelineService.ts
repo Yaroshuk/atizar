@@ -140,6 +140,34 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     opts?: { error?: string; summary?: string }
   ) => settle(settleDeps, id, edge, actor, opts)
 
+  // Finish→wake hook: after a work item finishes, check whether it was the answerer for an
+  // open question. If so, answer the question row with the work item's card (falling back to an
+  // empty object) and, once ALL questions for the asker are answered, wake the asker via
+  // observer.resume({ kind: 'answer', ... }). Cheap for non-answerers: one DB read (getQuestionByAnswerer)
+  // that returns undefined in the common case. Never throws — errors are logged so the finish
+  // edge itself always lands cleanly even if the wake fails.
+  const finishWake = async (id: string): Promise<void> => {
+    try {
+      const q = await store.getQuestionByAnswerer(id)
+      if (!q) return
+      const wi = await store.getWorkItem(id)
+      // Prefer the card (rich answer); fall back to empty object (a non-card answerer still closes the question).
+      const answer: Record<string, unknown> = wi?.card ?? {}
+      await store.answerQuestion(q.id, answer)
+      const pending = await store.getPendingQuestionsForAsker(q.askerWorkItemId)
+      if (pending.length === 0) {
+        const answers = [{ target: q.target, answer, ok: true as const }]
+        void observer
+          .resume(q.askerWorkItemId, { kind: 'answer', answers, allOk: true })
+          .catch((e) =>
+            console.error('[pipeline] resume-after-answer failed', q.askerWorkItemId, e)
+          )
+      }
+    } catch (e) {
+      console.error('[pipeline] finishWake failed for work item', id, e)
+    }
+  }
+
   observer = makeRunObserver({
     db,
     store,
@@ -148,7 +176,10 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     resolveAgent: deps.resolveAgent,
     deliver: deliverImpl,
     activity,
-    settle: (id, edge, actor, opts) => settleEdge(id, edge, actor, opts),
+    settle: async (id, edge, actor, opts) => {
+      await settleEdge(id, edge, actor, opts)
+      if (edge === 'finish') void finishWake(id)
+    },
     reconcile: (agentId) => pool.reconcile(agentId),
     resolveQuestionTarget: deps.resolveQuestionTarget,
   })

@@ -326,6 +326,27 @@ export function makeStateStore(db: Db) {
         .where(and(eq(questions.askerWorkItemId, askerId), eq(questions.status, 'open')))
     },
 
+    // Link the answerer work item id to an open question row. Called by RunObserver when
+    // deps.deliver returns the answerer's work item id — sets the return-channel link so that
+    // when the answerer finishes, the finish hook can look it up via getQuestionByAnswerer.
+    async setQuestionAnswerer(questionId: string, answererWorkItemId: string): Promise<void> {
+      await db.update(questions).set({ answererWorkItemId }).where(eq(questions.id, questionId))
+    },
+
+    // Find the single open question row whose answererWorkItemId = the given work item id.
+    // Used by the finish→wake hook: when an answerer finishes, look up the question it was
+    // dispatched to answer so we can answer it and wake the asker.
+    async getQuestionByAnswerer(answererWorkItemId: string): Promise<Question | undefined> {
+      const [row] = await db
+        .select()
+        .from(questions)
+        .where(
+          and(eq(questions.answererWorkItemId, answererWorkItemId), eq(questions.status, 'open'))
+        )
+        .limit(1)
+      return row
+    },
+
     async answerQuestion(id: string, answer: Record<string, unknown>): Promise<void> {
       await db
         .update(questions)

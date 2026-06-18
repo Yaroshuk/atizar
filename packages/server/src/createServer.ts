@@ -119,6 +119,16 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
       if (!def)
         throw new Error(`server binding for unknown agent "${b.agentId}" in "${descriptor.id}"`)
       assertAgentClassification(def, { allowedTools: b.allowedTools, effects: b.effects })
+      // Boot-time invariant: an agent that declares `asks` MUST have `buildResumeFromAnswer`
+      // in its binding prompts. Without it the asker will hang in awaiting_agent forever when
+      // the answer arrives — the resume call would branch to the null outcome and silently finish
+      // instead of continuing the agent's work. Fail-fast here so the mistake surfaces at startup,
+      // not when an answerer eventually finishes in production.
+      if ((def.asks?.length ?? 0) > 0 && !b.prompts.buildResumeFromAnswer) {
+        throw new Error(
+          `agent "${def.id}" in "${descriptor.id}" declares asks but binding prompts lack buildResumeFromAnswer`
+        )
+      }
       const key = instanceId(descriptor.id, b.agentId)
       const composed = composeInstructions(descriptor.prompt, def.instructions)
       const provider = buildProvider(
