@@ -6,7 +6,6 @@ import {
   readGateOpened,
   readAgentQuestion,
   type EffectFn,
-  type GateResolution,
   type PromptStrategy,
   type Provider,
   type ResumeOutcome,
@@ -305,7 +304,8 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
                   await store.setQuestionAnswerer(qRow.id, res.id)
                 } catch (e) {
                   throw new Error(
-                    `[runObserver] setQuestionAnswerer failed (questionId=${qRow.id} answererId=${res.id}): ${e instanceof Error ? e.message : String(e)}`
+                    `[runObserver] setQuestionAnswerer failed (questionId=${qRow.id} answererId=${res.id})`,
+                    { cause: e }
                   )
                 }
               }
@@ -315,7 +315,8 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
               throw e instanceof Error && e.message.startsWith('[runObserver]')
                 ? e
                 : new Error(
-                    `[runObserver] question deliver failed (workItemId=${id} agentId=${resolved.agentId}): ${e instanceof Error ? e.message : String(e)}`
+                    `[runObserver] question deliver failed (workItemId=${id} agentId=${resolved.agentId})`,
+                    { cause: e }
                   )
             }
 

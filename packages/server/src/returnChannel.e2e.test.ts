@@ -160,7 +160,7 @@ describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails
     // to avoid a race between our read and setQuestionAnswerer.
     await waitFor(async () => {
       const [q] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
-      return q?.answererWorkItemId != null
+      return q?.answererWorkItemId !== null
     })
 
     // (a) Asker is now awaiting_agent.
