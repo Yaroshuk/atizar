@@ -148,3 +148,30 @@ describe('maxInstances', () => {
     expect(() => defineAgent({ ...base, maxInstances: 1.5 })).toThrow()
   })
 })
+
+describe('defineAgent asks tool class', () => {
+  const base = {
+    id: 'a',
+    name: 'A',
+    provider: 'mock',
+    instructions: 'x',
+    tools: ['ask_peer'],
+    approvals: [],
+    renders: {},
+  }
+
+  it('accepts an ask tool declared in tools', () => {
+    const def = defineAgent({ ...base, asks: ['ask_peer'] })
+    expect(def.asks).toEqual(['ask_peer'])
+  })
+
+  it('defaults asks to []', () => {
+    expect(defineAgent(base).asks).toEqual([])
+  })
+
+  it('rejects an ask tool not declared in tools', () => {
+    expect(() => defineAgent({ ...base, asks: ['ghost'] })).toThrow(
+      /ask .*ghost.* is not declared in tools/
+    )
+  })
+})

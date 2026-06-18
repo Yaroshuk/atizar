@@ -27,6 +27,10 @@ export const AgentDefinitionSchema = z
     // Tools the model calls to spawn a child work item (machine dispatch — I2: allowed).
     // A dispatch tool produces a work item; it never executes an action directly.
     dispatches: z.array(z.string()).default([]),
+    // Tools the model calls to ASK another agent and SUSPEND until the answer returns (the return
+    // channel). Distinct from `dispatches` (fire-and-forget): an ask suspends the asker into
+    // `awaiting_agent`. Declared so the boot-time I15 classification stays exhaustive.
+    asks: z.array(z.string()).default([]),
   })
   .superRefine((def, ctx) => {
     for (const name of def.approvals) {
@@ -58,6 +62,14 @@ export const AgentDefinitionSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `dispatch "${name}" is not declared in tools`,
+        })
+      }
+    }
+    for (const name of def.asks) {
+      if (!def.tools.includes(name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `ask "${name}" is not declared in tools`,
         })
       }
     }
