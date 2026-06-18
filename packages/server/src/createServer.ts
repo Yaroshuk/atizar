@@ -222,8 +222,10 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
     await runMigrations()
     await startupSweep(db, (item) => pipeline.reenqueue(item))
     const port = resolvePort(process.env.PORT)
-    serve({ fetch: app.fetch, port })
-    console.log(`server on http://localhost:${port}`)
+    // Bind all interfaces (0.0.0.0), not just localhost — containers/PaaS (Fly, Render, Docker)
+    // route external traffic to the container IP, so a localhost-only bind is unreachable.
+    serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
+    console.log(`server on http://0.0.0.0:${port}`)
     if (!isDemo() && !authToken) {
       console.warn('[auth] disabled — set ATIZAR_AUTH_TOKEN to require a token on mutations')
     }

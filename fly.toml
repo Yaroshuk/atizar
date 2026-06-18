@@ -1,0 +1,21 @@
+# Fly.io config for the atizar demo. 1GB shared VM (fits the ~400-550MB demo boot); auto-stops when
+# idle so a low-traffic demo costs ~a couple $/mo. DEMO=1 = zero-credential mode (PGlite + cassettes).
+app = "atizar"
+primary_region = "fra"
+
+[build]
+
+[env]
+  DEMO = "1"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

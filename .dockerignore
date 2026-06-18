@@ -1,0 +1,14 @@
+# Keep the build context small + force a clean install/build inside the image. NOTE: do NOT ignore
+# apps/inbox/demo-cassettes — the demo replays them at runtime.
+.git
+.claude
+node_modules
+**/node_modules
+**/dist
+**/dist-types
+**/*.tsbuildinfo
+apps/inbox/.cassettes
+**/*.log
+.DS_Store
+playwright-report
+test-results
