@@ -241,7 +241,9 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     await transition(db, id, 'start')
     await transition(db, id, 'ask')
     await transition(db, id, 'answered')
-    expect((await store.getWorkItem(id))?.phase).toBe('active')
+    const wi = await store.getWorkItem(id)
+    expect(wi?.phase).toBe('active')
+    expect(wi?.outcome).toBe('running')
   })
 
   it('ask is illegal from a terminal item', async () => {
