@@ -185,13 +185,24 @@ export function recordReplayMode(): RecordReplayMode | null {
 // and writes that step to disk.
 export function withRecordReplay(
   provider: Provider,
-  opts: { key: string; approvalNames: readonly string[]; dir: string; mode: RecordReplayMode }
+  opts: {
+    key: string
+    approvalNames: readonly string[]
+    dir: string
+    mode: RecordReplayMode
+    // Optional per-run cassette key. When it returns a string, THAT names the cassette file for
+    // this run instead of the fixed `key` — so two instances of one agent (same `key`) can replay
+    // distinct recordings (e.g. one reply cassette per sender). Returns undefined ⇒ fall back to
+    // `key`. The framework only calls it; the discriminator (what makes a run distinct) is the
+    // caller's policy.
+    keyOf?: (input: RunAgentInput) => string | undefined
+  }
 ): Provider {
   const base: Provider = {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames)
-      const store = new CassetteStore(opts.dir, opts.key)
+      const store = new CassetteStore(opts.dir, opts.keyOf?.(input) ?? opts.key)
 
       if (opts.mode === 'replay' || opts.mode === 'demo') {
         const recorded = await store.readStep(step)
@@ -226,7 +237,10 @@ export function withRecordReplay(
     async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
       const messages = (handle.input?.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames) + 1
-      const store = new CassetteStore(opts.dir, opts.key)
+      const store = new CassetteStore(
+        opts.dir,
+        (handle.input ? opts.keyOf?.(handle.input) : undefined) ?? opts.key
+      )
 
       if (opts.mode === 'replay' || opts.mode === 'demo') {
         const recorded = await store.readStep(step)
