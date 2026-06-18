@@ -51,7 +51,7 @@ const createReplyPrompts = (instructions: string): PromptStrategy => ({
   },
   buildResumeFromAnswer(answers) {
     const first = answers[0]
-    const answer = first ? String(first.answer.text ?? JSON.stringify(first.answer)) : '(no answer)'
+    const answer = first ? (first.answer.text ?? '(no answer)') : '(no answer)'
     return {
       kind: 'prompt' as const,
       text: [instructions, `ANSWERED: ${answer}`].join('\n'),

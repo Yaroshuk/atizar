@@ -263,9 +263,11 @@ function conformanceRunner(): MastraRunner {
             type: 'text-delta',
             payload: {
               text:
-                payload.kind !== 'answer' && payload.decision === 'approved'
-                  ? 'Saved.'
-                  : 'Rejected.',
+                payload.kind === 'answer'
+                  ? 'Answered.'
+                  : payload.decision === 'approved'
+                    ? 'Saved.'
+                    : 'Rejected.',
             },
           },
         ],
