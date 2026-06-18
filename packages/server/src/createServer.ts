@@ -125,6 +125,7 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
         dispatchToolNames: def.dispatches,
         handoffs: def.handoffs ?? [],
         buildResume: b.prompts.buildResume,
+        buildResumeFromAnswer: b.prompts.buildResumeFromAnswer,
       }
       healthInputs[key] = {
         provider: def.provider,

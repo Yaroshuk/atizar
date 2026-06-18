@@ -6,7 +6,7 @@ import {
   type Provider,
   type Message,
   type ResumeHandle,
-  type GateResolution,
+  type ResumePayload,
 } from '@atizar/core'
 
 // A cassette file is JSONL: one recorded AG-UI event per line, tagged with its
@@ -191,7 +191,7 @@ export function withRecordReplay(
   const resume = provider.resume.bind(provider)
   return {
     ...base,
-    async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
+    async *resume(handle: ResumeHandle, resolution: ResumePayload): AsyncIterable<BaseEvent> {
       const messages = (handle.input?.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames) + 1
       const store = new CassetteStore(opts.dir, opts.key)

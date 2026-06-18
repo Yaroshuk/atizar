@@ -9,6 +9,7 @@ import {
   type PromptStrategy,
   type Provider,
   type ResumeOutcome,
+  type ResumePayload,
 } from '@atizar/core'
 import type { Db } from './db/client.js'
 import type { StateStore } from './stateStore.js'
@@ -41,6 +42,10 @@ export interface AgentRuntime {
   //   null    → settle('finish') silently, no event, no provider call
   // Absent (legacy/no-approval agents) defaults to null mode (silent settle).
   buildResume?: PromptStrategy['buildResume']
+  // F3 answer-resume: the PromptStrategy's buildResumeFromAnswer, bound at wiring time.
+  // Parallel to buildResume but called when an agent answer (kind:'answer') arrives instead
+  // of a human gate resolution. The same null/message/prompt outcome branching applies.
+  buildResumeFromAnswer?: PromptStrategy['buildResumeFromAnswer']
 }
 
 export interface RunObserverDeps {
@@ -76,7 +81,7 @@ export interface RunObserverDeps {
 
 export interface RunObserver {
   run(id: string): Promise<void>
-  resume(id: string, resolution: GateResolution): Promise<void>
+  resume(id: string, payload: ResumePayload): Promise<void>
   cancel(id: string): void
 }
 
@@ -301,7 +306,7 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       await consume(id, { ...wi, runId: input.runId }, runtime, runtime.provider.run(input))
     },
 
-    async resume(id, resolution) {
+    async resume(id, payload) {
       const wi = await store.getWorkItem(id)
       if (!wi) return
       const runtime = deps.resolveAgent(wi.agentId)
@@ -310,6 +315,57 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
         return
       }
 
+      // Shared outcome handler: given a ResumeOutcome, append a message event (message mode),
+      // settle silently (null mode), or spawn the provider (prompt mode). Both the gate arm and
+      // the answer arm converge here — the three-way logic lives in exactly one place.
+      const applyOutcome = async (outcome: ResumeOutcome): Promise<void> => {
+        if (!outcome) {
+          // null mode — clean silent finish: no turn, no event, no provider call.
+          await deps.settle(id, 'finish', null)
+          return
+        }
+
+        if (outcome.kind === 'message') {
+          // Server appends the verbatim canned line — NO provider spawn, no LLM round-trip.
+          // Uses the exact same appendTrace/bus.publish seam that consume() uses,
+          // so foldEventsToMessages renders it as a normal assistant text bubble.
+          const seq = await store.countTrace(id)
+          const event = {
+            type: EventType.TEXT_MESSAGE_CHUNK,
+            role: 'assistant',
+            messageId: randomUUID(),
+            delta: outcome.text,
+          } as unknown as BaseEvent
+          await store.appendTrace(id, seq, event)
+          bus.publish(`workitem:${id}`, { seq, event })
+          await deps.settle(id, 'finish', null)
+          return
+        }
+
+        // prompt mode — consume the provider's resume stream.
+        if (!runtime.provider.resume) {
+          await store.setError(id, 'provider has no resume')
+          return
+        }
+        const input = buildInput(wi)
+        const handle = { runId: wi.runId ?? input.runId, input }
+        await consume(id, wi, runtime, runtime.provider.resume(handle, payload))
+      }
+
+      if (payload.kind === 'answer') {
+        // Answer-resume: no gate to resolve, no gate transition. The asker was suspended in
+        // awaiting_agent; answered (awaiting_agent→active) is the correct edge.
+        await transition(db, id, 'answered')
+        publishStatus(id, 'active')
+        deps.reconcile(wi.agentId)
+
+        const outcome: ResumeOutcome = runtime.buildResumeFromAnswer?.(payload.answers) ?? null
+        await applyOutcome(outcome)
+        return
+      }
+
+      // Gate-resume path (payload.kind === 'gate' or omitted — backward-compat).
+      const resolution = payload
       const gate = await store.getOpenGate(id)
       if (gate) {
         // resolvedBy stays null: the bearer token (7c-C) authorises but is a single SHARED
@@ -324,42 +380,11 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
       deps.reconcile(wi.agentId)
 
       // Branch on the ResumeOutcome so the SERVER (not the provider) decides how to resume.
-      // Option A: buildResume is carried on the runtime (wired at buildAgent time).
+      // buildResume is carried on the runtime (wired at buildAgent time).
       // Absent → null (no-approval agents silently settle; they should never reach resume).
       const args = resolution.form ?? {}
       const outcome: ResumeOutcome = runtime.buildResume?.(args, resolution.executedResult) ?? null
-
-      if (!outcome) {
-        // null mode — clean silent finish: no turn, no event, no provider call.
-        await deps.settle(id, 'finish', null)
-        return
-      }
-
-      if (outcome.kind === 'message') {
-        // Server appends the verbatim canned line — NO provider spawn, no LLM round-trip.
-        // Uses the exact same appendTrace/bus.publish seam that consume() uses (lines 130-131),
-        // so foldEventsToMessages renders it as a normal assistant text bubble.
-        const seq = await store.countTrace(id)
-        const event = {
-          type: EventType.TEXT_MESSAGE_CHUNK,
-          role: 'assistant',
-          messageId: randomUUID(),
-          delta: outcome.text,
-        } as unknown as BaseEvent
-        await store.appendTrace(id, seq, event)
-        bus.publish(`workitem:${id}`, { seq, event })
-        await deps.settle(id, 'finish', null)
-        return
-      }
-
-      // prompt mode — unchanged path: consume the provider's resume stream.
-      if (!runtime.provider.resume) {
-        await store.setError(id, 'provider has no resume')
-        return
-      }
-      const input = buildInput(wi)
-      const handle = { runId: wi.runId ?? input.runId, input }
-      await consume(id, wi, runtime, runtime.provider.resume(handle, resolution))
+      await applyOutcome(outcome)
     },
 
     cancel(id) {

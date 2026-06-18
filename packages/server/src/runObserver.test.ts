@@ -8,6 +8,7 @@ import {
   type Provider,
   type ResumeHandle,
   type ResumeOutcome,
+  type AnswerResolution,
 } from '@atizar/core'
 import { db } from './db/client.js'
 import { makeStateStore } from './stateStore.js'
@@ -227,5 +228,73 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
         String((r.event as Record<string, unknown>)['delta'] ?? '').includes('Resume failed')
       )
     ).toBe(false)
+  })
+
+  it('answer-resume (message mode): appends verbatim text + finishes, WITHOUT spawning the provider', async () => {
+    // Build a work item that is directly in awaiting_agent (no gate). We do this by
+    // dispatching a new item, transitioning it to active (start), then straight to
+    // awaiting_agent so we can call observer.resume() with an AnswerResolution.
+    const agentId = `ro-test__${randomUUID().slice(0, 8)}`
+    const { id } = await store.insertWorkItem({
+      id: randomUUID(),
+      workflowId: 'ro-test',
+      agentId,
+      origin: 'human',
+      payload: {},
+      key: agentId,
+    })
+    await transition(db, id, 'start')
+    await transition(db, id, 'ask')
+
+    const spy = { resumed: false }
+    const providerSpy: Provider = {
+      async *run(_input: RunAgentInput) {
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'asking' })
+      },
+      async *resume(_handle: ResumeHandle, _resolution: GateResolution) {
+        spy.resumed = true
+        yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm2', delta: 'provider-answer' })
+      },
+    }
+
+    const { pool, reconcile } = fakePool()
+    const observer = makeRunObserver({
+      db,
+      store,
+      pool,
+      bus: { publish: vi.fn(), subscribe: () => () => {} },
+      resolveAgent: () => ({
+        provider: providerSpy,
+        renderToolNames: [],
+        maxInstances: 1,
+        effects: {},
+        dispatchToolNames: [],
+        handoffs: [],
+        buildResume: undefined,
+        buildResumeFromAnswer: () => ({ kind: 'message', text: 'continuing with the answer' }),
+      }),
+      deliver: vi.fn().mockResolvedValue({ ok: true, id: 'child', deduped: false }),
+      settle: async (sid, edge, _actor, opts) => {
+        await transition(db, sid, edge, opts)
+      },
+      reconcile,
+    })
+
+    const beforeLen = (await store.getTrace(id, 0)).length
+
+    const answerPayload: AnswerResolution = {
+      kind: 'answer',
+      answers: [{ target: {}, answer: { text: 'X' }, ok: true }],
+      allOk: true,
+    }
+    await observer.resume(id, answerPayload)
+
+    expect(spy.resumed).toBe(false) // provider.resume NOT called
+    expect((await store.getWorkItem(id))?.phase).toBe('terminal')
+    const trace = await store.getTrace(id, 0)
+    expect(trace.length).toBe(beforeLen + 1) // exactly ONE new event appended
+    const last = trace[trace.length - 1].event as Record<string, unknown>
+    expect(last['type']).toBe(EventType.TEXT_MESSAGE_CHUNK)
+    expect(last['delta']).toBe('continuing with the answer')
   })
 })

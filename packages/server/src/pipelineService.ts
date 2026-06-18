@@ -473,7 +473,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       publishBoard()
       // observer.resume() handles transition(resume) + reconcile + the run stream.
       void observer
-        .resume(wi.id, { ...resolution, gateId: gate.id, form, executedResult })
+        .resume(wi.id, { kind: 'gate', ...resolution, gateId: gate.id, form, executedResult })
         .catch((e) => console.error('[pipeline] resume(approve)', wi.id, e))
       return { ok: true }
     },
