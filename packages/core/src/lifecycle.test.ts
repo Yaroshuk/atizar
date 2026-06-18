@@ -84,6 +84,15 @@ describe('lifecycle() golden table (I12 ladder)', () => {
   })
 })
 
+describe('awaiting_agent phase', () => {
+  it('is live, visible, and covers (a suspended asker holds its source)', () => {
+    const lc = lifecycle('awaiting_agent', 'running', false, false)
+    expect(lc.isLive).toBe(true)
+    expect(lc.isVisible).toBe(true)
+    expect(lc.covers).toBe(true)
+  })
+})
+
 describe('hasLiveDescendant tree walk', () => {
   const rows = [
     { id: 'root', parentId: null, phase: 'terminal' as Phase },

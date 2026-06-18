@@ -5,7 +5,10 @@
 
 // phase: was the 8-value DB status, collapsed to 4. awaiting_human merges the old
 // awaiting_approval + awaiting_input (both pause on a human).
-export type Phase = 'queued' | 'active' | 'awaiting_human' | 'terminal'
+// awaiting_agent = suspended waiting on ANOTHER AGENT's answer (the return channel). A live,
+// visible pause like awaiting_human, but resolved by an agent answer (transition `answered`),
+// not a human gate. Distinct phase so the UI + classifier never confuse it with a human gate.
+export type Phase = 'queued' | 'active' | 'awaiting_human' | 'awaiting_agent' | 'terminal'
 
 // outcome: was `resolution`, now first-class. running = not-yet-terminal; the other seven are the
 // terminal flavours. done = a clean finish (incl. an approved gate, which is `done` + an audit
@@ -42,7 +45,7 @@ export interface Lifecycle {
   covers: boolean
 }
 
-const LIVE_PHASES: ReadonlySet<Phase> = new Set(['queued', 'active', 'awaiting_human'])
+const LIVE_PHASES: ReadonlySet<Phase> = new Set(['queued', 'active', 'awaiting_human', 'awaiting_agent'])
 
 // Terminal outcomes that have LEFT the board (retired into Activity/history) — never visible.
 // `dismissed` joins here: an acknowledged error recedes like reset/superseded but stays a DISTINCT
