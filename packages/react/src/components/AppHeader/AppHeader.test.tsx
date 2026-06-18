@@ -16,6 +16,21 @@ const base = {
   demo: true, // skip the live <Connections/> (its own test covers it) to isolate the header
 }
 
+describe('AppHeader brand', () => {
+  it('renders the workspace initial as the mark when no logoSrc is given', () => {
+    render(<AppHeader {...base} workspaceName='Acme Inbox' />)
+    expect(screen.getByText('A')).toBeInTheDocument()
+  })
+
+  it('renders a logo image (not the letter) when logoSrc is given', () => {
+    render(<AppHeader {...base} workspaceName='atizar' logoSrc='/atizar-orange.svg' />)
+    const logo = screen.getByRole('img', { name: /atizar/i })
+    expect(logo).toHaveAttribute('src', '/atizar-orange.svg')
+    expect(screen.queryByText('a')).not.toBeInTheDocument() // letter fallback suppressed
+    expect(screen.getByText('atizar')).toBeInTheDocument()
+  })
+})
+
 describe('AppHeader board-connection chip (CX1)', () => {
   it('shows the "Reconnecting…" chip when the board SSE has dropped', () => {
     render(<AppHeader {...base} boardConnection='reconnecting' />)

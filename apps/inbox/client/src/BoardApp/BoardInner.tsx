@@ -87,6 +87,8 @@ export const BoardInner = ({ config, demo }: BoardInnerProps) => {
         resettingAll={reset.resettingAll}
         activityOpen={activityOpen}
         onToggleActivity={() => setActivityOpen((v) => !v)}
+        workspaceName='atizar'
+        logoSrc='/atizar-orange.svg'
         demo={demo}
         boardConnection={boardConnection}
       />

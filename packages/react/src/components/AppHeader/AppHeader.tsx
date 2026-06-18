@@ -29,6 +29,9 @@ type AppHeaderProps = {
   activityOpen: boolean
   onToggleActivity: () => void
   workspaceName?: string
+  // Optional brand logo. When set, an <img> replaces the letter mark (the initial of
+  // workspaceName). The image lives in the consumer app; the framework only renders it.
+  logoSrc?: string
   demo?: boolean
   // 'reconnecting' shows a header chip so a dropped board stream never reads as live-but-frozen.
   boardConnection?: 'live' | 'reconnecting'
@@ -47,13 +50,18 @@ export const AppHeader = ({
   activityOpen,
   onToggleActivity,
   workspaceName = 'Acme Inbox',
+  logoSrc,
   demo,
   boardConnection,
 }: AppHeaderProps) => (
   <header className={s.appHeader}>
     <div className={s.ahBrand}>
       {/* `.ws-mark` stays a GLOBAL class (shared mark across surfaces) */}
-      <span className='ws-mark'>{workspaceName.charAt(0)}</span>
+      {logoSrc ? (
+        <img className='ws-mark ws-mark-img' src={logoSrc} alt={workspaceName} />
+      ) : (
+        <span className='ws-mark'>{workspaceName.charAt(0)}</span>
+      )}
       <span className={s.ahBrandName}>{workspaceName}</span>
     </div>
 
