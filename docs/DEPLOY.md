@@ -21,7 +21,7 @@ single origin — no CORS, no second service.
 
 ```bash
 yarn install --ignore-engines
-yarn build
+yarn build:web           # builds @atizar/react, then the client → apps/inbox/dist
 yarn start:demo          # → http://localhost:4000   (set PORT=… to change)
 ```
 
@@ -32,7 +32,7 @@ Open `http://localhost:4000` → landing → **Open demo** → the live pipeline
 1. **New → Web Service**, connect this repo.
 2. Settings:
    - **Runtime:** Node
-   - **Build command:** `yarn install --ignore-engines && yarn build`
+   - **Build command:** `yarn install --ignore-engines && yarn build:web`
    - **Start command:** `DEMO=1 yarn workspace inbox start`
    - **Instance type:** Free is fine for a demo (note: free instances sleep when idle, so the first
      request after a pause is slow — it cold-boots and runs migrations).
