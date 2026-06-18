@@ -2,7 +2,8 @@ import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import {
   approvalResolved,
   lastApprovalArgs,
-  type GateResolution,
+  type ResumePayload,
+  type AnswerResolution,
   type Provider,
   type PromptStrategy,
   type ResumeHandle,
@@ -90,12 +91,19 @@ export function createClaudeCliProvider(opts: {
   // message/null modes are resolved by the SERVER before resume() is called, so they never reach here.
   // Precedence is `??` (not `||`) on purpose: an explicitly-passed `form` is honored even when
   // empty `{}` — the caller's decision wins over the transcript. Do not change `??` to `||`.
-  function resumePromptFrom(handle: ResumeHandle, resolution: GateResolution): string | null {
+  function resumePromptFrom(handle: ResumeHandle, resolution: { form?: Record<string, unknown>; executedResult?: Record<string, unknown> }): string | null {
     const messages = (handle.input?.messages ?? []) as Message[]
     const args = resolution.form ?? lastApprovalArgs(messages, approvalNames) ?? {}
     const outcome = prompts.buildResume?.(args, resolution.executedResult) ?? null
     if (outcome && outcome.kind === 'prompt') return withIdentity(outcome.text)
     return null // message/null mode: nothing for the provider to spawn
+  }
+
+  // Build the resume prompt from an agent ANSWER (parallel to resumePromptFrom for a gate).
+  function resumePromptFromAnswer(answers: AnswerResolution['answers']): string | null {
+    const outcome = prompts.buildResumeFromAnswer?.(answers) ?? null
+    if (outcome && outcome.kind === 'prompt') return withIdentity(outcome.text)
+    return null // message/null handled server-side; nothing to spawn
   }
 
   return {
@@ -117,12 +125,18 @@ export function createClaudeCliProvider(opts: {
       yield* primeAndStream(withIdentity(prompts.buildFirst(input)) ?? '', approvalNames)
     },
 
-    async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
-      if (resolution.decision === 'rejected') {
+    async *resume(handle: ResumeHandle, payload: ResumePayload): AsyncIterable<BaseEvent> {
+      if (payload.kind === 'answer') {
+        const resumePrompt = resumePromptFromAnswer(payload.answers)
+        if (!resumePrompt) return
+        yield* primeAndStream(resumePrompt, [])
+        return
+      }
+      if (payload.decision === 'rejected') {
         yield textChunk('The human rejected the proposed action; no changes were made.')
         return
       }
-      const resumePrompt = resumePromptFrom(handle, resolution)
+      const resumePrompt = resumePromptFrom(handle, payload)
       if (!resumePrompt) return // message/null handled server-side; nothing to spawn here
       yield* primeAndStream(resumePrompt, [])
     },

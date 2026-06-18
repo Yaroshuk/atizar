@@ -256,12 +256,15 @@ function conformanceRunner(): MastraRunner {
         ],
         { status: 'suspended' }
       ),
-    resume: (_runId, resolution) =>
+    resume: (_runId, payload) =>
       fakeRun(
         [
           {
             type: 'text-delta',
-            payload: { text: resolution.decision === 'approved' ? 'Saved.' : 'Rejected.' },
+            payload: {
+              text:
+                payload.kind !== 'answer' && payload.decision === 'approved' ? 'Saved.' : 'Rejected.',
+            },
           },
         ],
         { status: 'completed' }

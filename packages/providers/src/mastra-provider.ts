@@ -1,5 +1,5 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
-import { gateOpened, type GateResolution, type Provider, type ResumeHandle } from '@atizar/core'
+import { gateOpened, type ResumePayload, type Provider, type ResumeHandle } from '@atizar/core'
 import { mapMastraStream } from './mastra-stream.js'
 import type { MastraRunner, MastraRun } from './mastra-types.js'
 
@@ -84,11 +84,12 @@ export function createMastraProvider(opts: {
       yield* drive(runner.start(runId, inputData), true)
     },
 
-    async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
-      // The server already executed the effect; resolution carries decision + executedResult.
-      // gateStep (server-side) reads these from resumeData (approved → confirm sentence;
-      // rejected → bail). A resumed run must NOT re-open the gate → emitGateOnSuspend=false.
-      yield* drive(runner.resume(handle.runId, resolution), false)
+    async *resume(handle: ResumeHandle, payload: ResumePayload): AsyncIterable<BaseEvent> {
+      // Pass the discriminated payload through to Mastra's native resume unchanged.
+      // The gate vs answer distinction lives in the suspended step's resume schema;
+      // the native snapshot path is symmetric for both kinds.
+      // A resumed run must NOT re-open the gate → emitGateOnSuspend=false.
+      yield* drive(runner.resume(handle.runId, payload), false)
     },
   }
 }

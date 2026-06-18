@@ -51,6 +51,24 @@ describe('mock-provider conformance', () => {
   }
 })
 
+describe('mock provider answer-resume', () => {
+  it('yields a turn that reflects the delivered answer', async () => {
+    const p = createMockInboxProvider(['saveDraft'])
+    const events = await collect(
+      p.resume!(
+        { runId: 'r1', input: { messages: [] } as never },
+        { kind: 'answer', answers: [{ target: {}, answer: { text: 'use X' }, ok: true }], allOk: true }
+      )
+    )
+    expect(events.length).toBeGreaterThan(0)
+    const text = events
+      .filter((e) => e.type === EventType.TEXT_MESSAGE_CHUNK)
+      .map((e) => (e as unknown as { delta: string }).delta)
+      .join('')
+    expect(text).toContain('answer')
+  })
+})
+
 describe('mockInboxProvider', () => {
   const provider = createMockInboxProvider(['saveDraft'])
 

@@ -2,7 +2,7 @@ import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import {
   approvalResolved,
   gateOpened,
-  type GateResolution,
+  type ResumePayload,
   type Provider,
   type ResumeHandle,
   type Message,
@@ -68,8 +68,13 @@ export function createMockInboxProvider(approvalNames: readonly string[]): Provi
       })
     },
 
-    async *resume(_handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
-      if (resolution.decision === 'rejected') {
+    async *resume(_handle: ResumeHandle, payload: ResumePayload): AsyncIterable<BaseEvent> {
+      if (payload.kind === 'answer') {
+        const ok = payload.allOk ? 'an answer' : 'no usable answer'
+        yield textChunk(`Continuing with ${ok} from the peer agent.`)
+        return
+      }
+      if (payload.decision === 'rejected') {
         yield textChunk('The human rejected the draft; nothing was saved.')
         return
       }

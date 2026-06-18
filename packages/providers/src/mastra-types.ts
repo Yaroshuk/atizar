@@ -1,4 +1,4 @@
-import type { GateResolution } from '@atizar/core'
+import type { ResumePayload } from '@atizar/core'
 
 // One Mastra fullStream chunk we read. Structural (NOT @mastra/core's type) so the package
 // has zero Mastra dependency — same discipline as claude-stream reading NDJSON. Fields are
@@ -41,5 +41,5 @@ export interface MastraRun {
 // runId === Mastra runId (native resume targets it).
 export interface MastraRunner {
   start(runId: string, inputData: Record<string, unknown>): MastraRun
-  resume(runId: string, resolution: GateResolution): MastraRun
+  resume(runId: string, payload: ResumePayload): MastraRun
 }
