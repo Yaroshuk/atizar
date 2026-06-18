@@ -148,6 +148,9 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
         handoffs: def.handoffs ?? [],
         buildResume: b.prompts.buildResume,
         buildResumeFromAnswer: b.prompts.buildResumeFromAnswer,
+        maxQuestionRounds: def.maxQuestionRounds,
+        questionTimeoutMs: def.questionTimeoutMs,
+        maxQuestionRetries: def.maxQuestionRetries,
       }
       healthInputs[key] = {
         provider: def.provider,

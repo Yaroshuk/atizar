@@ -33,6 +33,9 @@ function makeRuntime(provider: Provider): AgentRuntime {
     effects: {},
     dispatchToolNames: [],
     handoffs: [],
+    maxQuestionRounds: 5,
+    questionTimeoutMs: 120_000,
+    maxQuestionRetries: 2,
   }
 }
 
@@ -323,6 +326,357 @@ describe.skipIf(!reachable)(
     })
   }
 )
+
+// ── Task 6: cancel cascade + timeout/escalation + bounds ──────────────────────
+
+describe.skipIf(!reachable)('pipelineService: Task 6 safety rails (real Postgres)', () => {
+  // Helper: build a minimal pipeline service with a question-ask agent and a no-op answerer.
+  function makeQuestionService(opts: {
+    askerAgentId: string
+    answererAgentId: string
+    maxQuestionRetries?: number
+    questionTimeoutMs?: number
+    maxQuestionRounds?: number
+  }) {
+    return makePipelineService({
+      db,
+      resolveAgent: (agentId) => {
+        if (agentId === opts.askerAgentId) {
+          return {
+            ...makeRuntime(questionProvider(opts.answererAgentId)),
+            maxQuestionRetries: opts.maxQuestionRetries ?? 0,
+            questionTimeoutMs: opts.questionTimeoutMs ?? 60_000,
+            maxQuestionRounds: opts.maxQuestionRounds ?? 3,
+          }
+        }
+        if (agentId === opts.answererAgentId) {
+          return {
+            ...makeRuntime({ async *run() {} }),
+            maxQuestionRetries: 0,
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 3,
+          }
+        }
+        return undefined
+      },
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+  }
+
+  it('6a: cancelling an awaiting_agent asker fails its open questions', async () => {
+    const store = makeStateStore(db)
+    const askerAgentId = `t6a-asker__${randomUUID().slice(0, 8)}`
+    const answererAgentId = `t6a-answerer__${randomUUID().slice(0, 8)}`
+
+    const service = makeQuestionService({ askerAgentId, answererAgentId })
+
+    // Create asker WI in awaiting_agent phase
+    const askerWi = await store.insertWorkItem({
+      workflowId: 't6a-wf',
+      agentId: askerAgentId,
+      origin: 'human',
+      payload: {},
+      key: askerAgentId,
+    })
+    await transition(db, askerWi.id, 'start')
+    await transition(db, askerWi.id, 'ask')
+
+    // Insert an open question for this asker
+    const q = await store.insertQuestion({
+      askerWorkItemId: askerWi.id,
+      target: { agentId: answererAgentId },
+      toolCallId: 'tc-t6a',
+      payload: { q: 'hello' },
+    })
+    expect(q.status).toBe('open')
+
+    // Cancel the asker
+    await service.cancel(askerWi.id)
+
+    // Question must be failed (not left open)
+    const { questions: questionsTable } = await import('./db/schema.js')
+    const { eq } = await import('drizzle-orm')
+    const [qAfter] = await db.select().from(questionsTable).where(eq(questionsTable.id, q.id))
+    expect(qAfter.status).toBe('failed')
+    expect(qAfter.reason).toContain('cancelled')
+
+    // Asker itself should be terminal/stopped
+    const askerAfter = await store.getWorkItem(askerWi.id)
+    expect(askerAfter?.phase).toBe('terminal')
+    expect(askerAfter?.outcome).toBe('stopped')
+  })
+
+  it('6c: reaper retries a question when retries < maxQuestionRetries', async () => {
+    const store = makeStateStore(db)
+    const askerAgentId = `t6c-retry-asker__${randomUUID().slice(0, 8)}`
+    const answererAgentId = `t6c-retry-answerer__${randomUUID().slice(0, 8)}`
+
+    const deliverCalls: string[] = []
+    const service = makePipelineService({
+      db,
+      resolveAgent: (agentId) => {
+        if (agentId === askerAgentId)
+          return {
+            ...makeRuntime({ async *run() {} }),
+            maxQuestionRetries: 2,
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 3,
+          }
+        if (agentId === answererAgentId)
+          return {
+            ...makeRuntime({ async *run() {} }),
+            maxQuestionRetries: 0,
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 3,
+          }
+        return undefined
+      },
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+
+    // Create asker WI in awaiting_agent
+    const askerWi = await store.insertWorkItem({
+      workflowId: 't6c-retry-wf',
+      agentId: askerAgentId,
+      origin: 'human',
+      payload: {},
+      key: askerAgentId,
+    })
+    await transition(db, askerWi.id, 'start')
+    await transition(db, askerWi.id, 'ask')
+
+    // Insert a question that's already expired (deadline in the past)
+    const expiredDeadline = new Date(Date.now() - 1000)
+    const q = await store.insertQuestion({
+      askerWorkItemId: askerWi.id,
+      answererWorkItemId: null,
+      target: { agentId: answererAgentId },
+      toolCallId: 'tc-t6c',
+      payload: { q: 'timeout me' },
+      deadline: expiredDeadline,
+    })
+    expect(q.retries).toBe(0)
+
+    // Reap
+    await service.reapExpiredQuestions()
+
+    // retries should be 1, deadline reset, question still open (not escalated yet)
+    const { questions: questionsTable } = await import('./db/schema.js')
+    const { eq } = await import('drizzle-orm')
+    const [qAfter] = await db.select().from(questionsTable).where(eq(questionsTable.id, q.id))
+    expect(qAfter.retries).toBe(1)
+    expect(qAfter.status).toBe('open')
+    // deadline reset to future
+    expect(qAfter.deadline!.getTime()).toBeGreaterThan(Date.now())
+  })
+
+  it('6c: reaper escalates to human gate when retries == maxQuestionRetries', async () => {
+    const store = makeStateStore(db)
+    const askerAgentId = `t6c-esc-asker__${randomUUID().slice(0, 8)}`
+    const answererAgentId = `t6c-esc-answerer__${randomUUID().slice(0, 8)}`
+
+    const service = makePipelineService({
+      db,
+      resolveAgent: (agentId) => {
+        if (agentId === askerAgentId)
+          return {
+            ...makeRuntime({ async *run() {} }),
+            maxQuestionRetries: 0, // 0 retries → immediate escalation
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 3,
+          }
+        if (agentId === answererAgentId)
+          return {
+            ...makeRuntime({ async *run() {} }),
+            maxQuestionRetries: 0,
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 3,
+          }
+        return undefined
+      },
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+
+    // Create asker WI in awaiting_agent
+    const askerWi = await store.insertWorkItem({
+      workflowId: 't6c-esc-wf',
+      agentId: askerAgentId,
+      origin: 'human',
+      payload: {},
+      key: askerAgentId,
+    })
+    await transition(db, askerWi.id, 'start')
+    await transition(db, askerWi.id, 'ask')
+
+    // Insert expired question (retries=0 = already at limit)
+    const q = await store.insertQuestion({
+      askerWorkItemId: askerWi.id,
+      answererWorkItemId: null,
+      target: { agentId: answererAgentId },
+      toolCallId: 'tc-t6c-esc',
+      payload: { q: 'escalate me' },
+      deadline: new Date(Date.now() - 1000),
+    })
+
+    // Reap
+    await service.reapExpiredQuestions()
+
+    // Question should be failed
+    const { questions: questionsTable, gates } = await import('./db/schema.js')
+    const { eq } = await import('drizzle-orm')
+    const [qAfter] = await db.select().from(questionsTable).where(eq(questionsTable.id, q.id))
+    expect(qAfter.status).toBe('failed')
+
+    // Asker should now be in awaiting_human (escalated via human gate)
+    const askerAfter = await store.getWorkItem(askerWi.id)
+    expect(askerAfter?.phase).toBe('awaiting_human')
+
+    // There should be an open gate on the asker
+    const openGate = await db.select().from(gates).where(eq(gates.workItemId, askerWi.id))
+    expect(openGate.length).toBeGreaterThan(0)
+    expect(openGate[0].status).toBe('open')
+  })
+
+  it('6d: round > maxQuestionRounds escalates instead of dispatching', async () => {
+    const store = makeStateStore(db)
+    const askerAgentId = `t6d-asker__${randomUUID().slice(0, 8)}`
+    const answererAgentId = `t6d-answerer__${randomUUID().slice(0, 8)}`
+
+    const service = makePipelineService({
+      db,
+      resolveAgent: (agentId) => {
+        if (agentId === askerAgentId)
+          return {
+            ...makeRuntime(questionProvider(answererAgentId)),
+            maxQuestionRetries: 0,
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 1, // cap at 1: any question in round 2 escalates
+          }
+        if (agentId === answererAgentId)
+          return {
+            ...makeRuntime({ async *run() {} }),
+            maxQuestionRetries: 0,
+            questionTimeoutMs: 60_000,
+            maxQuestionRounds: 1,
+          }
+        return undefined
+      },
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+
+    // Create asker WI in awaiting_agent (simulating it was itself an answerer → round 2)
+    const askerWi = await store.insertWorkItem({
+      workflowId: 't6d-wf',
+      agentId: askerAgentId,
+      origin: 'agent',
+      payload: {},
+      key: askerAgentId,
+    })
+    await transition(db, askerWi.id, 'start')
+
+    // Simulate that this asker WI is itself an answerer for a round-1 question.
+    // Insert a round-1 question from some other asker where askerWi is the answerer.
+    const parentAskerWi = await store.insertWorkItem({
+      workflowId: 't6d-wf',
+      agentId: `t6d-parent-asker__${randomUUID().slice(0, 8)}`,
+      origin: 'human',
+      payload: {},
+      key: `parent-${randomUUID().slice(0, 8)}`,
+    })
+    await transition(db, parentAskerWi.id, 'start')
+    await transition(db, parentAskerWi.id, 'ask')
+    await store.insertQuestion({
+      askerWorkItemId: parentAskerWi.id,
+      answererWorkItemId: askerWi.id,
+      target: { agentId: askerAgentId },
+      toolCallId: 'tc-t6d-parent',
+      payload: { q: 'round 1' },
+      round: 1,
+    })
+
+    // Now attempt to insert a new question from askerWi (would be round 2, exceeds cap of 1)
+    // This is done via the service's insert path; we test by trying to trigger a question
+    // dispatch in the service. Since the asker is in active phase, let's directly test
+    // the round-cap path via store.insertQuestion with round=2 and a direct reaper check.
+    // Instead: insert the question at round 2 and verify the service's insertQuestionWithRoundCheck
+    // (or equivalent path) escalates. For Pass 1, we verify the store will set the round correctly
+    // and the service exposes a cap-check path.
+    //
+    // Direct test: use the public reaper indirectly — insert a round-2 question, then verify
+    // the service escalates when round > maxQuestionRounds.
+    // Actually, let's test the insertQuestion path directly: insertQuestion in the service
+    // should escalate when the computed round would exceed the cap.
+    //
+    // Per task brief (Pass 1): "implement the cap as a depth-of-question-chain check and note
+    // the limitation." We test via the service's dispatchQuestion method or by verifying the
+    // RunObserver path caps the round.
+    //
+    // Since the RunObserver calls insertQuestion during consume(), and Pass 1 may not have
+    // full chain traversal, we verify via service.insertQuestionOrEscalate if exposed,
+    // OR we verify by inserting a round-2 question and calling reapWithRoundCheck.
+    //
+    // For the simplest testable interface: expose a method on pipelineService that tests can call.
+    // checkAndEscalateRoundBound(questionId) — OR integrate into the RunObserver's question path.
+    // The task says round-cap is at question-insert path. We test via the service's ask path.
+
+    // Direct approach: invoke service.checkQuestionRound — a method on service for Pass 1 tests.
+    // If not present this test will fail RED as expected.
+
+    // Insert a question at round 2 from askerWi (exceeds maxQuestionRounds=1)
+    await transition(db, askerWi.id, 'ask')
+    const overRoundQ = await store.insertQuestion({
+      askerWorkItemId: askerWi.id,
+      answererWorkItemId: null,
+      target: { agentId: answererAgentId },
+      toolCallId: 'tc-t6d-over',
+      payload: { q: 'over round' },
+      round: 2,
+    })
+
+    // Call service method that checks round cap and escalates if exceeded
+    await service.checkAndEscalateRoundBound(overRoundQ.id)
+
+    // Question should be failed, asker should be awaiting_human
+    const { questions: questionsTable, gates } = await import('./db/schema.js')
+    const { eq } = await import('drizzle-orm')
+    const [qAfter] = await db
+      .select()
+      .from(questionsTable)
+      .where(eq(questionsTable.id, overRoundQ.id))
+    expect(qAfter.status).toBe('failed')
+
+    const askerAfter = await store.getWorkItem(askerWi.id)
+    expect(askerAfter?.phase).toBe('awaiting_human')
+
+    const openGates = await db.select().from(gates).where(eq(gates.workItemId, askerWi.id))
+    expect(openGates.length).toBeGreaterThan(0)
+    expect(openGates[0].status).toBe('open')
+  })
+})
 
 // ── Boot validation ─────────────────────────────────────────────────────────────
 

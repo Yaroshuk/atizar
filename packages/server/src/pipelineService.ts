@@ -205,6 +205,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       if (wi.phase === 'active') observer.cancel(workItemId)
       const open = await store.getOpenGate(workItemId)
       if (open) await store.resolveGateRow(open.id, { comment: 'cancelled' })
+      // When an asker is cancelled while suspended waiting for an agent answer, fail its open
+      // questions so they are not left open indefinitely (I12: no silent drop). The answerer
+      // children are cancelled by the existing child cascade below.
+      if (wi.phase === 'awaiting_agent') {
+        const pending = await store.getPendingQuestionsForAsker(workItemId)
+        for (const q of pending) {
+          await store.failQuestion(q.id, 'asker cancelled')
+        }
+      }
       await settleEdge(workItemId, 'cancel', actor, { summary: 'cancelled' }).catch(() => {})
       activity.record({
         ts: Date.now(),
@@ -295,6 +304,35 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     )
   )
   const isInputAgent = (agentId: string): boolean => inputAgentKeys.has(agentId)
+
+  // Escalate a question to a human gate on the asker: fail the question, insert a gate on the
+  // asker WI, and transition awaiting_agent → awaiting_human. Reuses the existing gate machinery
+  // (insertGate + transition('escalate')) — server-authoritative, human-gated (I1/I2).
+  // No silent drop (I12): every question that exhausts retries or exceeds the round cap escalates.
+  async function escalateQuestion(questionId: string): Promise<void> {
+    const q = await store.getQuestion(questionId)
+    if (!q || q.status !== 'open') return
+    const askerWi = await store.getWorkItem(q.askerWorkItemId)
+    if (!askerWi || askerWi.phase !== 'awaiting_agent') return
+
+    await store.failQuestion(q.id, 'escalated: no answer after retries')
+    await store.insertGate({
+      workItemId: askerWi.id,
+      toolName: 'escalated_question',
+      toolCallId: `escalate-${q.id}`,
+      proposedArtifact: {
+        questionId: q.id,
+        target: q.target,
+        payload: q.payload,
+        retries: q.retries,
+        round: q.round,
+      },
+    })
+    await transition(db, askerWi.id, 'escalate')
+    bus.publish(`workitem:${askerWi.id}`, { kind: 'status', status: 'awaiting_human' })
+    bus.publish('board', { kind: 'status', id: askerWi.id, status: 'awaiting_human' })
+    publishBoard()
+  }
 
   return {
     async dispatch(req: DispatchRequest): Promise<DispatchResult> {
@@ -664,6 +702,66 @@ export function makePipelineService(deps: PipelineServiceDeps) {
 
     getAudit(workItemId: string): ReturnType<StateStore['getAuditByWorkItem']> {
       return store.getAuditByWorkItem(workItemId)
+    },
+
+    // Reap expired questions: for each open question past its deadline, either retry (re-dispatch
+    // the answerer) or escalate to a human gate on the asker. Never silently drops a question (I12).
+    // Exposed as a callable method so tests can invoke it directly without a timer.
+    async reapExpiredQuestions(): Promise<void> {
+      const expired = await store.getExpiredQuestions(Date.now())
+      for (const q of expired) {
+        const askerWi = await store.getWorkItem(q.askerWorkItemId)
+        if (!askerWi) continue
+        const runtime = deps.resolveAgent(askerWi.agentId)
+        const maxRetries = runtime?.maxQuestionRetries ?? 2
+
+        if (q.retries < maxRetries) {
+          // Retry: increment retries, reset deadline, re-dispatch the answerer.
+          const timeoutMs = runtime?.questionTimeoutMs ?? 120_000
+          const newDeadline = new Date(Date.now() + timeoutMs)
+          await store.bumpQuestionRetry(q.id, newDeadline)
+
+          // Re-dispatch the answerer if a target can be resolved.
+          if (deps.resolveQuestionTarget && askerWi.phase === 'awaiting_agent') {
+            const resolved = deps.resolveQuestionTarget(q.target, {
+              workflowId: askerWi.workflowId,
+              askerWorkItemId: q.askerWorkItemId,
+              askerAgentId: askerWi.agentId,
+            })
+            if (resolved) {
+              const res = await deliverImpl({
+                origin: askerWi.workflowId,
+                dest: { kind: 'agent', agentId: resolved.agentId },
+                payload: q.payload as Record<string, unknown>,
+                parentId: q.askerWorkItemId,
+              }).catch((e) => {
+                console.error('[pipeline] reaper re-dispatch failed', q.id, e)
+                return undefined
+              })
+              if (res?.ok === true) {
+                await store.setQuestionAnswerer(q.id, res.id)
+              }
+            }
+          }
+        } else {
+          // Retries exhausted: escalate to a human gate on the asker.
+          await escalateQuestion(q.id)
+        }
+      }
+    },
+
+    // Check if a question's round exceeds the asker agent's maxQuestionRounds cap, and if so,
+    // escalate it to a human gate. Called at question-insert time (or by tests directly).
+    async checkAndEscalateRoundBound(questionId: string): Promise<void> {
+      const q = await store.getQuestion(questionId)
+      if (!q || q.status !== 'open') return
+      const askerWi = await store.getWorkItem(q.askerWorkItemId)
+      if (!askerWi) return
+      const runtime = deps.resolveAgent(askerWi.agentId)
+      const maxRounds = runtime?.maxQuestionRounds ?? 5
+      if (q.round > maxRounds) {
+        await escalateQuestion(q.id)
+      }
     },
   }
 }

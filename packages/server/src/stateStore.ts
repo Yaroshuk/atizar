@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, eq, gte, inArray, isNull, lt } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db, Tx } from './db/client.js'
 import {
@@ -49,6 +49,7 @@ export interface InsertQuestionInput {
   toolCallId: string
   payload: Record<string, unknown>
   deadline?: Date | null
+  round?: number
 }
 
 // Typed CRUD over the pipeline tables. The ONLY status writes go through transition()
@@ -314,8 +315,14 @@ export function makeStateStore(db: Db) {
           payload: input.payload,
           status: 'open',
           deadline: input.deadline ?? null,
+          round: input.round ?? 1,
         })
         .returning()
+      return row
+    },
+
+    async getQuestion(id: string): Promise<Question | undefined> {
+      const [row] = await db.select().from(questions).where(eq(questions.id, id)).limit(1)
       return row
     },
 
@@ -356,6 +363,13 @@ export function makeStateStore(db: Db) {
 
     async failQuestion(id: string, reason: string): Promise<void> {
       await db.update(questions).set({ status: 'failed', reason }).where(eq(questions.id, id))
+    },
+
+    async bumpQuestionRetry(id: string, newDeadline: Date): Promise<void> {
+      await db
+        .update(questions)
+        .set({ retries: sql`${questions.retries} + 1`, deadline: newDeadline })
+        .where(eq(questions.id, id))
     },
 
     async getExpiredQuestions(beforeMs: number): Promise<Question[]> {

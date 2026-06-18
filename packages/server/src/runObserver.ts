@@ -47,6 +47,11 @@ export interface AgentRuntime {
   // Parallel to buildResume but called when an agent answer (kind:'answer') arrives instead
   // of a human gate resolution. The same null/message/prompt outcome branching applies.
   buildResumeFromAnswer?: PromptStrategy['buildResumeFromAnswer']
+  // Return-channel tunables (from AgentDefinition, config-as-data I7).
+  // Optional so existing tests omitting them still compile; defaults applied at use-site.
+  maxQuestionRounds?: number
+  questionTimeoutMs?: number
+  maxQuestionRetries?: number
 }
 
 export interface RunObserverDeps {
@@ -267,11 +272,14 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
               )
             }
 
+            const timeoutMs = runtime.questionTimeoutMs ?? 120_000
+            const deadline = timeoutMs > 0 ? new Date(Date.now() + timeoutMs) : null
             const qRow = await store.insertQuestion({
               askerWorkItemId: id,
               target: question.target,
               toolCallId: question.toolCallId,
               payload: question.payload,
+              deadline,
             })
             await transition(db, id, 'ask')
             publishStatus(id, 'awaiting_agent')

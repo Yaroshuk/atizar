@@ -27,6 +27,7 @@ export type Edge =
   | 'acknowledge'
   | 'ask'
   | 'answered'
+  | 'escalate'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -72,6 +73,9 @@ const EDGES: Record<Edge, EdgeSpec> = {
   ask: { from: ['active'], to: 'awaiting_agent', outcome: 'running' },
   // answered: the peer responded; the suspended agent resumes.
   answered: { from: ['awaiting_agent'], to: 'active', outcome: 'running' },
+  // escalate: the timeout reaper could not get an answer from the peer agent after all retries;
+  // a human must resolve the situation. Moves awaiting_agent → awaiting_human and opens a gate.
+  escalate: { from: ['awaiting_agent'], to: 'awaiting_human', outcome: 'running' },
 }
 
 export interface TransitionOpts {

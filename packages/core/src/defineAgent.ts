@@ -31,6 +31,19 @@ export const AgentDefinitionSchema = z
     // channel). Distinct from `dispatches` (fire-and-forget): an ask suspends the asker into
     // `awaiting_agent`. Declared so the boot-time I15 classification stays exhaustive.
     asks: z.array(z.string()).default([]),
+    // ── Return-channel tunables (config-as-data, I7) ─────────────────────────────
+    // Maximum depth of chained questions before escalating to a human gate (cycle protection).
+    // Round 1 = first ask; a re-entrant ask from an answerer is round 2, etc.
+    maxQuestionRounds: z.number().int().positive().default(5),
+    // Total token budget across all question rounds (future enforcement — declared now, not yet
+    // consumed by the server). Declared so operator config can set it; the server will enforce it
+    // once token accounting is wired.
+    questionTokenBudget: z.number().int().positive().optional(),
+    // Milliseconds before an unanswered question times out and the reaper acts.
+    questionTimeoutMs: z.number().int().positive().default(120_000),
+    // How many times the reaper retries (re-dispatches the answerer) before escalating to a
+    // human gate. 0 = escalate immediately on first timeout.
+    maxQuestionRetries: z.number().int().min(0).default(2),
   })
   .superRefine((def, ctx) => {
     for (const name of def.approvals) {
