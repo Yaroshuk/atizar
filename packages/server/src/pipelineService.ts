@@ -60,6 +60,14 @@ export interface PipelineServiceDeps {
   // The app's dedup-source policy (Pass-1.5). REQUIRED — the framework never guesses a source.
   // Returns the dedup key for this work (null ⇒ never deduped). e.g. reply → the email id.
   sourceOf: (agentId: string, payload: Record<string, unknown>) => string | null
+  // F5 agent-to-agent questions: resolve an opaque question `target` to a concrete agentId.
+  // App policy (I5) — the framework never knows the answerer. Optional: if absent, routing always
+  // fails loudly (the observer throws) — wire it when any workflow uses AGENT_QUESTION.
+  // `askerAgentId` is the instance key (wf__agentId) so the app can dispatch to the right binding.
+  resolveQuestionTarget?: (
+    target: unknown,
+    ctx: { workflowId: string; askerWorkItemId: string; askerAgentId: string }
+  ) => { agentId: string } | null
 }
 
 export function makePipelineService(deps: PipelineServiceDeps) {
@@ -142,6 +150,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     activity,
     settle: (id, edge, actor, opts) => settleEdge(id, edge, actor, opts),
     reconcile: (agentId) => pool.reconcile(agentId),
+    resolveQuestionTarget: deps.resolveQuestionTarget,
   })
 
   // Coarse board cursor (Last-Event-ID); reconnect = snapshot refetch (spec §1.6).

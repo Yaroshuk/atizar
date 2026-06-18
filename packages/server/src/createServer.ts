@@ -33,6 +33,13 @@ export interface ServerBindingLike {
   prompts: PromptStrategy
   effects?: Record<string, EffectFn>
   health?: { check: () => Promise<HealthCheck> }[]
+  // F5 agent-to-agent questions: resolve an opaque question target to a concrete agentId.
+  // App policy (I5) — optional; only wire when the binding's agent uses AGENT_QUESTION.
+  // `askerAgentId` is the instance key (wf__agentId) so the binding can confirm the asker.
+  resolveQuestionTarget?: (
+    target: unknown,
+    ctx: { workflowId: string; askerWorkItemId: string; askerAgentId: string }
+  ) => { agentId: string } | null
 }
 export interface WorkflowServerLike {
   descriptor: WorkflowDescriptor
@@ -99,6 +106,11 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
   const runtimes: Record<string, AgentRuntime> = {}
   const healthInputs: Record<string, { provider: string; checks: (() => Promise<HealthCheck>)[] }> =
     {}
+  // Keyed by instanceId (wf__agentId) → the binding's question-target resolver.
+  const questionResolvers = new Map<
+    string,
+    NonNullable<ServerBindingLike['resolveQuestionTarget']>
+  >()
 
   for (const { descriptor, bindings } of activeWorkflowServers) {
     const byId = new Map(descriptor.agents.map((a) => [a.agent.id, a.agent]))
@@ -130,6 +142,9 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
       healthInputs[key] = {
         provider: def.provider,
         checks: (b.health ?? []).map((h) => h.check),
+      }
+      if (b.resolveQuestionTarget) {
+        questionResolvers.set(key, b.resolveQuestionTarget)
       }
     }
   }
@@ -173,6 +188,11 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
     refreshHealth,
     instanceKeyOf: args.instanceKeyOf,
     sourceOf: args.sourceOf,
+    // Dispatch to the binding-specific resolver keyed by the asker's instance key (wf__agentId).
+    resolveQuestionTarget:
+      questionResolvers.size > 0
+        ? (target, ctx) => questionResolvers.get(ctx.askerAgentId)?.(target, ctx) ?? null
+        : undefined,
   })
 
   const app = new Hono()

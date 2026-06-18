@@ -4,6 +4,7 @@ import {
   encodeHandoff,
   handoffNote,
   readGateOpened,
+  readAgentQuestion,
   type EffectFn,
   type GateResolution,
   type PromptStrategy,
@@ -77,6 +78,14 @@ export interface RunObserverDeps {
   ) => Promise<void>
   // Re-derive pool occupancy after a gate suspend (replaces pool.release(agentId)).
   reconcile: (agentId: string) => void
+  // F5 agent-to-agent questions: resolve an opaque question `target` to a concrete agentId.
+  // App policy — the framework never knows which agent is the answerer (I5). Returns null if
+  // routing is impossible; the observer throws loudly (routing failure is never silently dropped — I12).
+  // `askerAgentId` is the instance key (wf__agentId) so the app can dispatch to the right binding.
+  resolveQuestionTarget?: (
+    target: unknown,
+    ctx: { workflowId: string; askerWorkItemId: string; askerAgentId: string }
+  ) => { agentId: string } | null
 }
 
 export interface RunObserver {
@@ -130,6 +139,7 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
   ): Promise<void> {
     let seq = (await store.getTrace(id, 0)).length
     let gateOpened = false
+    let questionAsked = false
     // Accumulate render-tool-call args to fill the card on TOOL_CALL_END.
     const openCalls = new Map<string, { name: string; args: string }>()
     const iterator = iterable[Symbol.asyncIterator]()
@@ -235,10 +245,75 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
           })
           gateOpened = true
         }
+
+        // F5 agent-to-agent questions: mirrors the gate block above.
+        // The provider emits AGENT_QUESTION then returns (the asker process is dead, just like the
+        // claude-cli kill at a gate). We insert the question row(s), transition active→awaiting_agent,
+        // publish status, then route and dispatch the answerer via deps.deliver.
+        const q = readAgentQuestion(event)
+        if (q) {
+          for (const question of q.questions) {
+            // Resolve the opaque target via the injected router (app policy, I5).
+            // A null result is a ROUTING FAILURE — never silently drop (I12): throw loudly so the
+            // asker's run ends in error rather than silently hanging in awaiting_agent forever.
+            const resolved = deps.resolveQuestionTarget?.(question.target, {
+              workflowId: wi.workflowId,
+              askerWorkItemId: id,
+              askerAgentId: wi.agentId,
+            })
+            if (!resolved) {
+              throw new Error(
+                `[runObserver] routing failure: no answerer resolved for target ${JSON.stringify(question.target)} (workItemId=${id})`
+              )
+            }
+
+            await store.insertQuestion({
+              askerWorkItemId: id,
+              target: question.target as Record<string, unknown>,
+              toolCallId: question.toolCallId,
+              payload: question.payload,
+            })
+            await transition(db, id, 'ask')
+            publishStatus(id, 'awaiting_agent')
+
+            // Dispatch the answerer, seeded with the question payload.
+            // The payload is stored as-is on the work item; buildInput will call encodeHandoff on
+            // wi.payload to produce the seed message when the answerer's run starts.
+            // answererWorkItemId is left null on the question row for Pass 1 (deliver return value
+            // carries the id but there is no setQuestionAnswerer yet — add when the answer-back path
+            // needs to wake the asker by question id rather than by pool-scan).
+            await deps
+              .deliver({
+                origin: wi.workflowId,
+                dest: { kind: 'agent', agentId: resolved.agentId },
+                payload: question.payload,
+                parentId: id,
+              })
+              .catch((e) => {
+                console.error('[runObserver] question deliver failed', id, e)
+                return undefined
+              })
+
+            deps.activity?.record({
+              ts: Date.now(),
+              workflowId: wi.workflowId,
+              agentId: wi.agentId,
+              workItemId: id,
+              kind: 'question',
+              summary: `→ ${resolved.agentId}`,
+            })
+          }
+          questionAsked = true
+        }
       }
 
       if (gateOpened) {
         // Suspended at a gate — provider process is dead (claude-cli kill); re-derive occupancy.
+        deps.reconcile(wi.agentId)
+        return
+      }
+      if (questionAsked) {
+        // Suspended waiting for an agent answer — provider process is dead; re-derive occupancy.
         deps.reconcile(wi.agentId)
         return
       }
