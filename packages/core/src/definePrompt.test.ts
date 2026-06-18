@@ -57,3 +57,21 @@ describe('definePrompt', () => {
     expect(p.buildResume).toBeUndefined()
   })
 })
+
+describe('definePrompt onAnswer', () => {
+  it('wires onAnswer into buildResumeFromAnswer', () => {
+    const strat = definePrompt({
+      onStart: () => 'start',
+      onAnswer: (answers) => ({ kind: 'prompt', text: `got ${answers.length} answers` }),
+    })
+    expect(strat.buildResumeFromAnswer).toBeDefined()
+    expect(strat.buildResumeFromAnswer!([{ target: {}, answer: { a: 1 }, ok: true }])).toEqual({
+      kind: 'prompt',
+      text: 'got 1 answers',
+    })
+  })
+
+  it('leaves buildResumeFromAnswer undefined when onAnswer is omitted', () => {
+    expect(definePrompt({ onStart: () => 'start' }).buildResumeFromAnswer).toBeUndefined()
+  })
+})

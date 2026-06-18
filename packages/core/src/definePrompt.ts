@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import type { RunAgentInput } from '@ag-ui/client'
 import { decodeHandoff } from './handoff.js'
-import type { PromptStrategy, ResumeOutcome } from './providers.js'
+import type { PromptStrategy, ResumeOutcome, AnswerResolution } from './providers.js'
 
 // Declarative prompt for one agent. Returns TURN-ONLY prose — the agent's identity
 // (defineAgent.instructions, composed with the workflow prompt) is prepended by the provider,
@@ -17,6 +17,9 @@ export interface PromptSpec<T> {
   // Returns a ResumeOutcome: prompt → spawn the model; message → server appends text; null → silent.
   // Omit when the agent never proposes a gated effect → buildResume is undefined.
   onResume?: (result: Record<string, unknown>) => ResumeOutcome
+  // Resume after an agent ANSWER (the return channel). `answers` is one entry per outstanding
+  // question. Returns a ResumeOutcome like onResume. Omit for an agent that never asks.
+  onAnswer?: (answers: { target: unknown; answer: Record<string, unknown>; ok: boolean }[]) => ResumeOutcome
 }
 
 // ESCAPE HATCH: definePrompt is sugar, not a cage. It models a 3-hook lifecycle (onInput/onStart/
@@ -37,6 +40,9 @@ export function definePrompt<T>(spec: PromptSpec<T>): PromptStrategy {
     buildResume: onResume
       ? (_args: Record<string, unknown>, executedResult?: Record<string, unknown>): ResumeOutcome =>
           onResume(executedResult ?? {})
+      : undefined,
+    buildResumeFromAnswer: spec.onAnswer
+      ? (answers: AnswerResolution['answers']): ResumeOutcome => spec.onAnswer!(answers)
       : undefined,
   }
 }

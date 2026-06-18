@@ -7,7 +7,7 @@ export interface Provider {
   // resume mechanics (the orchestrator never hard-codes re-prime): claude-cli implements it
   // as kill-and-re-prime from the transcript + the verbatim approved artifact; Mastra (later)
   // resumes natively by runId against its own snapshot store. Absent ⇒ no resume capability.
-  resume?(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent>
+  resume?(handle: ResumeHandle, payload: ResumePayload): AsyncIterable<BaseEvent>
 }
 
 // What the orchestrator hands back to resume a suspended run. Both fields are always present;
@@ -23,6 +23,9 @@ export interface ResumeHandle {
 // The human's decision at a gate. `form` is the approved/edited artifact (byte-verbatim — it
 // becomes the effect arguments at step 4); `comment` seeds the future revise loop.
 export interface GateResolution {
+  // Optional discriminant: absent ⇒ a gate resolution (the default arm). Plan 2's callers set
+  // it explicitly; existing callers that omit it still typecheck and behave as a gate.
+  kind?: 'gate'
   gateId: string
   decision: 'approved' | 'rejected'
   form?: Record<string, unknown>
@@ -32,6 +35,21 @@ export interface GateResolution {
   // this result"; the model never re-performs the effect.
   executedResult?: Record<string, unknown>
 }
+
+// An agent answer delivered back to a suspended asker (the return channel). Carries one entry per
+// outstanding question (Pass 1: exactly one). `ok` is per-answer; `allOk` is the join verdict the
+// asker's prompt branches on. NOT a GateResolution — an answer has no gateId/decision (the patch
+// the design rejected); its own honest type instead.
+export interface AnswerResolution {
+  kind: 'answer'
+  answers: { target: unknown; answer: Record<string, unknown>; ok: boolean }[]
+  allOk: boolean
+}
+
+// What the orchestrator hands a provider to resume a suspended run. The provider branches on `kind`
+// and REUSES one resume mechanism for both (no second path): gate-resume and answer-resume differ
+// only in the prompt the strategy builds.
+export type ResumePayload = GateResolution | AnswerResolution
 
 // The resume result of a gated agent — a discriminated union (I14 provider/core contract). The
 // SERVER decides what to do from `kind`; the provider only ever runs `prompt`. `message` lets an
@@ -51,6 +69,11 @@ export interface PromptStrategy {
   buildResume?(
     args: Record<string, unknown>,
     executedResult?: Record<string, unknown>
+  ): ResumeOutcome
+  // Resume after an AGENT ANSWER (the return channel), parallel to buildResume (human gate). Builds
+  // the resume prompt from the delivered answers. Omit for an agent that never asks.
+  buildResumeFromAnswer?(
+    answers: AnswerResolution['answers']
   ): ResumeOutcome
 }
 
