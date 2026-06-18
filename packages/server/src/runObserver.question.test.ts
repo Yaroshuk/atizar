@@ -78,7 +78,7 @@ describe.skipIf(!reachable)('RunObserver question-detect (real Postgres, fake pr
       }),
       deliver: async (req) => {
         deliverCalls.push(req)
-        return { ok: true, id: 'answerer-wi-1', deduped: false }
+        return { ok: true, id: randomUUID(), deduped: false }
       },
       settle: async (sid, edge, _actor, opts) => {
         await transition(db, sid, edge, opts)
@@ -162,6 +162,58 @@ describe.skipIf(!reachable)('RunObserver question-detect (real Postgres, fake pr
     await observer.run(id)
 
     // Asker must NOT be stuck in awaiting_agent — deliver failure must terminate it
+    const wi = await store.getWorkItem(id)
+    expect(wi?.phase).toBe('terminal')
+    expect(wi?.outcome).toBe('error')
+  })
+
+  it('setQuestionAnswerer failure fails the asker terminal/error (not stuck in awaiting_agent)', async () => {
+    const agentId = `ro-q-link-fail__${randomUUID().slice(0, 8)}`
+    const { id } = await store.insertWorkItem({
+      id: randomUUID(),
+      workflowId: 'ro-q-test',
+      agentId,
+      origin: 'human',
+      payload: {},
+      key: agentId,
+    })
+
+    const { pool, reconcile } = fakePool()
+    const observer = makeRunObserver({
+      db,
+      store: {
+        ...store,
+        setQuestionAnswerer: async () => {
+          throw new Error('link write failed')
+        },
+      },
+      pool,
+      bus: { publish: vi.fn(), subscribe: () => () => {} },
+      resolveAgent: () => ({
+        provider: fakeQuestionProvider(),
+        renderToolNames: [],
+        maxInstances: 1,
+        effects: {},
+        dispatchToolNames: [],
+        handoffs: [],
+      }),
+      deliver: async () => ({ ok: true as const, id: randomUUID(), deduped: false }),
+      settle: async (sid, edge, _actor, opts) => {
+        await transition(db, sid, edge, opts)
+      },
+      reconcile,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await transition(db, id, 'start')
+    await observer.run(id)
+    spy.mockRestore()
+
+    // A broken link means the wake channel can never close — must fail the asker, not strand it
     const wi = await store.getWorkItem(id)
     expect(wi?.phase).toBe('terminal')
     expect(wi?.outcome).toBe('error')

@@ -289,19 +289,26 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
                 parentId: id,
               })
               if (res?.ok === true) {
-                // Link the answerer work item id to the question row (best-effort: a failure here
-                // is not fatal — the question still exists; the wake path can fall back to a pool scan
-                // if needed. I12: do NOT throw and kill the asker's ask flow over a linking error).
-                await store.setQuestionAnswerer(qRow.id, res.id).catch((e) => {
-                  console.error('[runObserver] setQuestionAnswerer failed', qRow.id, res.id, e)
-                })
+                // Link the answerer work item id to the question row. A failure here IS fatal:
+                // without the link the wake path can never find the answerer, so the asker would
+                // hang in awaiting_agent forever. Re-throw so the outer catch settles terminal/error
+                // (I12: no silent drop, same rule as deliver failure above).
+                try {
+                  await store.setQuestionAnswerer(qRow.id, res.id)
+                } catch (e) {
+                  throw new Error(
+                    `[runObserver] setQuestionAnswerer failed (questionId=${qRow.id} answererId=${res.id}): ${e instanceof Error ? e.message : String(e)}`
+                  )
+                }
               }
             } catch (e) {
-              // deliver failure is fatal: the question row exists but no answerer was dispatched.
-              // Re-throw so the outer catch settles the asker terminal/error (I12: no silent drop).
-              throw new Error(
-                `[runObserver] question deliver failed (workItemId=${id} agentId=${resolved.agentId}): ${e instanceof Error ? e.message : String(e)}`
-              )
+              // deliver failure (or setQuestionAnswerer failure) is fatal: re-throw so the outer
+              // catch settles the asker terminal/error (I12: no silent drop).
+              throw e instanceof Error && e.message.startsWith('[runObserver]')
+                ? e
+                : new Error(
+                    `[runObserver] question deliver failed (workItemId=${id} agentId=${resolved.agentId}): ${e instanceof Error ? e.message : String(e)}`
+                  )
             }
 
             deps.activity?.record({
