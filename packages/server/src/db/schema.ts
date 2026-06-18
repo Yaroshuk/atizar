@@ -21,6 +21,7 @@ export const workItemPhase = pgEnum('work_item_phase', [
   'queued',
   'active',
   'awaiting_human',
+  'awaiting_agent',
   'terminal',
 ])
 
