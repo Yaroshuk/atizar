@@ -110,13 +110,17 @@ export const AppHeader = ({
           onClick={onStopAll}
           title='Emergency stop — halt every active item across all workflows'
         />
-        <IconButton
-          icon='activity'
-          active={activityOpen}
-          onClick={onToggleActivity}
-          aria-label='Activity log'
-          title='Activity'
-        />
+        {/* The activity feed is process-global (not yet tenant-scoped) — hide it in the demo so a
+            visitor never sees another session's actions. The per-item trace stays (id-scoped). */}
+        {!demo && (
+          <IconButton
+            icon='activity'
+            active={activityOpen}
+            onClick={onToggleActivity}
+            aria-label='Activity log'
+            title='Activity'
+          />
+        )}
       </div>
     </header>
   )

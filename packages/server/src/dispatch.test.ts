@@ -180,4 +180,18 @@ describe.skipIf(!reachable)('dispatch() chokepoint (real Postgres)', () => {
     const c = await dispatch(db, pool, { ...base, key })
     expect(await episodeOf(c.id)).toBe(2)
   })
+
+  it('does not cross-dedup the same source across tenants (session isolation)', async () => {
+    const { pool } = fakePool()
+    const source = `email:${randomUUID()}`
+    const d = (sessionId: string) => dispatch(db, pool, { ...base, source, sessionId })
+    const r1 = await d('aaa')
+    const r2 = await d('bbb') // different tenant, same source → its OWN item
+    expect(r1.deduped).toBe(false)
+    expect(r2.deduped).toBe(false)
+    expect(r2.id).not.toBe(r1.id)
+    const r3 = await d('aaa') // same tenant + same source → deduped onto r1
+    expect(r3.deduped).toBe(true)
+    expect(r3.id).toBe(r1.id)
+  })
 })

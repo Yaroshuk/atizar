@@ -41,6 +41,7 @@ export { scope } from './scope.js'
 export { ThreadResultsContext, useThreadResult } from './threadResults.js'
 export { ThreadHandoffsContext, useThreadHandoffs, type ThreadHandoff } from './threadHandoffs.js'
 export { authHeaders } from './authHeaders.js'
+export { setSessionEnabled, sessionHeaders } from './session.js'
 export { Icon } from './components/Icon/Icon.js'
 export type { IconName } from './components/Icon/Icon.js'
 // UI primitives (token-driven, extensible — spread native attrs + merge className).

@@ -28,7 +28,13 @@ export interface DispatchInput {
   key: string
   parentId?: string | null
   maxInstances: number
+  // Tenant key (multi-tenant scoping). A root is stamped from the request; a child inherits its
+  // parent's sessionId. Defaults to 'global' (single-operator / shared). Scopes dedup + episode so
+  // two tenants never collide on the same source/key.
+  sessionId?: string
 }
+
+const GLOBAL_TENANT = 'global'
 
 export interface DispatchResult {
   id: string
@@ -63,11 +69,12 @@ export async function dispatch(
   //    is the exhaustive replacement for the old SQL ne/notInArray block (which silently omitted
   //    'reset' — the latent bug this closes). The card-keeps-it dimension is irrelevant to dedup,
   //    so hasCard/hasLiveDescendant are passed false here.
+  const sessionId = input.sessionId ?? GLOBAL_TENANT
   if (input.source) {
     const rows = await db
       .select({ id: workItems.id, phase: workItems.phase, outcome: workItems.outcome })
       .from(workItems)
-      .where(eq(workItems.source, input.source))
+      .where(and(eq(workItems.source, input.source), eq(workItems.sessionId, sessionId)))
     const covering = rows.find((r) => lifecycle(r.phase, r.outcome, false, false).covers)
     if (covering) return { id: covering.id, deduped: true }
   }
@@ -91,7 +98,8 @@ export async function dispatch(
       and(
         eq(workItems.workflowId, input.workflowId),
         eq(workItems.agentId, input.agentId),
-        eq(workItems.key, input.key)
+        eq(workItems.key, input.key),
+        eq(workItems.sessionId, sessionId)
       )
     )
   const maxSeq = siblings.reduce((m, s) => Math.max(m, s.episodeSeq), 0)
@@ -109,6 +117,7 @@ export async function dispatch(
       payload: input.payload,
       source: input.source ?? null,
       key: input.key,
+      sessionId,
       episodeSeq,
       parentId: input.parentId ?? null,
       phase: 'queued',

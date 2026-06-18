@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { setSessionEnabled } from '@atizar/react'
 import { BoardApp } from './BoardApp/BoardApp'
 import { workflowsConfig } from './workflows'
 
@@ -12,7 +13,12 @@ export const Demo = () => {
   useEffect(() => {
     fetch('/api/config')
       .then((r) => r.json())
-      .then((c: Config) => setConfig(c))
+      .then((c: Config) => {
+        // In demo mode, give this browser its own tenant key so its board is isolated from other
+        // visitors (the header rides on board/mutation requests). Non-demo ⇒ shared 'global'.
+        setSessionEnabled(c.demo)
+        setConfig(c)
+      })
       .catch(() =>
         setConfig({ demo: false, workflows: workflowsConfig.workflows.map((w) => w.id) })
       )
