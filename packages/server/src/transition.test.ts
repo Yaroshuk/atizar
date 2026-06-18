@@ -226,4 +226,38 @@ describe.skipIf(!reachable)('transition() edge guards (real Postgres)', () => {
     expect((await store.getWorkItem(parent))?.phase).toBe('terminal')
     expect((await store.getWorkItem(parent))?.outcome).toBe('superseded')
   })
+
+  it('ask suspends an active item into awaiting_agent', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'ask')
+    const wi = await store.getWorkItem(id)
+    expect(wi?.phase).toBe('awaiting_agent')
+    expect(wi?.outcome).toBe('running')
+  })
+
+  it('answered resumes an awaiting_agent item to active', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'ask')
+    await transition(db, id, 'answered')
+    expect((await store.getWorkItem(id))?.phase).toBe('active')
+  })
+
+  it('ask is illegal from a terminal item', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'finish')
+    await expect(transition(db, id, 'ask')).rejects.toThrow(/cannot "ask"/)
+  })
+
+  it('cancel is legal from awaiting_agent', async () => {
+    const { id } = await newQueued()
+    await transition(db, id, 'start')
+    await transition(db, id, 'ask')
+    await transition(db, id, 'cancel')
+    const wi = await store.getWorkItem(id)
+    expect(wi?.phase).toBe('terminal')
+    expect(wi?.outcome).toBe('stopped')
+  })
 })

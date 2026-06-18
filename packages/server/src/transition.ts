@@ -25,6 +25,8 @@ export type Edge =
   | 'reset'
   | 'reopen'
   | 'acknowledge'
+  | 'ask'
+  | 'answered'
 
 export class IllegalTransition extends Error {
   constructor(message: string) {
@@ -49,7 +51,11 @@ const EDGES: Record<Edge, EdgeSpec> = {
   resume: { from: ['awaiting_human'], to: 'active', outcome: 'running' },
   finish: { from: ['active'], to: 'terminal', outcome: 'done' },
   fail: { from: ['active', 'awaiting_human'], to: 'terminal', outcome: 'error' },
-  cancel: { from: ['queued', 'active', 'awaiting_human'], to: 'terminal', outcome: 'stopped' },
+  cancel: {
+    from: ['queued', 'active', 'awaiting_human', 'awaiting_agent'],
+    to: 'terminal',
+    outcome: 'stopped',
+  },
   reject: { from: ['awaiting_human'], to: 'terminal', outcome: 'rejected' },
   // supersede: retire a prior FINISHED scan root into the preserved Done bucket on a re-START.
   supersede: { from: ['terminal'], to: 'terminal', outcome: 'superseded' },
@@ -62,6 +68,10 @@ const EDGES: Record<Edge, EdgeSpec> = {
   // to `dismissed` so the run leaves the live UI (symmetric with approve→done / reject→rejected).
   // Legal ONLY from terminal/error (guarded below, like reopen's done-only guard).
   acknowledge: { from: ['terminal'], to: 'terminal', outcome: 'dismissed' },
+  // ask: the active agent suspends waiting for a peer agent to respond.
+  ask: { from: ['active'], to: 'awaiting_agent', outcome: 'running' },
+  // answered: the peer responded; the suspended agent resumes.
+  answered: { from: ['awaiting_agent'], to: 'active', outcome: 'running' },
 }
 
 export interface TransitionOpts {
