@@ -43,6 +43,14 @@ const scenario: ConformanceScenario = {
     handle: { runId: 'r1', input: { messages: resolvedMessages } as unknown as RunAgentInput },
     resolution: { gateId: 'g1', decision: 'rejected' },
   },
+  answered: {
+    handle: { runId: 'r1', input: { messages: [] } as never },
+    payload: {
+      kind: 'answer',
+      answers: [{ target: {}, answer: { text: 'use X' }, ok: true }],
+      allOk: true,
+    },
+  },
 }
 
 describe('mock-provider conformance', () => {
@@ -57,7 +65,11 @@ describe('mock provider answer-resume', () => {
     const events = await collect(
       p.resume!(
         { runId: 'r1', input: { messages: [] } as never },
-        { kind: 'answer', answers: [{ target: {}, answer: { text: 'use X' }, ok: true }], allOk: true }
+        {
+          kind: 'answer',
+          answers: [{ target: {}, answer: { text: 'use X' }, ok: true }],
+          allOk: true,
+        }
       )
     )
     expect(events.length).toBeGreaterThan(0)

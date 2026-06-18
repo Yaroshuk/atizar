@@ -49,6 +49,14 @@ const createReplyPrompts = (instructions: string): PromptStrategy => ({
       ].join('\n'),
     }
   },
+  buildResumeFromAnswer(answers) {
+    const first = answers[0]
+    const answer = first ? String(first.answer.text ?? JSON.stringify(first.answer)) : '(no answer)'
+    return {
+      kind: 'prompt' as const,
+      text: [instructions, `ANSWERED: ${answer}`].join('\n'),
+    }
+  },
 })
 
 const line = (o: unknown) => JSON.stringify(o)
@@ -479,6 +487,14 @@ describe('createClaudeCliProvider conformance', () => {
       handle: { runId: 'r1', input: runInput([]) },
       resolution: { gateId: 'g1', decision: 'rejected' },
     },
+    answered: {
+      handle: { runId: 'r1', input: { messages: [] } as never },
+      payload: {
+        kind: 'answer',
+        answers: [{ target: {}, answer: { text: 'use X' }, ok: true }],
+        allOk: true,
+      },
+    },
   }
   const makeProvider = () =>
     createClaudeCliProvider({
@@ -488,6 +504,7 @@ describe('createClaudeCliProvider conformance', () => {
       prompts: createReplyPrompts('do it'),
       spawn: fakeSpawn([
         { when: (p) => /APPROVED/.test(p), lines: [textDelta('Draft saved to Gmail.')] },
+        { when: (p) => /ANSWERED/.test(p), lines: [textDelta('Got the answer, continuing.')] },
         {
           when: () => true,
           lines: [

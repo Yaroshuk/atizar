@@ -1,6 +1,6 @@
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import { readGateOpened, type GateOpenedValue } from './gate.js'
-import type { Provider, ResumeHandle, GateResolution } from './providers.js'
+import type { Provider, ResumeHandle, GateResolution, AnswerResolution } from './providers.js'
 
 // The fixture a provider supplies so the generic checks can drive it. `turn1Input` must be a
 // fresh run that reaches the agent's approval tool; `approved`/`rejected` are the resume calls.
@@ -14,6 +14,7 @@ export interface ConformanceScenario {
   turn1Input: RunAgentInput
   approved: { handle: ResumeHandle; resolution: GateResolution }
   rejected: { handle: ResumeHandle; resolution: GateResolution }
+  answered: { handle: ResumeHandle; payload: AnswerResolution }
 }
 
 // A single named invariant. `run` throws on failure (so vitest reports it as that test failing).
@@ -90,6 +91,16 @@ export const providerConformanceChecks: ConformanceCheck[] = [
       // provider that fired an action on reject would emit one and fail here.
       const toolCalls = events.filter((e) => e.type === EventType.TOOL_CALL_START)
       assert(toolCalls.length === 0, 'resume(rejected) emitted a tool call (possible effect)')
+    },
+  },
+  {
+    name: 'resume(answer) completes and re-opens no gate',
+    async run(makeProvider, s) {
+      const p = makeProvider()
+      assert(typeof p.resume === 'function', 'provider does not implement resume()')
+      const events = await collect(p.resume!(s.answered.handle, s.answered.payload))
+      assert(gatesOf(events).length === 0, 'resume(answer) re-opened a gate')
+      assert(events.length > 0, 'resume(answer) produced no events')
     },
   },
   {

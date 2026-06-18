@@ -263,7 +263,9 @@ function conformanceRunner(): MastraRunner {
             type: 'text-delta',
             payload: {
               text:
-                payload.kind !== 'answer' && payload.decision === 'approved' ? 'Saved.' : 'Rejected.',
+                payload.kind !== 'answer' && payload.decision === 'approved'
+                  ? 'Saved.'
+                  : 'Rejected.',
             },
           },
         ],
@@ -288,6 +290,14 @@ const scenario: ConformanceScenario = {
   rejected: {
     handle: { runId: 'r1', input: { messages: [] } as unknown as RunAgentInput },
     resolution: { gateId: 'g1', decision: 'rejected' },
+  },
+  answered: {
+    handle: { runId: 'r1', input: { messages: [] } as never },
+    payload: {
+      kind: 'answer',
+      answers: [{ target: {}, answer: { text: 'use X' }, ok: true }],
+      allOk: true,
+    },
   },
 }
 
