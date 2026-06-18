@@ -15,7 +15,7 @@
     "dev:server": "yarn workspace inbox dev:server",
     "dev:client": "yarn workspace inbox dev:client",
     "build": "yarn workspace inbox build",
-    "build:web": "yarn workspace @atizar/react build && yarn workspace inbox build",
+    "build:web": "tsc --build && yarn workspace @atizar/react build && yarn workspace inbox build",
     "typecheck": "tsc --build",
     "test": "vitest run",
     "eval": "vitest run -c vitest.eval.config.ts",
