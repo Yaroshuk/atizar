@@ -68,26 +68,32 @@ Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workfl
 
 ---
 
-## 🔀 Agent return channel — Plan 1 built (2026-06-18, branch `feat/agent-return-channel`, NOT merged)
+## 🔀 Agent return channel — Pass 1 BUILT (Plan 1 + Plan 2) (2026-06-18, branch `feat/agent-return-channel`, NOT merged)
 
 The honest agent-to-agent return channel (an agent asks another → suspends in `awaiting_agent` →
-wakes with the answer; **Variant B / hub-routed, not mesh**). Design + plan:
-`docs/superpowers/{specs,plans}/2026-06-18-agent-return-channel*`. Branch kept as-is (not merged).
+wakes with the answer; **Variant B / hub-routed, not mesh**). Design + plans:
+`docs/superpowers/{specs,plans}/2026-06-18-agent-return-channel*`. **Ready to merge** (branch kept
+as-is, not merged — user's call). 750/750 tests green; final opus whole-branch review = Ready-to-merge
+(after one racy-capstone fix); our contribution typecheck+test+lint+format clean (remaining red is
+inherited/parallel Playwright + pre-existing format debt). `check-foundation` CLEAR for both plans.
 
-- **Built (Pass 1, Plan 1 — isolated core contract):** `AGENT_QUESTION` signal (core `question.ts`),
-  `asks` tool class on `defineAgent` (I15), `awaiting_agent` lifecycle phase + `work_item_phase`
-  pg-enum value + migration `0004`, the honest `ResumePayload = GateResolution | AnswerResolution`
-  union (additive `kind?`) + `buildResumeFromAnswer`/`onAnswer`, all 3 providers branch resume on
-  `payload.kind`, provider-conformance answer-resume parity (I4). Per-task TDD + spec/quality review;
-  `check-foundation` CLEAR (additive contract extension); final opus review = Ready-to-merge; boot +
-  migration `0004` verified on live PG; 725/725 green. (Browser-verify deferred to Pass 2 — no
-  `awaiting_agent` UI symptom yet.)
-- **NEXT (Plan 2 — server orchestration, SAME branch):** `ask`/`answered` transition edges; the
-  `questions` table + stateStore; runObserver detect→suspend + answer-propagation→wake;
-  `resolveQuestionTarget` workflow-routing binding; bounds + timeout→human-escalation. **Carry-forward
-  (Plan-1 final review):** widen the server resume seam (`recordReplay.ts`, `runObserver.ts`,
-  `pipelineService.ts`) `GateResolution`→`ResumePayload`; add wiring validation that an agent
-  declaring `asks` provides `buildResumeFromAnswer`. Then Plan 3 (harness + cross-provider e2e).
+- **Plan 1 (core contract):** `AGENT_QUESTION` signal (`question.ts`), `asks` tool class (I15),
+  `awaiting_agent` phase + `work_item_phase` pg-enum + migration `0004`, the honest
+  `ResumePayload = GateResolution | AnswerResolution` union (additive `kind?`) +
+  `buildResumeFromAnswer`/`onAnswer`, 3 providers branch resume on `payload.kind`, conformance
+  answer-resume parity (I4).
+- **Plan 2 (server orchestration):** `ask`/`answered`/`escalate` transition edges (+ `fail`/`cancel`
+  from `awaiting_agent`); `questions` table + migration `0005` + stateStore CRUD; widened server
+  resume seam to `ResumePayload`; runObserver detects `AGENT_QUESTION` → suspend → dispatch answerer
+  (hub-routed via the app `resolveQuestionTarget` binding — zero agent-id literals in `@atizar/*`);
+  answerer-finish → `finishWake` → auto-wakes the asker; cancel cascade + timeout retry/escalation
+  reaper + config-as-data tunables; e2e capstone (deterministic). Both Plan-1 carry-forwards done.
+- **Pass 2 (NEXT, future):** fan-out/join (N>1 questions), deep re-entrancy + the round auto-increment
+  wiring in runObserver (today `round`=1 in prod, cap inert; `DEPTH_CAP=5` is the live backstop),
+  `questionTokenBudget` enforcement, the real `feature-delivery` workflow (orchestrator hub +
+  knowledge agents), the `awaiting_agent` UI surface + **browser-verify** (no UI symptom yet), and
+  `add-workflow` skill co-evolution to teach wiring an ask/answer pair. Minor follow-ups: cancel the
+  old answerer WI on retry; a `lastAssistantText` column to avoid `finishWake`'s full-trace scan.
 
 ## ⏭️ NEXT
 
