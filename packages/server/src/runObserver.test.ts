@@ -4,10 +4,10 @@ import { sql } from 'drizzle-orm'
 import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import {
   gateOpened,
-  type GateResolution,
   type Provider,
   type ResumeHandle,
   type ResumeOutcome,
+  type ResumePayload,
   type AnswerResolution,
 } from '@atizar/core'
 import { db } from './db/client.js'
@@ -40,7 +40,7 @@ function fakeProvider(): Provider {
         proposedArtifact: { to: 'a@b.c', body: 'hi' },
       })
     },
-    async *resume(_handle: ResumeHandle, _resolution: GateResolution) {
+    async *resume(_handle: ResumeHandle, _resolution: ResumePayload) {
       yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm3', delta: 'saved' })
       yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm3', delta: '!' })
     },
@@ -59,7 +59,7 @@ function fakeProviderWithResumeSpy(spy: { resumed: boolean }): Provider {
         proposedArtifact: { body: 'hi' },
       })
     },
-    async *resume(_handle: ResumeHandle, _resolution: GateResolution) {
+    async *resume(_handle: ResumeHandle, _resolution: ResumePayload) {
       spy.resumed = true
       yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm3', delta: 'spawned' })
     },
@@ -251,7 +251,7 @@ describe.skipIf(!reachable)('RunObserver (real Postgres, fake provider)', () => 
       async *run(_input: RunAgentInput) {
         yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm1', delta: 'asking' })
       },
-      async *resume(_handle: ResumeHandle, _resolution: GateResolution) {
+      async *resume(_handle: ResumeHandle, _resolution: ResumePayload) {
         spy.resumed = true
         yield ev({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'm2', delta: 'provider-answer' })
       },
