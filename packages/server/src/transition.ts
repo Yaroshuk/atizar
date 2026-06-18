@@ -50,7 +50,7 @@ const EDGES: Record<Edge, EdgeSpec> = {
   gate: { from: ['active'], to: 'awaiting_human', outcome: 'running' },
   resume: { from: ['awaiting_human'], to: 'active', outcome: 'running' },
   finish: { from: ['active'], to: 'terminal', outcome: 'done' },
-  fail: { from: ['active', 'awaiting_human'], to: 'terminal', outcome: 'error' },
+  fail: { from: ['active', 'awaiting_human', 'awaiting_agent'], to: 'terminal', outcome: 'error' },
   cancel: {
     from: ['queued', 'active', 'awaiting_human', 'awaiting_agent'],
     to: 'terminal',

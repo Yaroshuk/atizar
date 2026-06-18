@@ -45,7 +45,7 @@ export interface ResolveGateInput {
 export interface InsertQuestionInput {
   askerWorkItemId: string
   answererWorkItemId?: string | null
-  target: Record<string, unknown>
+  target: unknown
   toolCallId: string
   payload: Record<string, unknown>
   deadline?: Date | null
@@ -309,7 +309,7 @@ export function makeStateStore(db: Db) {
           id: randomUUID(),
           askerWorkItemId: input.askerWorkItemId,
           answererWorkItemId: input.answererWorkItemId ?? null,
-          target: input.target,
+          target: input.target as Record<string, unknown>,
           toolCallId: input.toolCallId,
           payload: input.payload,
           status: 'open',

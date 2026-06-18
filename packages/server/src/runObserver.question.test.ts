@@ -120,6 +120,53 @@ describe.skipIf(!reachable)('RunObserver question-detect (real Postgres, fake pr
     expect(reconcile).toHaveBeenCalledWith(agentId)
   })
 
+  it('deliver failure (deliver rejects) fails the asker terminal/error instead of stranding in awaiting_agent', async () => {
+    const agentId = `ro-q-deliver-fail__${randomUUID().slice(0, 8)}`
+    const { id } = await store.insertWorkItem({
+      id: randomUUID(),
+      workflowId: 'ro-q-test',
+      agentId,
+      origin: 'human',
+      payload: {},
+      key: agentId,
+    })
+
+    const { pool, reconcile } = fakePool()
+    const observer = makeRunObserver({
+      db,
+      store,
+      pool,
+      bus: { publish: vi.fn(), subscribe: () => () => {} },
+      resolveAgent: () => ({
+        provider: fakeQuestionProvider(),
+        renderToolNames: [],
+        maxInstances: 1,
+        effects: {},
+        dispatchToolNames: [],
+        handoffs: [],
+      }),
+      deliver: async () => {
+        throw new Error('deliver failed')
+      },
+      settle: async (sid, edge, _actor, opts) => {
+        await transition(db, sid, edge, opts)
+      },
+      reconcile,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+
+    await transition(db, id, 'start')
+    await observer.run(id)
+
+    // Asker must NOT be stuck in awaiting_agent — deliver failure must terminate it
+    const wi = await store.getWorkItem(id)
+    expect(wi?.phase).toBe('terminal')
+    expect(wi?.outcome).toBe('error')
+  })
+
   it('routing failure (resolveQuestionTarget returns null) throws and fails the asker loudly', async () => {
     const agentId = `ro-q-fail__${randomUUID().slice(0, 8)}`
     const { id } = await store.insertWorkItem({

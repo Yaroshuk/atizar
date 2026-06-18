@@ -269,7 +269,7 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
 
             await store.insertQuestion({
               askerWorkItemId: id,
-              target: question.target as Record<string, unknown>,
+              target: question.target,
               toolCallId: question.toolCallId,
               payload: question.payload,
             })
@@ -282,17 +282,20 @@ export function makeRunObserver(deps: RunObserverDeps): RunObserver {
             // answererWorkItemId is left null on the question row for Pass 1 (deliver return value
             // carries the id but there is no setQuestionAnswerer yet — add when the answer-back path
             // needs to wake the asker by question id rather than by pool-scan).
-            await deps
-              .deliver({
+            try {
+              await deps.deliver({
                 origin: wi.workflowId,
                 dest: { kind: 'agent', agentId: resolved.agentId },
                 payload: question.payload,
                 parentId: id,
               })
-              .catch((e) => {
-                console.error('[runObserver] question deliver failed', id, e)
-                return undefined
-              })
+            } catch (e) {
+              // deliver failure is fatal: the question row exists but no answerer was dispatched.
+              // Re-throw so the outer catch settles the asker terminal/error (I12: no silent drop).
+              throw new Error(
+                `[runObserver] question deliver failed (workItemId=${id} agentId=${resolved.agentId}): ${e instanceof Error ? e.message : String(e)}`
+              )
+            }
 
             deps.activity?.record({
               ts: Date.now(),
