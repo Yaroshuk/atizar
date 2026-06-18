@@ -1,0 +1,31 @@
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+.env
+.env.local
+.vite/
+coverage/
+.code-review/
+.playwright-mcp/
+e2e-*.png
+dist-types/
+*.tsbuildinfo
+
+# brainstorm visual companion scratch
+.superpowers/
+
+# stray verification screenshots
+pipeline-*.png
+.playwright-mcp/
+
+# Dev record/replay cassettes — real captured email/ticket data, never commit
+apps/inbox/.cassettes/
+
+# Subagent git worktrees (harness-managed, transient) — never tracked or linted
+.claude/worktrees/
+
+# Playwright run artifacts (screenshots, traces, error-context) — regenerated each run
+apps/inbox/test-results/
+playwright-report/
