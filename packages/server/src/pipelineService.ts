@@ -313,7 +313,13 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     const q = await store.getQuestion(questionId)
     if (!q || q.status !== 'open') return
     const askerWi = await store.getWorkItem(q.askerWorkItemId)
-    if (!askerWi || askerWi.phase !== 'awaiting_agent') return
+    if (!askerWi || askerWi.phase !== 'awaiting_agent') {
+      console.warn('[pipeline] escalateQuestion skipped: asker not awaiting_agent', {
+        questionId: q.id,
+        phase: askerWi?.phase,
+      })
+      return
+    }
 
     await store.failQuestion(q.id, 'escalated: no answer after retries')
     await store.insertGate({
@@ -721,6 +727,9 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           const newDeadline = new Date(Date.now() + timeoutMs)
           await store.bumpQuestionRetry(q.id, newDeadline)
 
+          // TODO(Pass-2): cancel the old answerer work-item on retry — currently a stuck (still-live) old
+          // answerer remains an orphan WI until it terminates naturally (no data corruption: the question's
+          // answererWorkItemId is replaced, so the old answerer's finishWake is a no-op).
           // Re-dispatch the answerer if a target can be resolved.
           if (deps.resolveQuestionTarget && askerWi.phase === 'awaiting_agent') {
             const resolved = deps.resolveQuestionTarget(q.target, {
@@ -750,6 +759,9 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       }
     },
 
+    // TODO(Pass-2): wire round propagation in RunObserver (compute round = parentRound + 1 at the ask
+    // insert) — until then this is test-wired only and the round cap never fires in production
+    // (DEPTH_CAP=5 is the structural backstop for Pass-1 cycles).
     // Check if a question's round exceeds the asker agent's maxQuestionRounds cap, and if so,
     // escalate it to a human gate. Called at question-insert time (or by tests directly).
     async checkAndEscalateRoundBound(questionId: string): Promise<void> {

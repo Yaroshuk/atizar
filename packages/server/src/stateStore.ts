@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db, Tx } from './db/client.js'
 import {
@@ -376,7 +376,13 @@ export function makeStateStore(db: Db) {
       return db
         .select()
         .from(questions)
-        .where(and(eq(questions.status, 'open'), lt(questions.deadline, new Date(beforeMs))))
+        .where(
+          and(
+            eq(questions.status, 'open'),
+            isNotNull(questions.deadline), // isNotNull is explicit: a null deadline means "no timeout" and must never be reaped.
+            lt(questions.deadline, new Date(beforeMs))
+          )
+        )
     },
   }
 }
