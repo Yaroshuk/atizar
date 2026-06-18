@@ -41,10 +41,14 @@ function askerProvider(answererBareId: string): Provider {
   }
 }
 
-/** Answerer provider: emits a render-card tool call (so the card gets set) then terminates. */
-function answererProvider(card: Record<string, unknown>): Provider {
+/** Answerer provider: emits a render-card tool call (so the card gets set) then terminates.
+ *  If `gate` is provided, the run blocks until the promise resolves before emitting anything —
+ *  this lets the test assert the intermediate state (asker suspended) BEFORE the answerer
+ *  finishes, making the phase-a assertions deterministic (no race). */
+function answererProvider(card: Record<string, unknown>, gate?: Promise<void>): Provider {
   return {
     async *run(_input: RunAgentInput) {
+      if (gate) await gate
       yield ev({
         type: EventType.TOOL_CALL_START,
         toolCallId: 'tc-card',
@@ -116,6 +120,15 @@ describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails
     const answererRuntimeId = `${wfId}__${answererBareId}`
     const card = { text: 'the answer' }
 
+    // Gate that blocks the answerer's run until the test has observed the asker in awaiting_agent
+    // with the answerer linked. This makes the phase-a assertions DETERMINISTIC: the answerer
+    // cannot finish (and trigger finishWake) until after our assertions, so there is no race
+    // between "read asker phase" and "answerer already done → asker already back to active".
+    let releaseAnswerer!: () => void
+    const answererGate = new Promise<void>((resolve) => {
+      releaseAnswerer = resolve
+    })
+
     const store = makeStateStore(db)
 
     const service = makePipelineService({
@@ -130,7 +143,10 @@ describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails
           })
         }
         if (agentId === answererRuntimeId) {
-          return makeRuntime(answererProvider(card), { renderToolNames: ['renderCard'] })
+          // Gate the answerer so it doesn't finish until the test releases it (after phase-a assertions).
+          return makeRuntime(answererProvider(card, answererGate), {
+            renderToolNames: ['renderCard'],
+          })
         }
         return undefined
       },
@@ -156,11 +172,14 @@ describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails
 
     // Wait until the asker has suspended AND the question row has the answerer linked.
     // The observer transitions active→awaiting_agent BEFORE calling deliver+setQuestionAnswerer,
-    // so we must wait for the answererWorkItemId to be populated (not just for awaiting_agent phase)
-    // to avoid a race between our read and setQuestionAnswerer.
+    // so we wait for the answererWorkItemId to be non-null (a populated string) to confirm the
+    // full dispatch+link sequence completed. The answerer is still gated (answererGate), so it
+    // cannot finish before we assert, eliminating the phase-a race entirely.
     await waitFor(async () => {
       const [q] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
-      return q?.answererWorkItemId !== null
+      // q is undefined before the row is inserted; q.answererWorkItemId is null until linked.
+      // We need the answererWorkItemId to be a string (non-null, non-undefined) to confirm link.
+      return typeof q?.answererWorkItemId === 'string'
     })
 
     // (a) Asker is now awaiting_agent.
@@ -189,11 +208,11 @@ describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails
       .where(eq(questions.askerWorkItemId, askerWiId))
     expect(qRowAfterDispatch.answererWorkItemId).toBe(answererWorkItemId)
 
-    // ── Phase 2: wait for the full automatic chain to complete ────────────────
-    // The answerer was already enqueued by deliverImpl. The pool activates it and runs it
-    // automatically. When it finishes, finishWake fires → answerQuestion → observer.resume(asker).
-    // The asker then resumes via buildResumeFromAnswer and reaches terminal/done.
-    // NO manual observer.resume call here — this is the production automatic chain under test.
+    // ── Phase 2: release the answerer, wait for the full automatic chain to complete ─────────
+    // Phase-a assertions are done. Release the gated answerer now: it will produce its renderCard,
+    // finishWake fires → answerQuestion → observer.resume(asker) → asker wakes and finishes.
+    // NO manual observer.resume call — this proves the production finishWake chain.
+    releaseAnswerer()
     await waitFor(async () => {
       const wi = await store.getWorkItem(askerWiId)
       return wi?.phase === 'terminal'
@@ -393,5 +412,86 @@ describe.skipIf(!reachable)('returnChannel e2e: full suspend→wake on the rails
     expect(openGates.length).toBeGreaterThan(0)
     expect(openGates[0].status).toBe('open')
     expect(openGates[0].toolName).toBe('escalated_question')
+  })
+
+  /**
+   * NO-CARD ANSWERER PATH
+   * An answerer that finishes without emitting a card OR any assistant text should
+   * fail the question (not wake the asker with a false empty-object answer).
+   * Per design §3.6: no card + no text → failQuestion → question becomes 'failed',
+   * and the asker is NOT resumed (it stays in awaiting_agent for the reaper to handle).
+   */
+  it('no-card answerer: question becomes failed, asker is not resumed with empty answer', async () => {
+    const wfId = `e2e-nocard__${randomUUID().slice(0, 8)}`
+    const askerBareId = 'asker'
+    const answererBareId = 'answerer'
+    const askerAgentId = `${wfId}__${askerBareId}`
+    const answererAgentId = `${wfId}__${answererBareId}`
+
+    // Answerer that emits nothing (no card, no text) — a silent empty finish.
+    const emptyProvider: Provider = { async *run() {} }
+
+    const service = makePipelineService({
+      db,
+      resolveAgent: (agentId) => {
+        if (agentId === askerAgentId) {
+          return makeRuntime(askerProvider(answererBareId))
+        }
+        if (agentId === answererAgentId) {
+          return makeRuntime(emptyProvider)
+        }
+        return undefined
+      },
+      descriptors: [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      resolveQuestionTarget: (target) => {
+        const t = target as { agentId?: string }
+        return typeof t.agentId === 'string' ? { agentId: t.agentId } : null
+      },
+    })
+
+    const store = makeStateStore(db)
+
+    // Manually set up an open question + answerer work item (already in terminal/done state to
+    // simulate a finished answerer), then call finishWake indirectly via pipelineService settle.
+    // Simpler approach: dispatch the asker (which dispatches the answerer), wait for answerer done.
+    const { id: askerWiId } = await service.dispatch({
+      workflowId: wfId,
+      agentId: askerAgentId,
+      origin: 'human',
+      payload: { task: 'test' },
+    })
+
+    // Wait for the answerer to be dispatched and linked.
+    await waitFor(async () => {
+      const [q] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
+      return typeof q?.answererWorkItemId === 'string'
+    })
+
+    // Retrieve the answerer work item id.
+    const [qRowLinked] = await db
+      .select()
+      .from(questions)
+      .where(eq(questions.askerWorkItemId, askerWiId))
+    const answererWiId = qRowLinked.answererWorkItemId
+    if (!answererWiId) throw new Error('answerer not linked')
+
+    // Wait for the question to leave 'open' state — finishWake fires void after the answerer's
+    // settle, so we must poll until the hook has had a chance to run rather than just waiting
+    // for the answerer to be terminal (the terminal state may precede finishWake completion).
+    await waitFor(async () => {
+      const [q] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
+      return q?.status !== 'open'
+    })
+
+    // (a) Question is FAILED — finishWake detected no card and no text, so it called failQuestion.
+    const [qRow] = await db.select().from(questions).where(eq(questions.askerWorkItemId, askerWiId))
+    expect(qRow.status).toBe('failed')
+    expect(qRow.answer).toBeNull()
+
+    // (b) Asker remains in awaiting_agent — it was NOT resumed with an empty answer.
+    const askerAfter = await store.getWorkItem(askerWiId)
+    expect(askerAfter?.phase).toBe('awaiting_agent')
   })
 })

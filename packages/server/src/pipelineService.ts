@@ -1,4 +1,4 @@
-import type { BaseEvent } from '@ag-ui/client'
+import { EventType, type BaseEvent } from '@ag-ui/client'
 import {
   resolveDelivery,
   instanceId,
@@ -141,18 +141,44 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   ) => settle(settleDeps, id, edge, actor, opts)
 
   // Finish→wake hook: after a work item finishes, check whether it was the answerer for an
-  // open question. If so, answer the question row with the work item's card (falling back to an
-  // empty object) and, once ALL questions for the asker are answered, wake the asker via
-  // observer.resume({ kind: 'answer', ... }). Cheap for non-answerers: one DB read (getQuestionByAnswerer)
-  // that returns undefined in the common case. Never throws — errors are logged so the finish
-  // edge itself always lands cleanly even if the wake fails.
+  // open question. If so, derive the answer (card → text → fail), answer or fail the question
+  // row, and, once ALL questions for the asker are answered, wake the asker via
+  // observer.resume({ kind: 'answer', ... }). Cheap for non-answerers: one DB read
+  // (getQuestionByAnswerer) that returns undefined in the common case. Never throws — errors
+  // are logged so the finish edge itself always lands cleanly even if the wake fails.
+  //
+  // Answer derivation (§3.6):
+  //   1. card present      → { tool, props }  (rich, preferred)
+  //   2. final assistant text → { text }       (narrative fallback)
+  //   3. neither           → failQuestion(...)  (leaves question for reaper/escalation — I12)
   const finishWake = async (id: string): Promise<void> => {
     try {
       const q = await store.getQuestionByAnswerer(id)
       if (!q) return
       const wi = await store.getWorkItem(id)
-      // Prefer the card (rich answer); fall back to empty object (a non-card answerer still closes the question).
-      const answer: Record<string, unknown> = wi?.card ?? {}
+
+      let answer: Record<string, unknown> | null = wi?.card ?? null
+
+      if (!answer) {
+        // Fallback: concatenate all TEXT_MESSAGE_CHUNK deltas from the answerer's trace.
+        const traceRows = await store.getTrace(id, 0)
+        const text = traceRows
+          .map((r) => {
+            const e = r.event as { type?: string; delta?: string }
+            return e.type === EventType.TEXT_MESSAGE_CHUNK ? (e.delta ?? '') : ''
+          })
+          .join('')
+          .trim()
+        if (text) answer = { text }
+      }
+
+      if (!answer) {
+        // No card AND no text → the answerer produced nothing meaningful.
+        // Fail the question so the reaper can retry/escalate (I12: no silent drop).
+        await store.failQuestion(q.id, 'answerer finished without an answer')
+        return
+      }
+
       await store.answerQuestion(q.id, answer)
       const pending = await store.getPendingQuestionsForAsker(q.askerWorkItemId)
       if (pending.length === 0) {
