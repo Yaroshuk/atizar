@@ -171,7 +171,7 @@ describe('defineAgent asks tool class', () => {
 
   it('rejects an ask tool not declared in tools', () => {
     expect(() => defineAgent({ ...base, asks: ['ghost'] })).toThrow(
-      /ask .*ghost.* is not declared in tools/
+      /ask \\"ghost\\" is not declared in tools/
     )
   })
 })
