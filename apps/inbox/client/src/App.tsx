@@ -1,27 +1,14 @@
-import { useEffect, useState } from 'react'
-import { BoardApp } from './BoardApp/BoardApp'
-import { workflowsConfig } from './workflows'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Landing } from './Landing/Landing'
+import { Demo } from './Demo'
 
-type Config = { demo: boolean; workflows: string[] }
-
-export const App = () => {
-  const [config, setConfig] = useState<Config | null>(null)
-
-  useEffect(() => {
-    fetch('/api/config')
-      .then((r) => r.json())
-      .then((c: Config) => setConfig(c))
-      .catch(() =>
-        setConfig({ demo: false, workflows: workflowsConfig.workflows.map((w) => w.id) })
-      )
-  }, [])
-
-  if (!config) return null // brief load before config resolves (acceptable for the demo)
-
-  const enabled = new Set(config.workflows)
-  const filtered = {
-    ...workflowsConfig,
-    workflows: workflowsConfig.workflows.filter((w) => enabled.has(w.id)),
-  }
-  return <BoardApp config={filtered} demo={config.demo} />
-}
+// `/` = the marketing landing; `/demo` = the live board. One SPA, one origin — the server's
+// static fallback (staticDir seam) serves index.html for both so /demo deep-links directly.
+export const App = () => (
+  <BrowserRouter>
+    <Routes>
+      <Route path='/' element={<Landing />} />
+      <Route path='/demo' element={<Demo />} />
+    </Routes>
+  </BrowserRouter>
+)

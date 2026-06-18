@@ -10,6 +10,8 @@
     "demo:scan-cassettes": "tsx server/scan-demo-cassettes.ts",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
+    "start": "tsx server/index.ts",
+    "start:demo": "DEMO=1 tsx server/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx -e \"import('@atizar/server').then(m=>m.runMigrations()).then(()=>process.exit(0))\"",
     "db:reset": "tsx -e \"import('@atizar/server').then(m=>m.resetDb()).then(()=>process.exit(0))\"",
@@ -41,6 +43,7 @@
     "hono": "^4.12.23",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

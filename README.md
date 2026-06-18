@@ -68,7 +68,16 @@ _Demo media lands with the zero-credential demo mode — see [Status](#status)._
 
 ## Quick start
 
-> **Beta.** A zero-credential demo mode is landing: it runs entirely on an in-process database and a mock agent — no Docker, no API keys. The one-command quick start will appear here when it ships ([status](#status)).
+> **Beta.** The zero-credential demo runs entirely on an in-process database and recorded cassettes — no Docker, no API keys.
+
+Try the live demo locally:
+
+```bash
+yarn install --ignore-engines
+yarn demo            # → http://localhost:5173  (landing → Open demo → the live pipeline)
+```
+
+Or run it as a single deployable process (`yarn build && yarn start:demo`) — see [deploying the demo](docs/DEPLOY.md).
 
 The smallest thing you write looks like this:
 

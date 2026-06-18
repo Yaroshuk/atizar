@@ -1,4 +1,6 @@
 import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
+import { join } from 'node:path'
 import { Hono } from 'hono'
 import {
   instanceId,
@@ -68,12 +70,25 @@ export interface CreateServerArgs {
   sourceOf: (agentId: string, payload: Record<string, unknown>) => string | null
   // When false, assemble + register but do NOT serve/migrate/sweep (the unit-test path).
   start?: boolean
+  // Absolute path to the built client (the app injects its own dist dir). When set, the server
+  // serves those assets for every non-`/api` request and falls back to index.html for unknown
+  // paths (SPA client-side routing / deep-links). Omitted in dev — Vite serves the client there.
+  // This is the single-process-deploy seam (a generic mechanism; the path is the app's policy).
+  staticDir?: string
 }
 
 export interface BuiltServer {
   app: Hono
   runtimes: Record<string, AgentRuntime>
   refreshHealth: () => Promise<Record<string, HealthCheck>>
+}
+
+// The listen port. `PORT` is a host/vendor convention (Render/Railway/Heroku), so per the
+// env-namespace contract it is read WITHOUT the ATIZAR_ prefix (same class as legacy DATABASE_URL).
+// Any non-positive-integer value (unset, empty, non-numeric) falls back to the local-dev 4000.
+export function resolvePort(raw: string | undefined): number {
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : 4000
 }
 
 export async function createServer(args: CreateServerArgs): Promise<BuiltServer> {
@@ -186,11 +201,29 @@ export async function createServer(args: CreateServerArgs): Promise<BuiltServer>
     createConnectRoutes({ store: makeCredentialStore(db), scopesFor, list: connections })
   )
 
+  // Single-process deploy: serve the built client for non-`/api` requests, with an SPA fallback
+  // to index.html so client-side routes (e.g. /demo) deep-link. Registered AFTER the /api routes
+  // (which terminate their own request chain), and the `/api` guard keeps unmatched API paths from
+  // resolving to index.html. Skipped entirely when staticDir is unset (dev → Vite serves the SPA).
+  if (args.staticDir) {
+    const dir = args.staticDir
+    // An unmatched /api path 404s rather than resolving to index.html; everything else falls
+    // through to the static handlers. (Matched /api routes terminate their own chain above, so
+    // this guard never runs for them.)
+    app.use('*', async (c, next) => {
+      if (c.req.path.startsWith('/api')) return c.notFound()
+      await next()
+    })
+    app.get('*', serveStatic({ root: dir }))
+    app.get('*', serveStatic({ path: join(dir, 'index.html') })) // SPA fallback
+  }
+
   if (args.start) {
     await runMigrations()
     await startupSweep(db, (item) => pipeline.reenqueue(item))
-    serve({ fetch: app.fetch, port: 4000 })
-    console.log('server on http://localhost:4000')
+    const port = resolvePort(process.env.PORT)
+    serve({ fetch: app.fetch, port })
+    console.log(`server on http://localhost:${port}`)
     if (!isDemo() && !authToken) {
       console.warn('[auth] disabled — set ATIZAR_AUTH_TOKEN to require a token on mutations')
     }

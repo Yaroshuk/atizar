@@ -1,4 +1,6 @@
 import './load-dev-env.js' // MUST be first: loads .env.local (dev) before any env read below
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { createServer, isDemo } from '@atizar/server'
 import { providerRegistry } from './providers.js'
 import { buildProvider } from './build-agent.js'
@@ -10,6 +12,12 @@ import { ReplyPayloadSchema, EmailBatchSchema } from '../workflows/email-inbox/d
 // all workflows are active (null = all).
 const ENABLED_WORKFLOWS: string[] | null = isDemo() ? ['email-inbox'] : null
 
+// Single-process deploy: when the client has been built (`yarn build` → apps/inbox/dist), serve it
+// from the same Hono server (the staticDir seam). Absent in dev — Vite serves the client there, so
+// this stays undefined and the server is API-only.
+const clientDist = fileURLToPath(new URL('../dist', import.meta.url))
+const STATIC_DIR = existsSync(clientDist) ? clientDist : undefined
+
 void createServer({
   workflowServers,
   providerRegistry,
@@ -17,6 +25,7 @@ void createServer({
   connections: connectionList,
   scopesFor,
   enabledWorkflows: ENABLED_WORKFLOWS,
+  staticDir: STATIC_DIR,
   // The email-inbox instance-key policy (the framework declares the seam; the literals live HERE):
   // reply correlates per sender (one reply instance per email address); the sorter + batch agents
   // (reader/spam/important) each collapse to a single constant instance (the agent id). NOTE: this

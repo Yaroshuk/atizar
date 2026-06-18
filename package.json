@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "yarn workspace inbox dev",
     "demo": "yarn workspace inbox demo",
+    "start": "yarn workspace inbox start",
+    "start:demo": "yarn workspace inbox start:demo",
     "dev:server": "yarn workspace inbox dev:server",
     "dev:client": "yarn workspace inbox dev:client",
     "build": "yarn workspace inbox build",
