@@ -240,6 +240,14 @@ item-list` / `gh issue view`), not in any agent allow-list, nowhere. REPLY-DRAFT
   only running the app catches it → always browser-verify.)
 - **yarn-classic does not auto-install peer deps** (npm did): `@testing-library/dom` had to be
   added explicitly to root devDeps to keep the React tests green.
+- **A core `Phase` value and the `work_item_phase` pg-enum value MUST land in the SAME change.**
+  They are one concept (single source of truth). Adding a value to `Phase` (`@atizar/core`
+  `lifecycle.ts`) alone widens it past the narrower DB-enum union, and the FULL `tsc --build`
+  (`yarn typecheck`) breaks at `transition.ts` (`applyEdge` assigns `spec.to: Phase` into the
+  `phase` column → `Type 'Phase' is not assignable to '… | "terminal"'`). **Invisible to a
+  core-only `yarn test packages/core`** — only the cross-package typecheck catches it. So a `Phase`
+  add always carries the pg-enum value + a drizzle migration (`work_item_phase`, `ADD VALUE`). (Seen
+  adding `awaiting_agent`, `feat/agent-return-channel`.)
 - **Workflows are modules; agents are registered by INSTANCE id.** (As of `feat/workflow-separation`,
   §8.) A workflow = `apps/inbox/workflows/<id>/{descriptor,server,client}` + one line per aggregator
   (`workflows/index.ts`, `server/workflows.ts`, `client/src/workflows.ts`) — agent defs live in the

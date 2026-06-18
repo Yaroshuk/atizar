@@ -68,6 +68,27 @@ Demo app `apps/inbox/` consumes ONLY the public packages. **ONE reference workfl
 
 ---
 
+## 🔀 Agent return channel — Plan 1 built (2026-06-18, branch `feat/agent-return-channel`, NOT merged)
+
+The honest agent-to-agent return channel (an agent asks another → suspends in `awaiting_agent` →
+wakes with the answer; **Variant B / hub-routed, not mesh**). Design + plan:
+`docs/superpowers/{specs,plans}/2026-06-18-agent-return-channel*`. Branch kept as-is (not merged).
+
+- **Built (Pass 1, Plan 1 — isolated core contract):** `AGENT_QUESTION` signal (core `question.ts`),
+  `asks` tool class on `defineAgent` (I15), `awaiting_agent` lifecycle phase + `work_item_phase`
+  pg-enum value + migration `0004`, the honest `ResumePayload = GateResolution | AnswerResolution`
+  union (additive `kind?`) + `buildResumeFromAnswer`/`onAnswer`, all 3 providers branch resume on
+  `payload.kind`, provider-conformance answer-resume parity (I4). Per-task TDD + spec/quality review;
+  `check-foundation` CLEAR (additive contract extension); final opus review = Ready-to-merge; boot +
+  migration `0004` verified on live PG; 725/725 green. (Browser-verify deferred to Pass 2 — no
+  `awaiting_agent` UI symptom yet.)
+- **NEXT (Plan 2 — server orchestration, SAME branch):** `ask`/`answered` transition edges; the
+  `questions` table + stateStore; runObserver detect→suspend + answer-propagation→wake;
+  `resolveQuestionTarget` workflow-routing binding; bounds + timeout→human-escalation. **Carry-forward
+  (Plan-1 final review):** widen the server resume seam (`recordReplay.ts`, `runObserver.ts`,
+  `pipelineService.ts`) `GateResolution`→`ResumePayload`; add wiring validation that an agent
+  declaring `asks` provides `buildResumeFromAnswer`. Then Plan 3 (harness + cross-provider e2e).
+
 ## ⏭️ NEXT
 
 The cleanup → minimal-demo → extensibility track (6 units) **and** the pipeline lifecycle fixes
