@@ -19,7 +19,7 @@ export interface PromptSpec<T> {
   onResume?: (result: Record<string, unknown>) => ResumeOutcome
   // Resume after an agent ANSWER (the return channel). `answers` is one entry per outstanding
   // question. Returns a ResumeOutcome like onResume. Omit for an agent that never asks.
-  onAnswer?: (answers: { target: unknown; answer: Record<string, unknown>; ok: boolean }[]) => ResumeOutcome
+  onAnswer?: (answers: AnswerResolution['answers']) => ResumeOutcome
 }
 
 // ESCAPE HATCH: definePrompt is sugar, not a cage. It models a 3-hook lifecycle (onInput/onStart/
