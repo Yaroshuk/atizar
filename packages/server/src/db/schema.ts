@@ -131,6 +131,29 @@ export const actionLedger = pgTable('action_ledger', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
+// Agent-to-agent return channel (spec Plan 2). An asker suspends (awaiting_agent) and links here;
+// when answered/failed the asker is woken. One row per ask; status drives the lifecycle.
+export const questionStatus = pgEnum('question_status', ['open', 'answered', 'failed'])
+
+export const questions = pgTable('questions', {
+  id: uuid('id').primaryKey(),
+  askerWorkItemId: uuid('asker_work_item_id')
+    .notNull()
+    .references(() => workItems.id),
+  answererWorkItemId: uuid('answerer_work_item_id'),
+  target: jsonb('target').notNull().$type<Record<string, unknown>>(),
+  toolCallId: text('tool_call_id').notNull(),
+  payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
+  status: questionStatus('status').notNull().default('open'),
+  answer: jsonb('answer').$type<Record<string, unknown>>(),
+  reason: text('reason'),
+  round: integer('round').notNull().default(1),
+  retries: integer('retries').notNull().default(0),
+  deadline: timestamp('deadline', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  answeredAt: timestamp('answered_at', { withTimezone: true }),
+})
+
 // Durable, attributed audit of human decisions + server-executed effects. Append-only (one row
 // per recorded action), so it survives restart — UNLIKE the in-memory activity ring buffer
 // (which stays the live-UI tail). `actor` is the resolver identity (connection label or
@@ -180,3 +203,6 @@ export type WorkItemOutcome = (typeof workItemOutcome.enumValues)[number]
 export type OriginKind = (typeof originKind.enumValues)[number]
 export type AuditRow = typeof auditLog.$inferSelect
 export type NewAuditRow = typeof auditLog.$inferInsert
+export type Question = typeof questions.$inferSelect
+export type NewQuestion = typeof questions.$inferInsert
+export type QuestionStatus = (typeof questionStatus.enumValues)[number]

@@ -1,16 +1,18 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, eq, gte, inArray, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNull, lt } from 'drizzle-orm'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Db, Tx } from './db/client.js'
 import {
   actionLedger,
   auditLog,
   gates,
+  questions,
   trace,
   workItems,
   type AuditRow,
   type Gate,
   type OriginKind,
+  type Question,
   type TraceRow,
   type WorkItem,
 } from './db/schema.js'
@@ -38,6 +40,15 @@ export interface ResolveGateInput {
   resolvedBy?: string
   comment?: string
   form?: Record<string, unknown>
+}
+
+export interface InsertQuestionInput {
+  askerWorkItemId: string
+  answererWorkItemId?: string | null
+  target: Record<string, unknown>
+  toolCallId: string
+  payload: Record<string, unknown>
+  deadline?: Date | null
 }
 
 // Typed CRUD over the pipeline tables. The ONLY status writes go through transition()
@@ -289,6 +300,48 @@ export function makeStateStore(db: Db) {
         .from(workItems)
         .where(and(eq(workItems.agentId, agentId), eq(workItems.phase, 'active')))
       return row?.c ?? 0
+    },
+
+    async insertQuestion(input: InsertQuestionInput): Promise<Question> {
+      const [row] = await db
+        .insert(questions)
+        .values({
+          id: randomUUID(),
+          askerWorkItemId: input.askerWorkItemId,
+          answererWorkItemId: input.answererWorkItemId ?? null,
+          target: input.target,
+          toolCallId: input.toolCallId,
+          payload: input.payload,
+          status: 'open',
+          deadline: input.deadline ?? null,
+        })
+        .returning()
+      return row
+    },
+
+    async getPendingQuestionsForAsker(askerId: string): Promise<Question[]> {
+      return db
+        .select()
+        .from(questions)
+        .where(and(eq(questions.askerWorkItemId, askerId), eq(questions.status, 'open')))
+    },
+
+    async answerQuestion(id: string, answer: Record<string, unknown>): Promise<void> {
+      await db
+        .update(questions)
+        .set({ status: 'answered', answer, answeredAt: new Date() })
+        .where(eq(questions.id, id))
+    },
+
+    async failQuestion(id: string, reason: string): Promise<void> {
+      await db.update(questions).set({ status: 'failed', reason }).where(eq(questions.id, id))
+    },
+
+    async getExpiredQuestions(beforeMs: number): Promise<Question[]> {
+      return db
+        .select()
+        .from(questions)
+        .where(and(eq(questions.status, 'open'), lt(questions.deadline, new Date(beforeMs))))
     },
   }
 }
