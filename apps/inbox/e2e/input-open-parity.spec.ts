@@ -8,7 +8,9 @@ import { InboxBoard } from './pages/InboxBoard'
 // while card open-routing counts only `isLive(self)` — the done scan isn't "live" → type-view. Both
 // paths MUST land on the same place. This spec asserts parity; red = the divergence.
 test.describe('Input agent: pipeline-open and card-open reach the same scan', () => {
-  test('opening the sorter from the card matches opening it from the pipeline', async ({ page }) => {
+  test('opening the sorter from the card matches opening it from the pipeline', async ({
+    page,
+  }) => {
     const board = new InboxBoard(page)
 
     await test.step('START scans; close the auto-opened thread', async () => {
