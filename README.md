@@ -1,11 +1,3 @@
-<!--
-  DRAFT — do not publish/merge to a public default branch until:
-  (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
-  (2) the @platform/* → @atizar/* rename is done,
-  (3) the approval-gate demo GIF is recorded.
-  Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
--->
-
 <div align="center">
 
 <picture>
@@ -28,8 +20,6 @@ An open-source TypeScript framework for building agentic automations — agentic
 [Quick start](#quick-start) · [How it works](#how-it-works) · [Concepts](#core-concepts) · [Philosophy](docs/PHILOSOPHY.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
-
-<!-- TODO: approval-gate demo GIF here once DEMO=1 lands -->
 
 ---
 
@@ -59,16 +49,16 @@ No 24/7 agents running loose. Every consequential step is **proposed by the agen
 
 Safety isn't bolted on. It's the foundation.
 
-## See it work
-
-<!-- TODO: GIF — agent board → thread → approval-gate card → approve → action executed & audited -->
-<!-- TODO: side-by-side — a defineAgent snippet next to the clean operator UI -->
-
-_Demo media lands with the zero-credential demo mode — see [Status](#status)._
-
 ## Quick start
 
-> **Beta.** A zero-credential demo mode is landing: it runs entirely on an in-process database and a mock agent — no Docker, no API keys. The one-command quick start will appear here when it ships ([status](#status)).
+> **Beta.** The zero-credential demo runs entirely on an in-process database and recorded cassettes — no Docker, no API keys, no LLM provider.
+
+Try the live demo locally:
+
+```bash
+yarn install --ignore-engines
+yarn demo            # → http://localhost:5173  (landing → Open demo → the live pipeline)
+```
 
 The smallest thing you write looks like this:
 
@@ -123,6 +113,56 @@ The core knows no concrete engine. Swap the runtime without rewriting your workf
 ## The flagship example: an inbox
 
 The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come in → an agent **qualifies** them → it **drafts** a reply or proposes actions → a human **approves** → the server acts (saves the draft, applies the labels). It runs on both providers and is the best place to see every concept above working together.
+
+## Run the inbox yourself
+
+The demo above is zero-credential. To run the **real** inbox against your own Gmail, you supply three things: a Postgres database, an LLM provider, and a Google OAuth app. Everything is configured through environment variables — copy [`.env.example`](.env.example) to `.env.local` (gitignored) and fill only what you use.
+
+### 1. Install & database
+
+```bash
+yarn install --ignore-engines
+docker compose up -d postgres        # default DATABASE_URL already matches compose
+yarn workspace inbox db:migrate      # create the schema
+```
+
+The Postgres URL resolves in order `ATIZAR_DATABASE_URL` → `DATABASE_URL` → the docker-compose default — so with the standard `docker compose up` you set nothing.
+
+### 2. Credentials
+
+| Variable                                                   | Required for          | What it is / where to get it                                                                                                                                                                                                         |
+| ---------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ATIZAR_SECRET_KEY`                                        | any OAuth integration | AES master key for the **encrypted credential store**. Any strong random string (e.g. `openssl rand -hex 32`). Per-user OAuth tokens are encrypted with it at rest.                                                                  |
+| `ANTHROPIC_API_KEY`                                        | production provider   | Anthropic API key, used when `PROVIDER=mastra`. (Vendor convention — **not** namespaced.)                                                                                                                                            |
+| `ATIZAR_GOOGLE_CLIENT_ID`<br>`ATIZAR_GOOGLE_CLIENT_SECRET` | Gmail                 | One-time OAuth app from **Google Cloud Console → APIs & Services → Credentials → OAuth client ID**. Enable the Gmail API on the project. The per-user token is obtained later through the in-app **Connect** flow — not pasted here. |
+| `ATIZAR_AUTH_TOKEN`                                        | recommended           | Shared bearer token guarding all mutation routes. Set it and send `Authorization: Bearer <token>` from the client.                                                                                                                   |
+
+Choose a provider:
+
+- **`PROVIDER=mastra`** — the production path. Needs `ANTHROPIC_API_KEY`. (Optional `MASTRA_MODEL` to pick the model.)
+- **`PROVIDER=claude-cli`** — dev only. Uses your local Claude Code **subscription** via the macOS keychain — no API key — but spawns the `claude` binary, so it's not for production.
+
+A minimal `.env.local` for a real Gmail run:
+
+```bash
+ATIZAR_SECRET_KEY=<openssl rand -hex 32>
+PROVIDER=mastra
+ANTHROPIC_API_KEY=sk-ant-...
+ATIZAR_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+ATIZAR_GOOGLE_CLIENT_SECRET=...
+ATIZAR_AUTH_TOKEN=<openssl rand -hex 32>
+# DATABASE_URL defaults to the docker-compose Postgres — leave unset for the standard setup
+```
+
+### 3. Run & connect
+
+```bash
+yarn dev        # server (:4000) + client (:5173)
+```
+
+Open the app, **Connect** your Google account (the OAuth flow stores an encrypted per-user token), and the inbox workflow goes live: new mail is qualified, replies are drafted, and every consequential action waits for your approval before the server runs it.
+
+> For a production build, run `yarn build:web` and start the server with `NODE_ENV=production`; the server serves the built client from `apps/inbox/dist`. The listen port comes from `PORT` (default `4000`).
 
 ## What's included
 

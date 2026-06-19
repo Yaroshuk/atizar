@@ -1,8 +1,8 @@
 {
   "name": "@atizar/react",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "build": "vite build"
   },
@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@atizar/core": "*",
+    "@atizar/core": "^0.1.0",
     "clsx": "^2.1.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

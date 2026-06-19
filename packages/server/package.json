@@ -1,16 +1,36 @@
 {
   "name": "@atizar/server",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build"
+  },
   "exports": {
-    ".": "./src/index.ts",
-    "./db/schema": "./src/db/schema.ts",
-    "./mastra": "./src/mastraTools.ts"
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./db/schema": {
+      "development": "./src/db/schema.ts",
+      "types": "./dist/db/schema.d.ts",
+      "import": "./dist/db/schema.js"
+    },
+    "./mastra": {
+      "development": "./src/mastraTools.ts",
+      "types": "./dist/mastra.d.ts",
+      "import": "./dist/mastra.js"
+    }
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@atizar/core": "*",
+    "@atizar/core": "^0.1.0",
+    "@hono/node-server": "^2.0.4",
     "@mastra/core": "^1.41.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.23",
@@ -19,5 +39,9 @@
   },
   "optionalDependencies": {
     "@electric-sql/pglite": "^0.2.0"
+  },
+  "devDependencies": {
+    "vite": "^8.0.16",
+    "vite-plugin-dts": "^4.5.4"
   }
 }

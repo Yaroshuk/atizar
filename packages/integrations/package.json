@@ -1,8 +1,12 @@
 {
   "name": "@atizar/integrations",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "files": [
+    "src/**/*.mjs",
+    "src/**/*.d.ts"
+  ],
   "exports": {
     "./gmail/auth": {
       "types": "./src/gmail/auth.d.ts",
@@ -39,7 +43,7 @@
     }
   },
   "dependencies": {
-    "@atizar/core": "*",
+    "@atizar/core": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.25.76"
   },
