@@ -94,6 +94,9 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     const [workflowId] = r.instanceId.split('__')
     const runtime = deps.resolveAgent(r.instanceId)
     const maxInstances = runtime?.maxInstances ?? 1
+    // A child inherits its parent's tenant (so a delivered/handed-off item stays in the same
+    // session as the card it came from) — works for both the route and the machine-dispatch path.
+    const parent = await store.getWorkItem(req.parentId)
     const result = await dispatchChokepoint(db, pool, {
       workflowId: workflowId ?? r.instanceId,
       agentId: r.instanceId,
@@ -102,6 +105,7 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       source: deps.sourceOf(r.instanceId, req.payload),
       key: deps.instanceKeyOf(r.instanceId, req.payload),
       parentId: req.parentId,
+      sessionId: parent?.sessionId,
       maxInstances,
     })
     activity.record({
@@ -257,17 +261,17 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     publishBoard()
   }
 
-  async function cancelWorkflowImpl(workflowId: string): Promise<void> {
-    const active = await store.getActiveByWorkflow(workflowId)
+  async function cancelWorkflowImpl(workflowId: string, sessionId?: string): Promise<void> {
+    const active = await store.getActiveByWorkflow(workflowId, sessionId)
     for (const item of active.sort((a, b) => a.id.localeCompare(b.id))) {
       await cancelItem(item.id)
     }
   }
 
-  // Stop every LIVE work item across ALL workflows. Reuses the tested cascade by looping
-  // cancelWorkflowImpl over the distinct workflowIds with a live item in the board snapshot.
-  async function cancelAllImpl(): Promise<void> {
-    const snap = await store.getBoardSnapshot()
+  // Stop every LIVE work item across ALL workflows IN THIS TENANT. Reuses the tested cascade by
+  // looping cancelWorkflowImpl over the distinct workflowIds with a live item in the tenant's board.
+  async function cancelAllImpl(sessionId?: string): Promise<void> {
+    const snap = await store.getBoardSnapshot(sessionId)
     const liveWorkflowIds = [
       ...new Set(
         snap.items
@@ -275,15 +279,15 @@ export function makePipelineService(deps: PipelineServiceDeps) {
           .map((i) => i.workflowId)
       ),
     ]
-    for (const workflowId of liveWorkflowIds) await cancelWorkflowImpl(workflowId)
+    for (const workflowId of liveWorkflowIds) await cancelWorkflowImpl(workflowId, sessionId)
   }
 
   // Board RESET (Unit 4.4, I8/I12): retire every TERMINAL item of the scope into the preserved
   // Done bucket (outcome 'reset') via settle() — every status change still goes through the one
   // terminal writer; no row is deleted (hidden, reachable in Activity/history). The `wipe`
   // primitive cancels active items first, so resetImpl only handles already-terminal rows here.
-  async function resetImpl(workflowId?: string): Promise<{ reset: number }> {
-    const resettable = await store.getResettable(workflowId)
+  async function resetImpl(workflowId?: string, sessionId?: string): Promise<{ reset: number }> {
+    const resettable = await store.getResettable(workflowId, sessionId)
     let reset = 0
     for (const item of resettable.sort((a, b) => a.id.localeCompare(b.id))) {
       try {
@@ -311,14 +315,17 @@ export function makePipelineService(deps: PipelineServiceDeps) {
   // The ONE wipe primitive (cancel every active item, then retire every terminal one). Every caller
   // — the reset routes, the public wipe*/reset* methods, and the Start-over re-START path — goes
   // through this, so "cancel + reset" lives in exactly one place (no copy-paste).
-  async function wipeWorkflowImpl(workflowId: string): Promise<{ reset: number }> {
-    await cancelWorkflowImpl(workflowId)
-    return resetImpl(workflowId)
+  async function wipeWorkflowImpl(
+    workflowId: string,
+    sessionId?: string
+  ): Promise<{ reset: number }> {
+    await cancelWorkflowImpl(workflowId, sessionId)
+    return resetImpl(workflowId, sessionId)
   }
 
-  async function wipeAllImpl(): Promise<{ reset: number }> {
-    await cancelAllImpl()
-    return resetImpl()
+  async function wipeAllImpl(sessionId?: string): Promise<{ reset: number }> {
+    await cancelAllImpl(sessionId)
+    return resetImpl(undefined, sessionId)
   }
 
   // True when `agentId` (= wf__agent) is the runtime key of a role:'input' agent in some loaded
@@ -382,21 +389,22 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       // artifact, gone now that one card aggregates a key's Runs. So we revert from wipe to
       // supersede-prior-finished-scan + one-live-gate. No wipe, no Start-over confirm. (wipeWorkflowImpl
       // STAYS — it backs the explicit Clear button.)
+      const sid = req.sessionId
       if (req.origin === 'human' && isInputAgent(req.agentId)) {
-        if (await store.hasLiveInputScan(req.workflowId, req.agentId)) {
+        if (await store.hasLiveInputScan(req.workflowId, req.agentId, sid)) {
           // The gate dedups only a live SCAN itself. `hasLiveInputScan` is Approach-B (also true when
           // a finished root has a live DESCENDANT), but the lookup matches only a self-live root — so
           // a `done` scan whose only live thing is a child draft yields `live === undefined`, falls
           // through, and is superseded + re-scanned. That is intended: the gate blocks two concurrent
           // scans, NOT a re-scan while child drafts run ("done → re-runnable; live → sequential").
-          const live = (await store.getActiveByWorkflow(req.workflowId)).find(
+          const live = (await store.getActiveByWorkflow(req.workflowId, sid)).find(
             (w) => w.agentId === req.agentId && !w.parentId
           )
           if (live) return { id: live.id, deduped: true }
         }
-        const prior = await store.getFinishedInputRoots(req.workflowId, req.agentId)
+        const prior = await store.getFinishedInputRoots(req.workflowId, req.agentId, sid)
         if (prior.length) {
-          const snap = await store.getBoardSnapshot()
+          const snap = await store.getBoardSnapshot(sid)
           // The SAME core tree-walk stateStore/board use — one liveness source. Set of ids whose
           // tree still contains a live node.
           const liveAnc = hasLiveDescendant(
@@ -606,8 +614,8 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       await cancelItem(workItemId)
     },
 
-    async cancelWorkflow(workflowId: string): Promise<void> {
-      await cancelWorkflowImpl(workflowId)
+    async cancelWorkflow(workflowId: string, sessionId?: string): Promise<void> {
+      await cancelWorkflowImpl(workflowId, sessionId)
     },
 
     // Stop a whole instance: cancel every Run sharing (workflowId, agentId, key). Each cancelItem
@@ -620,8 +628,13 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     // its live children would never be stopped. The target set is the snapshot at call time (same
     // pattern as cancelAllImpl); a Run dispatched concurrently AFTER the snapshot may not be caught —
     // acceptable for a deliberate human Stop.
-    async cancelInstance(workflowId: string, agentId: string, key: string): Promise<void> {
-      const snap = await store.getBoardSnapshot()
+    async cancelInstance(
+      workflowId: string,
+      agentId: string,
+      key: string,
+      sessionId?: string
+    ): Promise<void> {
+      const snap = await store.getBoardSnapshot(sessionId)
       const matching = snap.items.filter(
         (w) => w.workflowId === workflowId && w.agentId === agentId && w.key === key
       )
@@ -629,29 +642,29 @@ export function makePipelineService(deps: PipelineServiceDeps) {
     },
 
     // Stop every active work item across ALL workflows. Public alias for cancelAllImpl.
-    async cancelAll(): Promise<void> {
-      await cancelAllImpl()
+    async cancelAll(sessionId?: string): Promise<void> {
+      await cancelAllImpl(sessionId)
     },
 
     // Wipe = the full Start-over primitive: stop every active item in scope, then retire every
     // terminal item (hide, not delete — I12). One server op (wipeWorkflowImpl) behind the reset
     // routes (U7/U8) AND the Start-over re-START path — no duplicated cancel+reset.
-    async wipeWorkflow(workflowId: string): Promise<{ reset: number }> {
-      return wipeWorkflowImpl(workflowId)
+    async wipeWorkflow(workflowId: string, sessionId?: string): Promise<{ reset: number }> {
+      return wipeWorkflowImpl(workflowId, sessionId)
     },
 
-    async wipeAll(): Promise<{ reset: number }> {
-      return wipeAllImpl()
+    async wipeAll(sessionId?: string): Promise<{ reset: number }> {
+      return wipeAllImpl(sessionId)
     },
 
     // resetWorkflow/resetAll are thin aliases to the wipe primitive (the routes call these; the
     // route contract drops the `active` field — U7d).
-    async resetWorkflow(workflowId: string): Promise<{ reset: number }> {
-      return wipeWorkflowImpl(workflowId)
+    async resetWorkflow(workflowId: string, sessionId?: string): Promise<{ reset: number }> {
+      return wipeWorkflowImpl(workflowId, sessionId)
     },
 
-    async resetAll(): Promise<{ reset: number }> {
-      return wipeAllImpl()
+    async resetAll(sessionId?: string): Promise<{ reset: number }> {
+      return wipeAllImpl(sessionId)
     },
 
     async getStatus(
@@ -677,13 +690,13 @@ export function makePipelineService(deps: PipelineServiceDeps) {
       }
     },
 
-    async getBoard(): Promise<{
+    async getBoard(sessionId?: string): Promise<{
       items: WorkItem[]
       gates: Gate[]
       lastEventId: number
       agentHealth: Record<string, HealthCheck>
     }> {
-      const snap = await store.getBoardSnapshot()
+      const snap = await store.getBoardSnapshot(sessionId)
       // Ship everything that has NOT left the board (superseded/reset are retired → Activity only).
       // Do NOT filter on isVisible here — that is the client's card-rendering decision (U8). The
       // board must keep queued + no-card rows so the client can count queued and walk live

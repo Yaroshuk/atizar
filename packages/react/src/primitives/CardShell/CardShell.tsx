@@ -34,7 +34,10 @@ export const CardShell = ({
   className,
   testId,
 }: CardShellProps) => (
-  <div className={clsx(s.shell, tone === 'attention' && s.attention, className)} data-testid={testId}>
+  <div
+    className={clsx(s.shell, tone === 'attention' && s.attention, className)}
+    data-testid={testId}
+  >
     {(icon || kicker || title || badge) && (
       <div className={s.head}>
         {icon && (

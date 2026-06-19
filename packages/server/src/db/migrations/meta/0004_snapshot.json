@@ -1,5 +1,5 @@
 {
-  "id": "c3d2037e-7378-4775-9ea1-55942037d251",
+  "id": "5cdb8670-9ecb-46da-bf76-63b77582edfc",
   "prevId": "1bc05da2-e917-47e3-a333-35c6bd7432ce",
   "version": "7",
   "dialect": "postgresql",
@@ -408,6 +408,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'global'"
+        },
         "origin": {
           "name": "origin",
           "type": "origin_kind",
@@ -543,7 +550,6 @@
         "queued",
         "active",
         "awaiting_human",
-        "awaiting_agent",
         "terminal"
       ]
     }

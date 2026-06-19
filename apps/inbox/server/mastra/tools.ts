@@ -2,7 +2,8 @@ import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { listUnread } from '@atizar/integrations/gmail/list-unread'
 import { getEmail } from '@atizar/integrations/gmail/get-email'
-import { resolveCredential, atizarEnv, captureTool } from '@atizar/server'
+import { resolveCredential, atizarEnv } from '@atizar/server'
+import { captureTool } from '@atizar/server/mastra'
 import { auth as gmailAuth } from '@atizar/integrations/gmail/auth'
 
 // Resolve the live Gmail credential for the single beta connection ('default'); null = not connected.

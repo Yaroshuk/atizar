@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { Board } from '../serverTypes'
 import type { ConnState } from './useActivity'
+import { sessionHeaders } from '../session'
 
 // The board is server-authoritative AND shared. Several consumers call useBoard() in one tree —
 // useWorkflowSelection, useBoardNavigation, and the demo's board composition. A per-call
@@ -31,7 +32,9 @@ const setConnection = (next: ConnState): void => {
 }
 
 const refetch = async (): Promise<void> => {
-  const b = (await (await fetch('/api/board')).json()) as Board
+  // The board SSE is a coarse global poke; the snapshot is the truth and carries the tenant header
+  // so each browser refetches ONLY its own items (demo isolation; absent header ⇒ 'global').
+  const b = (await (await fetch('/api/board', { headers: sessionHeaders() })).json()) as Board
   current = b
   for (const l of listeners) l()
 }

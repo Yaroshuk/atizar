@@ -254,6 +254,70 @@ describe('withRecordReplay', () => {
   })
 })
 
+describe('withRecordReplay keyOf fallback', () => {
+  it('demo: per-run key missing → falls back to the base-key cassette (no real call)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('live')]) // must NOT be called in demo
+    await new CassetteStore(dir, 'wf__a').writeStep(0, [ev('base')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'demo',
+      keyOf: () => 'wf__a__missing',
+    })
+    const out = await collect(wrapped.run(step0Input))
+    expect(out).toEqual([ev('base')])
+    expect(fake.calls()).toBe(0)
+  })
+
+  it('demo: per-run key present → replays the per-run cassette, not the base', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('live')])
+    await new CassetteStore(dir, 'wf__a').writeStep(0, [ev('base')])
+    await new CassetteStore(dir, 'wf__a__k1').writeStep(0, [ev('keyed')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'demo',
+      keyOf: () => 'wf__a__k1',
+    })
+    const out = await collect(wrapped.run(step0Input))
+    expect(out).toEqual([ev('keyed')])
+    expect(fake.calls()).toBe(0)
+  })
+
+  it('demo: per-run AND base both missing → still throws DemoCassetteMissing', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeProvider([ev('live')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'demo',
+      keyOf: () => 'wf__a__missing',
+    })
+    await expect(collect(wrapped.run(step0Input))).rejects.toThrow(/DemoCassetteMissing/)
+  })
+
+  it('demo resume: per-run key missing → falls back to the base-key cassette', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cassette-'))
+    const fake = fakeResumeProvider([], [ev('live')])
+    await new CassetteStore(dir, 'wf__a').writeStep(1, [ev('base-resume')])
+    const wrapped = withRecordReplay(fake.provider, {
+      key: 'wf__a',
+      approvalNames: APPROVALS,
+      dir,
+      mode: 'demo',
+      keyOf: () => 'wf__a__missing',
+    })
+    const out = await collect(wrapped.resume!(resumeHandle, approvedResolution))
+    expect(out).toEqual([ev('base-resume')])
+    expect(fake.resumes()).toBe(0)
+  })
+})
+
 describe('withRecordReplay resume()', () => {
   it('records the resume run under step (resolvedApprovalCount + 1)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'cassette-'))

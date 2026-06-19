@@ -1,1 +1,0 @@
-ALTER TYPE "public"."work_item_phase" ADD VALUE 'awaiting_agent' BEFORE 'terminal';

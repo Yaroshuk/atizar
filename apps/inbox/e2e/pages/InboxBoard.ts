@@ -134,4 +134,20 @@ export class InboxBoard {
     await row.click()
     await expect(this.instanceModal()).toBeVisible()
   }
+
+  // Stop EVERY live instance of an agent, one at a time, until none remain in the pipeline.
+  // Data-independent: handles a single instance or N (e.g. the sorter routes two reply emails).
+  async stopAllInstances(agentId: string): Promise<void> {
+    for (;;) {
+      const rows = this.pipelineRow(agentId)
+      const n = await rows.count()
+      if (n === 0) break
+      await rows.first().click()
+      await expect(this.instanceModal()).toBeVisible()
+      await expect(this.instanceStop()).toBeVisible({ timeout: 30_000 })
+      await this.instanceStop().click()
+      await this.closeModalIfOpen()
+      await expect(rows).toHaveCount(n - 1, { timeout: 30_000 })
+    }
+  }
 }

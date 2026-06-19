@@ -1,0 +1,18 @@
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_reply5_lead","toolCallName":"renderLead","parentMessageId":"demo-reply5-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_lead","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_lead","delta":"{\"from\": \"Priya Nair <priya@lumen-retail.example>\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_lead","delta":" \"subject\": \"Starter vs Growth for a small team?\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_lead","delta":" \"summary\": \"Priya is evaluating plans for a 6-person team and asks what Growth"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_lead","delta":" adds over Starter.\"}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_reply5_lead"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-reply5-res-1","toolCallId":"demo_reply5_lead","content":"Email surfaced to the user.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_reply5_save","toolCallName":"saveDraft","parentMessageId":"demo-reply5-msg-2"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_save","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_save","delta":"{\"threadId\": \"demo-thread-5\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_save","delta":" \"body\": \"Hi Priya,\\n\\nThanks for considering us! For a team of six, here is how the two tiers compare.\\n\\n"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_save","delta":"Starter fits a single workspace with up to 5 seats. Growth removes the seat limit and adds the"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply5_save","delta":" advanced reporting dashboards and priority support — the usual fit for a growing team.\\n\\nHappy to set up a quick walkthrough.\\n\\nBest,\\nThe team\"}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_reply5_save"}}
+{"step":0,"event":{"type":"CUSTOM","name":"GATE_OPENED","value":{"gateKind":"approval","toolName":"saveDraft","toolCallId":"demo_reply5_save","proposedArtifact":{"threadId":"demo-thread-5","body":"Hi Priya,\n\nThanks for considering us! For a team of six, here is how the two tiers compare.\n\nStarter fits a single workspace with up to 5 seats. Growth removes the seat limit and adds the advanced reporting dashboards and priority support — the usual fit for a growing team.\n\nHappy to set up a quick walkthrough.\n\nBest,\nThe team"}}}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reply5-text-1","delta":"The"}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reply5-text-1","delta":" Gmail draft has been saved."}}

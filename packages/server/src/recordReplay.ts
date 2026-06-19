@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { BaseEvent, RunAgentInput } from '@ag-ui/client'
+import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client'
 import {
   resolvedApprovalCount,
   type Provider,
@@ -138,6 +138,38 @@ export class CassetteStore {
 
 export type RecordReplayMode = 'replay' | 'record' | 'demo'
 
+// Demo-only replay pacing: recorded events fire instantly, so a demo replays in a blink and the
+// viewer never sees the pipeline progress. In 'demo' mode we sleep before each "visible" boundary
+// (a new tool call / a new message) and a tick between streaming deltas, so the board animates as
+// if the agent were working live. Tunable via env; ZERO effect outside demo mode (tests replay at
+// full speed). DEMO_PACE_MS=0 disables.
+const DEMO_PACE_MS = Number.isFinite(Number(process.env.DEMO_PACE_MS))
+  ? Number(process.env.DEMO_PACE_MS)
+  : 850
+const DEMO_DELTA_MS = Number.isFinite(Number(process.env.DEMO_DELTA_MS))
+  ? Number(process.env.DEMO_DELTA_MS)
+  : 28
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+async function paceDemoEvent(event: BaseEvent): Promise<void> {
+  if (DEMO_PACE_MS <= 0) return
+  const t = event.type
+  const boundary = t === EventType.TOOL_CALL_START || t === EventType.TEXT_MESSAGE_START
+  await sleep(boundary ? DEMO_PACE_MS : DEMO_DELTA_MS)
+}
+
+// Replay a recorded step, paced in demo mode so the run is watchable.
+async function* yieldRecorded(
+  events: BaseEvent[],
+  mode: RecordReplayMode
+): AsyncIterable<BaseEvent> {
+  for (const event of events) {
+    if (mode === 'demo') await paceDemoEvent(event)
+    yield event
+  }
+}
+
 // Reads the dev toggle. unset → null (no wrapping, pure production path).
 // "record" → force-overwrite; anything else truthy ("1"/"replay") → auto
 // (replay a step if recorded, else record it).
@@ -153,18 +185,46 @@ export function recordReplayMode(): RecordReplayMode | null {
 // and writes that step to disk.
 export function withRecordReplay(
   provider: Provider,
-  opts: { key: string; approvalNames: readonly string[]; dir: string; mode: RecordReplayMode }
+  opts: {
+    key: string
+    approvalNames: readonly string[]
+    dir: string
+    mode: RecordReplayMode
+    // Optional per-run cassette key. When it returns a string, THAT names the cassette file for
+    // this run instead of the fixed `key` — so two instances of one agent (same `key`) can replay
+    // distinct recordings (e.g. one reply cassette per sender). Returns undefined ⇒ fall back to
+    // `key`. The framework only calls it; the discriminator (what makes a run distinct) is the
+    // caller's policy.
+    keyOf?: (input: RunAgentInput) => string | undefined
+  }
 ): Provider {
+  // Read a step from the per-run cassette, falling back to the shared base-key cassette when the
+  // per-run file is absent. So a per-run keyed instance replays its own recording when present, and
+  // gracefully shares the base cassette otherwise (e.g. a reply staged with an unrecorded messageId
+  // still replays the shared reply cassette instead of hard-failing).
+  const readStepWithFallback = async (
+    perRunKey: string | undefined,
+    step: number
+  ): Promise<BaseEvent[] | null> => {
+    const primary = await new CassetteStore(opts.dir, perRunKey ?? opts.key).readStep(step)
+    if (primary) return primary
+    if (perRunKey && perRunKey !== opts.key) {
+      return new CassetteStore(opts.dir, opts.key).readStep(step)
+    }
+    return null
+  }
+
   const base: Provider = {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames)
-      const store = new CassetteStore(opts.dir, opts.key)
+      const perRunKey = opts.keyOf?.(input)
+      const store = new CassetteStore(opts.dir, perRunKey ?? opts.key)
 
       if (opts.mode === 'replay' || opts.mode === 'demo') {
-        const recorded = await store.readStep(step)
+        const recorded = await readStepWithFallback(perRunKey, step)
         if (recorded) {
-          yield* recorded
+          yield* yieldRecorded(recorded, opts.mode)
           return
         }
         if (opts.mode === 'demo') {
@@ -194,12 +254,13 @@ export function withRecordReplay(
     async *resume(handle: ResumeHandle, resolution: ResumePayload): AsyncIterable<BaseEvent> {
       const messages = (handle.input?.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames) + 1
-      const store = new CassetteStore(opts.dir, opts.key)
+      const perRunKey = handle.input ? opts.keyOf?.(handle.input) : undefined
+      const store = new CassetteStore(opts.dir, perRunKey ?? opts.key)
 
       if (opts.mode === 'replay' || opts.mode === 'demo') {
-        const recorded = await store.readStep(step)
+        const recorded = await readStepWithFallback(perRunKey, step)
         if (recorded) {
-          yield* recorded
+          yield* yieldRecorded(recorded, opts.mode)
           return
         }
         if (opts.mode === 'demo') {

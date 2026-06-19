@@ -169,3 +169,58 @@ describe.skipIf(!reachable)('StateStore (real Postgres)', () => {
     expect(await store.hasLiveInputScan(workflowId, agentId)).toBe(false)
   })
 })
+
+describe.skipIf(!reachable)('session isolation (tenant scoping)', () => {
+  it('getBoardSnapshot returns only the tenant’s items', async () => {
+    const wf = `wf-${randomUUID()}`
+    const a = await store.insertWorkItem({
+      workflowId: wf,
+      agentId: `${wf}__sorter`,
+      origin: 'human',
+      payload: {},
+      key: 'k',
+      sessionId: 'aaa',
+    })
+    const b = await store.insertWorkItem({
+      workflowId: wf,
+      agentId: `${wf}__sorter`,
+      origin: 'human',
+      payload: {},
+      key: 'k',
+      sessionId: 'bbb',
+    })
+    const ids = (await store.getBoardSnapshot('aaa')).items.map((i) => i.id)
+    expect(ids).toContain(a.id)
+    expect(ids).not.toContain(b.id)
+  })
+
+  it('getActiveByWorkflow + hasLiveInputScan are tenant-scoped', async () => {
+    const wf = `wf-${randomUUID()}`
+    const agent = `${wf}__sorter`
+    const a = await store.insertWorkItem({
+      workflowId: wf,
+      agentId: agent,
+      origin: 'human',
+      payload: {},
+      key: agent,
+      sessionId: 'aaa',
+    })
+    await transition(db, a.id, 'start')
+    expect((await store.getActiveByWorkflow(wf, 'aaa')).map((i) => i.id)).toContain(a.id)
+    expect(await store.getActiveByWorkflow(wf, 'bbb')).toHaveLength(0)
+    expect(await store.hasLiveInputScan(wf, agent, 'aaa')).toBe(true)
+    expect(await store.hasLiveInputScan(wf, agent, 'bbb')).toBe(false)
+  })
+
+  it('defaults to global when no sessionId (non-demo unchanged)', async () => {
+    const wf = `wf-${randomUUID()}`
+    const g = await store.insertWorkItem({
+      workflowId: wf,
+      agentId: `${wf}__sorter`,
+      origin: 'human',
+      payload: {},
+      key: 'k',
+    })
+    expect((await store.getBoardSnapshot('global')).items.map((i) => i.id)).toContain(g.id)
+  })
+})

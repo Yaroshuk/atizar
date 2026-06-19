@@ -84,4 +84,13 @@ describe('lookups', () => {
     expect(lk.labelOf(wi({ payload: { from: 'a@b.com' } }))).toBe('a@b.com')
     expect(lk.labelOf(wi({ payload: { subject: 'Hi' } }))).toBe('Hi')
   })
+  it('labels a reply by the sender from the nested email payload (display name preferred)', () => {
+    const lk = lookups(cfg, 'lead-inbox')
+    expect(
+      lk.labelOf(wi({ payload: { email: { from: 'Sam Carter <sam@harborfreight.example>' } } }))
+    ).toBe('Sam Carter')
+    expect(lk.labelOf(wi({ payload: { email: { from: 'jane@acme.example' } } }))).toBe(
+      'jane@acme.example'
+    )
+  })
 })

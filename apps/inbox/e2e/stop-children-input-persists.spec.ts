@@ -20,11 +20,9 @@ test.describe('Stopping children one-by-one keeps the input agent launchable', (
     })
 
     for (const child of CHILDREN) {
-      await test.step(`stop the ${child} instance → it leaves the pipeline`, async () => {
-        await board.openInstance(child)
-        await expect(board.instanceStop()).toBeVisible({ timeout: 30_000 })
-        await board.instanceStop().click()
-        await board.closeModalIfOpen()
+      await test.step(`stop the ${child} instance(s) → ${child} leaves the pipeline`, async () => {
+        // reply may have more than one instance (per-sender); stop every instance of this child.
+        await board.stopAllInstances(child)
         await expect(board.pipelineRow(child)).toHaveCount(0, { timeout: 30_000 })
       })
     }

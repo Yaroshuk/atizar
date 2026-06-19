@@ -1,4 +1,5 @@
 CREATE TYPE "public"."question_status" AS ENUM('open', 'answered', 'failed');--> statement-breakpoint
+ALTER TYPE "public"."work_item_phase" ADD VALUE 'awaiting_agent' BEFORE 'terminal';--> statement-breakpoint
 CREATE TABLE "questions" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"asker_work_item_id" uuid NOT NULL,

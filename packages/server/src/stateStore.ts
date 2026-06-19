@@ -27,7 +27,12 @@ export interface InsertWorkItemInput {
   parentId?: string | null
   source?: string | null
   key: string
+  // Tenant key (multi-tenant scoping). Defaults to 'global' (single-operator / shared).
+  sessionId?: string
 }
+
+// Default tenant when none is supplied (non-demo / single operator) — everything shares it.
+const GLOBAL_TENANT = 'global'
 
 export interface InsertGateInput {
   workItemId: string
@@ -69,6 +74,7 @@ export function makeStateStore(db: Db) {
           parentId: input.parentId ?? null,
           source: input.source ?? null,
           key: input.key,
+          sessionId: input.sessionId ?? GLOBAL_TENANT,
           phase: 'queued',
           outcome: 'running',
         })
@@ -108,10 +114,23 @@ export function makeStateStore(db: Db) {
       return row?.c ?? 0
     },
 
-    // The board snapshot: all work items (newest first) + every OPEN gate.
-    async getBoardSnapshot(): Promise<{ items: WorkItem[]; gates: Gate[] }> {
-      const items = await db.select().from(workItems).orderBy(asc(workItems.createdAt))
-      const openGates = await db.select().from(gates).where(eq(gates.status, 'open'))
+    // The board snapshot for a tenant: its work items (oldest first) + its OPEN gates. The tenant
+    // ('global' by default) scopes EVERYTHING the client sees — per-browser isolation in the demo.
+    async getBoardSnapshot(
+      sessionId: string = GLOBAL_TENANT
+    ): Promise<{ items: WorkItem[]; gates: Gate[] }> {
+      const items = await db
+        .select()
+        .from(workItems)
+        .where(eq(workItems.sessionId, sessionId))
+        .orderBy(asc(workItems.createdAt))
+      const ids = items.map((i) => i.id)
+      const openGates = ids.length
+        ? await db
+            .select()
+            .from(gates)
+            .where(and(eq(gates.status, 'open'), inArray(gates.workItemId, ids)))
+        : []
       return { items, gates: openGates }
     },
 
@@ -201,18 +220,30 @@ export function makeStateStore(db: Db) {
       return rows.filter((r) => lifecycle(r.phase, r.outcome, false, false).isLive)
     },
 
-    async getActiveByWorkflow(workflowId: string): Promise<WorkItem[]> {
-      const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
+    async getActiveByWorkflow(
+      workflowId: string,
+      sessionId: string = GLOBAL_TENANT
+    ): Promise<WorkItem[]> {
+      const rows = await db
+        .select()
+        .from(workItems)
+        .where(and(eq(workItems.workflowId, workflowId), eq(workItems.sessionId, sessionId)))
       return rows.filter((r) => lifecycle(r.phase, r.outcome, false, false).isLive)
     },
 
     // Resettable = TERMINAL items that have NOT already left the board (outcome not
     // superseded/reset). transition('reset') accepts any terminal phase; we pre-filter to terminal
     // items still showing so we don't churn already-retired rows.
-    async getResettable(workflowId?: string): Promise<WorkItem[]> {
+    async getResettable(
+      workflowId?: string,
+      sessionId: string = GLOBAL_TENANT
+    ): Promise<WorkItem[]> {
       const rows = workflowId
-        ? await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
-        : await db.select().from(workItems)
+        ? await db
+            .select()
+            .from(workItems)
+            .where(and(eq(workItems.workflowId, workflowId), eq(workItems.sessionId, sessionId)))
+        : await db.select().from(workItems).where(eq(workItems.sessionId, sessionId))
       return rows.filter(
         (r) => r.phase === 'terminal' && r.outcome !== 'superseded' && r.outcome !== 'reset'
       )
@@ -226,7 +257,11 @@ export function makeStateStore(db: Db) {
     // second visible Run of the one input instance.) 'superseded'/'reset' are already-retired and
     // never re-superseded. Children (parentId != null) are never roots and are never superseded;
     // the caller still keeps any root with a live descendant (orphan guard).
-    async getFinishedInputRoots(workflowId: string, agentId: string): Promise<WorkItem[]> {
+    async getFinishedInputRoots(
+      workflowId: string,
+      agentId: string,
+      sessionId: string = GLOBAL_TENANT
+    ): Promise<WorkItem[]> {
       return db
         .select()
         .from(workItems)
@@ -234,6 +269,7 @@ export function makeStateStore(db: Db) {
           and(
             eq(workItems.workflowId, workflowId),
             eq(workItems.agentId, agentId),
+            eq(workItems.sessionId, sessionId),
             isNull(workItems.parentId),
             eq(workItems.phase, 'terminal'),
             inArray(workItems.outcome, ['done', 'stopped', 'error'])
@@ -244,8 +280,15 @@ export function makeStateStore(db: Db) {
     // True when this input agent has ≥1 non-retired root whose tree still contains a live node.
     // The ONE tree walk lives in core hasLiveDescendant; a root is "live" if it is itself live OR
     // has a live descendant (Approach B: a finished root with an awaiting child is a live scan).
-    async hasLiveInputScan(workflowId: string, agentId: string): Promise<boolean> {
-      const rows = await db.select().from(workItems).where(eq(workItems.workflowId, workflowId))
+    async hasLiveInputScan(
+      workflowId: string,
+      agentId: string,
+      sessionId: string = GLOBAL_TENANT
+    ): Promise<boolean> {
+      const rows = await db
+        .select()
+        .from(workItems)
+        .where(and(eq(workItems.workflowId, workflowId), eq(workItems.sessionId, sessionId)))
       const liveAncestors = hasLiveDescendant(
         rows.map((r) => ({ id: r.id, parentId: r.parentId, phase: r.phase as Phase }))
       )
