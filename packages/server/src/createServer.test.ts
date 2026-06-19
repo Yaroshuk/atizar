@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { defineAgent, defineProviders, instanceId } from '@atizar/core'
 import type { Provider } from '@atizar/core'
-import { createServer } from './createServer.js'
+import { createServer, resolvePort } from './createServer.js'
 
 const baseProvider: Provider = { async *run() {} }
 const registry = defineProviders({ mock: () => baseProvider })
@@ -88,5 +91,79 @@ describe('createServer (start: false)', () => {
       start: false,
     })
     expect(Object.keys(built.runtimes)).toEqual([])
+  })
+})
+
+describe('resolvePort', () => {
+  it('defaults to 4000 when PORT is unset', () => {
+    expect(resolvePort(undefined)).toBe(4000)
+  })
+
+  it('uses a numeric PORT injected by the host', () => {
+    expect(resolvePort('8080')).toBe(8080)
+  })
+
+  it('falls back to 4000 for a non-numeric PORT', () => {
+    expect(resolvePort('not-a-port')).toBe(4000)
+  })
+})
+
+describe('createServer — static client serving', () => {
+  let dir: string
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'atizar-static-'))
+    writeFileSync(join(dir, 'index.html'), '<!doctype html><title>ATIZAR demo</title>')
+    mkdirSync(join(dir, 'assets'))
+    writeFileSync(join(dir, 'assets', 'app.js'), 'console.log("hi")')
+  })
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  const build = (staticDir?: string) =>
+    createServer({
+      workflowServers,
+      providerRegistry: registry,
+      buildProvider,
+      connections: [],
+      scopesFor: () => [],
+      instanceKeyOf: (agentId) => agentId,
+      sourceOf: () => null,
+      enabledWorkflows: null,
+      start: false,
+      staticDir,
+    })
+
+  it('serves index.html at the root when staticDir is set', async () => {
+    const { app } = await build(dir)
+    const res = await app.request('/')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('ATIZAR demo')
+  })
+
+  it('serves a built asset from staticDir', async () => {
+    const { app } = await build(dir)
+    const res = await app.request('/assets/app.js')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('console.log')
+  })
+
+  it('falls back to index.html for an unknown client route (SPA deep-link)', async () => {
+    const { app } = await build(dir)
+    const res = await app.request('/demo')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('ATIZAR demo')
+  })
+
+  it('does not shadow the API when staticDir is set', async () => {
+    const { app } = await build(dir)
+    const res = await app.request('/api/config')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ demo: expect.any(Boolean) })
+  })
+
+  it('mounts no static routes when staticDir is omitted', async () => {
+    const { app } = await build()
+    const res = await app.request('/')
+    expect(res.status).toBe(404)
   })
 })

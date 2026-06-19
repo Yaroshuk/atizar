@@ -18,10 +18,10 @@ test.describe('Stopping one child leaves its siblings live', () => {
       await expect(board.pipelineRow('reader').first()).toBeVisible()
     })
 
-    await test.step('stop ONLY the reply instance', async () => {
-      await board.openInstance('reply')
-      await expect(board.instanceStop()).toBeVisible({ timeout: 30_000 })
-      await board.instanceStop().click()
+    await test.step('stop ONLY the reply instance(s)', async () => {
+      // The sorter may route more than one email to reply; stop every reply instance so the assertion
+      // is about reply leaving entirely, independent of how many the cassette produces.
+      await board.stopAllInstances('reply')
       await board.closeModalIfOpen()
     })
 

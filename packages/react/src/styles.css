@@ -320,6 +320,14 @@ button {
     0 1px 2px rgba(0, 135, 95, 0.35);
   flex: 0 0 auto;
 }
+/* When the mark is a brand image (logoSrc), drop the letter-badge gradient/shadow and
+   let the logo art fill the rounded box. */
+.ws-mark-img {
+  background: none;
+  object-fit: cover;
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.18);
+}
 .ws-text {
   display: flex;
   flex-direction: column;

@@ -9,7 +9,7 @@ import { InboxBoard } from './pages/InboxBoard'
 // draft from an earlier episode is resurrected next to the fresh one. Target: an opened thread shows
 // ONLY the latest episode's run(s).
 test.describe('Episode scoping', () => {
-  test('reply does not resurrect a prior episode\'s done draft', async ({ page }) => {
+  test("reply does not resurrect a prior episode's done draft", async ({ page }) => {
     const board = new InboxBoard(page)
     const sender = 'episode-x@example.com'
 
