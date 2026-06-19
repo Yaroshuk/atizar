@@ -7,17 +7,16 @@
 
 # Atizar
 
-# Atizar
-
 ### Not a 24/7 agent. A workflow you can _actually trust_.
 
 _Open-source · Human-in-the-loop · TypeScript_
 
+[![Website](https://img.shields.io/badge/website-atizar.io-e6562e.svg)](https://atizar.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-e6562e.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-e6562e.svg)](https://www.typescriptlang.org/)
 [![Status: beta](https://img.shields.io/badge/status-beta-e6562e.svg)](#status)
 
-[Quick start](#quick-start) · [Why atizar](#why-atizar) · [How it works](#how-it-works) · [Run the inbox](#run-the-inbox-yourself) · [Philosophy](docs/PHILOSOPHY.md)
+[Website](https://atizar.io) · [Live demo](https://atizar.io/demo) · [Quick start](#quick-start) · [Why atizar](#why-atizar) · [How it works](#how-it-works) · [Run the inbox](#run-the-inbox-yourself) · [Philosophy](docs/PHILOSOPHY.md)
 
 </div>
 
@@ -57,7 +56,9 @@ The name is the Spanish verb _atizar_ — to stoke a fire that's already burning
 
 > **Beta.** The zero-credential demo runs entirely on an in-process database and recorded cassettes — no Docker, no API keys, no LLM provider.
 
-Try the live demo locally:
+Try it instantly, nothing to install: **[atizar.io/demo](https://atizar.io/demo)**.
+
+Or run the same demo locally:
 
 ```bash
 yarn install --ignore-engines
