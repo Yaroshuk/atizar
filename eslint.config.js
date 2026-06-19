@@ -63,7 +63,7 @@ export default tseslint.config(
       '**/dist-types/**',
       '**/coverage/**',
       '**/.playwright-mcp/**',
-      '**/.claude/**',
+      '**/.claude/worktrees/**',
       '**/*.config.*',
     ],
   }
