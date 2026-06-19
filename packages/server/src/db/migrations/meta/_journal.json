@@ -29,6 +29,13 @@
       "when": 1781725990138,
       "tag": "0003_cultured_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781786929577,
+      "tag": "0004_burly_terror",
+      "breakpoints": true
     }
   ]
 }

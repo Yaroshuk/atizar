@@ -56,6 +56,10 @@ export const workItems = pgTable('work_items', {
   workflowId: text('workflow_id').notNull(),
   agentId: text('agent_id').notNull(),
   parentId: uuid('parent_id'),
+  // Tenant key for multi-tenant scoping (e.g. per-browser demo isolation). The client sends it via
+  // the X-Atizar-Session header; absent ⇒ 'global' (single-operator / shared, the default). A root
+  // is stamped from the request; a child inherits its parent's sessionId at dispatch.
+  sessionId: text('session_id').notNull().default('global'),
   origin: originKind('origin').notNull(),
   // Dedup key (app-supplied via sourceOf at dispatch); null ⇒ never deduped.
   source: text('source'),

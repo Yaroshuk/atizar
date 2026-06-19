@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./db/schema": "./src/db/schema.ts"
+    "./db/schema": "./src/db/schema.ts",
+    "./mastra": "./src/mastraTools.ts"
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",

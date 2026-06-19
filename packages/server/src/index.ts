@@ -42,7 +42,10 @@ export { makeClaudeSpawn } from './makeClaudeSpawn.js'
 export type { ClaudeSpawnOptions, McpServerSpec } from './makeClaudeSpawn.js'
 export { buildAgentProvider } from './buildAgent.js'
 export type { BuildAgentWrap, BuildAgentArgs } from './buildAgent.js'
-export { captureTool } from './mastraTools.js'
+// NOTE: captureTool is NOT re-exported here — it lives behind the `@atizar/server/mastra` subpath.
+// mastraTools.ts eagerly imports `@mastra/core`, so re-exporting it from the main index would force
+// EVERY consumer of `@atizar/server` to load Mastra at boot (heavy) even when they use another
+// provider. Mastra users import it from `@atizar/server/mastra`.
 export { createServer } from './createServer.js'
 export type {
   CreateServerArgs,

@@ -1,8 +1,13 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { BaseEvent } from '@ag-ui/client'
 import type { Destination } from '@atizar/core'
 import type { PipelineService } from './pipelineService.js'
+
+// The tenant key for multi-tenant scoping: the client's X-Atizar-Session header (per-browser in the
+// demo), or 'global' when absent (single-operator / shared — non-demo, unchanged). Scopes the board
+// read, dispatch, and the global cancel/reset ops; per-id routes don't need it (ids are unguessable).
+const sessionOf = (c: Context): string => c.req.header('x-atizar-session') ?? 'global'
 
 // HTTP surface over the PipelineService — the ONLY transport (CopilotKit dropped at step 6).
 // Read shapes (trace snapshot + SSE tail) originated in the step-2 spike. The production triggers
@@ -34,6 +39,7 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       agentId: agent,
       origin: 'human',
       payload: payload ?? {},
+      sessionId: sessionOf(c),
     })
     return c.json({ id: result.id })
   })
@@ -194,13 +200,13 @@ export function createPipelineRoutes(service: PipelineService): Hono {
 
   // STOP every active work item of a workflow.
   app.post('/api/workflows/:id/cancel', async (c) => {
-    await service.cancelWorkflow(c.req.param('id'))
+    await service.cancelWorkflow(c.req.param('id'), sessionOf(c))
     return c.json({ ok: true })
   })
 
-  // STOP every active work item across ALL workflows ("Stop all").
+  // STOP every active work item across ALL workflows ("Stop all") — scoped to the tenant.
   app.post('/api/cancel-all', async (c) => {
-    await service.cancelAll()
+    await service.cancelAll(sessionOf(c))
     return c.json({ ok: true })
   })
 
@@ -212,7 +218,7 @@ export function createPipelineRoutes(service: PipelineService): Hono {
       key: string
     }>()
     if (!workflowId || !agentId || !key) return c.json({ error: 'missing fields' }, 400)
-    await service.cancelInstance(workflowId, agentId, key)
+    await service.cancelInstance(workflowId, agentId, key, sessionOf(c))
     return c.json({ ok: true })
   })
 
@@ -220,13 +226,13 @@ export function createPipelineRoutes(service: PipelineService): Hono {
   // item from the live board (hidden, not deleted, I12). One server op (U7); returns how many
   // were retired.
   app.post('/api/workflows/:id/reset', async (c) => {
-    const { reset } = await service.resetWorkflow(c.req.param('id'))
+    const { reset } = await service.resetWorkflow(c.req.param('id'), sessionOf(c))
     return c.json({ ok: true, reset })
   })
 
-  // RESET every workflow ("reset all"). Same wipe contract as the per-workflow reset.
+  // RESET every workflow ("reset all"). Same wipe contract as the per-workflow reset — tenant-scoped.
   app.post('/api/reset-all', async (c) => {
-    const { reset } = await service.resetAll()
+    const { reset } = await service.resetAll(sessionOf(c))
     return c.json({ ok: true, reset })
   })
 
@@ -238,9 +244,9 @@ export function createPipelineRoutes(service: PipelineService): Hono {
     return c.json(await service.refreshHealth())
   })
 
-  // BOARD snapshot.
+  // BOARD snapshot — scoped to the tenant (per-browser in demo, 'global' otherwise).
   app.get('/api/board', async (c) => {
-    return c.json(await service.getBoard())
+    return c.json(await service.getBoard(sessionOf(c)))
   })
 
   // BOARD SSE — coarse status changes only (resume via snapshot refetch).
