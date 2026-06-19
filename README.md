@@ -7,47 +7,51 @@
 
 # Atizar
 
-**Developer builds. Human directs. Agent runs.**
+# Atizar
 
-_Don't light a fire and walk away. Tend it._
+### Not a 24/7 agent. A workflow you can _actually trust_.
 
-An open-source TypeScript framework for building agentic automations — agentic-first, human-in-the-loop.
+_Open-source · Human-in-the-loop · TypeScript_
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-e6562e.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-e6562e.svg)](https://www.typescriptlang.org/)
 [![Status: beta](https://img.shields.io/badge/status-beta-e6562e.svg)](#status)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Concepts](#core-concepts) · [Philosophy](docs/PHILOSOPHY.md) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [Why atizar](#why-atizar) · [How it works](#how-it-works) · [Run the inbox](#run-the-inbox-yourself) · [Philosophy](docs/PHILOSOPHY.md)
 
 </div>
 
 ---
 
-Autonomous agents are easy to start and hard to trust. The moment one touches your inbox, your data, or your money, "fire and forget" stops being a feature and starts being a liability.
+Autonomous agents are easy to start and impossible to trust the moment they touch your inbox, your data, or your money. **Atizar keeps a human's hand on every step that matters** — the agent proposes, you approve, the server acts. Safe, predictable, auditable.
 
-**Atizar keeps a human's hand on the poker.** The agent does the work — reads, drafts, proposes — and a person approves every step that matters. The approved action is run by the server, never by the model. Everything is audited.
+You build the automation in real TypeScript. The people who run it get a clean board — cards and buttons, never your codebase. One framework, two faces.
 
-The name is the Spanish verb _atizar_ — to stoke a fire that's already burning. That's the whole idea: the agent is the fire, you're the one tending it.
+> **Developer builds · Human directs · Agent runs.**
 
-### Built for developers — agentic-first.
+## Why atizar
 
-You don't hand-write pipelines. The agent **plans, writes, and tests** — guided by **skills baked into the framework**. Your job is to point it at the right one and stay in control. Need an integration? Ask, and it's written in ~10 minutes. No 400-node marketplace.
+**🤖 Agentic-first — you don't write the pipeline.**
+The coding agent plans, writes, and tests your workflow, guided by skills baked into the framework. Test-driven by default. You point it and stay in control.
 
-### Two views of one pipeline.
+**🔒 Safe by code — approval is a guarantee, not a prompt.**
+Effect tools bind to server-side functions the model never sees, and run through an action ledger exactly once — only after you approve. A jailbroken prompt still cannot fire an action.
 
-Developers want code. The people who run it want a UI. So atizar gives each its own:
+**🪟 Two faces — node editors fail everyone.**
+Too low-ceiling for a developer (faster to open an editor), too noisy for an operator (they just want buttons). Atizar gives each its own: real TypeScript for you, a clean board for them.
 
-- **Developer → code.** Real TypeScript, no node canvas.
-- **Consumer → a clean UI.** Cards and buttons, never your codebase.
+**🔌 Engine-agnostic — swap the runtime, keep the code.**
+Mastra, claude-cli, or your own runtime sit behind one thin contract — proven by a provider conformance suite, not just claimed.
 
-### Safe by design — you're always in control.
+> **You don't need 400+ integrations.** When the agent can write you any one in ~10 minutes — skills included — a marketplace is just lock-in.
 
-No 24/7 agents running loose. Every consequential step is **proposed by the agent, approved by a human, executed by the server** — never the model — and fully audited.
+## What "safe" actually means
 
-- **Trace & activity log** — every step the agent took, visible.
-- **Stop, instantly** — Stop agent · Stop workflow · Stop all.
+- **Nothing irreversible without a yes.** Every consequential action waits behind an approval gate — edit it, approve it, or reject it.
+- **Stop, instantly.** Halt one agent, one workflow, or everything at once, at any moment, no matter what's running.
+- **Total transparency.** Every step the agent took is in the activity & trace log. Nothing happens off-screen.
 
-Safety isn't bolted on. It's the foundation.
+The name is the Spanish verb _atizar_ — to stoke a fire that's already burning. The agent is the fire; you're the one tending it.
 
 ## Quick start
 
