@@ -198,14 +198,31 @@ export function withRecordReplay(
     keyOf?: (input: RunAgentInput) => string | undefined
   }
 ): Provider {
+  // Read a step from the per-run cassette, falling back to the shared base-key cassette when the
+  // per-run file is absent. So a per-run keyed instance replays its own recording when present, and
+  // gracefully shares the base cassette otherwise (e.g. a reply staged with an unrecorded messageId
+  // still replays the shared reply cassette instead of hard-failing).
+  const readStepWithFallback = async (
+    perRunKey: string | undefined,
+    step: number
+  ): Promise<BaseEvent[] | null> => {
+    const primary = await new CassetteStore(opts.dir, perRunKey ?? opts.key).readStep(step)
+    if (primary) return primary
+    if (perRunKey && perRunKey !== opts.key) {
+      return new CassetteStore(opts.dir, opts.key).readStep(step)
+    }
+    return null
+  }
+
   const base: Provider = {
     async *run(input: RunAgentInput): AsyncIterable<BaseEvent> {
       const messages = (input.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames)
-      const store = new CassetteStore(opts.dir, opts.keyOf?.(input) ?? opts.key)
+      const perRunKey = opts.keyOf?.(input)
+      const store = new CassetteStore(opts.dir, perRunKey ?? opts.key)
 
       if (opts.mode === 'replay' || opts.mode === 'demo') {
-        const recorded = await store.readStep(step)
+        const recorded = await readStepWithFallback(perRunKey, step)
         if (recorded) {
           yield* yieldRecorded(recorded, opts.mode)
           return
@@ -237,13 +254,11 @@ export function withRecordReplay(
     async *resume(handle: ResumeHandle, resolution: GateResolution): AsyncIterable<BaseEvent> {
       const messages = (handle.input?.messages ?? []) as Message[]
       const step = resolvedApprovalCount(messages, opts.approvalNames) + 1
-      const store = new CassetteStore(
-        opts.dir,
-        (handle.input ? opts.keyOf?.(handle.input) : undefined) ?? opts.key
-      )
+      const perRunKey = handle.input ? opts.keyOf?.(handle.input) : undefined
+      const store = new CassetteStore(opts.dir, perRunKey ?? opts.key)
 
       if (opts.mode === 'replay' || opts.mode === 'demo') {
-        const recorded = await store.readStep(step)
+        const recorded = await readStepWithFallback(perRunKey, step)
         if (recorded) {
           yield* yieldRecorded(recorded, opts.mode)
           return
