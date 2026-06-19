@@ -1,0 +1,18 @@
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_reply4_lead","toolCallName":"renderLead","parentMessageId":"demo-reply4-msg-1"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_lead","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_lead","delta":"{\"from\": \"Sam Carter <sam@harborfreight.example>\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_lead","delta":" \"subject\": \"Question about your pricing tiers\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_lead","delta":" \"summary\": \"Sam is comparing the Starter and Growth tiers and asks what the Growth"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_lead","delta":" tier includes that Starter does not.\"}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_reply4_lead"}}
+{"step":0,"event":{"type":"TOOL_CALL_RESULT","messageId":"demo-reply4-res-1","toolCallId":"demo_reply4_lead","content":"Email surfaced to the user.","role":"tool"}}
+{"step":0,"event":{"type":"TOOL_CALL_START","toolCallId":"demo_reply4_save","toolCallName":"saveDraft","parentMessageId":"demo-reply4-msg-2"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_save","delta":""}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_save","delta":"{\"threadId\": \"demo-thread-4\","}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_save","delta":" \"body\": \"Hi Sam,\\n\\nThanks for reaching out! Happy to clarify the difference between our tiers.\\n\\n"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_save","delta":"Starter covers a single workspace and up to 5 seats. Growth adds unlimited seats, the"}}
+{"step":0,"event":{"type":"TOOL_CALL_ARGS","toolCallId":"demo_reply4_save","delta":" advanced reporting dashboards, and priority support.\\n\\nHappy to walk you through it on a quick call if useful.\\n\\nBest,\\nThe team\"}"}}
+{"step":0,"event":{"type":"TOOL_CALL_END","toolCallId":"demo_reply4_save"}}
+{"step":0,"event":{"type":"CUSTOM","name":"GATE_OPENED","value":{"gateKind":"approval","toolName":"saveDraft","toolCallId":"demo_reply4_save","proposedArtifact":{"threadId":"demo-thread-4","body":"Hi Sam,\n\nThanks for reaching out! Happy to clarify the difference between our tiers.\n\nStarter covers a single workspace and up to 5 seats. Growth adds unlimited seats, the advanced reporting dashboards, and priority support.\n\nHappy to walk you through it on a quick call if useful.\n\nBest,\nThe team"}}}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reply4-text-1","delta":"The"}}
+{"step":1,"event":{"type":"TEXT_MESSAGE_CHUNK","role":"assistant","messageId":"demo-reply4-text-1","delta":" Gmail draft has been saved."}}
