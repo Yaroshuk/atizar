@@ -16,7 +16,7 @@ _Open-source · Human-in-the-loop · TypeScript_
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-e6562e.svg)](https://www.typescriptlang.org/)
 [![Status: beta](https://img.shields.io/badge/status-beta-e6562e.svg)](#status)
 
-[Website](https://atizar.io) · [Live demo](https://atizar.io/demo) · [Quick start](#quick-start) · [Why atizar](#why-atizar) · [How it works](#how-it-works) · [Run the inbox](#run-the-inbox-yourself) · [Philosophy](docs/PHILOSOPHY.md)
+[Website](https://atizar.io) · [Live demo](https://atizar.io/demo) · [**Use the template →**](https://github.com/Yaroshuk/atizar-demo-inbox) · [Quick start](#quick-start) · [Why atizar](#why-atizar) · [How it works](#how-it-works) · [Philosophy](docs/PHILOSOPHY.md)
 
 </div>
 
@@ -58,7 +58,25 @@ The name is the Spanish verb _atizar_ — to stoke a fire that's already burning
 
 Try it instantly, nothing to install: **[atizar.io/demo](https://atizar.io/demo)**.
 
-Or run the same demo locally:
+### 👉 Build & deploy your own — start here
+
+The **[`atizar-demo-inbox`](https://github.com/Yaroshuk/atizar-demo-inbox)** template is the place to
+begin: a standalone project that installs `@atizar/*` straight from npm (nothing vendored), so you
+clone it, run the demo, then edit the workflow to make it yours.
+
+```bash
+git clone https://github.com/Yaroshuk/atizar-demo-inbox
+cd atizar-demo-inbox
+npm install
+npm run demo            # → http://localhost:5173  (zero-credential demo)
+```
+
+Then point it at your own Gmail, or build a new workflow with the `add-workflow` skill — its README
+walks you through both.
+
+---
+
+Or explore the framework **source** in this monorepo:
 
 ```bash
 yarn install --ignore-engines
