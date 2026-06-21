@@ -10,6 +10,24 @@ jobs:
   # Standard gate: the same checks run locally, on a clean Linux runner.
   build-and-test:
     runs-on: ubuntu-latest
+    # The server tests exercise a real Postgres (the dev default is Docker on
+    # :5432 with the aiworkflow role); provide the same as a service container so
+    # the full suite runs for real instead of failing on ECONNREFUSED. The test
+    # global-setup creates the aiworkflow_test DB itself.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aiworkflow
+          POSTGRES_PASSWORD: aiworkflow
+          POSTGRES_DB: aiworkflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aiworkflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
