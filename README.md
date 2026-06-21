@@ -119,6 +119,8 @@ The core knows no concrete engine. Swap the runtime without rewriting your workf
 
 The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come in → an agent **qualifies** them → it **drafts** a reply or proposes actions → a human **approves** → the server acts (saves the draft, applies the labels). It runs on both providers and is the best place to see every concept above working together.
 
+**Building your own?** The same inbox also lives as a standalone project that installs the framework straight from npm — **[atizar-demo-inbox](https://github.com/Yaroshuk/atizar-demo-inbox)**. It's pure userland (workflow policy + UI cards, no framework source vendored), so it's the template to copy when you start your own automation: `npm install`, `npm run demo`, done.
+
 ## Run the inbox yourself
 
 The demo above is zero-credential. To run the **real** inbox against your own Gmail, you supply three things: a Postgres database, an LLM provider, and a Google OAuth app. Everything is configured through environment variables — copy [`.env.example`](.env.example) to `.env.local` (gitignored) and fill only what you use.
@@ -179,15 +181,30 @@ Open the app, **Connect** your Google account (the OAuth flow stores an encrypte
 | `@atizar/server`       | The server spine: Postgres-authoritative state, the dispatch chokepoint, server-executed effects, SSE.          |
 | `@atizar/react`        | The UI: board, thread, approval gates, and the card-construction kit.                                           |
 
+## Coding-agent skills
+
+Atizar is agentic-first: the knowledge a coding agent needs to extend the framework ships **inside the packages**, right next to the code it describes — not in a separate wiki that drifts.
+
+- `@atizar/core` carries the **`add-workflow`** skill — it scaffolds a new workflow end-to-end (ids, contracts, prompts, descriptor, server bindings, cards, the drift-guard test).
+- `@atizar/integrations` carries the **`gmail`** skill, and `write-integration` rides inside the framework — connect a new service in minutes.
+
+Claude Code reads skills from `.claude/skills/`, not from `node_modules`, so a small bridge wires them up. In your project, once:
+
+```bash
+npm i -D skills-npm
+npx skills-npm setup     # adds a "prepare" hook to package.json
+```
+
+From then on, every `npm install` symlinks the skills shipped by your installed `@atizar/*` packages into `.claude/skills/`. Your coding agent then sees them — invoke `/add-workflow` and it builds the workflow with you. (This is exactly how [atizar-demo-inbox](https://github.com/Yaroshuk/atizar-demo-inbox) is set up.)
+
 ## Status
 
 **Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
 
-Recently shipped: the zero-credential demo mode (`DEMO=1`), the `@platform/* → @atizar/*` scope rename, a shared bearer token on mutation routes, and per-workflow golden-set evals. Not done yet: an npm release. APIs may still shift. Stars and feedback are very welcome.
+Recently shipped: **the npm release** — all five `@atizar/*` packages install as versioned dependencies (see [atizar-demo-inbox](https://github.com/Yaroshuk/atizar-demo-inbox) for a project that consumes them) — plus the zero-credential demo mode (`DEMO=1`), the `@platform/* → @atizar/*` scope rename, a shared bearer token on mutation routes, and per-workflow golden-set evals. APIs may still shift. Stars and feedback are very welcome.
 
 ## Roadmap
 
-- **npm release** — publish the `@atizar/*` packages so the framework installs as a versioned dependency.
 - **Workflows that learn** _(planned — not built yet)._ A direction we're designing toward: the agent improves from how you correct it, without fine-tuning. Two channels — implicit few-shot memory from past corrections, and explicit rules a distiller proposes and **you approve**. The model never changes, only the context it receives.
 
 ## Docs & community
