@@ -217,6 +217,14 @@ Recently shipped: **the npm release** — all five `@atizar/*` packages install 
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Atizar is agentic-first by design: the skills shipped inside each package guide you — and your coding agent — when you extend the framework or add an integration. That's the intended way in.
 
+## Contact & feedback
+
+Feedback, ideas, and proposals are very welcome — reach out any time:
+
+- **Email:** [yaroshukmail@gmail.com](mailto:yaroshukmail@gmail.com)
+- **Telegram:** [@yaroshuk](https://t.me/yaroshuk)
+- **LinkedIn:** [in/syaroshuk](https://www.linkedin.com/in/syaroshuk)
+
 ## License
 
 [MIT](LICENSE) © Atizar contributors. Security disclosures: [SECURITY.md](SECURITY.md).
