@@ -67,7 +67,7 @@ Three laws the whole pattern rests on:
 Read the public-SDK signatures you will call:
 
 - `defineAgent` / `defineWorkflow` / `definePrompt` — from `@atizar/core`.
-- `ServerBindingLike` / `WorkflowServerLike` — from `@atizar/server` (`createServer.ts`).
+- `ServerBindingLike` — from `@atizar/server` (`createServer.ts`).
 - `scope` / `AgentMeta` / `RenderSpec` / `HitlSpec` — from `@atizar/react`.
 - Any integration you plan to reuse — from `@atizar/integrations`.
 
@@ -290,7 +290,8 @@ export const myWorkflowServer = (): ServerBindingLike[] => [
     agentId: qualifierAgent.id,
     prompts: qualifierPrompt,
     // Fully-qualified MCP tool names: mcp__<server>__<toolName>
-    allowedTools: ['mcp__crm__get_lead', 'mcp__inbox__renderLead', 'mcp__inbox__submitOutcome', 'mcp__inbox__dispatch_worker'],
+    // 'myapp' = your app's stdio MCP server name
+    allowedTools: ['mcp__crm__get_lead', 'mcp__myapp__renderLead', 'mcp__myapp__submitOutcome', 'mcp__myapp__dispatch_worker'],
     effects: {
       submitOutcome: async (form) => {
         if (isDemo()) return { ok: true, outcomeId: 'demo-1' }
@@ -331,6 +332,8 @@ Key rules for `server.ts`:
 import type { AgentMeta, RenderSpec, HitlSpec } from '@atizar/react'
 import { MY_WF_TOOLS as t } from './tools.js'
 import { z } from 'zod'
+import { LeadCard } from './components/LeadCard.js' // your card component
+import { OutcomeDialog } from './components/OutcomeDialog.js' // your approval dialog
 
 export const myWorkflowMeta: Record<string, AgentMeta> = {
   qualifier: { subtitle: 'Qualifies inbound leads', iconName: 'user-check', intro: 'Starting qualification…' },
@@ -444,6 +447,7 @@ const VALID_AGENTS = new Set(Object.values(MY_WF_AGENTS))
 
 function collectProse(strategy: { buildFirst?: Function; buildResume?: Function }): string {
   const parts: string[] = []
+  // definePrompt({onStart,...}) returns a strategy with buildFirst()/buildResume() — the test inspects those.
   try { parts.push(String(strategy.buildFirst?.({ messages: [], context: [] }) ?? '')) } catch {}
   try { parts.push(String(strategy.buildResume?.({}, {}) ?? '')) } catch {}
   return parts.join(' ')

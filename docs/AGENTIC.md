@@ -240,7 +240,8 @@ shipped inside its package:
 - ❌ `add-integration` (in `@atizar/integrations`) — the flagship; proves "Claude writes your
   integration in a minute, guided by the skill". (Its L1 dev twin `write-integration` is BUILT —
   see Phase 1 #3; this L2 twin is the lighter userland-facing rewrite.)
-- ❌ `add-workflow` / `add-agent` (in `@atizar/core` or `@atizar/server` post-extraction).
+- ✅ `add-workflow` (in `@atizar/core`) — BUILT (2026-06-21). See `packages/core/skills/add-workflow/SKILL.md`.
+- ❌ `add-agent` (in `@atizar/core` or `@atizar/server` post-extraction).
 - ❌ `add-render-card` (in `@atizar/react` post-extraction) — register a custom card on the
   render registry; `ThreadResultsContext`/`useThreadResult` for data tools.
 - ❌ `add-provider` (in `@atizar/providers`) — conformance suite as the contract.

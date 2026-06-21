@@ -6,7 +6,6 @@ this workflow and how do I run it."
 
 ---
 
-```markdown
 # <Label> workflow
 
 <!-- One sentence: what this workflow automates and what it decides or produces. -->
@@ -61,4 +60,3 @@ this workflow and how do I run it."
 <!-- List every approval tool (from defineAgent.approvals). -->
 <!-- "Effect when approved" is what ServerBinding.effects[toolName] does. -->
 <!-- If there is no gate (no approval tool), remove this section. -->
-```
