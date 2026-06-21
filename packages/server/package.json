@@ -31,11 +31,18 @@
     "@ag-ui/client": "^0.0.55",
     "@atizar/core": "^0.1.0",
     "@hono/node-server": "^2.0.4",
-    "@mastra/core": "^1.41.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.23",
     "postgres": "^3.4.9",
     "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "@mastra/core": "^1.41.0"
+  },
+  "peerDependenciesMeta": {
+    "@mastra/core": {
+      "optional": true
+    }
   },
   "optionalDependencies": {
     "@electric-sql/pglite": "^0.2.0"

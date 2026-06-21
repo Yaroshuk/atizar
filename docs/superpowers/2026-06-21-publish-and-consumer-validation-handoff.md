@@ -11,26 +11,51 @@ This session hit a string of issues that a consumer would also hit: a hard-pinne
 for composite declarations; `@atizar/server` eagerly loading `@mastra/core`. A clean-project smoke
 test + CI catches this whole class **before** anyone outside hits it.
 
-## Current state (2026-06-21)
+## Current state (updated 2026-06-21 — Phase 1 + 2 DONE on `chore/publish-prep-readme`)
 - **Live demo:** https://atizar.io on Fly (`feat/demo-site`, `DEMO=1`, one always-on 1GB machine). Works.
-- **PR #2** (`feat/framework-extract` → master, https://github.com/Yaroshuk/atizar/pull/2): the generic
-  framework changes (deploy seam: staticDir/PORT/bind-0.0.0.0; multi-tenant `sessionId` scoping;
-  Mastra-free boot via the `@atizar/server/mastra` subpath; `AppHeader` logoSrc/brandHref; `session.ts`;
-  recordReplay `keyOf` seam). **Merge this FIRST** — the packages you publish must include it.
-- **Open e2e fix** (separate handoff: `docs/superpowers/2026-06-19-e2e-cassette-decouple-handoff.md`):
-  `yarn ui` is red after the 2-reply cassette change. Get it green before/with publish.
-- **Package readiness today:**
-  - `@atizar/react` — HAS a real build (Vite lib mode → `dist/index.js` ESM + rolled-up `.d.ts` +
-    `react.css` with the `--atz-*` tokens). Publishable shape; just remove `private`.
-  - `@atizar/core`, `@atizar/providers`, `@atizar/server`, `@atizar/integrations` — `exports` point at
-    raw `./src/*.ts`, `private: true`, **no build**. Need build + packaging.
-- The monorepo consumes `./src` via the **`development` export condition**
-  (`customConditions: ["development"]` in `tsconfig.base.json`); a normal consumer (no dev condition)
-  must resolve `dist`. Preserve this trick per package.
+- **PR #2 — MERGED.** `master` is at `fe083bd Merge pull request #2`. The generic framework changes
+  (deploy seam staticDir/PORT/0.0.0.0; multi-tenant `sessionId`; Mastra-free boot via
+  `@atizar/server/mastra`; `AppHeader` logoSrc/brandHref; `session.ts`; recordReplay `keyOf`) are all
+  in master.
+- **e2e fix — DONE** (`ab255c2`): `yarn ui` is green under the 2-reply cassettes. The
+  `2026-06-19-e2e-cassette-decouple-handoff.md` is closed.
+- **Phase 1 (packaging) — DONE** (`706af61`): all 5 packages `0.1.0`, `private:false`, MIT,
+  `files:["dist"]`, internal deps `^0.1.0`. `core`/`providers`/`server`/`react` build via Vite lib mode
+  → `dist/` (ESM + rolled-up `.d.ts`; react also ships `react.css`). `integrations` ships compiled
+  `src/**/*.mjs`+`.d.ts`. Root `build:lib` script. The `development` export condition (src in monorepo,
+  dist for consumers) is preserved per package — keep it.
+- **README polish — DONE** (`706af61`/`0491cd3`/`bdb04cf`): atizar.io links, self-host section,
+  runnable Quick start.
+- **Phase 2 (consumer smoke test) — DONE this session** (see the block below). A fresh external project
+  built + ran the full approve→executed→done pipeline from packed tarballs; surfaced + fixed two real
+  packaging bugs.
+
+### Phase 2 results + the two packaging fixes (committed on `chore/publish-prep-readme`)
+A throwaway consumer at `/private/tmp/atizar-consumer` (one mock-provider workflow, no monorepo paths)
+installed the 5 tarballs and proved: tarball cross-resolution of `@atizar/*`, `tsc --noEmit` from
+`dist/*.d.ts`, `vite build` of the client (react dist + the 64 kB CSS bundle in a foreign Vite), server
+boot in DEMO (PGlite), and the full `dispatch → gate → approve → executed saveDraft → done` path.
+Two bugs found and fixed:
+- **Migrations weren't shipped.** The bundler doesn't emit the drizzle SQL + `meta/_journal.json`, so
+  `createServer({ start:true })` crashed at boot (`Can't find meta/_journal.json`). Fix: a
+  `copyMigrations` Vite plugin copies `src/db/migrations` → `dist/migrations` (resolved at
+  `dirname(import.meta.url)/migrations` = `dist/migrations` after bundling). `packages/server/vite.config.ts`.
+- **Mastra forced on every consumer.** `@mastra/core`/`@mastra/pg`/`@ai-sdk/anthropic` were hard deps,
+  and `@atizar/providers`' main index statically re-exported `mastraRunner` (which imports `@mastra/*` as
+  runtime values) — so even a mock consumer crashed at import / pulled all of Mastra. Fix: those are now
+  optional `peerDependencies`, and the Mastra provider+runner moved behind a new
+  **`@atizar/providers/mastra`** subpath (mirrors `@atizar/server/mastra`); the main entry is Mastra-free.
+  A mock/claude-cli consumer no longer installs `@mastra` at all; `@electric-sql/pglite` auto-resolves as
+  an optional dep. Files: `packages/providers/{package.json,vite.config.ts,src/index.ts,src/mastra.ts}`,
+  `packages/server/package.json`, `apps/inbox/server/providers.ts`.
+- **Note:** building requires Node ≥20.19/22 (vite8/rolldown native binding); on Node 20.14 the binding
+  is skipped (environment, not a defect). The smoke ran under Node 22.22 via nvm.
+- Green gate after the fixes: typecheck ✅, test 734 (3 known flaky timeouts under load — green in
+  isolation) ✅, lint ✅, format (changed files) ✅.
 
 ## Work — in order
 
-### Phase 1 — build steps for the 4 unbuilt packages
+### Phase 1 — build steps for the 4 unbuilt packages — ✅ DONE (`706af61`)
 Mirror `@atizar/react` (`packages/react/vite.config.ts` + its `package.json`). For each of
 `core`, `providers`, `server`, `integrations`:
 - Add a build (Vite lib mode, or `tsc`) → `dist/index.js` (ESM) + rolled-up `dist/index.d.ts`.
@@ -48,7 +73,7 @@ Mirror `@atizar/react` (`packages/react/vite.config.ts` + its `package.json`). F
   `next`/`beta` until stable. Confirm with the user.
 - Build order = dependency order: `core` first; `providers`/`react`/`integrations`/`server` depend on it.
 
-### Phase 2 — local consumer smoke test (do this BEFORE `npm publish`)
+### Phase 2 — local consumer smoke test (do this BEFORE `npm publish`) — ✅ DONE (see Current state)
 The key validation; uses `npm pack` so nothing hits npm until it works.
 1. Build all packages (`yarn build:web` builds react + app; add the new package builds to a
    `build:packages` script).

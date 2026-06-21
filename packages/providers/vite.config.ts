@@ -12,6 +12,7 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
         ids: resolve(__dirname, 'src/provider-ids.ts'),
+        mastra: resolve(__dirname, 'src/mastra.ts'),
       },
       formats: ['es'],
     },

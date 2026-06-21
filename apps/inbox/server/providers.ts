@@ -1,11 +1,7 @@
 import { defineProviders, type ProviderRegistry, type ProviderFactory } from '@atizar/core'
-import {
-  createMockInboxProvider,
-  createClaudeCliProvider,
-  createMastraProvider,
-  makeMastraRunner,
-  PROVIDERS,
-} from '@atizar/providers'
+import { createMockInboxProvider, createClaudeCliProvider, PROVIDERS } from '@atizar/providers'
+// Mastra-backed provider + runner live behind the subpath so the main entry stays Mastra-free.
+import { createMastraProvider, makeMastraRunner } from '@atizar/providers/mastra'
 import { claudeSpawn } from './claude-spawn.js'
 import { databaseUrl } from '@atizar/server'
 import {
