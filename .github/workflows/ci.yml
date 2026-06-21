@@ -1,0 +1,37 @@
+name: CI
+
+# Run on every push to master and on every pull request.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  # Standard gate: the same checks run locally, on a clean Linux runner.
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # vite8/rolldown needs >= 20.19; match what a consumer uses
+          cache: yarn
+      - run: yarn install --frozen-lockfile --ignore-engines
+      - run: yarn build:web
+      - run: yarn typecheck
+      - run: yarn test
+      - run: yarn lint
+      - run: yarn format:check
+
+  # Consumer smoke test: prove the @atizar/* packages install + build + run
+  # from a clean outside project (no monorepo paths). This is scripts/check-packages.sh.
+  consumer-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile --ignore-engines
+      - run: bash scripts/check-packages.sh
