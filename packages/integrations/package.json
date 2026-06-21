@@ -1,11 +1,12 @@
 {
   "name": "@atizar/integrations",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "license": "MIT",
   "files": [
     "src/**/*.mjs",
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "skills"
   ],
   "publishConfig": {
     "access": "public"
