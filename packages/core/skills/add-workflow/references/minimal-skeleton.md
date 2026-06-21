@@ -56,15 +56,10 @@ export const workflowDescriptors: WorkflowDescriptor[] = []
 
 ```ts
 import type { WorkflowDescriptor } from '@atizar/core'
-import type { ServerBindingLike } from '@atizar/server'
-
-export type WorkflowServer = {
-  descriptor: WorkflowDescriptor
-  bindings: (workflowId: string) => ServerBindingLike[]
-}
+import type { WorkflowServerLike } from '@atizar/server'
 
 // Add a workflow: append { descriptor, bindings: yourWorkflowServer } here.
-export const workflowServers: WorkflowServer[] = []
+export const workflowServers: WorkflowServerLike[] = []
 ```
 
 ---
@@ -97,11 +92,18 @@ listening. The provider registry tells the framework which factory to call for e
 declared in your agent descriptors.
 
 ```ts
-import { createServer, buildAgentProvider, isDemo, atizarEnv, deriveConnectionList } from '@atizar/server'
-import { defineProviders, type ProviderRegistry } from '@atizar/core'
+import { createServer, buildAgentProvider, deriveConnectionList } from '@atizar/server'
+import { defineProviders, type ProviderRegistry, type ClaudeSpawn } from '@atizar/core'
 import { createClaudeCliProvider, PROVIDERS } from '@atizar/providers'
 import { workflowServers } from './workflows.js'
 import { workflowDescriptors } from '../workflows/index.js'
+
+// (need demo gating or env? import { isDemo, atizarEnv } from '@atizar/server')
+
+// TODO: replace with a real spawn — see makeClaudeSpawn from '@atizar/server'
+const spawn: ClaudeSpawn = () => {
+  throw new Error('spawn not configured — wire makeClaudeSpawn (see @atizar/server)')
+}
 
 // Minimal provider registry: claude-cli for dev; add a Mastra factory here when PROVIDER=mastra.
 const providerRegistry: ProviderRegistry = defineProviders({
@@ -112,8 +114,7 @@ const providerRegistry: ProviderRegistry = defineProviders({
       surfaceTools: config.surfaceTools,
       allowedTools: config.allowedTools,
       prompts: config.prompts,
-      // Inject a real spawn here; replace with makeClaudeSpawn(...) from @atizar/server.
-      spawn: async () => { throw new Error('spawn not configured') },
+      spawn,
     }),
 })
 
