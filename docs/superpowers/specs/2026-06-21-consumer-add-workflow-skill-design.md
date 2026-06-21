@@ -62,18 +62,22 @@ added later from the same files without rework.
 
 ---
 
-## 2. Starter assumption (first cut) + flexibility
+## 2. Skeleton detection + bootstrap
 
-For the first version the skill assumes the **demo-app layout** (`apps/inbox`-style): a server entry that calls
-`createServer`, a client that mounts the board, and the **three aggregators** at known paths
-(`workflows/index.ts`, `server/workflows.ts`, `client/workflows.ts`). Fixed paths = the skill knows exactly
-where to write files and how to wire, which keeps it simple and deterministic.
+The skill no longer assumes a pre-existing demo-app layout. **Stage 0 detects whether the skeleton exists**
+(three aggregators + a `createServer`-based server entry + a `WorkflowsProvider`-based client entry). If any
+aggregator is missing, **Stage 0b bootstraps the full minimal skeleton inline** — five files derived from the
+public SDK, with the real `createServer` / `WorkflowsProvider` shapes — and then proceeds as normal.
 
-**Flexibility (deliberately deferred, not precluded):** the fixed layout is a *default*, not a cage. Future
-varied workflows are just different file sets inside their own `workflows/<id>/` folder — same skill shape. If a
-consumer's layout differs, a later version can ask where things live. A standalone clean starter-template repo
-is also deferred. The first cut targets the demo-app layout; the skill must `log`/state this assumption so a
-consumer on a different layout isn't silently misled.
+If the skeleton already exists the bootstrap is skipped entirely; Stage 0 simply records the actual paths and
+moves on.
+
+The skeleton templates live in `references/minimal-skeleton.md` (co-located with the skill). They are the
+authoritative minimal starting point for a consumer project and must stay in sync with the public SDK.
+
+**Flexibility (deliberately deferred, not precluded):** the fixed three-aggregator layout is a *default*, not a
+cage. Future varied workflows are just different file sets inside their own `workflows/<id>/` folder — same
+skill shape. If a consumer's layout differs from the defaults, a later version can ask where things live.
 
 ---
 
@@ -84,10 +88,17 @@ TDD-red-first, browser-verified, ends with self-improvement. Lighter than the 13
 named stages. **Self-contained** — every stage's procedure is inlined (no superpowers dependency).
 
 - **Stage 0 — Preflight (probe, don't ask).** Read the public-SDK signatures the skill will call
-  (`defineWorkflow`/`defineAgent`/`definePrompt` from `@atizar/core`; `ServerBinding`/effects from
-  `@atizar/server`; render/HITL specs from `@atizar/react`) and one worked example. Confirm the project is in
-  the assumed starter layout (the three aggregators exist). **Read the local self-improvement notes file**
-  (§5) so accumulated learnings inform this run.
+  (`defineWorkflow`/`defineAgent`/`definePrompt` from `@atizar/core`; `ServerBindingLike`/`createServer`/
+  `buildAgentProvider`/`deriveConnectionList` from `@atizar/server`; `WorkflowsProvider`/`WorkflowsConfig`/
+  render/HITL specs from `@atizar/react`). **Read the local self-improvement notes file** (§5) so accumulated
+  learnings inform this run. Then **detect the skeleton**: check whether the three aggregators
+  (`workflows/index.ts`, `server/workflows.ts`, `client/src/workflows.ts`) plus a `createServer`-calling server
+  entry and a `WorkflowsProvider`-mounting client entry exist.
+
+  - **If PRESENT** → record actual paths; proceed.
+  - **If MISSING** → run Stage 0b: bootstrap the minimal skeleton from `references/minimal-skeleton.md`
+    (five files derived from the public SDK only), confirm `typecheck` is clean, tell the user what was
+    created, then proceed.
 
 - **Stage 1 — Intent [GATE].** In ONE message, confirm with the user: workflow **id / label / icon**; the
   **agent roster** (which agent is the `input` — the human-started entry — and which are `worker`s); each
@@ -160,7 +171,8 @@ named stages. **Self-contained** — every stage's procedure is inlined (no supe
 
 ## 6. Out of scope / deferred (YAGNI)
 
-- A standalone clean **starter-template repo** (first cut targets the demo-app layout).
+- A standalone clean **starter-template repo** (the skill now bootstraps inline — a polished standalone repo is
+  a separate, deferred convenience for consumers who want a git-clone starting point rather than the skill).
 - The **plugin + marketplace** distribution channel (same publisher files; add later if needed).
 - **Layout flexibility** beyond the assumed three-aggregator layout (a later version can ask where files go).
 - A separate **"explain my workflows" query-skill** (the co-located README + Claude reading it covers "what is

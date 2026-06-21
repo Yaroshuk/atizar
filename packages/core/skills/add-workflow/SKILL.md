@@ -13,14 +13,14 @@ superpowers or external plugins — stages are inlined below).
 `@atizar/server`, `@atizar/react`, and optionally `@atizar/integrations`. You are NOT working
 inside the framework repo itself.
 
-**Layout assumption (first-cut):** this skill assumes the **demo-app three-aggregator layout**:
+**Layout:** this skill uses the **three-aggregator layout**:
 - `workflows/<id>/` — the per-workflow module (you create this).
 - `workflows/index.ts` — descriptor aggregator.
 - `server/workflows.ts` — server-binding aggregator.
 - `client/src/workflows.ts` — client render/HITL aggregator.
 
-If your layout differs, adapt the aggregator-wiring steps at Stage 3 accordingly and leave a note
-at Stage 7 so future runs adapt faster.
+If these files do not exist yet, Stage 0b bootstraps them for you. If your existing layout differs,
+adapt the aggregator-wiring steps at Stage 3 accordingly and leave a note at Stage 7.
 
 ---
 
@@ -67,20 +67,68 @@ Three laws the whole pattern rests on:
 Read the public-SDK signatures you will call:
 
 - `defineAgent` / `defineWorkflow` / `definePrompt` — from `@atizar/core`.
-- `ServerBindingLike` — from `@atizar/server` (`createServer.ts`).
-- `scope` / `AgentMeta` / `RenderSpec` / `HitlSpec` — from `@atizar/react`.
+- `ServerBindingLike` / `createServer` / `buildAgentProvider` / `deriveConnectionList` — from `@atizar/server`.
+- `scope` / `WorkflowsProvider` / `WorkflowsConfig` / `AgentMeta` / `RenderSpec` / `HitlSpec` — from `@atizar/react`.
 - Any integration you plan to reuse — from `@atizar/integrations`.
-
-Check whether the three aggregators exist at the expected paths (`workflows/index.ts`,
-`server/workflows.ts`, `client/src/workflows.ts`). If they are at different paths, note the actual
-paths before Stage 3 so wiring is accurate.
 
 **Read the local self-improvement notes**, if they exist, at
 `.claude/atizar/add-workflow-notes.md`. Past runs may have left notes about this project's layout,
 credential sources, or aggregator paths that will save time now. If the file does not exist, proceed
 — it will be created at Stage 7 if something systemic surfaces.
 
-Do NOT ask the user anything in this stage. Probe the code.
+**Detect the skeleton.** Check whether these five items exist:
+
+| Item | What to look for |
+|---|---|
+| `workflows/index.ts` | exports `workflowDescriptors` |
+| `server/workflows.ts` | exports `workflowServers` |
+| `client/src/workflows.ts` (or `client/workflows.ts`) | exports `workflowsConfig` |
+| Server entry | any `.ts` under `server/` that imports `createServer` from `@atizar/server` |
+| Client entry | any `.tsx` under `client/` that imports `WorkflowsProvider` from `@atizar/react` |
+
+If **all five exist** → note the actual paths and proceed to Stage 0c.
+
+If **any of the top three aggregators are missing** → run Stage 0b (bootstrap the full skeleton
+as a unit; a partial skeleton is risky). Then proceed to Stage 0c.
+
+---
+
+## Stage 0b — Bootstrap skeleton (only if aggregators are absent)
+
+Create the five files below. Use the exact content from
+[`references/minimal-skeleton.md`](references/minimal-skeleton.md) — it has the real template for
+each file derived from the public SDK. Do NOT copy demo-app internal paths. Do NOT invent API
+shapes: if `createServer`'s signature or `WorkflowsProvider`'s props are unclear, read them from
+the installed `@atizar/server` and `@atizar/react` packages before writing.
+
+Files to create (relative to the consumer project root):
+
+1. `workflows/index.ts` — empty `workflowDescriptors = []` export.
+2. `server/workflows.ts` — empty `workflowServers = []` export with the `WorkflowServer` type.
+3. `client/src/workflows.ts` — empty `workflowsConfig` export with `WorkflowsProvider`-compatible
+   shape.
+4. `server/index.ts` (or `server/server.ts` if an entry already exists under a different name) —
+   calls `createServer({ workflowServers, providerRegistry, buildProvider, ... })`. Set up a minimal
+   `claude-cli` provider registry; include a `spawn` placeholder with a clear TODO comment.
+5. `client/src/main.tsx` (or adapt the existing entry) — mounts `<WorkflowsProvider config={workflowsConfig}>` wrapping the consumer's board layout. Note: `@atizar/react` does NOT export a
+   turnkey `BoardApp`; the consumer composes their own chrome from the exported primitives
+   (`PipelineColumn`, `AgentCard`, `AgentModal`, `WorkflowSwitcher`, …).
+
+After creating these files, confirm `yarn typecheck` (or `tsc --noEmit`) is clean before Stage 1.
+If it is not clean, fix type errors before proceeding — a broken skeleton produces confusing errors
+in later stages.
+
+Tell the user what was created and that they will need to wire a real `spawn` (for `claude-cli`)
+or add `ANTHROPIC_API_KEY` (for `mastra`) before Stage 5.
+
+---
+
+## Stage 0c — Paths confirmed
+
+Record the actual paths for the three aggregators (they may differ from the defaults if the project
+uses a monorepo layout or a `src/` prefix). These paths are used verbatim in Stage 3i.
+
+Do NOT ask the user anything in Stage 0/0b/0c. Probe the code.
 
 ---
 
@@ -585,4 +633,5 @@ package.
 
 ## References
 
+- [`references/minimal-skeleton.md`](references/minimal-skeleton.md) — minimal skeleton templates (empty aggregators, server entry, client entry) used by Stage 0b when bootstrapping a fresh project.
 - [`references/workflow-readme-template.md`](references/workflow-readme-template.md) — the co-located README template (What / Agents&roles / How-to-run / Credentials / Gates).
