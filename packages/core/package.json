@@ -8,6 +8,9 @@
     "dist",
     "skills"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "vite build"
   },

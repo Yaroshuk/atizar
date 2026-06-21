@@ -7,6 +7,9 @@
     "src/**/*.mjs",
     "src/**/*.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     "./gmail/auth": {
       "types": "./src/gmail/auth.d.ts",
