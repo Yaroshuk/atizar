@@ -17,10 +17,10 @@ this workflow and how do I run it."
 
 ## Agents & roles
 
-| Agent | Role | Description |
-|---|---|---|
-| `<agent-id>` | Input (startable) | <What it does: reads source, qualifies, dispatches> |
-| `<agent-id>` | Worker | <What it does: handles one item dispatched by the input> |
+| Agent        | Role              | Description                                              |
+| ------------ | ----------------- | -------------------------------------------------------- |
+| `<agent-id>` | Input (startable) | <What it does: reads source, qualifies, dispatches>      |
+| `<agent-id>` | Worker            | <What it does: handles one item dispatched by the input> |
 
 <!-- Mark exactly one agent as "Input (startable)" — it is the agent the human STARTs. -->
 <!-- All others are workers spawned by dispatch. -->
@@ -42,8 +42,8 @@ this workflow and how do I run it."
 
 ## Credentials / integrations
 
-| Service | Env var | Where to get it |
-|---|---|---|
+| Service        | Env var                  | Where to get it        |
+| -------------- | ------------------------ | ---------------------- |
 | <Service name> | `ATIZAR_<SERVICE>_TOKEN` | <Link or instructions> |
 
 <!-- List every ATIZAR_* env var the workflow reads. Copy the var names from server.ts effects. -->
@@ -53,8 +53,8 @@ this workflow and how do I run it."
 
 ## Gates (human approval points)
 
-| Gate | What the human approves | Effect when approved |
-|---|---|---|
+| Gate          | What the human approves            | Effect when approved                              |
+| ------------- | ---------------------------------- | ------------------------------------------------- |
 | `<tool-name>` | <What the human sees and confirms> | <What the server executes: API call, write, etc.> |
 
 <!-- List every approval tool (from defineAgent.approvals). -->

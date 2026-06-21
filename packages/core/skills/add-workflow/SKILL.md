@@ -14,6 +14,7 @@ superpowers or external plugins — stages are inlined below).
 inside the framework repo itself.
 
 **Layout:** this skill uses the **three-aggregator layout**:
+
 - `workflows/<id>/` — the per-workflow module (you create this).
 - `workflows/index.ts` — descriptor aggregator.
 - `server/workflows.ts` — server-binding aggregator.
@@ -28,25 +29,25 @@ adapt the aggregator-wiring steps at Stage 3 accordingly and leave a note at Sta
 
 A workflow has two halves, kept strictly separate:
 
-| Half | What | Law |
-|---|---|---|
-| **Structure** | `defineWorkflow` + `defineAgent` in `descriptor.ts` | Pure data — no turn prose, no tool literals |
-| **Words** | `definePrompt` blocks in `prompts.ts` | Turn-only — no agent identity, every tool via a const |
+| Half          | What                                                | Law                                                   |
+| ------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| **Structure** | `defineWorkflow` + `defineAgent` in `descriptor.ts` | Pure data — no turn prose, no tool literals           |
+| **Words**     | `definePrompt` blocks in `prompts.ts`               | Turn-only — no agent identity, every tool via a const |
 
 File map inside `workflows/<id>/`:
 
-| File | Holds |
-|---|---|
-| `ids.ts` | Workflow id, agent-id map, roles — all `as const` |
-| `contracts.ts` | Zod schemas for handoff/dispatch payloads |
-| `tools.ts` | Tool-name const map (read tools included) |
-| `cards.ts` | Card/component-name const map |
-| `prompts.ts` | `definePrompt` blocks — turn-only prose |
-| `descriptor.ts` | `defineAgent` + `defineWorkflow` — structure only |
-| `server.ts` | `ServerBinding[]` factory — prompts, allow-list, effects, health |
-| `client.tsx` | `AgentMeta` + render/HITL specs for this workflow's cards |
-| `*.test.ts` | Drift-guard + behavior tests (drift guard is mandatory) |
-| `README.md` | Co-located doc — what/how-to-run/credentials/gates |
+| File            | Holds                                                            |
+| --------------- | ---------------------------------------------------------------- |
+| `ids.ts`        | Workflow id, agent-id map, roles — all `as const`                |
+| `contracts.ts`  | Zod schemas for handoff/dispatch payloads                        |
+| `tools.ts`      | Tool-name const map (read tools included)                        |
+| `cards.ts`      | Card/component-name const map                                    |
+| `prompts.ts`    | `definePrompt` blocks — turn-only prose                          |
+| `descriptor.ts` | `defineAgent` + `defineWorkflow` — structure only                |
+| `server.ts`     | `ServerBinding[]` factory — prompts, allow-list, effects, health |
+| `client.tsx`    | `AgentMeta` + render/HITL specs for this workflow's cards        |
+| `*.test.ts`     | Drift-guard + behavior tests (drift guard is mandatory)          |
+| `README.md`     | Co-located doc — what/how-to-run/credentials/gates               |
 
 Three laws the whole pattern rests on:
 
@@ -78,13 +79,13 @@ credential sources, or aggregator paths that will save time now. If the file doe
 
 **Detect the skeleton.** Check whether these five items exist:
 
-| Item | What to look for |
-|---|---|
-| `workflows/index.ts` | exports `workflowDescriptors` |
-| `server/workflows.ts` | exports `workflowServers` |
-| `client/src/workflows.ts` (or `client/workflows.ts`) | exports `workflowsConfig` |
-| Server entry | any `.ts` under `server/` that imports `createServer` from `@atizar/server` |
-| Client entry | any `.tsx` under `client/` that imports `WorkflowsProvider` from `@atizar/react` |
+| Item                                                 | What to look for                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `workflows/index.ts`                                 | exports `workflowDescriptors`                                                    |
+| `server/workflows.ts`                                | exports `workflowServers`                                                        |
+| `client/src/workflows.ts` (or `client/workflows.ts`) | exports `workflowsConfig`                                                        |
+| Server entry                                         | any `.ts` under `server/` that imports `createServer` from `@atizar/server`      |
+| Client entry                                         | any `.tsx` under `client/` that imports `WorkflowsProvider` from `@atizar/react` |
 
 If **all five exist** → note the actual paths and proceed to Stage 0c.
 
@@ -281,7 +282,7 @@ export { LeadRefSchema, type LeadRef } from './contracts.js'
 export const qualifierAgent = defineAgent({
   id: a.qualifier,
   name: 'QUALIFIER',
-  provider: 'claude-cli',           // or your registered provider name
+  provider: 'claude-cli', // or your registered provider name
   instructions: 'You qualify inbound leads. Be concise and professional.',
   tools: [t.renderLead, t.submitOutcome, t.dispatch_worker],
   readonly: [t.get_lead],
@@ -290,7 +291,7 @@ export const qualifierAgent = defineAgent({
   dispatches: [t.dispatch_worker],
   renders: { [t.renderLead]: c.LeadCard, [t.submitOutcome]: c.OutcomeDialog },
   handoffs: [a.worker],
-  maxInstances: 1,                  // singleton input agent
+  maxInstances: 1, // singleton input agent
 })
 
 export const workerAgent = defineAgent({
@@ -308,7 +309,8 @@ export const myWorkflow = defineWorkflow({
   id: MY_WF_ID,
   label: 'Lead qualify',
   iconName: 'user-check',
-  prompt: 'You are part of a lead-qualification automation. Be concise. The human approves every outward action.',
+  prompt:
+    'You are part of a lead-qualification automation. Be concise. The human approves every outward action.',
   agents: [
     { agent: qualifierAgent, role: ROLES.input },
     { agent: workerAgent, role: ROLES.worker },
@@ -339,11 +341,19 @@ export const myWorkflowServer = (): ServerBindingLike[] => [
     prompts: qualifierPrompt,
     // Fully-qualified MCP tool names: mcp__<server>__<toolName>
     // 'myapp' = your app's stdio MCP server name
-    allowedTools: ['mcp__crm__get_lead', 'mcp__myapp__renderLead', 'mcp__myapp__submitOutcome', 'mcp__myapp__dispatch_worker'],
+    allowedTools: [
+      'mcp__crm__get_lead',
+      'mcp__myapp__renderLead',
+      'mcp__myapp__submitOutcome',
+      'mcp__myapp__dispatch_worker',
+    ],
     effects: {
       submitOutcome: async (form) => {
         if (isDemo()) return { ok: true, outcomeId: 'demo-1' }
-        const cred = await resolveCredential({ integration: 'crm', connectionId: atizarEnv.connection() })
+        const cred = await resolveCredential({
+          integration: 'crm',
+          connectionId: atizarEnv.connection(),
+        })
         if (!cred) return { error: 'CRM not connected' }
         // call your integration function with the approved form args
         return { ok: true, outcomeId: String(form.outcomeId ?? '') }
@@ -353,8 +363,13 @@ export const myWorkflowServer = (): ServerBindingLike[] => [
       {
         name: 'crm',
         check: async () => {
-          const cred = await resolveCredential({ integration: 'crm', connectionId: atizarEnv.connection() })
-          return cred ? { ok: true } : { ok: false, hint: 'Set ATIZAR_CRM_TOKEN and connect via the header' }
+          const cred = await resolveCredential({
+            integration: 'crm',
+            connectionId: atizarEnv.connection(),
+          })
+          return cred
+            ? { ok: true }
+            : { ok: false, hint: 'Set ATIZAR_CRM_TOKEN and connect via the header' }
         },
       },
     ],
@@ -368,6 +383,7 @@ export const myWorkflowServer = (): ServerBindingLike[] => [
 ```
 
 Key rules for `server.ts`:
+
 - `allowedTools` is the **fully-qualified MCP tool name** (`mcp__<server>__<toolName>`). This is the
   single-point boundary — a tool not listed here cannot reach the agent.
 - `effects` keys match the `approvals` in the descriptor, one-to-one.
@@ -384,7 +400,11 @@ import { LeadCard } from './components/LeadCard.js' // your card component
 import { OutcomeDialog } from './components/OutcomeDialog.js' // your approval dialog
 
 export const myWorkflowMeta: Record<string, AgentMeta> = {
-  qualifier: { subtitle: 'Qualifies inbound leads', iconName: 'user-check', intro: 'Starting qualification…' },
+  qualifier: {
+    subtitle: 'Qualifies inbound leads',
+    iconName: 'user-check',
+    intro: 'Starting qualification…',
+  },
   worker: { subtitle: 'Carries out approved outcomes', iconName: 'check', intro: 'Executing…' },
 }
 
@@ -415,13 +435,15 @@ card — render/HITL resolution is scoped per workflow.
 Add one entry to each:
 
 **`workflows/index.ts`**
+
 ```ts
 import { myWorkflow } from './my-workflow/descriptor.js'
 // add to the workflowDescriptors array:
-export const workflowDescriptors: WorkflowDescriptor[] = [/* existing */, myWorkflow]
+export const workflowDescriptors: WorkflowDescriptor[] = [, /* existing */ myWorkflow]
 ```
 
 **`server/workflows.ts`**
+
 ```ts
 import { myWorkflow } from '../workflows/my-workflow/descriptor.js'
 import { myWorkflowServer } from '../workflows/my-workflow/server.js'
@@ -430,6 +452,7 @@ import { myWorkflowServer } from '../workflows/my-workflow/server.js'
 ```
 
 **`client/src/workflows.ts`**
+
 ```ts
 import { scope } from '@atizar/react'
 import { myWorkflowMeta, myWorkflowRenders, myWorkflowHitl } from '../../workflows/my-workflow/client.js'
@@ -496,8 +519,12 @@ const VALID_AGENTS = new Set(Object.values(MY_WF_AGENTS))
 function collectProse(strategy: { buildFirst?: Function; buildResume?: Function }): string {
   const parts: string[] = []
   // definePrompt({onStart,...}) returns a strategy with buildFirst()/buildResume() — the test inspects those.
-  try { parts.push(String(strategy.buildFirst?.({ messages: [], context: [] }) ?? '')) } catch {}
-  try { parts.push(String(strategy.buildResume?.({}, {}) ?? '')) } catch {}
+  try {
+    parts.push(String(strategy.buildFirst?.({ messages: [], context: [] }) ?? ''))
+  } catch {}
+  try {
+    parts.push(String(strategy.buildResume?.({}, {}) ?? ''))
+  } catch {}
   return parts.join(' ')
 }
 
@@ -549,12 +576,14 @@ a lint error is not green.
 Unit tests pass. Now prove the workflow actually works in the running app.
 
 **Start the dev server** (from your project root):
+
 ```bash
 yarn dev  # or npm run dev
 ```
 
 Confirm ONE server on `:4000` and ONE Vite dev server on `:5173` (or your configured ports).
 If you see `EADDRINUSE`, kill stale processes first:
+
 ```bash
 lsof -tiTCP:4000,5173 | xargs kill -9
 ```
@@ -619,15 +648,15 @@ package.
 
 ## Red flags — STOP, you are rationalizing
 
-| Thought | Reality |
-|---|---|
-| "Tests pass, so the browser is fine." | The framework's worst bugs pass all tests. Not verified until the browser showed it — text bubble splits, frozen HITL closures, stuck tool chips. |
-| "I'll skip the reject path — approve works." | Reject/cancel failures are silent. One flow is not done — verify approve AND reject. |
-| "I'll put identity prose into the prompt." | The provider prepends identity. Prose in `definePrompt` is turn-only; identity in `defineAgent.instructions` + the workflow `prompt`. |
-| "I'll put a read tool into `tools` — it's a tool, isn't it." | Read tools go in `readonly` ONLY. A read tool in `tools` is misclassified by the Mastra factory and will break tool routing. |
-| "I'll use a string literal for the tool name in the prompt." | A raw literal drifts silently when the const is renamed. Use `${t.toolName}` — the drift guard will catch it if you don't. |
-| "One aggregator line is already there from a paste — I'll skip the check." | One missing `scope()` call means the workflow's cards never resolve. Verify all three aggregator wires before Stage 5. |
-| "The approval HITL closes immediately — must be a product bug." | Check dev server hygiene first: stale dev stacks cause Vite ws-disconnect → page reload → state wipe. Kill stale processes, then retest. |
+| Thought                                                                    | Reality                                                                                                                                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Tests pass, so the browser is fine."                                      | The framework's worst bugs pass all tests. Not verified until the browser showed it — text bubble splits, frozen HITL closures, stuck tool chips. |
+| "I'll skip the reject path — approve works."                               | Reject/cancel failures are silent. One flow is not done — verify approve AND reject.                                                              |
+| "I'll put identity prose into the prompt."                                 | The provider prepends identity. Prose in `definePrompt` is turn-only; identity in `defineAgent.instructions` + the workflow `prompt`.             |
+| "I'll put a read tool into `tools` — it's a tool, isn't it."               | Read tools go in `readonly` ONLY. A read tool in `tools` is misclassified by the Mastra factory and will break tool routing.                      |
+| "I'll use a string literal for the tool name in the prompt."               | A raw literal drifts silently when the const is renamed. Use `${t.toolName}` — the drift guard will catch it if you don't.                        |
+| "One aggregator line is already there from a paste — I'll skip the check." | One missing `scope()` call means the workflow's cards never resolve. Verify all three aggregator wires before Stage 5.                            |
+| "The approval HITL closes immediately — must be a product bug."            | Check dev server hygiene first: stale dev stacks cause Vite ws-disconnect → page reload → state wipe. Kill stale processes, then retest.          |
 
 ---
 

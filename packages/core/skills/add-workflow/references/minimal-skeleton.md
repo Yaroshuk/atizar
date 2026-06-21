@@ -67,7 +67,13 @@ export const workflowServers: WorkflowServerLike[] = []
 ## `client/src/workflows.ts` — client render/HITL aggregator
 
 ```ts
-import { scope, type WorkflowsConfig, type AgentMeta, type RenderSpec, type HitlSpec } from '@atizar/react'
+import {
+  scope,
+  type WorkflowsConfig,
+  type AgentMeta,
+  type RenderSpec,
+  type HitlSpec,
+} from '@atizar/react'
 import { workflowDescriptors } from '../../workflows/index.js'
 
 // Add a workflow: spread its meta/renders/hitl into the three maps below (see Stage 3i).
@@ -119,8 +125,14 @@ const providerRegistry: ProviderRegistry = defineProviders({
 })
 
 // buildProvider delegates to the registry — add a DEV_RECORD_REPLAY wrap here if needed.
-const buildProvider = (def: any, prompts: any, registry: ProviderRegistry, allowedTools: readonly string[], instanceKey: string, composedInstructions?: string) =>
-  buildAgentProvider({ def, prompts, registry, allowedTools, instanceKey, composedInstructions })
+const buildProvider = (
+  def: any,
+  prompts: any,
+  registry: ProviderRegistry,
+  allowedTools: readonly string[],
+  instanceKey: string,
+  composedInstructions?: string
+) => buildAgentProvider({ def, prompts, registry, allowedTools, instanceKey, composedInstructions })
 
 // Derive the connections from the workflow descriptors (reads each workflow's integration list).
 const connectionList = deriveConnectionList(workflowDescriptors)
@@ -130,10 +142,10 @@ void createServer({
   providerRegistry,
   buildProvider,
   connections: connectionList,
-  scopesFor: () => [],               // add OAuth scopes per integration when needed
-  enabledWorkflows: null,            // null = all workflows active
-  instanceKeyOf: (agentId) => agentId,  // default: one instance per agent
-  sourceOf: () => null,              // default: no dedup source
+  scopesFor: () => [], // add OAuth scopes per integration when needed
+  enabledWorkflows: null, // null = all workflows active
+  instanceKeyOf: (agentId) => agentId, // default: one instance per agent
+  sourceOf: () => null, // default: no dedup source
   start: true,
 }).catch((err) => {
   console.error('[server] boot failed:', err)
@@ -162,7 +174,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { WorkflowsProvider } from '@atizar/react'
 import { workflowsConfig } from './workflows.js'
-import { Board } from './Board.js'    // your own board layout component
+import { Board } from './Board.js' // your own board layout component
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -182,12 +194,12 @@ createRoot(document.getElementById('root')!).render(
 
 ## Detection checklist (Stage 0b uses this)
 
-| File | Existence check |
-|---|---|
-| `workflows/index.ts` | exports `workflowDescriptors` |
-| `server/workflows.ts` | exports `workflowServers` |
-| `client/src/workflows.ts` or `client/workflows.ts` | exports `workflowsConfig` |
-| Server entry | imports `createServer` from `@atizar/server` |
-| Client entry | imports `WorkflowsProvider` from `@atizar/react` |
+| File                                               | Existence check                                  |
+| -------------------------------------------------- | ------------------------------------------------ |
+| `workflows/index.ts`                               | exports `workflowDescriptors`                    |
+| `server/workflows.ts`                              | exports `workflowServers`                        |
+| `client/src/workflows.ts` or `client/workflows.ts` | exports `workflowsConfig`                        |
+| Server entry                                       | imports `createServer` from `@atizar/server`     |
+| Client entry                                       | imports `WorkflowsProvider` from `@atizar/react` |
 
 Any of the top three missing → bootstrap all five (they are a unit; partial bootstrap is risky).
