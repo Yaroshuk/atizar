@@ -64,6 +64,15 @@ stops being a phrase and becomes a build list.
   up-to-date without a human);
   (3) **past-run incidents quoted verbatim in the skill body** — the skill learns from its
   failures in place.
+  **Correction (2026-06-21):** an earlier draft of this decision said Claude Code auto-discovers
+  skills in `node_modules`. That is incorrect. Claude Code reads `.claude/skills/`,
+  `~/.claude/skills/`, and installed plugins — it does NOT scan `node_modules`. The chosen
+  distribution path for consumer skills is **`skills-npm`** (antfu/skills-npm), a **third-party
+  symlink bridge**: the consumer runs `npm i -D skills-npm` then `npx skills-npm setup`; the
+  `prepare` hook then symlinks `node_modules/**/skills/*/SKILL.md` into `.claude/skills/` on every
+  `npm install`. This is the mechanism, not native auto-discovery. The **plugin + marketplace**
+  channel (official Claude Code plugin API + e.g. skills.sh) is the separate-official alternative
+  and is deliberately deferred.
 - **A7 — Consumer skills mirror the public SDK, one per thin contract,** and live in the package
   whose contract they teach (`packages/<pkg>/skills/<name>/SKILL.md`), versioned with the code —
   drift is impossible by construction. The demo app is the worked example each one points at.
@@ -241,11 +250,23 @@ shipped inside its package:
 Each = the L1 twin, rewritten for an audience that has NOT read this repo: lighter (4–6 steps,
 1–2 gates, not magma's 12 stages), self-contained, worked example from the demo app.
 
-### Phase 3 — delivery (deferred, deliberately thin)
+### Phase 3 — delivery
 
-- ❌ Follow the `skills-npm` discovery convention so consumer skills are found in
-  `node_modules` automatically. Convention only — no CLI, no catalog, no marketplace until
-  real demand (philosophy's "осознанные нет").
+- ✅ **`skills-npm` bridge wired (2026-06-21).** Consumer skills shipped inside `@atizar/core`
+  (at `packages/core/skills/`) are discovered via **`skills-npm`** (antfu/skills-npm) — a
+  third-party symlink bridge, NOT native Claude Code auto-discovery. Claude Code reads
+  `.claude/skills/`; it does NOT scan `node_modules`. The bridge: consumer runs
+  `npm i -D skills-npm && npx skills-npm setup`, which adds a `prepare` hook; on every
+  `npm install` the hook symlinks `node_modules/**/skills/*/SKILL.md` into `.claude/skills/`
+  (e.g. `.claude/skills/npm-atizar-core-add-workflow`). The consumer then invokes the skill
+  normally (e.g. `/add-workflow`). Skills re-sync with the package version automatically on
+  install. Optional `skills-npm.config.ts` controls source/include/exclude. The `skills/`
+  folder is added to `@atizar/core`'s `files` array so it ships in the npm tarball.
+- ❌ **Plugin + marketplace channel (deferred).** The official-but-separate alternative is the
+  Claude Code plugin API + marketplaces (e.g. skills.sh). The publisher file layout
+  (`skills/<name>/SKILL.md`) is compatible with both — the plugin channel can be added later
+  from the same files without rework. No CLI, no catalog, no marketplace until real demand
+  (philosophy's "осознанные нет").
 
 ## Not doing (so future sessions don't relitigate)
 
