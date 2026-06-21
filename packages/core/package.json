@@ -1,13 +1,32 @@
 {
   "name": "@atizar/core",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.2",
   "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "skills"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build"
+  },
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "atizar-src": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "vite": "^8.0.16",
+    "vite-plugin-dts": "^4.5.4"
   }
 }

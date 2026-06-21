@@ -1,11 +1,3 @@
-<!--
-  DRAFT — do not publish/merge to a public default branch until:
-  (1) the DEMO=1 quick-start command lands (see docs/superpowers/specs/2026-06-12-demo-mode-zero-cred-design.md),
-  (2) the @platform/* → @atizar/* rename is done,
-  (3) the approval-gate demo GIF is recorded.
-  Design: docs/superpowers/specs/2026-06-12-readme-repo-presentation-design.md
--->
-
 <div align="center">
 
 <picture>
@@ -15,60 +7,63 @@
 
 # Atizar
 
-**Developer builds. Human directs. Agent runs.**
+### Not a 24/7 agent. A workflow you can _actually trust_.
 
-_Don't light a fire and walk away. Tend it._
+_Open-source · Human-in-the-loop · TypeScript_
 
-An open-source TypeScript framework for building agentic automations — agentic-first, human-in-the-loop.
-
+[![Website](https://img.shields.io/badge/website-atizar.io-e6562e.svg)](https://atizar.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-e6562e.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-e6562e.svg)](https://www.typescriptlang.org/)
 [![Status: beta](https://img.shields.io/badge/status-beta-e6562e.svg)](#status)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Concepts](#core-concepts) · [Philosophy](docs/PHILOSOPHY.md) · [Contributing](CONTRIBUTING.md)
+[Website](https://atizar.io) · [Live demo](https://atizar.io/demo) · [Quick start](#quick-start) · [Why atizar](#why-atizar) · [How it works](#how-it-works) · [Run the inbox](#run-the-inbox-yourself) · [Philosophy](docs/PHILOSOPHY.md)
 
 </div>
 
-<!-- TODO: approval-gate demo GIF here once DEMO=1 lands -->
-
 ---
 
-Autonomous agents are easy to start and hard to trust. The moment one touches your inbox, your data, or your money, "fire and forget" stops being a feature and starts being a liability.
+Autonomous agents are easy to start and impossible to trust the moment they touch your inbox, your data, or your money. **Atizar keeps a human's hand on every step that matters** — the agent proposes, you approve, the server acts. Safe, predictable, auditable.
 
-**Atizar keeps a human's hand on the poker.** The agent does the work — reads, drafts, proposes — and a person approves every step that matters. The approved action is run by the server, never by the model. Everything is audited.
+You build the automation in real TypeScript. The people who run it get a clean board — cards and buttons, never your codebase. One framework, two faces.
 
-The name is the Spanish verb _atizar_ — to stoke a fire that's already burning. That's the whole idea: the agent is the fire, you're the one tending it.
+> **Developer builds · Human directs · Agent runs.**
 
-### Built for developers — agentic-first.
+## Why atizar
 
-You don't hand-write pipelines. The agent **plans, writes, and tests** — guided by **skills baked into the framework**. Your job is to point it at the right one and stay in control. Need an integration? Ask, and it's written in ~10 minutes. No 400-node marketplace.
+**🤖 Agentic-first — you don't write the pipeline.**
+The coding agent plans, writes, and tests your workflow, guided by skills baked into the framework. Test-driven by default. You point it and stay in control.
 
-### Two views of one pipeline.
+**🔒 Safe by code — approval is a guarantee, not a prompt.**
+Effect tools bind to server-side functions the model never sees, and run through an action ledger exactly once — only after you approve. A jailbroken prompt still cannot fire an action.
 
-Developers want code. The people who run it want a UI. So atizar gives each its own:
+**🪟 Two faces — node editors fail everyone.**
+Too low-ceiling for a developer (faster to open an editor), too noisy for an operator (they just want buttons). Atizar gives each its own: real TypeScript for you, a clean board for them.
 
-- **Developer → code.** Real TypeScript, no node canvas.
-- **Consumer → a clean UI.** Cards and buttons, never your codebase.
+**🔌 Engine-agnostic — swap the runtime, keep the code.**
+Mastra, claude-cli, or your own runtime sit behind one thin contract — proven by a provider conformance suite, not just claimed.
 
-### Safe by design — you're always in control.
+> **You don't need 400+ integrations.** When the agent can write you any one in ~10 minutes — skills included — a marketplace is just lock-in.
 
-No 24/7 agents running loose. Every consequential step is **proposed by the agent, approved by a human, executed by the server** — never the model — and fully audited.
+## What "safe" actually means
 
-- **Trace & activity log** — every step the agent took, visible.
-- **Stop, instantly** — Stop agent · Stop workflow · Stop all.
+- **Nothing irreversible without a yes.** Every consequential action waits behind an approval gate — edit it, approve it, or reject it.
+- **Stop, instantly.** Halt one agent, one workflow, or everything at once, at any moment, no matter what's running.
+- **Total transparency.** Every step the agent took is in the activity & trace log. Nothing happens off-screen.
 
-Safety isn't bolted on. It's the foundation.
-
-## See it work
-
-<!-- TODO: GIF — agent board → thread → approval-gate card → approve → action executed & audited -->
-<!-- TODO: side-by-side — a defineAgent snippet next to the clean operator UI -->
-
-_Demo media lands with the zero-credential demo mode — see [Status](#status)._
+The name is the Spanish verb _atizar_ — to stoke a fire that's already burning. The agent is the fire; you're the one tending it.
 
 ## Quick start
 
-> **Beta.** A zero-credential demo mode is landing: it runs entirely on an in-process database and a mock agent — no Docker, no API keys. The one-command quick start will appear here when it ships ([status](#status)).
+> **Beta.** The zero-credential demo runs entirely on an in-process database and recorded cassettes — no Docker, no API keys, no LLM provider.
+
+Try it instantly, nothing to install: **[atizar.io/demo](https://atizar.io/demo)**.
+
+Or run the same demo locally:
+
+```bash
+yarn install --ignore-engines
+yarn demo            # → http://localhost:5173  (landing → Open demo → the live pipeline)
+```
 
 The smallest thing you write looks like this:
 
@@ -124,6 +119,58 @@ The core knows no concrete engine. Swap the runtime without rewriting your workf
 
 The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come in → an agent **qualifies** them → it **drafts** a reply or proposes actions → a human **approves** → the server acts (saves the draft, applies the labels). It runs on both providers and is the best place to see every concept above working together.
 
+**Building your own?** The same inbox also lives as a standalone project that installs the framework straight from npm — **[atizar-demo-inbox](https://github.com/Yaroshuk/atizar-demo-inbox)**. It's pure userland (workflow policy + UI cards, no framework source vendored), so it's the template to copy when you start your own automation: `npm install`, `npm run demo`, done.
+
+## Run the inbox yourself
+
+The demo above is zero-credential. To run the **real** inbox against your own Gmail, you supply three things: a Postgres database, an LLM provider, and a Google OAuth app. Everything is configured through environment variables — copy [`.env.example`](.env.example) to `.env.local` (gitignored) and fill only what you use.
+
+### 1. Install & database
+
+```bash
+yarn install --ignore-engines
+docker compose up -d postgres        # default DATABASE_URL already matches compose
+yarn workspace inbox db:migrate      # create the schema
+```
+
+The Postgres URL resolves in order `ATIZAR_DATABASE_URL` → `DATABASE_URL` → the docker-compose default — so with the standard `docker compose up` you set nothing.
+
+### 2. Credentials
+
+| Variable                                                   | Required for          | What it is / where to get it                                                                                                                                                                                                         |
+| ---------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ATIZAR_SECRET_KEY`                                        | any OAuth integration | AES master key for the **encrypted credential store**. Any strong random string (e.g. `openssl rand -hex 32`). Per-user OAuth tokens are encrypted with it at rest.                                                                  |
+| `ANTHROPIC_API_KEY`                                        | production provider   | Anthropic API key, used when `PROVIDER=mastra`. (Vendor convention — **not** namespaced.)                                                                                                                                            |
+| `ATIZAR_GOOGLE_CLIENT_ID`<br>`ATIZAR_GOOGLE_CLIENT_SECRET` | Gmail                 | One-time OAuth app from **Google Cloud Console → APIs & Services → Credentials → OAuth client ID**. Enable the Gmail API on the project. The per-user token is obtained later through the in-app **Connect** flow — not pasted here. |
+| `ATIZAR_AUTH_TOKEN`                                        | recommended           | Shared bearer token guarding all mutation routes. Set it and send `Authorization: Bearer <token>` from the client.                                                                                                                   |
+
+Choose a provider:
+
+- **`PROVIDER=mastra`** — the production path. Needs `ANTHROPIC_API_KEY`. (Optional `MASTRA_MODEL` to pick the model.)
+- **`PROVIDER=claude-cli`** — dev only. Uses your local Claude Code **subscription** via the macOS keychain — no API key — but spawns the `claude` binary, so it's not for production.
+
+A minimal `.env.local` for a real Gmail run:
+
+```bash
+ATIZAR_SECRET_KEY=<openssl rand -hex 32>
+PROVIDER=mastra
+ANTHROPIC_API_KEY=sk-ant-...
+ATIZAR_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+ATIZAR_GOOGLE_CLIENT_SECRET=...
+ATIZAR_AUTH_TOKEN=<openssl rand -hex 32>
+# DATABASE_URL defaults to the docker-compose Postgres — leave unset for the standard setup
+```
+
+### 3. Run & connect
+
+```bash
+yarn dev        # server (:4000) + client (:5173)
+```
+
+Open the app, **Connect** your Google account (the OAuth flow stores an encrypted per-user token), and the inbox workflow goes live: new mail is qualified, replies are drafted, and every consequential action waits for your approval before the server runs it.
+
+> For a production build, run `yarn build:web` and start the server with `NODE_ENV=production`; the server serves the built client from `apps/inbox/dist`. The listen port comes from `PORT` (default `4000`).
+
 ## What's included
 
 | Package                | What it is                                                                                                      |
@@ -134,15 +181,30 @@ The canonical workflow ships in [`apps/inbox`](apps/inbox): email or leads come 
 | `@atizar/server`       | The server spine: Postgres-authoritative state, the dispatch chokepoint, server-executed effects, SSE.          |
 | `@atizar/react`        | The UI: board, thread, approval gates, and the card-construction kit.                                           |
 
+## Coding-agent skills
+
+Atizar is agentic-first: the knowledge a coding agent needs to extend the framework ships **inside the packages**, right next to the code it describes — not in a separate wiki that drifts.
+
+- `@atizar/core` carries the **`add-workflow`** skill — it scaffolds a new workflow end-to-end (ids, contracts, prompts, descriptor, server bindings, cards, the drift-guard test).
+- `@atizar/integrations` carries the **`gmail`** skill, and `write-integration` rides inside the framework — connect a new service in minutes.
+
+Claude Code reads skills from `.claude/skills/`, not from `node_modules`, so a small bridge wires them up. In your project, once:
+
+```bash
+npm i -D skills-npm
+npx skills-npm setup     # adds a "prepare" hook to package.json
+```
+
+From then on, every `npm install` symlinks the skills shipped by your installed `@atizar/*` packages into `.claude/skills/`. Your coding agent then sees them — invoke `/add-workflow` and it builds the workflow with you. (This is exactly how [atizar-demo-inbox](https://github.com/Yaroshuk/atizar-demo-inbox) is set up.)
+
 ## Status
 
 **Beta — building in the open.** The framework is validated end-to-end in the browser: the server spine (Postgres-authoritative state, server-executed effects, Stop/cancel), both providers (Mastra + claude-cli) behind one conformance-tested contract, the Gmail integration on an OAuth credential contract, and the operator UI (board, thread, approval gates, activity & trace log).
 
-Recently shipped: the zero-credential demo mode (`DEMO=1`), the `@platform/* → @atizar/*` scope rename, a shared bearer token on mutation routes, and per-workflow golden-set evals. Not done yet: an npm release. APIs may still shift. Stars and feedback are very welcome.
+Recently shipped: **the npm release** — all five `@atizar/*` packages install as versioned dependencies (see [atizar-demo-inbox](https://github.com/Yaroshuk/atizar-demo-inbox) for a project that consumes them) — plus the zero-credential demo mode (`DEMO=1`), the `@platform/* → @atizar/*` scope rename, a shared bearer token on mutation routes, and per-workflow golden-set evals. APIs may still shift. Stars and feedback are very welcome.
 
 ## Roadmap
 
-- **npm release** — publish the `@atizar/*` packages so the framework installs as a versioned dependency.
 - **Workflows that learn** _(planned — not built yet)._ A direction we're designing toward: the agent improves from how you correct it, without fine-tuning. Two channels — implicit few-shot memory from past corrections, and explicit rules a distiller proposes and **you approve**. The model never changes, only the context it receives.
 
 ## Docs & community

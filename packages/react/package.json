@@ -1,37 +1,40 @@
 {
   "name": "@atizar/react",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.1",
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "build": "vite build"
   },
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": [
     "*.css"
   ],
   "exports": {
     ".": {
-      "development": "./src/index.ts",
+      "atizar-src": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./testIds": {
-      "development": "./src/testIds.ts",
+      "atizar-src": "./src/testIds.ts",
       "types": "./dist/testIds.d.ts",
       "import": "./dist/testIds.js"
     },
     "./styles.css": {
-      "development": "./src/styles.css",
+      "atizar-src": "./src/styles.css",
       "default": "./dist/react.css"
     },
     "./tokens.css": "./src/tokens.css"
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@atizar/core": "*",
+    "@atizar/core": "^0.1.1",
     "clsx": "^2.1.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

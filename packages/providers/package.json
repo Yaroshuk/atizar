@@ -1,18 +1,58 @@
 {
   "name": "@atizar/providers",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.1",
   "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build"
+  },
   "exports": {
-    ".": "./src/index.ts",
-    "./ids": "./src/provider-ids.ts"
+    ".": {
+      "atizar-src": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ids": {
+      "atizar-src": "./src/provider-ids.ts",
+      "types": "./dist/ids.d.ts",
+      "import": "./dist/ids.js"
+    },
+    "./mastra": {
+      "atizar-src": "./src/mastra.ts",
+      "types": "./dist/mastra.d.ts",
+      "import": "./dist/mastra.js"
+    }
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.55",
-    "@ai-sdk/anthropic": "^3.0.82",
-    "@atizar/core": "*",
-    "@mastra/core": "^1.41.0",
-    "@mastra/pg": "^1.12.1",
+    "@atizar/core": "^0.1.1",
     "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "@ai-sdk/anthropic": "^3.0.82",
+    "@mastra/core": "^1.41.0",
+    "@mastra/pg": "^1.12.1"
+  },
+  "peerDependenciesMeta": {
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@mastra/core": {
+      "optional": true
+    },
+    "@mastra/pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "vite": "^8.0.16",
+    "vite-plugin-dts": "^4.5.4"
   }
 }
