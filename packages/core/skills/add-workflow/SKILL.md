@@ -1,6 +1,6 @@
 ---
 name: add-workflow
-description: Scaffold a new workflow in a project that uses @atizar/core — creates the ids/contracts/tools/cards consts, definePrompt blocks, the defineWorkflow/defineAgent descriptor, the ServerBinding + effects, client render/HITL specs, wires the three aggregators, writes tests, browser-verifies the HITL flow, and produces a co-located README. Use when adding, creating, scaffolding, or building a new workflow (a multi-agent automation: an inbound flow, an approval pipeline, a qualify-and-dispatch loop) on top of the @atizar framework.
+description: Scaffold a new workflow in a project that uses @atizar/core — creates the ids/contracts/tools/cards consts, definePrompt blocks, the defineWorkflow/defineAgent descriptor, the ServerBinding + effects, client render/HITL specs, wires the three aggregators, writes tests, browser-verifies the HITL flow, and produces a co-located README. Use when adding, creating, scaffolding, or building a new workflow (a multi-agent automation — an inbound flow, an approval pipeline, or a qualify-and-dispatch loop) on top of the @atizar framework.
 ---
 
 # Add a workflow (consumer / L2)
